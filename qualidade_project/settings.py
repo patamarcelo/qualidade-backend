@@ -147,6 +147,7 @@ AUTH_USER_MODEL = "usuario.CustomUsuario"
 STATIC_URL = "/static/"
 STATIC_ROOT = os.path.join(BASE_DIR, "static")
 
+
 MEDIA_URL = "/media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 # Default primary key field type
@@ -158,3 +159,6 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 REST_AUTH_SERIALIZERS = {
     "USER_DETAILS_SERIALIZER": "path.to.custom.UserSerializer",
 }
+
+STATICFILES_DIRS = [os.path.join(BASE_DIR, "static")]
+STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
