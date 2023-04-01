@@ -28,6 +28,7 @@ urlpatterns = [
     path("", IndexView.as_view(), name="index"),
     path("admin/", admin.site.urls),
     path("usuario/", include("usuario.urls")),
+    path("diamante/", include("diamante.urls")),
     path("auth/", CustomAuthToken.as_view()),
 ]
 
