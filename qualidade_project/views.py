@@ -8,6 +8,15 @@ from django.contrib.auth import logout
 from django.shortcuts import redirect
 
 
+from django.views.generic import ListView, View
+from django.views.generic.edit import CreateView, UpdateView, DeleteView
+from django.views.generic.detail import DetailView
+
+from django.contrib.auth.mixins import LoginRequiredMixin
+
+from diamante.models import Talhao
+
+
 class CustomAuthToken(ObtainAuthToken):
     def post(self, request, *args, **kwargs):
         serializer = self.serializer_class(
@@ -41,3 +50,14 @@ class LogoutView(View):
     def get(self, request):
         logout(request)
         return redirect("index")
+
+
+class TalhoesView(LoginRequiredMixin, TemplateView):
+    login_url = "login"
+    template_name = "talhao.html"
+    queryset = Talhao.objects.all()
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["talhao"] = Talhao.objects.all()
+        return context
