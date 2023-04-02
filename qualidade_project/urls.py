@@ -19,7 +19,7 @@ from django.urls import path
 from django.conf.urls import include
 
 from rest_framework.authtoken.views import obtain_auth_token
-from .views import CustomAuthToken, IndexView
+from .views import CustomAuthToken, IndexView, LogoutView
 
 from django.conf.urls.static import static
 from django.conf import settings
@@ -27,6 +27,7 @@ from django.conf import settings
 urlpatterns = [
     path("", IndexView.as_view(), name="index"),
     path("admin/", admin.site.urls),
+    path("logout/", LogoutView.as_view(), name="logout"),
     path("usuario/", include("usuario.urls")),
     path("diamante/", include("diamante.urls")),
     path("auth/", CustomAuthToken.as_view()),

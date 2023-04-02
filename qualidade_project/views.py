@@ -33,3 +33,11 @@ class CustomAuthToken(ObtainAuthToken):
 
 class IndexView(TemplateView):
     template_name = "home/index.html"
+
+
+class LogoutView(View):
+    template_name = "index.html"
+
+    def get(self, request):
+        logout(request)
+        return redirect("index")
