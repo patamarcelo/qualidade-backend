@@ -29,7 +29,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = env("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG_ENV = env("DEBUG")
+if DEBUG_ENV == "1":
+    DEBUG = True
+if DEBUG_ENV == "0":
+    DEBUG = False
+
 
 ALLOWED_HOSTS = ["*", "https://diamante-quality.up.railway.app"]
 CSRF_TRUSTED_ORIGINS = ["https://diamante-quality.up.railway.app"]
