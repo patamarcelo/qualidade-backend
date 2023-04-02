@@ -122,6 +122,11 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/4.0/topics/i18n/
 
+
+LOGOUT_REDIRECT_URL = "index"
+LOGIN_URL = "index"
+
+
 THOUSAND_SEPARATOR = (".",)
 
 USE_THOUSAND_SEPARATOR = True
