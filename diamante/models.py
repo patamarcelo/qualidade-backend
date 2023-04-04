@@ -164,7 +164,15 @@ class Ciclo(Base):
 
     def __str__(self):
         return str(self.ciclo)
+    
+    class Programa(Base):
+        pass
 
+    class Operacao(Base):
+        pass
+    
+    class Aplicacoes(Base):
+        pass
 
 #  ------------- ------------- xxxxxxxxxx -------------  -------------#
 
@@ -194,6 +202,8 @@ class Plantio(Base):
     data_plantio = models.DateField(
         default=timezone.now, help_text="dd/mm/aaaa", blank=True, null=True
     )
+    
+    veiculos_carregados = models.IntegerField("Veículos Carregados / Talhao", default=0)
 
     class Meta:
         unique_together = ("safra", "ciclo", "talhao")
