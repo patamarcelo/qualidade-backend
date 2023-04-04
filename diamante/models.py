@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils import timezone
 
 # Create your models here.
 
@@ -91,12 +92,12 @@ class Talhao(Base):
     )
 
     class Meta:
-        ordering = ["id_talhao"]
+        order_with_respect_to = 'fazenda'
         verbose_name = "Talhao"
         verbose_name_plural = "Talhoes"
 
     def __str__(self):
-        return f"{self.id_talhao}"
+        return f"{self.fazenda.nome} - {self.id_talhao}"
 
 
 # -------------  ------------- PRODUTO -------------  -------------#
@@ -166,3 +167,79 @@ class Ciclo(Base):
 
 
 #  ------------- ------------- xxxxxxxxxx -------------  -------------#
+
+
+class Plantio(Base):
+    safra = models.ForeignKey(Safra, on_delete=models.PROTECT)
+    ciclo = models.ForeignKey(Ciclo, on_delete=models.PROTECT)
+    talhao = models.ForeignKey(Talhao, on_delete=models.PROTECT)
+    variedade = models.ForeignKey(Variedade, on_delete=models.PROTECT)
+    finalizado_plantio = models.BooleanField(
+        "Finalizado", default=True, help_text="Finalizado o Plantio"
+    )
+    finalizado_colheita = models.BooleanField(
+        "Finalizado", default=False, help_text="Finalizado o Plantio"
+    )
+    area_colheita = models.DecimalField(
+        "Area Colheita", help_text="Area Plantada / ha", max_digits=8, decimal_places=2
+    )
+    area_parcial = models.DecimalField(
+        "Area Parcial Colhida",
+        help_text="Area Parcial / ha",
+        max_digits=8,
+        decimal_places=2,
+        blank=True,
+        null=True,
+    )
+    data_plantio = models.DateField(
+        default=timezone.now, help_text="dd/mm/aaaa", blank=True, null=True
+    )
+
+    class Meta:
+        unique_together = ("safra", "ciclo", "talhao")
+        ordering = ["data_plantio"]
+        verbose_name = "Plantio"
+        verbose_name_plural = "Plantios"
+
+    def __str__(self):
+        return f"{self.talhao.id_talhao} | {self.talhao.fazenda.nome} | {str(self.area_colheita)}"
+
+
+class Colheita(Base):
+    plantio = models.ForeignKey(Plantio, on_delete=models.PROTECT)
+    data_colheita = models.DateField(help_text="dd/mm/aaaa", blank=True, null=True)
+    romaneio = models.CharField(
+        "Romaneio", max_length=40, help_text="Número do Romaneio"
+    )
+    placa = models.CharField("Placa", max_length=40, help_text="Placa do Veículo")
+    motorista = models.CharField(
+        "Nome Motorista", max_length=40, help_text="Nome do Motorista"
+    )
+    romaneio = models.CharField(
+        "Romaneio", max_length=40, help_text="Número do Romaneio", unique=True
+    )
+    peso_umido = models.DecimalField(
+        "Peso Úmido",
+        help_text="Peso Líquido Antes dos descontos",
+        max_digits=14,
+        decimal_places=2,
+    )
+    peso_liquido = models.DecimalField(
+        "Peso Líquido",
+        help_text="Peso Líquido Depois dos descontos",
+        max_digits=14,
+        decimal_places=2,
+    )
+    deposito = models.ForeignKey(Deposito, on_delete=models.PROTECT)
+
+    class Meta:
+        unique_together = (
+            "plantio",
+            "romaneio",
+        )
+        ordering = ["data_colheita"]
+        verbose_name = "Colheita"
+        verbose_name_plural = "Colheitas"
+
+    def __str__(self):
+        return f"{self.romaneio} | {self.plantio.talhao.id_talhao} | {self.plantio.talhao.fazenda.nome} | {str(self.peso_liquido)}"
