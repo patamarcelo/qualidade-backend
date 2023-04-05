@@ -2,7 +2,7 @@ from django.shortcuts import render
 
 # Create your views here.
 
-from .serializers import TalhaoSerializer
+from .serializers import TalhaoSerializer, PlantioSerializer
 
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -19,7 +19,10 @@ from dateutil.relativedelta import relativedelta
 from decimal import *
 
 
-from .models import Talhao, Projeto
+from .models import Talhao, Projeto, Variedade, Plantio, Safra, Ciclo
+
+from functools import reduce
+
 
 import openpyxl
 import json
@@ -82,7 +85,7 @@ class TalaoViewSet(viewsets.ModelViewSet):
             }
             return Response(response, status=status.HTTP_200_OK)
 
-    @action(detail=False)
+    @action(detail=False, methods=["GET"])
     def get_talhao(self, request):
         if request.user.is_authenticated:
             try:
@@ -98,6 +101,97 @@ class TalaoViewSet(viewsets.ModelViewSet):
                 return Response(response, status=status.HTTP_200_OK)
             except Exception as e:
                 response = {"message": f"Ocorreu um Erro: {e}"}
+                return Response(response, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            response = {"message": "Você precisa estar logado!!!"}
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=["POST"])
+    def save_load_data(self, request, pk=None):
+        if request.user.is_authenticated:
+            print(request.data)
+            if "plantio_arroz" in request.data:
+                try:
+                    file = request.FILES["plantio_arroz"]
+                    entradas = openpyxl.load_workbook(file, data_only=True)
+                    worksheet = entradas["Plantio"]
+                    plantios = []
+
+                    # DB CONSULT
+                    talhao_list = Talhao.objects.all()
+                    variedade_list = Variedade.objects.all()
+                    safra = Safra.objects.all()[0]
+                    ciclo = Ciclo.objects.all()[2]
+                    
+                    for col in worksheet.iter_rows(min_row=1, max_col=12, max_row=3000):
+                        if col[1].value != None and col[0].value != "ID":
+                            id_talhao = col[0].value
+                            finalizado = True if col[2].value == "Sim" else False
+                            area_colher, data_plantio, id_variedade = (
+                                col[7].value,
+                                col[9].value,
+                                col[10].value,
+                            )
+
+                            if id_talhao:
+                                try:
+                                    talhao_id = [
+                                        x
+                                        for x in talhao_list
+                                        if x.id_unico == id_talhao
+                                    ][0]
+                                except Exception as e:
+                                    print(f"id sem cadastro: {id_talhao}")
+                            else:
+                                talhao_id = 0
+                            try:
+                                variedade_id = [
+                                    x for x in variedade_list if x.id == id_variedade
+                                ][0]
+                            except Exception as e:
+                                print(f"variedade sem cadastro: {id_variedade}")
+                            try:
+                                novo_plantio = Plantio(
+                                    safra=safra,
+                                    ciclo=ciclo,
+                                    talhao=talhao_id,
+                                    variedade=variedade_id,
+                                    area_colheita=area_colher,
+                                    data_plantio=data_plantio,
+                                )
+
+                                novo_plantio.save()
+                            except Exception as e:
+                                print(f"Problema em salvar o plantio: {id_variedade}")
+                            # plantio = {
+                            #     # "id_talhao": id_talhao,
+                            #     "id_talhao": talhao_id,
+                            #     "finalizado": finalizado,
+                            #     "area_colher": area_colher,
+                            #     "data_plantio": data_plantio,
+                            #     "id_variedade": variedade_id,
+                            # }
+                            # plantios.append(plantio)
+                    # total_plantado = reduce(
+                    #     lambda x, y: x + y, [x["area_colher"] for x in plantios]
+                    # )
+                    # for i in plantios:
+                    #     print(i)
+                    qs_plantio = Plantio.objects.all()
+                    total_plantado = Plantio.objects.aggregate(Sum("area_colheita"))
+                    serializer_plantio = PlantioSerializer(qs_plantio, many=True)
+                    response = {
+                        "msg": f"Consulta realizada com sucesso!!",
+                        "total_return": len(qs_plantio),
+                        "Area Total dos Talhoes Plantados": total_plantado,
+                        "dados": serializer_plantio.data,
+                    }
+                    return Response(response, status=status.HTTP_200_OK)
+                except Exception as e:
+                    response = {"message": f"Ocorreu um Erro: {e}"}
+                    return Response(response, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                response = {"message": "Arquivo desconhecido"}
                 return Response(response, status=status.HTTP_400_BAD_REQUEST)
         else:
             response = {"message": "Você precisa estar logado!!!"}

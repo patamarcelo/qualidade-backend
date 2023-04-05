@@ -47,6 +47,7 @@ class ProjetoAdmin(admin.ModelAdmin):
 class TalhaoAdmin(admin.ModelAdmin):
     list_display = ("id_talhao", "fazenda", "id_unico", "area_total", "modulo")
     ordering = ("id_talhao",)
+    search_fields = ["id_talhao", "id_unico", "area_total", "modulo"]
 
 
 @admin.register(Cultura)
@@ -73,7 +74,16 @@ admin.site.register(Ciclo)
 
 @admin.register(Plantio)
 class PlantioAdmin(admin.ModelAdmin):
-    # list_select_related = ["fazenda", "talhao"]
+    search_fields = [
+        "safra__safra",
+        "talhao__id_unico",
+        "variedade__variedade",
+        "finalizado_plantio",
+        "finalizado_colheita",
+        "area_colheita",
+        "area_parcial",
+        "data_plantio",
+    ]
     raw_id_fields = ["talhao"]
     list_display = (
         "safra_description",
@@ -88,10 +98,8 @@ class PlantioAdmin(admin.ModelAdmin):
     ordering = ("data_plantio",)
 
     def safra_description(self, obj):
-        return obj.safra.safra
+        return f"{obj.safra.safra} - {obj.ciclo.ciclo}"
         safra_description.short_description = "Safra"
-
-
 
 
 @admin.register(Colheita)
