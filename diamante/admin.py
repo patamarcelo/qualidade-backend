@@ -1,6 +1,8 @@
 from django.contrib import admin
 from django import forms
 
+from django.utils.formats import date_format
+
 # Register your models here.
 from django.contrib import admin
 from .models import (
@@ -86,20 +88,31 @@ class PlantioAdmin(admin.ModelAdmin):
     ]
     raw_id_fields = ["talhao"]
     list_display = (
+        "talhao_description",
         "safra_description",
-        "talhao",
         "variedade",
         "finalizado_plantio",
         "finalizado_colheita",
         "area_colheita",
         "area_parcial",
-        "data_plantio",
+        "get_data",
     )
     ordering = ("data_plantio",)
+    
+    def get_data(self,obj):
+        return date_format(obj.data_plantio, format='SHORT_DATE_FORMAT', use_l10n=True)
+    get_data.short_description = 'Data Plantio'
 
     def safra_description(self, obj):
         return f"{obj.safra.safra} - {obj.ciclo.ciclo}"
         safra_description.short_description = "Safra"
+
+    def talhao_description(self, obj):
+        projeto_name = "Projeto"
+        if projeto_name in obj.talhao.fazenda.nome:
+            return f'{obj.talhao.fazenda.nome.split(projeto_name)[-1]} - {obj.talhao.id_talhao}'
+        else:
+            return obj.talhao
 
 
 @admin.register(Colheita)
