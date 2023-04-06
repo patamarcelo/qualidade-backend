@@ -29,6 +29,9 @@ import json
 import csv
 
 
+# --------------------- --------------------- START TALHAO API --------------------- --------------------- #
+
+
 class TalaoViewSet(viewsets.ModelViewSet):
     queryset = Talhao.objects.all().order_by("id_talhao")
     serializer_class = TalhaoSerializer
@@ -106,6 +109,10 @@ class TalaoViewSet(viewsets.ModelViewSet):
             response = {"message": "Você precisa estar logado!!!"}
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
+    # --------------------- --------------------- END TALHAO API --------------------- --------------------- #
+
+    # --------------------- --------------------- PLANTIO API --------------------- --------------------- #
+
     @action(detail=True, methods=["POST"])
     def save_load_data(self, request, pk=None):
         if request.user.is_authenticated:
@@ -122,7 +129,7 @@ class TalaoViewSet(viewsets.ModelViewSet):
                     variedade_list = Variedade.objects.all()
                     safra = Safra.objects.all()[0]
                     ciclo = Ciclo.objects.all()[2]
-                    
+
                     for col in worksheet.iter_rows(min_row=1, max_col=12, max_row=3000):
                         if col[1].value != None and col[0].value != "ID":
                             id_talhao = col[0].value
@@ -196,3 +203,57 @@ class TalaoViewSet(viewsets.ModelViewSet):
         else:
             response = {"message": "Você precisa estar logado!!!"}
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=["GET"])
+    def get_plantio(self, request):
+        if request.user.is_authenticated:
+            try:
+                qs = Plantio.objects.values(
+                    "safra__safra",
+                    "ciclo__ciclo",
+                    "talhao__id_talhao",
+                    "talhao__fazenda__nome",
+                    "talhao__fazenda__fazenda__nome",
+                    "variedade__cultura__cultura",
+                    "variedade__nome_fantasia",
+                    "finalizado_plantio",
+                    "finalizado_colheita",
+                    "area_colheita",
+                    "area_parcial",
+                    "data_plantio",
+                )
+
+                resumo = {}
+                for i in qs:
+                    resumo[i["talhao__fazenda__fazenda__nome"]] = {}
+                for i in qs:
+                    resumo[i["talhao__fazenda__fazenda__nome"]].update(
+                        {
+                            i["talhao__id_talhao"]: {
+                                "safra": i["safra__safra"],
+                                "ciclo": i["ciclo__ciclo"],
+                                "cultura": i["variedade__cultura__cultura"],
+                                "variedade": i["variedade__nome_fantasia"],
+                                "finalizado": i["finalizado_plantio"],
+                            }
+                        }
+                    )
+
+                area_total = Plantio.objects.aggregate(Sum("area_colheita"))
+
+                response = {
+                    "msg": f"Consulta realizada com sucesso!!",
+                    "total_return": len(qs),
+                    "Area Total dos Talhoes Plantados": area_total,
+                    "dados": resumo,
+                }
+                return Response(response, status=status.HTTP_200_OK)
+            except Exception as e:
+                response = {"message": f"Ocorreu um Erro: {e}"}
+                return Response(response, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            response = {"message": "Você precisa estar logado!!!"}
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+
+# --------------------- --------------------- END PLANTIO API --------------------- --------------------- #

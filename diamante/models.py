@@ -178,10 +178,10 @@ class Ciclo(Base):
 
 
 class Plantio(Base):
-    safra = models.ForeignKey(Safra, on_delete=models.PROTECT)
-    ciclo = models.ForeignKey(Ciclo, on_delete=models.PROTECT)
-    talhao = models.ForeignKey(Talhao, on_delete=models.PROTECT)
-    variedade = models.ForeignKey(Variedade, on_delete=models.PROTECT)
+    safra              = models.ForeignKey(Safra, on_delete=models.PROTECT)
+    ciclo              = models.ForeignKey(Ciclo, on_delete=models.PROTECT)
+    talhao             = models.ForeignKey(Talhao, related_name="plantios", on_delete=models.PROTECT)
+    variedade          = models.ForeignKey(Variedade, on_delete=models.PROTECT)
     finalizado_plantio = models.BooleanField(
         "Finalizado", default=True, help_text="Finalizado o Plantio"
     )
