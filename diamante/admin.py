@@ -79,6 +79,7 @@ class PlantioAdmin(admin.ModelAdmin):
     search_fields = [
         "safra__safra",
         "talhao__id_unico",
+        "talhao__fazenda__nome",
         "variedade__variedade",
         "finalizado_plantio",
         "finalizado_colheita",
