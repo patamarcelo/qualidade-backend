@@ -234,7 +234,7 @@ class TalaoViewSet(viewsets.ModelViewSet):
                                 "ciclo": i["ciclo__ciclo"],
                                 "cultura": i["variedade__cultura__cultura"],
                                 "variedade": i["variedade__nome_fantasia"],
-                                "finalizado": i["finalizado_plantio"],
+                                "finalizado_colheita": i["finalizado_colheita"],
                             }
                         }
                     )
