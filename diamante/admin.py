@@ -88,17 +88,29 @@ class PlantioAdmin(admin.ModelAdmin):
         "data_plantio",
     ]
     raw_id_fields = ["talhao"]
+    list_filter = ('finalizado_plantio','variedade','finalizado_plantio')
     list_display = (
         "talhao_description",
         "safra_description",
         "variedade",
-        "finalizado_plantio",
-        "finalizado_colheita",
+        "get_description_finalizado_plantio",
+        "get_description_finalizado_colheita",
         "area_colheita",
         "area_parcial",
         "get_data",
     )
     ordering = ("data_plantio",)
+    
+    def get_description_finalizado_plantio(self,obj):        
+        return obj.finalizado_plantio
+    get_description_finalizado_plantio.boolean = True
+    get_description_finalizado_plantio.short_description = 'Plantio'
+    
+    def get_description_finalizado_colheita(self,obj):        
+        return obj.finalizado_colheita
+    get_description_finalizado_colheita.boolean = True
+    get_description_finalizado_colheita.short_description = 'Colheita'
+    
     
     def get_data(self,obj):
         return date_format(obj.data_plantio, format='SHORT_DATE_FORMAT', use_l10n=True)
