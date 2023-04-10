@@ -221,13 +221,22 @@ class TalaoViewSet(viewsets.ModelViewSet):
                     "area_colheita",
                     "area_parcial",
                     "data_plantio",
-                )
+                ).order_by('talhao__fazenda__nome', 'talhao__id_talhao')
 
                 resumo = {}
                 for i in qs:
-                    resumo[i["talhao__fazenda__fazenda__nome"]] = {}
+                    resumo[i["talhao__fazenda__fazenda__nome"]] = {
+                        i["talhao__fazenda__nome"]: {}
+                    }
+
                 for i in qs:
                     resumo[i["talhao__fazenda__fazenda__nome"]].update(
+                        {i["talhao__fazenda__nome"]: {}}
+                    )
+                for i in qs:
+                    resumo[i["talhao__fazenda__fazenda__nome"]][
+                        i["talhao__fazenda__nome"]
+                    ].update(
                         {
                             i["talhao__id_talhao"]: {
                                 "safra": i["safra__safra"],
@@ -255,6 +264,38 @@ class TalaoViewSet(viewsets.ModelViewSet):
             response = {"message": "Você precisa estar logado!!!"}
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
+    # --------------------- --------------------- END PLANTIO API --------------------- --------------------- #
 
-# --------------------- --------------------- END PLANTIO API --------------------- --------------------- #
-# --------------------- --------------------- END PLANTIO API --------------------- --------------------- #
+    # --------------------- --------------------- START PROJETOS API --------------------- --------------------- #
+
+    @action(detail=False, methods=["GET"])
+    def get_projetos(self, request):
+        if request.user.is_authenticated:
+            try:
+                qs = Projeto.objects.values(
+                    "nome",
+                    "id_d",
+                    "fazenda__nome",
+                    "fazenda__id_d",
+                )
+
+                resumo = {}
+                for i in qs:
+                    resumo[i["fazenda__nome"]] = {}
+                for i in qs:
+                    resumo[i["fazenda__nome"]].update({i["id_d"]: i["nome"]})
+
+                response = {
+                    "msg": f"Consulta realizada com sucesso!!",
+                    "dados": resumo,
+                }
+                return Response(response, status=status.HTTP_200_OK)
+            except Exception as e:
+                response = {"message": f"Ocorreu um Erro: {e}"}
+                return Response(response, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            response = {"message": "Você precisa estar logado!!!"}
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+
+# --------------------- --------------------- END PROJETOS API --------------------- --------------------- #
