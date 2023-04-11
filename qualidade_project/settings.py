@@ -36,7 +36,7 @@ if DEBUG_ENV == "0":
     DEBUG = False
 
 
-ALLOWED_HOSTS = ["*", "https://diamante-quality.up.railway.app"]
+ALLOWED_HOSTS = ["*"]
 CSRF_TRUSTED_ORIGINS = ["https://diamante-quality.up.railway.app"]
 
 
@@ -74,11 +74,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-CORS_ALLOW_ALL_ORIGINS = True
-CORS_ALLOWED_ORIGINS = [
-    "https://diamanteubs.netlify.app",
-    "http://localhost:3000",
-]
+CORS_ORIGIN_ALLOW_ALL = True
 
 ROOT_URLCONF = "qualidade_project.urls"
 
