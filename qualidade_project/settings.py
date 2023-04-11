@@ -36,10 +36,7 @@ if DEBUG_ENV == "0":
     DEBUG = False
 
 
-ALLOWED_HOSTS = [
-    "*"
-]
-CSRF_TRUSTED_ORIGINS = ["https://diamante-quality.up.railway.app"]
+ALLOWED_HOSTS = ["*"]
 
 
 # Application definition
@@ -80,7 +77,11 @@ MIDDLEWARE = [
 ]
 
 
-
+CSRF_TRUSTED_ORIGINS = [
+    "https://diamante-quality.up.railway.app",
+    "http://localhost:3000",
+    "https://diamanteubs.netlify.app",
+]
 
 ROOT_URLCONF = "qualidade_project.urls"
 
