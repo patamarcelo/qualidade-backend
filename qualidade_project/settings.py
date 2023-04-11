@@ -44,6 +44,9 @@ CSRF_TRUSTED_ORIGINS = ["https://diamante-quality.up.railway.app"]
 
 # Application definition
 
+CORS_ALLOW_ALL_ORIGINS = True
+
+
 INSTALLED_APPS = [
     # General use templates & template tags (should appear first)
     "adminlte3",
@@ -77,7 +80,7 @@ MIDDLEWARE = [
 ]
 
 
-CORS_ALLOW_ALL_ORIGINS = True
+
 
 ROOT_URLCONF = "qualidade_project.urls"
 
