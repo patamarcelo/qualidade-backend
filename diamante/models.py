@@ -188,6 +188,9 @@ class Plantio(Base):
     finalizado_colheita = models.BooleanField(
         "Finalizado", default=False, help_text="Finalizada a Colheita"
     )
+    area_aproveito = models.BooleanField(
+        "Area Aproveito", default=False, help_text="Apontar caso seja Area de Aproveito"
+    )
     area_colheita = models.DecimalField(
         "Area Colheita", help_text="Area Plantada / ha", max_digits=8, decimal_places=2
     )
