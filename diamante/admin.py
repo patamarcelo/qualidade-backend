@@ -95,6 +95,7 @@ class PlantioAdmin(admin.ModelAdmin):
         "variedade",
         "get_description_finalizado_plantio",
         "get_description_finalizado_colheita",
+        "area_aproveito",
         "area_colheita",
         "area_parcial",
         "get_data",
