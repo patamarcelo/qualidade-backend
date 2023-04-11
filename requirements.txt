@@ -1,6 +1,7 @@
 asgiref==3.6.0
 Django==4.1.7
 django-adminlte3==0.1.6
+django-cors-headers==3.14.0
 django-environ==0.10.0
 django_debug_toolbar==3.8.1
 djangorestframework==3.14.0
