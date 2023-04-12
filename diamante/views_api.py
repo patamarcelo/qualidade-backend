@@ -204,6 +204,14 @@ class TalaoViewSet(viewsets.ModelViewSet):
             response = {"message": "Você precisa estar logado!!!"}
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
+
+#--------------------- ---------------------- UPDATE PLANTIO API --------------------- ----------------------#
+
+# Plantio.objects.filter(talhao__id_unico="4A11").update(finalizado_colheita=True)
+# Plantio.objects.filter(talhao__id_unico="7B13").update(veiculos_carregados=4)
+
+#--------------------- ---------------------- UPDATE PLANTIO API --------------------- ----------------------#
+
     @action(detail=False, methods=["GET"])
     def get_plantio(self, request):
         if request.user.is_authenticated:

@@ -92,7 +92,7 @@ class PlantioAdmin(admin.ModelAdmin):
     list_display = (
         "talhao_description",
         "safra_description",
-        "variedade",
+        "variedade_description",
         "get_description_finalizado_plantio",
         "get_description_finalizado_colheita",
         "area_aproveito",
@@ -117,9 +117,14 @@ class PlantioAdmin(admin.ModelAdmin):
         return date_format(obj.data_plantio, format='SHORT_DATE_FORMAT', use_l10n=True)
     get_data.short_description = 'Data Plantio'
 
+    def variedade_description(self, obj):
+        variedade = obj.variedade.nome_fantasia if obj.variedade.nome_fantasia else "-"
+        return variedade
+    variedade_description.short_description = "Variedade"
+
     def safra_description(self, obj):
         return f"{obj.safra.safra} - {obj.ciclo.ciclo}"
-        safra_description.short_description = "Safra"
+    safra_description.short_description = "Safra"
 
     def talhao_description(self, obj):
         projeto_name = "Projeto"
@@ -127,6 +132,7 @@ class PlantioAdmin(admin.ModelAdmin):
             return f'{obj.talhao.fazenda.nome.split(projeto_name)[-1]} - {obj.talhao.id_talhao}'
         else:
             return obj.talhao
+    talhao_description.short_description = "Parcela"
 
 
 @admin.register(Colheita)
