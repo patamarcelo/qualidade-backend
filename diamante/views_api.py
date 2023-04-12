@@ -111,6 +111,47 @@ class TalaoViewSet(viewsets.ModelViewSet):
 
     # --------------------- --------------------- END TALHAO API --------------------- --------------------- #
 
+    # --------------------- --------------------- START PROJETOS API --------------------- --------------------- #
+
+    @action(detail=False, methods=["GET"])
+    def get_projetos(self, request):
+        if request.user.is_authenticated:
+            try:
+                qs = Projeto.objects.values(
+                    "nome",
+                    "id_d",
+                    "fazenda__nome",
+                    "fazenda__id_d",
+                )
+
+                resumo = {}
+                for i in qs:
+                    resumo[i["fazenda__nome"]] = {}
+                for i in qs:
+                    resumo[i["fazenda__nome"]].update({i["id_d"]: i["nome"]})
+
+                response = {
+                    "msg": f"Consulta realizada com sucesso!!",
+                    "dados": resumo,
+                }
+                return Response(response, status=status.HTTP_200_OK)
+            except Exception as e:
+                response = {"message": f"Ocorreu um Erro: {e}"}
+                return Response(response, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            response = {"message": "Você precisa estar logado!!!"}
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+
+# --------------------- --------------------- END PROJETOS API --------------------- --------------------- #
+
+
+class PlantioViewSet(viewsets.ModelViewSet):
+    queryset = Plantio.objects.all().order_by("data_plantio")
+    serializer_class = PlantioSerializer
+    authentication_classes = (TokenAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
     # --------------------- --------------------- PLANTIO API --------------------- --------------------- #
 
     @action(detail=True, methods=["POST"])
@@ -130,14 +171,20 @@ class TalaoViewSet(viewsets.ModelViewSet):
                     safra = Safra.objects.all()[0]
                     ciclo = Ciclo.objects.all()[2]
 
-                    for col in worksheet.iter_rows(min_row=1, max_col=12, max_row=3000):
+                    for col in worksheet.iter_rows(min_row=1, max_col=14, max_row=3000):
                         if col[1].value != None and col[0].value != "ID":
                             id_talhao = col[0].value
                             finalizado = True if col[2].value == "Sim" else False
-                            area_colher, data_plantio, id_variedade = (
-                                col[7].value,
-                                col[9].value,
+                            (
+                                area_colher,
+                                data_plantio,
+                                dap,
+                                id_variedade,
+                            ) = (
+                                col[8].value,
                                 col[10].value,
+                                col[11].value,
+                                col[12].value,
                             )
 
                             if id_talhao:
@@ -157,6 +204,7 @@ class TalaoViewSet(viewsets.ModelViewSet):
                                 ][0]
                             except Exception as e:
                                 print(f"variedade sem cadastro: {id_variedade}")
+
                             try:
                                 novo_plantio = Plantio(
                                     safra=safra,
@@ -170,20 +218,6 @@ class TalaoViewSet(viewsets.ModelViewSet):
                                 novo_plantio.save()
                             except Exception as e:
                                 print(f"Problema em salvar o plantio: {id_variedade}")
-                            # plantio = {
-                            #     # "id_talhao": id_talhao,
-                            #     "id_talhao": talhao_id,
-                            #     "finalizado": finalizado,
-                            #     "area_colher": area_colher,
-                            #     "data_plantio": data_plantio,
-                            #     "id_variedade": variedade_id,
-                            # }
-                            # plantios.append(plantio)
-                    # total_plantado = reduce(
-                    #     lambda x, y: x + y, [x["area_colher"] for x in plantios]
-                    # )
-                    # for i in plantios:
-                    #     print(i)
                     qs_plantio = Plantio.objects.all()
                     total_plantado = Plantio.objects.aggregate(Sum("area_colheita"))
                     serializer_plantio = PlantioSerializer(qs_plantio, many=True)
@@ -204,13 +238,7 @@ class TalaoViewSet(viewsets.ModelViewSet):
             response = {"message": "Você precisa estar logado!!!"}
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
-
-#--------------------- ---------------------- UPDATE PLANTIO API --------------------- ----------------------#
-
-# Plantio.objects.filter(talhao__id_unico="4A11").update(finalizado_colheita=True)
-# Plantio.objects.filter(talhao__id_unico="7B13").update(veiculos_carregados=4)
-
-#--------------------- ---------------------- UPDATE PLANTIO API --------------------- ----------------------#
+    # --------------------- ---------------------- UPDATE PLANTIO API --------------------- ----------------------#
 
     @action(detail=False, methods=["GET"])
     def get_plantio(self, request):
@@ -229,7 +257,7 @@ class TalaoViewSet(viewsets.ModelViewSet):
                     "area_colheita",
                     "area_parcial",
                     "data_plantio",
-                ).order_by('talhao__fazenda__nome', 'talhao__id_talhao')
+                ).order_by("talhao__fazenda__nome", "talhao__id_talhao")
 
                 resumo = {}
                 for i in qs:
@@ -274,36 +302,110 @@ class TalaoViewSet(viewsets.ModelViewSet):
 
     # --------------------- --------------------- END PLANTIO API --------------------- --------------------- #
 
-    # --------------------- --------------------- START PROJETOS API --------------------- --------------------- #
-
-    @action(detail=False, methods=["GET"])
-    def get_projetos(self, request):
+    @action(detail=True, methods=["POST"])
+    def update_plantio_data(self, request, pk=None):
         if request.user.is_authenticated:
-            try:
-                qs = Projeto.objects.values(
-                    "nome",
-                    "id_d",
-                    "fazenda__nome",
-                    "fazenda__id_d",
-                )
+            print(request.data)
+            if "plantio_arroz" in request.data:
+                try:
+                    file = request.FILES["plantio_arroz"]
+                    entradas = openpyxl.load_workbook(file, data_only=True)
+                    worksheet = entradas["Plantio"]
+                    plantios = []
 
-                resumo = {}
-                for i in qs:
-                    resumo[i["fazenda__nome"]] = {}
-                for i in qs:
-                    resumo[i["fazenda__nome"]].update({i["id_d"]: i["nome"]})
+                    # DB CONSULT
+                    talhao_list = Talhao.objects.all()
+                    variedade_list = Variedade.objects.all()
+                    safra = Safra.objects.all()[0]
+                    ciclo = Ciclo.objects.all()[2]
 
-                response = {
-                    "msg": f"Consulta realizada com sucesso!!",
-                    "dados": resumo,
-                }
-                return Response(response, status=status.HTTP_200_OK)
-            except Exception as e:
-                response = {"message": f"Ocorreu um Erro: {e}"}
+                    for col in worksheet.iter_rows(min_row=1, max_col=14, max_row=3000):
+                        if col[1].value != None and col[0].value != "ID":
+                            id_talhao = col[0].value
+                            finalizado = True if col[2].value == "Sim" else False
+                            (
+                                area_colher,
+                                data_plantio,
+                                dap,
+                                id_variedade,
+                            ) = (
+                                col[8].value,
+                                col[10].value,
+                                col[11].value,
+                                col[12].value,
+                            )
+
+                            if id_talhao:
+                                try:
+                                    talhao_id = [
+                                        x
+                                        for x in talhao_list
+                                        if x.id_unico == id_talhao
+                                    ][0]
+                                except Exception as e:
+                                    print(f"id sem cadastro: {id_talhao}")
+                            else:
+                                talhao_id = 0
+                            try:
+                                variedade_id = [
+                                    x for x in variedade_list if x.id == id_variedade
+                                ][0]
+                            except Exception as e:
+                                print(f"variedade sem cadastro: {id_variedade}")
+                            print(
+                                safra,
+                                talhao_id,
+                                talhao_id.id_unico,
+                                variedade_id,
+                                area_colher,
+                                data_plantio,
+                                finalizado,
+                                dap,
+                            )
+                            try:
+                                Plantio.objects.filter(
+                                    talhao__id_unico=talhao_id.id_unico
+                                ).update(finalizado_colheita=finalizado)
+
+                            except Exception as e:
+                                print(
+                                    f"Problema em Atualiar o plantio: {talhao_id} - {e}"
+                                )
+
+                    qs_plantio_finalizado = Plantio.objects.filter(
+                        finalizado_colheita=True
+                    )
+                    total_plantado = Plantio.objects.aggregate(Sum("area_colheita"))
+
+                    total_plantado_finalizado = Plantio.objects.filter(
+                        finalizado_colheita=True
+                    ).aggregate(Sum("area_colheita"))
+
+                    qs_plantio = Plantio.objects.all()
+                    serializer_plantio = PlantioSerializer(qs_plantio, many=True)
+
+                    response = {
+                        "msg": f"Parcelas Atualizadas com successo!!",
+                        "total_return": len(qs_plantio),
+                        "Area Total dos Talhoes Plantados": total_plantado,
+                        "Area Total dos Talhoes Plantados Finalizados": total_plantado_finalizado,
+                        "Quantidade Total de Parcelas Finalizadas": len(
+                            qs_plantio_finalizado
+                        ),
+                        "dados": serializer_plantio.data,
+                    }
+
+                    return Response(response, status=status.HTTP_200_OK)
+                except Exception as e:
+                    response = {"message": f"Ocorreu um Erro: {e}"}
+                    return Response(response, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                response = {"message": "Arquivo desconhecido"}
                 return Response(response, status=status.HTTP_400_BAD_REQUEST)
         else:
             response = {"message": "Você precisa estar logado!!!"}
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
+    # Plantio.objects.filter(talhao__id_unico="7B13").update(veiculos_carregados=4)
 
-# --------------------- --------------------- END PROJETOS API --------------------- --------------------- #
+    # --------------------- ---------------------- UPDATE PLANTIO API --------------------- ----------------------#

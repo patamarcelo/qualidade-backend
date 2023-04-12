@@ -15,23 +15,8 @@ class TalhaoSerializer(serializers.ModelSerializer):
 
 
 class PlantioSerializer(serializers.ModelSerializer):
-    # talhao_name = serializers.CharField(source="talhao.id_talhao")
-    # variedade_name = serializers.CharField(source="variedade.variedade")
-
     class Meta:
         model = Plantio
-        # fields = [
-        #     "safra",
-        #     "ciclo",
-        #     "talhao",
-        #     # "talhao_name",
-        #     "variedade",
-        #     # "variedade_name",
-        #     "finalizado_plantio",
-        #     "finalizado_colheita",
-        #     "area_colheita",
-        #     "area_parcial",
-        # ]
         fields = "__all__"
 
 

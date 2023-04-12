@@ -88,7 +88,7 @@ class PlantioAdmin(admin.ModelAdmin):
         "data_plantio",
     ]
     raw_id_fields = ["talhao"]
-    list_filter = ('finalizado_plantio','variedade','finalizado_plantio')
+    list_filter = ('variedade','finalizado_colheita','talhao__fazenda__nome','safra__safra')
     list_display = (
         "talhao",
         "safra_description",
