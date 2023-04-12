@@ -1,6 +1,8 @@
 from django.db import models
 from django.utils import timezone
 
+from datetime import timedelta
+import datetime
 # Create your models here.
 
 
@@ -207,6 +209,15 @@ class Plantio(Base):
     )
     
     veiculos_carregados = models.IntegerField("Veículos Carregados / Talhao", default=0)
+    
+    @property
+    def get_dap(self):
+        dap = 0
+        today = datetime.date.today()
+        if self.data_plantio:
+            dap = today - self.data_plantio
+            dap = dap.days
+        return dap
 
     class Meta:
         unique_together = ("safra", "ciclo", "talhao")

@@ -90,7 +90,7 @@ class PlantioAdmin(admin.ModelAdmin):
     raw_id_fields = ["talhao"]
     list_filter = ('finalizado_plantio','variedade','finalizado_plantio')
     list_display = (
-        "talhao_description",
+        "talhao",
         "safra_description",
         "variedade_description",
         "get_description_finalizado_plantio",
@@ -99,8 +99,15 @@ class PlantioAdmin(admin.ModelAdmin):
         "area_colheita",
         "area_parcial",
         "get_data",
+        "get_dap_description"
+        
     )
     ordering = ("data_plantio",)
+    
+    
+    def get_dap_description(self,obj):
+        return obj.get_dap
+    get_dap_description.short_description = 'DAP'
     
     def get_description_finalizado_plantio(self,obj):        
         return obj.finalizado_plantio
@@ -126,13 +133,13 @@ class PlantioAdmin(admin.ModelAdmin):
         return f"{obj.safra.safra} - {obj.ciclo.ciclo}"
     safra_description.short_description = "Safra"
 
-    def talhao_description(self, obj):
-        projeto_name = "Projeto"
-        if projeto_name in obj.talhao.fazenda.nome:
-            return f'{obj.talhao.fazenda.nome.split(projeto_name)[-1]} - {obj.talhao.id_talhao}'
-        else:
-            return obj.talhao
-    talhao_description.short_description = "Parcela"
+    # def talhao_description(self, obj):
+    #     projeto_name = "Projeto"
+    #     if projeto_name in obj.talhao.fazenda.nome:
+    #         return f'{obj.talhao.fazenda.nome.split(projeto_name)[-1]} - {obj.talhao.id_talhao}'
+    #     else:
+    #         return obj.talhao
+    # talhao_description.short_description = "Parcela"
 
 
 @admin.register(Colheita)
