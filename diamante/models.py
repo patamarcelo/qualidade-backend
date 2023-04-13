@@ -239,9 +239,7 @@ class Colheita(Base):
     motorista = models.CharField(
         "Nome Motorista", max_length=40, help_text="Nome do Motorista"
     )
-    romaneio = models.CharField(
-        "Romaneio", max_length=40, help_text="Número do Romaneio", unique=True
-    )
+    
     peso_umido = models.DecimalField(
         "Peso Úmido",
         help_text="Peso Líquido Antes dos descontos",
