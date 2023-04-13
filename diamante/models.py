@@ -326,25 +326,26 @@ class Plantio(Base):
             dap = today - self.data_plantio
             dap = dap.days
         return dap
-    get_dap.fget.short_description = ("DAP")
+
+    get_dap.fget.short_description = "DAP"
 
     @property
     def get_cronograma_programa(self):
-        cronograma = []
+        cronograma = [{"Data Plantio": self.data_plantio}]
         qs = self.programa.programa_related_operacao.all()
+
         if len(qs) > 0:
             for i in qs:
                 etapa = {
                     "Estagio": i.estagio,
                     "dap": i.prazo_dap,
-                    "Data Plantio": self.data_plantio,
                     "Data Prevista": self.data_plantio
                     + datetime.timedelta(days=i.prazo_dap),
                 }
                 cronograma.append(etapa)
         return cronograma
-    get_cronograma_programa.fget.short_description = ("Programação Programa")
 
+    get_cronograma_programa.fget.short_description = "Programação Programa"
 
     class Meta:
         unique_together = ("safra", "ciclo", "talhao")
