@@ -3,6 +3,7 @@ from django.utils import timezone
 
 from datetime import timedelta
 import datetime
+
 # Create your models here.
 
 
@@ -94,12 +95,17 @@ class Talhao(Base):
     )
 
     class Meta:
-        order_with_respect_to = 'fazenda'
+        order_with_respect_to = "fazenda"
         verbose_name = "Talhao"
         verbose_name_plural = "Talhoes"
 
     def __str__(self):
-        return f"{self.fazenda.nome} - {self.id_talhao}"
+        nome_proj = (
+            self.fazenda.nome.replace("Projeto", "")
+            if "Projeto" in self.fazenda.nome
+            else self.fazenda.nome
+        )
+        return f"{nome_proj} - {self.id_talhao}"
 
 
 # -------------  ------------- PRODUTO -------------  -------------#
@@ -166,24 +172,121 @@ class Ciclo(Base):
 
     def __str__(self):
         return str(self.ciclo)
-    
-    class Programa(Base):
-        pass
 
-    class Operacao(Base):
-        pass
-    
-    class Aplicacoes(Base):
-        pass
+
+class Programa(Base):
+    nome = models.CharField(
+        "Nome Programa",
+        max_length=120,
+        help_text="Nome do Programa",
+        blank=True,
+        null=True,
+    )
+    nome_fantasia = models.CharField(
+        "Nome Fantasia Programa",
+        max_length=40,
+        help_text="Nome Fantasia do Programa",
+        blank=True,
+        null=True,
+    )
+    safra = models.ForeignKey(Safra, on_delete=models.PROTECT, blank=True, null=True)
+    ciclo = models.ForeignKey(Ciclo, on_delete=models.PROTECT, blank=True, null=True)
+    cultura = models.ForeignKey(
+        Cultura, on_delete=models.PROTECT, blank=True, null=True
+    )
+
+    programa_por_data = models.BooleanField(
+        "Regra por data",
+        default=True,
+        help_text="Define se o programa é calculado por data",
+    )
+    programa_por_estagio = models.BooleanField(
+        "Regra por estágio",
+        default=False,
+        help_text="Define se o programa é calculado por Estágio",
+    )
+
+    class Meta:
+        # ordering = ["variedade"]
+        verbose_name = "Programa"
+        verbose_name_plural = "Programas"
+
+    def __str__(self):
+        return self.nome_fantasia
+
+
+class Operacao(Base):
+    estagio = models.CharField(
+        "Estagio", max_length=120, help_text="Nome do Estágio", blank=True, null=True
+    )
+    operacao_numero = models.IntegerField("Número da Operação", blank=True, null=True)
+    programa = models.ForeignKey(
+        Programa,
+        on_delete=models.PROTECT,
+        related_name="programa_related_operacao",
+        blank=True,
+        null=True,
+    )
+    prazo_dap = models.IntegerField("DAP - Dias Após Plantio", blank=True, null=True)
+    prazo_emergencia = models.IntegerField("Dias da Emergencia", blank=True, null=True)
+
+    base_dap = models.BooleanField(
+        "Prazo Base da Operação por DAP",
+        default=False,
+        help_text="Informar se a Operação é pelo prazo do Plantio",
+    )
+
+    base_emergencia = models.BooleanField(
+        "Prazo Base da Operação por Emergencia",
+        default=False,
+        help_text="Informar se a Operação é pelo prazo de Emergencia",
+    )
+
+    estagio_iniciado = models.BooleanField(
+        "Estagio Iniciado",
+        default=False,
+        help_text="Informar quando o estágio iniciar",
+    )
+    estagio_finalizado = models.BooleanField(
+        "Estagio Finalizado",
+        default=False,
+        help_text="Informar quando o estágio finalizar",
+    )
+
+    obs = models.TextField("Observação", max_length=500, blank=True)
+    obs_1 = models.TextField("Observação 1", max_length=500, blank=True)
+    obs_2 = models.TextField("Observação 2", max_length=500, blank=True)
+
+    class Meta:
+        ordering = ["programa", "operacao_numero"]
+        verbose_name = "Programa - Operação"
+        verbose_name_plural = "Programas - Operações"
+
+    def __str__(self):
+        return self.estagio
+
+
+class Aplicacoes(Base):
+    pass
+
 
 #  ------------- ------------- xxxxxxxxxx -------------  -------------#
 
 
 class Plantio(Base):
-    safra              = models.ForeignKey(Safra, on_delete=models.PROTECT)
-    ciclo              = models.ForeignKey(Ciclo, on_delete=models.PROTECT)
-    talhao             = models.ForeignKey(Talhao, related_name="plantios", on_delete=models.PROTECT)
-    variedade          = models.ForeignKey(Variedade, on_delete=models.PROTECT)
+    safra = models.ForeignKey(Safra, on_delete=models.PROTECT)
+    ciclo = models.ForeignKey(Ciclo, on_delete=models.PROTECT)
+    talhao = models.ForeignKey(
+        Talhao, related_name="plantios", on_delete=models.PROTECT
+    )
+    programa = models.ForeignKey(
+        Programa,
+        on_delete=models.PROTECT,
+        related_name="programa_related_plantio",
+        blank=True,
+        null=True,
+    )
+    variedade = models.ForeignKey(Variedade, on_delete=models.PROTECT)
     finalizado_plantio = models.BooleanField(
         "Finalizado", default=True, help_text="Finalizado o Plantio"
     )
@@ -191,25 +294,30 @@ class Plantio(Base):
         "Finalizado", default=False, help_text="Finalizada a Colheita"
     )
     area_aproveito = models.BooleanField(
-        "Area Aproveito", default=False, help_text="Apontar caso seja Area de Aproveito"
+        "Area Aprov.", default=False, help_text="Apontar caso seja Area de Aproveito"
     )
     area_colheita = models.DecimalField(
         "Area Colheita", help_text="Area Plantada / ha", max_digits=8, decimal_places=2
     )
     area_parcial = models.DecimalField(
-        "Area Parcial Colhida",
+        "Area P. Colhida",
         help_text="Area Parcial / ha",
         max_digits=8,
         decimal_places=2,
         blank=True,
         null=True,
     )
+
     data_plantio = models.DateField(
         default=timezone.now, help_text="dd/mm/aaaa", blank=True, null=True
     )
-    
+
+    data_emergencia = models.DateField(
+        help_text="Data Emergencia Talhao dd/mm/aaaa", blank=True, null=True
+    )
+
     veiculos_carregados = models.IntegerField("Veículos Carregados / Talhao", default=0)
-    
+
     @property
     def get_dap(self):
         dap = 0
@@ -218,6 +326,25 @@ class Plantio(Base):
             dap = today - self.data_plantio
             dap = dap.days
         return dap
+    get_dap.fget.short_description = ("DAP")
+
+    @property
+    def get_cronograma_programa(self):
+        cronograma = []
+        qs = self.programa.programa_related_operacao.all()
+        if len(qs) > 0:
+            for i in qs:
+                etapa = {
+                    "Estagio": i.estagio,
+                    "dap": i.prazo_dap,
+                    "Data Plantio": self.data_plantio,
+                    "Data Prevista": self.data_plantio
+                    + datetime.timedelta(days=i.prazo_dap),
+                }
+                cronograma.append(etapa)
+        return cronograma
+    get_cronograma_programa.fget.short_description = ("Programação Programa")
+
 
     class Meta:
         unique_together = ("safra", "ciclo", "talhao")
@@ -239,7 +366,7 @@ class Colheita(Base):
     motorista = models.CharField(
         "Nome Motorista", max_length=40, help_text="Nome do Motorista"
     )
-    
+
     peso_umido = models.DecimalField(
         "Peso Úmido",
         help_text="Peso Líquido Antes dos descontos",
@@ -253,6 +380,14 @@ class Colheita(Base):
         decimal_places=2,
     )
     deposito = models.ForeignKey(Deposito, on_delete=models.PROTECT)
+
+    # @property
+    # def peso_saco_umido(self):
+    #     return self.peso_umido / 60
+
+    # @property
+    # def peso_saco_liquido(self):
+    #     return self.peso_liquido / 60
 
     class Meta:
         unique_together = (

@@ -2,6 +2,8 @@ from django.contrib import admin
 from django import forms
 
 from django.utils.formats import date_format
+from django.utils.html import format_html
+
 
 # Register your models here.
 from django.contrib import admin
@@ -16,6 +18,8 @@ from .models import (
     Ciclo,
     Plantio,
     Colheita,
+    Programa,
+    Operacao,
 )
 
 # admin.site.register(ValuRisk)
@@ -88,7 +92,12 @@ class PlantioAdmin(admin.ModelAdmin):
         "data_plantio",
     ]
     raw_id_fields = ["talhao"]
-    list_filter = ('variedade','finalizado_colheita','talhao__fazenda__nome','safra__safra')
+    list_filter = (
+        "variedade",
+        "finalizado_colheita",
+        "talhao__fazenda__nome",
+        "safra__safra",
+    )
     list_display = (
         "talhao",
         "safra_description",
@@ -99,38 +108,44 @@ class PlantioAdmin(admin.ModelAdmin):
         "area_colheita",
         "area_parcial",
         "get_data",
-        "get_dap_description"
-        
+        "get_dap_description",
+        "programa",
     )
+    readonly_fields = ("get_cronograma_programa",)
+
     ordering = ("data_plantio",)
-    
-    
-    def get_dap_description(self,obj):
+
+    def get_dap_description(self, obj):
         return obj.get_dap
-    get_dap_description.short_description = 'DAP'
-    
-    def get_description_finalizado_plantio(self,obj):        
+
+    get_dap_description.short_description = "DAP"
+
+    def get_description_finalizado_plantio(self, obj):
         return obj.finalizado_plantio
+
     get_description_finalizado_plantio.boolean = True
-    get_description_finalizado_plantio.short_description = 'Plantio'
-    
-    def get_description_finalizado_colheita(self,obj):        
+    get_description_finalizado_plantio.short_description = "Plantio"
+
+    def get_description_finalizado_colheita(self, obj):
         return obj.finalizado_colheita
+
     get_description_finalizado_colheita.boolean = True
-    get_description_finalizado_colheita.short_description = 'Colheita'
-    
-    
-    def get_data(self,obj):
-        return date_format(obj.data_plantio, format='SHORT_DATE_FORMAT', use_l10n=True)
-    get_data.short_description = 'Data Plantio'
+    get_description_finalizado_colheita.short_description = "Colheita"
+
+    def get_data(self, obj):
+        return date_format(obj.data_plantio, format="SHORT_DATE_FORMAT", use_l10n=True)
+
+    get_data.short_description = "Data Plantio"
 
     def variedade_description(self, obj):
         variedade = obj.variedade.nome_fantasia if obj.variedade.nome_fantasia else "-"
         return variedade
+
     variedade_description.short_description = "Variedade"
 
     def safra_description(self, obj):
         return f"{obj.safra.safra} - {obj.ciclo.ciclo}"
+
     safra_description.short_description = "Safra"
 
     # def talhao_description(self, obj):
@@ -168,3 +183,7 @@ class ColheitaAdmin(admin.ModelAdmin):
             return obj.deposito.nome
 
     deposito_abrev.short_description = "CPF/CNPJ"
+
+
+admin.site.register(Programa)
+admin.site.register(Operacao)
