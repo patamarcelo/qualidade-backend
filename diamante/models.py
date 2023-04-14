@@ -309,7 +309,7 @@ class Plantio(Base):
     )
 
     data_plantio = models.DateField(
-        default=timezone.now, help_text="dd/mm/aaaa", blank=True, null=True
+        default=timezone.now, help_text="dd/mm/aaaa",
     )
 
     data_emergencia = models.DateField(
@@ -346,6 +346,11 @@ class Plantio(Base):
         return cronograma
 
     get_cronograma_programa.fget.short_description = "Programação Programa"
+    
+    @property
+    def get_data_prevista_colheita(self):
+        prazo = self.variedade.dias_ciclo
+        return self.data_plantio + datetime.timedelta(days=prazo)
 
     class Meta:
         unique_together = ("safra", "ciclo", "talhao")
