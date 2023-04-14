@@ -128,7 +128,7 @@ TIPO_CHOICES = (
 
 
 class Defensivo(Base):
-    produto = models.CharField("Descrição Defensivo", max_length=140)
+    produto = models.CharField("Descrição Defensivo", max_length=140, unique=True)
     unidade_medida = models.CharField(
         "Unidade de Medida", max_length=20, choices=UNIDADE_CHOICES
     )
@@ -377,7 +377,7 @@ class Plantio(Base):
     #     if len(qs) > 0:
     #         for i in qs:
     #             data_prev = self.data_plantio + datetime.timedelta(days=i.prazo_dap)
-                
+
     #             print(programas[count])
     #             # etapa = {
     #             #     "Estagio": i.estagio,
