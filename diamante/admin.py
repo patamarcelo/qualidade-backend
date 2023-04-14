@@ -186,8 +186,32 @@ class ColheitaAdmin(admin.ModelAdmin):
     deposito_abrev.short_description = "CPF/CNPJ"
 
 
-admin.site.register(Programa)
-admin.site.register(Operacao)
+@admin.register(Programa)
+class ProgramaAdmin(admin.ModelAdmin):
+    list_display = ("nome", "safra_description")
+
+    ordering = ("safra", "ciclo")
+
+    def safra_description(self, obj):
+        return f"{obj.safra.safra} - {obj.ciclo.ciclo}"
+
+    safra_description.short_description = "Safra"
+
+
+@admin.register(Operacao)
+class OperacaoAdmin(admin.ModelAdmin):
+    list_display = ("programa", "estagio", "prazo_dap", "get_cultura_description")
+    list_filter = ["programa"]
+
+    ordering = (
+        "programa",
+        "prazo_dap",
+    )
+
+    def get_cultura_description(self, obj):
+        return obj.programa.cultura.cultura
+
+    get_cultura_description.short_description = "Cultura"
 
 
 @admin.register(Defensivo)
