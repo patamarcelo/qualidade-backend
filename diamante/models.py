@@ -110,6 +110,41 @@ class Talhao(Base):
 
 # -------------  ------------- PRODUTO -------------  -------------#
 
+UNIDADE_CHOICES = (("l_ha", "LT"), ("kg_ha", "KG"))
+FORMULACAO_CHOICES = (("liquido", "Líquido"), ("solido", "Sólido"))
+
+TIPO_CHOICES = (
+    ("acaricida", "Acaricida"),
+    ("adjuvante", "Adjuvante"),
+    ("biologico", "Biológico"),
+    ("fertilizante", "Fertilizante"),
+    ("fungicida", "Fungicida"),
+    ("herbicida", "Herbicida"),
+    ("inseticida", "Inseticida"),
+    ("nutricao", "Nutrição"),
+    ("oleo_mineral_vegetal", "Óleo Mineral/Vegetal"),
+    ("regulador", "Regulador"),
+)
+
+
+class Defensivo(Base):
+    produto = models.CharField("Descrição Defensivo", max_length=140)
+    unidade_medida = models.CharField(
+        "Unidade de Medida", max_length=20, choices=UNIDADE_CHOICES
+    )
+    formulacao = models.CharField(
+        "Formulação", max_length=40, choices=FORMULACAO_CHOICES
+    )
+    tipo = models.CharField("Tipo", max_length=40, choices=TIPO_CHOICES)
+
+    class Meta:
+        ordering = ["produto"]
+        verbose_name = "Defensivo"
+        verbose_name_plural = "Defensivos"
+
+    def __str__(self):
+        return self.produto
+
 
 class Cultura(Base):
     cultura = models.CharField(
@@ -309,7 +344,8 @@ class Plantio(Base):
     )
 
     data_plantio = models.DateField(
-        default=timezone.now, help_text="dd/mm/aaaa",
+        default=timezone.now,
+        help_text="dd/mm/aaaa",
     )
 
     data_emergencia = models.DateField(
@@ -346,7 +382,7 @@ class Plantio(Base):
         return cronograma
 
     get_cronograma_programa.fget.short_description = "Programação Programa"
-    
+
     @property
     def get_data_prevista_colheita(self):
         prazo = self.variedade.dias_ciclo

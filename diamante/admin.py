@@ -20,6 +20,7 @@ from .models import (
     Colheita,
     Programa,
     Operacao,
+    Defensivo,
 )
 
 # admin.site.register(ValuRisk)
@@ -187,3 +188,8 @@ class ColheitaAdmin(admin.ModelAdmin):
 
 admin.site.register(Programa)
 admin.site.register(Operacao)
+
+
+@admin.register(Defensivo)
+class DefensivoAdmin(admin.ModelAdmin):
+    list_display = ("produto", "tipo")
