@@ -344,15 +344,49 @@ class Plantio(Base):
     )
 
     data_plantio = models.DateField(
-        default=timezone.now,
-        help_text="dd/mm/aaaa",
+        help_text="dd/mm/aaaa - Data Efetiva de Plantio",
+        blank=True,
+        null=True,
+    )
+
+    data_prevista_plantio = models.DateField(
+        help_text="dd/mm/aaaa - Data Projetada para o Plantio",
+        blank=True,
+        null=True,
     )
 
     data_emergencia = models.DateField(
-        help_text="Data Emergencia Talhao dd/mm/aaaa", blank=True, null=True
+        help_text="dd/mm/aaaa - Data Emergencia Talhao ", blank=True, null=True
     )
 
     veiculos_carregados = models.IntegerField("Veículos Carregados / Talhao", default=0)
+
+    # data_programa_1 = models.DateField(
+    #     help_text="dd/mm/aaaa - Data Etapa 1", blank=True, null=True
+    # )
+
+    # data_programa_2 = models.DateField(
+    #     help_text="dd/mm/aaaa - Data Etapa 2", blank=True, null=True
+    # )
+
+    # def save(self, *args, **kwargs):
+    #     print(f" Programa Console: {self.programa}")
+    #     qs = self.programa.programa_related_operacao.all()
+    #     count = 0
+    #     programas = [self.data_programa_1, self.data_programa_2]
+    #     if len(qs) > 0:
+    #         for i in qs:
+    #             data_prev = self.data_plantio + datetime.timedelta(days=i.prazo_dap)
+                
+    #             print(programas[count])
+    #             # etapa = {
+    #             #     "Estagio": i.estagio,
+    #             #     "dap": i.prazo_dap,
+    #             #     "Data Prevista": self.data_plantio
+    #             #     + datetime.timedelta(days=i.prazo_dap),
+    #             # }
+    #         count += 1
+    #     super(Plantio, self).save(*args, **kwargs)
 
     @property
     def get_dap(self):
