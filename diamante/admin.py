@@ -7,21 +7,7 @@ from django.utils.html import format_html
 
 # Register your models here.
 from django.contrib import admin
-from .models import (
-    Deposito,
-    Fazenda,
-    Projeto,
-    Talhao,
-    Cultura,
-    Variedade,
-    Safra,
-    Ciclo,
-    Plantio,
-    Colheita,
-    Programa,
-    Operacao,
-    Defensivo,
-)
+from .models import *
 
 # admin.site.register(ValuRisk)
 
@@ -217,3 +203,14 @@ class OperacaoAdmin(admin.ModelAdmin):
 @admin.register(Defensivo)
 class DefensivoAdmin(admin.ModelAdmin):
     list_display = ("produto", "tipo")
+    ordering = ["produto"]
+    search_fields = ["produto", "tipo"]
+    list_filter = ("tipo",)
+
+
+@admin.register(Aplicacao)
+class AplicacaoAdmin(admin.ModelAdmin):
+    list_display = ("operacao", "defensivo", "dose")
+    search_fields = ["operacao", "defensivo", "dose"]
+    raw_id_fields = ["operacao"]
+    list_filter = ("operacao", "defensivo", "dose")

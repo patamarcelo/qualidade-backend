@@ -301,8 +301,21 @@ class Operacao(Base):
         return self.estagio
 
 
-class Aplicacoes(Base):
-    pass
+class Aplicacao(Base):
+    operacao = models.ForeignKey(Operacao, on_delete=models.PROTECT)
+    defensivo = models.ForeignKey(Defensivo, on_delete=models.PROTECT)
+    dose = models.DecimalField(
+        "Dose KG/LT por ha",
+        help_text="Dose aplicada de Kg ou Lt por ha.",
+        max_digits=8,
+        decimal_places=3,
+    )
+    obs = models.TextField("Observação", max_length=500, blank=True)
+
+    class Meta:
+        ordering = ["operacao", "defensivo"]
+        verbose_name = "Programa - Operações/Aplicações"
+        verbose_name_plural = "Programas - Operações/Aplicações"
 
 
 #  ------------- ------------- xxxxxxxxxx -------------  -------------#
