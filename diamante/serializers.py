@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from rest_framework.authtoken.models import Token
-from .models import Talhao, Plantio, Projeto
+from .models import Talhao, Plantio, Projeto, Defensivo
 from rest_framework.fields import CurrentUserDefault
 
 from usuario.models import CustomUsuario as User
@@ -17,6 +17,12 @@ class TalhaoSerializer(serializers.ModelSerializer):
 class PlantioSerializer(serializers.ModelSerializer):
     class Meta:
         model = Plantio
+        fields = "__all__"
+
+
+class DefensivoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Defensivo
         fields = "__all__"
 
 

@@ -2,7 +2,7 @@ from django.shortcuts import render
 
 # Create your views here.
 
-from .serializers import TalhaoSerializer, PlantioSerializer
+from .serializers import TalhaoSerializer, PlantioSerializer, DefensivoSerializer
 
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -19,7 +19,7 @@ from dateutil.relativedelta import relativedelta
 from decimal import *
 
 
-from .models import Talhao, Projeto, Variedade, Plantio, Safra, Ciclo
+from .models import Talhao, Projeto, Variedade, Plantio, Safra, Ciclo, Defensivo
 
 from functools import reduce
 
@@ -409,3 +409,64 @@ class PlantioViewSet(viewsets.ModelViewSet):
     # Plantio.objects.filter(talhao__id_unico="7B13").update(veiculos_carregados=4)
 
     # --------------------- ---------------------- UPDATE PLANTIO API --------------------- ----------------------#
+
+    # --------------------- ---------------------- DEFENSIVOS API START --------------------- ----------------------#
+
+
+class DefensivoViewSet(viewsets.ModelViewSet):
+    queryset = Defensivo.objects.all().order_by("produto")
+    serializer_class = DefensivoSerializer
+    authentication_classes = (TokenAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    @action(detail=True, methods=["POST"])
+    def save_defensivo_data(self, request, pk=None):
+        if request.user.is_authenticated:
+            if "defensivos" in request.data:
+                try:
+                    file = request.FILES["defensivos"]
+                    entradas = openpyxl.load_workbook(file, data_only=True)
+                    worksheet = entradas["defensivos"]
+                    for col in worksheet.iter_rows(min_row=1, max_col=5, max_row=3000):
+                        if col[1].value != None and col[0].value != "ID":
+                            produto = col[0].value.strip()
+                            unidade_medida = col[1].value
+                            formulacao = col[2].value
+                            tipo = col[3].value
+
+                            try:
+                                new_product = Defensivo(
+                                    produto=produto,
+                                    unidade_medida=unidade_medida,
+                                    formulacao=formulacao,
+                                    tipo=tipo,
+                                )
+                                new_product.save()
+                                print(
+                                    f"Novo Defensivo Salvo com sucesso!! - {new_product.produto}"
+                                )
+                            except Exception as e:
+                                print(f"Erro ao Salvar o produto {produto} - Erro: {e}")
+                    qs_defensivos = Defensivo.objects.all()
+                    serializer_defensivos = DefensivoSerializer(
+                        qs_defensivos, many=True
+                    )
+
+                    response = {
+                        "msg": f"Defensivos Atualizados com sucesso!!",
+                        "total_return": len(qs_defensivos),
+                        "dados": serializer_defensivos.data,
+                    }
+                    return Response(response, status=status.HTTP_200_OK)
+                except Exception as e:
+                    response = {"message": f"Ocorreu um Erro: {e}"}
+                    return Response(response, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                response = {"message": "Arquivo desconhecido"}
+                return Response(response, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            response = {"message": "Você precisa estar logado!!!"}
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+
+# --------------------- ---------------------- DEFENSIVOS API END  --------------------- ----------------------#
