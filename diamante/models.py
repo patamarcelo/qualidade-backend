@@ -48,6 +48,7 @@ class Fazenda(Base):
 class Projeto(Base):
     nome = models.CharField("Nome", max_length=100, help_text="Projeto", unique=True)
     id_d = models.IntegerField("ID_D", unique=True)
+    id_farmbox = models.IntegerField("ID_D", unique=True, blank=True, null=True)
     fazenda = models.ForeignKey(Fazenda, on_delete=models.PROTECT)
     quantidade_area_produtiva = models.DecimalField(
         "Area Produtiva",
@@ -166,6 +167,7 @@ class Cultura(Base):
 
 class Variedade(Base):
     variedade = models.CharField("Variedade", max_length=100, unique=True)
+    id_farmbox = models.IntegerField("ID_D", unique=True, blank=True, null=True)
     nome_fantasia = models.CharField(
         "Nome Fant.", max_length=100, blank=True, null=True
     )
