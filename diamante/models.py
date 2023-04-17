@@ -289,8 +289,6 @@ class Operacao(Base):
     )
 
     obs = models.TextField("Observação", max_length=500, blank=True)
-    obs_1 = models.TextField("Observação 1", max_length=500, blank=True)
-    obs_2 = models.TextField("Observação 2", max_length=500, blank=True)
 
     class Meta:
         ordering = ["programa", "operacao_numero"]
@@ -336,10 +334,10 @@ class Plantio(Base):
     )
     variedade = models.ForeignKey(Variedade, on_delete=models.PROTECT)
     finalizado_plantio = models.BooleanField(
-        "Finalizado", default=True, help_text="Finalizado o Plantio"
+        "Finalizado Plantio", default=True, help_text="Finalizado o Plantio"
     )
     finalizado_colheita = models.BooleanField(
-        "Finalizado", default=False, help_text="Finalizada a Colheita"
+        "Finalizado Colheita", default=False, help_text="Finalizada a Colheita"
     )
     area_aproveito = models.BooleanField(
         "Area Aprov.", default=False, help_text="Apontar caso seja Area de Aproveito"
@@ -364,6 +362,12 @@ class Plantio(Base):
 
     data_prevista_plantio = models.DateField(
         help_text="dd/mm/aaaa - Data Projetada para o Plantio",
+        blank=True,
+        null=True,
+    )
+
+    data_prevista_colheita = models.DateField(
+        help_text="dd/mm/aaaa - Data Projetada para a Colheita",
         blank=True,
         null=True,
     )
@@ -431,7 +435,7 @@ class Plantio(Base):
     get_cronograma_programa.fget.short_description = "Programação Programa"
 
     @property
-    def get_data_prevista_colheita(self):
+    def get_data_prevista_colheita_base_dap(self):
         prazo = self.variedade.dias_ciclo
         return self.data_plantio + datetime.timedelta(days=prazo)
 

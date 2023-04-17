@@ -317,7 +317,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     talhao_list = Talhao.objects.all()
                     variedade_list = Variedade.objects.all()
                     safra = Safra.objects.all()[0]
-                    ciclo = Ciclo.objects.all()[2]
+                    # ciclo = Ciclo.objects.all()[2]
 
                     for col in worksheet.iter_rows(min_row=1, max_col=14, max_row=3000):
                         if col[1].value != None and col[0].value != "ID":
@@ -332,7 +332,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 col[8].value,
                                 col[10].value,
                                 col[11].value,
-                                col[12].value,
+                                col[13].value,
                             )
 
                             if id_talhao:
@@ -350,18 +350,18 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 variedade_id = [
                                     x for x in variedade_list if x.id == id_variedade
                                 ][0]
+                                print(
+                                    safra,
+                                    talhao_id,
+                                    talhao_id.id_unico,
+                                    variedade_id,
+                                    area_colher,
+                                    data_plantio,
+                                    finalizado,
+                                    dap,
+                                )
                             except Exception as e:
                                 print(f"variedade sem cadastro: {id_variedade}")
-                            print(
-                                safra,
-                                talhao_id,
-                                talhao_id.id_unico,
-                                variedade_id,
-                                area_colher,
-                                data_plantio,
-                                finalizado,
-                                dap,
-                            )
                             try:
                                 Plantio.objects.filter(
                                     talhao__id_unico=talhao_id.id_unico
