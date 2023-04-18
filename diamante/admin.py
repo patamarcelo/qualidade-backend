@@ -213,4 +213,4 @@ class AplicacaoAdmin(admin.ModelAdmin):
     list_display = ("operacao", "defensivo", "dose")
     search_fields = ["operacao", "defensivo", "dose"]
     raw_id_fields = ["operacao"]
-    list_filter = ("operacao", "defensivo", "dose")
+    list_filter = ("defensivo","operacao__programa","operacao")
