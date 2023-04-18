@@ -259,20 +259,13 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "data_plantio",
                 ).order_by("talhao__fazenda__nome", "talhao__id_talhao")
 
+                # ------------- ------------- START SEPARADO POR PROJETO ------------- -------------#
                 resumo = {}
                 for i in qs:
-                    resumo[i["talhao__fazenda__fazenda__nome"]] = {
-                        i["talhao__fazenda__nome"]: {}
-                    }
+                    resumo[i["talhao__fazenda__nome"]] = {}
 
                 for i in qs:
-                    resumo[i["talhao__fazenda__fazenda__nome"]].update(
-                        {i["talhao__fazenda__nome"]: {}}
-                    )
-                for i in qs:
-                    resumo[i["talhao__fazenda__fazenda__nome"]][
-                        i["talhao__fazenda__nome"]
-                    ].update(
+                    resumo[i["talhao__fazenda__nome"]].update(
                         {
                             i["talhao__id_talhao"]: {
                                 "safra": i["safra__safra"],
@@ -283,6 +276,35 @@ class PlantioViewSet(viewsets.ModelViewSet):
                             }
                         }
                     )
+                # ------------- ------------- END SEPARADO POR PROJETO ------------- -------------#
+
+                # ------------- ------------- START SEPARADO POR FAZENDA > PROJETO ------------- -------------#
+                # resumo = {}
+                # for i in qs:
+                #     resumo[i["talhao__fazenda__fazenda__nome"]] = {
+                #         i["talhao__fazenda__nome"]: {}
+                #     }
+
+                # for i in qs:
+                #     resumo[i["talhao__fazenda__fazenda__nome"]].update(
+                #         {i["talhao__fazenda__nome"]: {}}
+                #     )
+                # for i in qs:
+                #     resumo[i["talhao__fazenda__fazenda__nome"]][
+                #         i["talhao__fazenda__nome"]
+                #     ].update(
+                #         {
+                #             i["talhao__id_talhao"]: {
+                #                 "safra": i["safra__safra"],
+                #                 "ciclo": i["ciclo__ciclo"],
+                #                 "cultura": i["variedade__cultura__cultura"],
+                #                 "variedade": i["variedade__nome_fantasia"],
+                #                 "finalizado_colheita": i["finalizado_colheita"],
+                #             }
+                #         }
+                #     )
+
+                # ------------- ------------- END SEPARADO POR FAZENDA > PROJETO ------------- -------------#
 
                 area_total = Plantio.objects.aggregate(Sum("area_colheita"))
 
