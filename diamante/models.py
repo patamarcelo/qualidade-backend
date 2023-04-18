@@ -302,7 +302,7 @@ class Operacao(Base):
 
 
 class Aplicacao(Base):
-    operacao = models.ForeignKey(Operacao, on_delete=models.PROTECT)
+    operacao = models.ForeignKey(Operacao, on_delete=models.PROTECT, related_name="programa_related_aplicacao")
     defensivo = models.ForeignKey(Defensivo, on_delete=models.PROTECT)
     dose = models.DecimalField(
         "Dose KG/LT por ha",
