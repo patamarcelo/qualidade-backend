@@ -186,8 +186,8 @@ class ProgramaAdmin(admin.ModelAdmin):
 
 @admin.register(Operacao)
 class OperacaoAdmin(admin.ModelAdmin):
-    list_display = ("programa", "estagio", "prazo_dap", "get_cultura_description")
-    list_filter = ["programa"]
+    list_display = ("programa", "estagio", "prazo_dap", "get_cultura_description", "get_obs_description")
+    list_filter = ["programa",'programa__safra','programa__ciclo']
 
     ordering = (
         "programa",
@@ -198,6 +198,14 @@ class OperacaoAdmin(admin.ModelAdmin):
         return obj.programa.cultura.cultura
 
     get_cultura_description.short_description = "Cultura"
+    
+    def get_obs_description(self, obj):
+        if obj.obs:
+            return f'{obj.obs[:20] }...'
+        else:
+            return ' - '
+
+    get_obs_description.short_description = "Obs"
 
 
 @admin.register(Defensivo)
