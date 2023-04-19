@@ -152,6 +152,7 @@ class Cultura(Base):
         "Cultura", max_length=100, help_text="Cultura", unique=True
     )
     id_d = models.PositiveIntegerField("ID_D", unique=True)
+    id_farmbox = models.IntegerField("ID FarmBox", unique=True, blank=True, null=True)
     tipo_producao = models.CharField(
         "Tipo Produção", max_length=20, null=True, blank=True
     )
