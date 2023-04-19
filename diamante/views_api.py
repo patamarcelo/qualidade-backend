@@ -260,11 +260,9 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 ).order_by("talhao__fazenda__nome", "talhao__id_talhao")
 
                 # ------------- ------------- START SEPARADO POR PROJETO ------------- -------------#
-                resumo = {}
-                for i in qs:
-                    resumo[i["talhao__fazenda__nome"]] = {}
+                resumo = {i["talhao__fazenda__nome"]: {} for i in qs}
 
-                for i in qs:
+                {
                     resumo[i["talhao__fazenda__nome"]].update(
                         {
                             i["talhao__id_talhao"]: {
@@ -276,6 +274,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                             }
                         }
                     )
+                    for i in qs
+                }
                 # ------------- ------------- END SEPARADO POR PROJETO ------------- -------------#
 
                 # ------------- ------------- START SEPARADO POR FAZENDA > PROJETO ------------- -------------#
