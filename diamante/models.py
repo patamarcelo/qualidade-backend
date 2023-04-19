@@ -289,6 +289,16 @@ class Operacao(Base):
         default=False,
         help_text="Informar quando o estágio finalizar",
     )
+    
+    base_operacao_anterior = models.BooleanField(
+        "Base ültima Operação",
+        default=False,
+        help_text="Infomrar se esta operação tem como base a data de aplicação da Operação anterior",
+    )
+    
+    dias_base_operacao_anterior = models.IntegerField("Dias de Janela Após a aplicação anterior", blank=True, null=True)
+    
+    
 
     obs = models.TextField("Observação", max_length=500, blank=True)
 
