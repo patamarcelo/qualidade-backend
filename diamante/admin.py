@@ -59,6 +59,7 @@ class VariedadeAdmin(admin.ModelAdmin):
         "dias_germinacao",
     )
     ordering = ("variedade",)
+    list_filter = ['cultura',]
 
 
 admin.site.register(Safra)
