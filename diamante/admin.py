@@ -40,7 +40,7 @@ class ProjetoAdmin(admin.ModelAdmin):
 class TalhaoAdmin(admin.ModelAdmin):
     list_display = ("id_talhao", "fazenda", "id_unico", "area_total", "modulo")
     ordering = ("id_talhao",)
-    search_fields = ["id_talhao", "id_unico", "area_total", "modulo"]
+    search_fields = ["id_talhao", "id_unico", "area_total", "modulo", "fazenda__nome"]
 
 
 @admin.register(Cultura)
@@ -59,7 +59,9 @@ class VariedadeAdmin(admin.ModelAdmin):
         "dias_germinacao",
     )
     ordering = ("variedade",)
-    list_filter = ['cultura',]
+    list_filter = [
+        "cultura",
+    ]
 
 
 admin.site.register(Safra)
@@ -121,7 +123,12 @@ class PlantioAdmin(admin.ModelAdmin):
     get_description_finalizado_colheita.short_description = "Colheita"
 
     def get_data(self, obj):
-        return date_format(obj.data_plantio, format="SHORT_DATE_FORMAT", use_l10n=True)
+        if obj.data_plantio:
+            return date_format(
+                obj.data_plantio, format="SHORT_DATE_FORMAT", use_l10n=True
+            )
+        else:
+            return " - "
 
     get_data.short_description = "Data Plantio"
 
@@ -187,8 +194,14 @@ class ProgramaAdmin(admin.ModelAdmin):
 
 @admin.register(Operacao)
 class OperacaoAdmin(admin.ModelAdmin):
-    list_display = ("programa", "estagio", "prazo_dap", "get_cultura_description", "get_obs_description")
-    list_filter = ["programa",'programa__safra','programa__ciclo']
+    list_display = (
+        "programa",
+        "estagio",
+        "prazo_dap",
+        "get_cultura_description",
+        "get_obs_description",
+    )
+    list_filter = ["programa", "programa__safra", "programa__ciclo"]
 
     ordering = (
         "programa",
@@ -199,12 +212,12 @@ class OperacaoAdmin(admin.ModelAdmin):
         return obj.programa.cultura.cultura
 
     get_cultura_description.short_description = "Cultura"
-    
+
     def get_obs_description(self, obj):
         if obj.obs:
-            return f'{obj.obs[:20] }...'
+            return f"{obj.obs[:20] }..."
         else:
-            return ' - '
+            return " - "
 
     get_obs_description.short_description = "Obs"
 
@@ -222,4 +235,4 @@ class AplicacaoAdmin(admin.ModelAdmin):
     list_display = ("operacao", "defensivo", "dose")
     search_fields = ["operacao", "defensivo", "dose"]
     raw_id_fields = ["operacao"]
-    list_filter = ("defensivo","operacao__programa","operacao")
+    list_filter = ("defensivo", "operacao__programa", "operacao")
