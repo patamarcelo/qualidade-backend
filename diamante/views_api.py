@@ -555,6 +555,134 @@ class PlantioViewSet(viewsets.ModelViewSet):
 
     # --------------------- ---------------------- UPDATE PLANTIO API --------------------- ----------------------#
 
+    # --------------------- ---------------------- UPDATE PLANTIO API FROM FARMBOX START --------------------- ----------------------#
+    @action(detail=True, methods=["GET"])
+    def update_plantio_from_farmBox(self, request, pk=None):
+        if request.user.is_authenticated:
+            try:
+                # file = request.FILES["plantio_arroz"]
+                # file_ = open(os.path.join(settings.BASE_DIR, 'filename'))
+                date_file = "2023-04-18"
+                with open(f"static/files/dataset-{date_file}.json") as user_file:
+                    file_contents = user_file.read()
+                    parsed_json = json.loads(file_contents)
+                    new_list = parsed_json
+                # DB CONSULT
+                talhao_list = Talhao.objects.all()
+                variedade_list = Variedade.objects.all()
+                safra = Safra.objects.all()[1]
+                ciclo_list = Ciclo.objects.all()
+                projetos = Projeto.objects.all()
+
+                count_total = 0
+                for i in new_list:
+                    state = i["state"]
+                    date_plantio = i["date"]
+                    activation_date = ["activation_date"]
+                    parcela = i["name"].replace(" ", "")
+                    farm_name = i["farm_name"]
+                    variedade_name = i["variety_name"]
+                    area = i["area"]
+
+                    variedade_planejada = i["planned_variety_name"]
+                    cultura_planejada = i["planned_culture_name"]
+
+                    culture_id = i["culture_id"]
+                    variety_id = i["variety_id"]
+                    fazenda_id = i["farm"]["id"]
+                    variedade_planejada_id = i["planned_variety_id"]
+                    cultura_planejada_id = i["planned_culture_id"]
+
+                    safra_farm = i["harvest_name"]
+                    ciclo_json = i["cycle"]
+
+                    ciclo = ciclo_list[ciclo_json - 1]
+
+                    id_talhao = [
+                        x.id_d for x in projetos if x.id_farmbox == fazenda_id
+                    ][0]
+                    id_variedade = [
+                        x
+                        for x in variedade_list
+                        if x.id_farmbox == variedade_planejada_id
+                    ][0]
+
+                    if id_talhao:
+                        try:
+                            talhao_id = f"{id_talhao}{parcela}"
+                            talhao_id = [
+                                x for x in talhao_list if x.id_unico == talhao_id
+                            ][0]
+                        except Exception as e:
+                            print(
+                                f"{Fore.RED}id sem cadastro: {id_talhao}{parcela} - {farm_name} - Ciclo: {ciclo}{Style.RESET_ALL}"
+                            )
+                    else:
+                        talhao_id = 0
+                    try:
+                        id_variedade = [
+                            x
+                            for x in variedade_list
+                            if x.id_farmbox == variedade_planejada_id
+                        ][0]
+                    except Exception as e:
+                        print(
+                            f"{Fore.RED}variedade sem cadastro: {id_variedade}{Style.RESET_ALL}"
+                        )
+                    if cultura_planejada:
+                        try:
+                            field_to_update = Plantio.objects.filter(
+                                safra=safra, ciclo=ciclo, talhao=talhao_id
+                            )[0]
+
+                            if date_plantio:
+                                field_to_update.data_plantio = date_plantio
+
+                            if variety_id:
+                                id_variedade_done = [
+                                    x
+                                    for x in variedade_list
+                                    if x.id_farmbox == variety_id
+                                ][0]
+                                field_to_update.variedade = id_variedade_done
+                            else:
+                                field_to_update.variedade = id_variedade
+                            field_to_update.save()
+                            print(
+                                f"{Fore.GREEN}Plantio Alterado com sucesso: {field_to_update}{Style.RESET_ALL}"
+                            )
+                            print("\n")
+                            count_total += 1
+                        except Exception as e:
+                            print(
+                                f"{Fore.RED}Problema em salvar o plantio: {talhao_id} - {safra} - {ciclo}{Style.RESET_ALL}{e}"
+                            )
+                qs_plantio = Plantio.objects.filter(safra__safra="2023/2024")
+
+                total_plantado = Plantio.objects.filter(
+                    safra__safra="2023/2024", ciclo__ciclo="1"
+                ).aggregate(Sum("area_colheita"))
+
+                serializer_plantio = PlantioSerializer(qs_plantio, many=True)
+                response = {
+                    "msg": f"Consulta realizada com sucesso!!",
+                    "total_return": len(qs_plantio),
+                    "Total de Talhões alterados": count_total,
+                    "dados": serializer_plantio.data,
+                }
+                return Response(response, status=status.HTTP_200_OK)
+            except Exception as e:
+                response = {"message": f"Ocorreu um Erro: {e}"}
+                return Response(response, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                response = {"message": "Arquivo desconhecido"}
+                return Response(response, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            response = {"message": "Você precisa estar logado!!!"}
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+    # --------------------- ---------------------- UPDATE PLANTIO API FROM FARMBOX END--------------------- ----------------------#
+
     @action(detail=True, methods=["GET"])
     def get_plantio_info(self, request, pk=None):
         if request.user.is_authenticated:

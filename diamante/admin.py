@@ -87,6 +87,7 @@ class PlantioAdmin(admin.ModelAdmin):
         "finalizado_colheita",
         "talhao__fazenda__nome",
         "safra__safra",
+        "ciclo__ciclo",
     )
     list_display = (
         "talhao",
