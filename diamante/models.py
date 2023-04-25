@@ -244,6 +244,18 @@ class Programa(Base):
         help_text="Define se o programa é calculado por Estágio",
     )
 
+    start_date = models.DateField(
+        help_text="dd/mm/aaaa - Data Prevista Inínicio Programa / Plantio",
+        blank=True,
+        null=True,
+    )
+
+    end_date = models.DateField(
+        help_text="dd/mm/aaaa - Data Prevista Término Programa / Plantio",
+        blank=True,
+        null=True,
+    )
+
     class Meta:
         # ordering = ["variedade"]
         verbose_name = "Programa"
@@ -290,16 +302,16 @@ class Operacao(Base):
         default=False,
         help_text="Informar quando o estágio finalizar",
     )
-    
+
     base_operacao_anterior = models.BooleanField(
         "Base ültima Operação",
         default=False,
         help_text="Infomrar se esta operação tem como base a data de aplicação da Operação anterior",
     )
-    
-    dias_base_operacao_anterior = models.IntegerField("Dias de Janela Após a aplicação anterior", blank=True, null=True)
-    
-    
+
+    dias_base_operacao_anterior = models.IntegerField(
+        "Dias de Janela Após a aplicação anterior", blank=True, null=True
+    )
 
     obs = models.TextField("Observação", max_length=500, blank=True)
 
@@ -313,7 +325,9 @@ class Operacao(Base):
 
 
 class Aplicacao(Base):
-    operacao = models.ForeignKey(Operacao, on_delete=models.PROTECT, related_name="programa_related_aplicacao")
+    operacao = models.ForeignKey(
+        Operacao, on_delete=models.PROTECT, related_name="programa_related_aplicacao"
+    )
     defensivo = models.ForeignKey(Defensivo, on_delete=models.PROTECT)
     dose = models.DecimalField(
         "Dose KG/LT por ha",
