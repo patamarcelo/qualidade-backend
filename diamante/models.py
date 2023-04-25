@@ -446,17 +446,37 @@ class Plantio(Base):
     @property
     def get_cronograma_programa(self):
         cronograma = [{"Data Plantio": self.data_plantio}]
-        qs = self.programa.programa_related_operacao.all()
+        # qs = self.programa.programa_related_operacao.all()
+        qs = Operacao.objects.select_related("programa").all()
+        qs = [x for x in qs if x.programa == self.programa]
+        queryset = Aplicacao.objects.select_related("operacao").all()
 
         if len(qs) > 0:
             for i in qs:
-                etapa = {
-                    "Estagio": i.estagio,
-                    "dap": i.prazo_dap,
-                    "Data Prevista": self.data_plantio
-                    + datetime.timedelta(days=i.prazo_dap),
-                }
-                cronograma.append(etapa)
+                data_plantio = (
+                    self.data_plantio if self.data_plantio else self.programa.start_date
+                )
+                produtos = []
+                query_filter = [x for x in queryset if x.operacao == i]
+                for dose_produto in query_filter:
+                    produtos.append(
+                        {
+                            "produto": dose_produto.defensivo.produto,
+                            "dose": dose_produto.dose,
+                            "quantidade_total": dose_produto.dose * self.area_colheita,
+                        }
+                    )
+                if data_plantio:
+                    etapa = {
+                        "Estagio": i.estagio,
+                        "dap": i.prazo_dap,
+                        "Data Prevista": data_plantio
+                        + datetime.timedelta(days=i.prazo_dap),
+                        "produtos": produtos,
+                    }
+                    cronograma.append(etapa)
+                else:
+                    print(f"Sem Data de Plantio {data_plantio}")
         return cronograma
 
     get_cronograma_programa.fget.short_description = "Programação Programa"

@@ -88,6 +88,7 @@ class PlantioAdmin(admin.ModelAdmin):
         "talhao__fazenda__nome",
         "safra__safra",
         "ciclo__ciclo",
+        "programa__nome",
     )
     list_display = (
         "talhao",
@@ -183,7 +184,12 @@ class ColheitaAdmin(admin.ModelAdmin):
 
 @admin.register(Programa)
 class ProgramaAdmin(admin.ModelAdmin):
-    list_display = ("nome", "safra_description")
+    list_display = (
+        "nome",
+        "safra_description",
+        "start_date_description",
+        "end_date_description",
+    )
 
     ordering = ("safra", "ciclo")
 
@@ -191,6 +197,24 @@ class ProgramaAdmin(admin.ModelAdmin):
         return f"{obj.safra.safra} - {obj.ciclo.ciclo}"
 
     safra_description.short_description = "Safra"
+
+    def start_date_description(self, obj):
+        if obj.start_date:
+            return date_format(
+                obj.start_date, format="SHORT_DATE_FORMAT", use_l10n=True
+            )
+        else:
+            return " - "
+
+    start_date_description.short_description = "Start Plantio"
+
+    def end_date_description(self, obj):
+        if obj.end_date:
+            return date_format(obj.end_date, format="SHORT_DATE_FORMAT", use_l10n=True)
+        else:
+            return " - "
+
+    end_date_description.short_description = "End Plantio"
 
 
 @admin.register(Operacao)
