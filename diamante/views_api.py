@@ -723,20 +723,24 @@ class PlantioViewSet(viewsets.ModelViewSet):
     def get_plantio(self, request):
         if request.user.is_authenticated:
             try:
-                qs = Plantio.objects.values(
-                    "safra__safra",
-                    "ciclo__ciclo",
-                    "talhao__id_talhao",
-                    "talhao__fazenda__nome",
-                    "talhao__fazenda__fazenda__nome",
-                    "variedade__cultura__cultura",
-                    "variedade__nome_fantasia",
-                    "finalizado_plantio",
-                    "finalizado_colheita",
-                    "area_colheita",
-                    "area_parcial",
-                    "data_plantio",
-                ).order_by("talhao__fazenda__nome", "talhao__id_talhao")
+                qs = (
+                    Plantio.objects.values(
+                        "safra__safra",
+                        "ciclo__ciclo",
+                        "talhao__id_talhao",
+                        "talhao__fazenda__nome",
+                        "talhao__fazenda__fazenda__nome",
+                        "variedade__cultura__cultura",
+                        "variedade__nome_fantasia",
+                        "finalizado_plantio",
+                        "finalizado_colheita",
+                        "area_colheita",
+                        "area_parcial",
+                        "data_plantio",
+                    )
+                    .order_by("talhao__fazenda__nome", "talhao__id_talhao")
+                    .filter(safra__safra="2023/2024", ciclo__ciclo="1")
+                )
 
                 # ------------- ------------- START SEPARADO POR PROJETO ------------- -------------#
                 resumo = {i["talhao__fazenda__nome"]: {} for i in qs}
@@ -972,6 +976,51 @@ class PlantioViewSet(viewsets.ModelViewSet):
         else:
             response = {"message": "Você precisa estar logado!!!"}
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+    # --------------------- ---------------------- PLANTIO APLICACOES API START --------------------- ----------------------#
+
+    @action(detail=False, methods=["GET"])
+    def get_plantio_operacoes_detail(self, request):
+        if request.user.is_authenticated:
+            try:
+                qs = Plantio.objects.values(
+                    "id",
+                    "talhao__id_talhao",
+                    "talhao_id",
+                    "talhao__fazenda__nome",
+                    "variedade__nome_fantasia",
+                    "area_colheita",
+                    "data_plantio",
+                    # "get_cronograma_programa",
+                ).filter(programa_id=6)
+                ids_list = qs.values("id")
+
+                crono_list = [
+                    (x.get_detail_cronograma_and_aplication, x.get_dap)
+                    for x in Plantio.objects.filter(id__in=ids_list)
+                ]
+
+                final_return = []
+                for i in crono_list:
+                    dict_up = qs.filter(id=i[0][0]["id"])[0]
+                    dict_up.update({"DAP": i[1]})
+                    dict_up.update({"cronograma": i[0]})
+                    final_return.append(dict_up)
+
+                response = {
+                    "msg": f"Consulta realizada com sucesso!!",
+                    "total_return": len(final_return),
+                    "dados": final_return,
+                }
+                return Response(response, status=status.HTTP_200_OK)
+            except Exception as e:
+                response = {"message": f"Ocorreu um Erro: {e}"}
+                return Response(response, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            response = {"message": "Você precisa estar logado!!!"}
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+    # --------------------- ---------------------- PLANTIO APLICACOES API END --------------------- ----------------------#
 
     # --------------------- ---------------------- DEFENSIVOS API START --------------------- ----------------------#
 

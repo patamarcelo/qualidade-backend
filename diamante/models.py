@@ -346,6 +346,9 @@ class Aplicacao(Base):
         verbose_name = "Programa - Operações/Aplicações"
         verbose_name_plural = "Programas - Operações/Aplicações"
 
+    def __str__(self):
+        return f"{self.defensivo} - {self.dose}"
+
 
 #  ------------- ------------- xxxxxxxxxx -------------  -------------#
 
@@ -458,7 +461,11 @@ class Plantio(Base):
     @property
     def get_detail_cronograma_and_aplication(self):
         cronograma = [
-            {"Data Plantio": self.data_plantio, "Area_plantio": self.area_colheita}
+            {
+                "Data Plantio": self.data_plantio,
+                "Area_plantio": self.area_colheita,
+                "id": self.id,
+            }
         ]
         qs = Operacao.objects.select_related("programa").all()
         qs = [x for x in qs if x.programa == self.programa]
