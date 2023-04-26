@@ -930,14 +930,17 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 ids_list = qs.values("id")
 
                 crono_list = [
-                    x.get_cronograma_programa
+                    (x.get_cronograma_programa, x.get_dap)
                     for x in Plantio.objects.filter(id__in=ids_list)
                 ]
 
+                print(crono_list[0][1])
+
                 final_return = []
                 for i in crono_list:
-                    dict_up = qs.filter(id=i[0]["id"])[0]
-                    dict_up.update({"cronograma": i})
+                    dict_up = qs.filter(id=i[0][0]["id"])[0]
+                    dict_up.update({"DAP": i[1]})
+                    dict_up.update({"cronograma": i[0]})
                     final_return.append(dict_up)
 
                 # final_return = [
