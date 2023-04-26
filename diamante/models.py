@@ -4,6 +4,10 @@ from django.utils import timezone
 from datetime import timedelta
 import datetime
 
+from django.db import connection
+
+connection.queries
+
 # Create your models here.
 
 
@@ -405,33 +409,6 @@ class Plantio(Base):
 
     veiculos_carregados = models.IntegerField("Veículos Carregados / Talhao", default=0)
 
-    # data_programa_1 = models.DateField(
-    #     help_text="dd/mm/aaaa - Data Etapa 1", blank=True, null=True
-    # )
-
-    # data_programa_2 = models.DateField(
-    #     help_text="dd/mm/aaaa - Data Etapa 2", blank=True, null=True
-    # )
-
-    # def save(self, *args, **kwargs):
-    #     print(f" Programa Console: {self.programa}")
-    #     qs = self.programa.programa_related_operacao.all()
-    #     count = 0
-    #     programas = [self.data_programa_1, self.data_programa_2]
-    #     if len(qs) > 0:
-    #         for i in qs:
-    #             data_prev = self.data_plantio + datetime.timedelta(days=i.prazo_dap)
-
-    #             print(programas[count])
-    #             # etapa = {
-    #             #     "Estagio": i.estagio,
-    #             #     "dap": i.prazo_dap,
-    #             #     "Data Prevista": self.data_plantio
-    #             #     + datetime.timedelta(days=i.prazo_dap),
-    #             # }
-    #         count += 1
-    #     super(Plantio, self).save(*args, **kwargs)
-
     @property
     def get_dap(self):
         dap = 0
@@ -445,20 +422,56 @@ class Plantio(Base):
 
     @property
     def get_cronograma_programa(self):
-        cronograma = [{"Data Plantio": self.data_plantio}]
-        # qs = self.programa.programa_related_operacao.all()
+        cronograma = [
+            {
+                "Data Plantio": self.data_plantio,
+                "Area_plantio": self.area_colheita,
+                "id": self.id,
+            }
+        ]
         qs = Operacao.objects.select_related("programa").all()
         qs = [x for x in qs if x.programa == self.programa]
-        queryset = Aplicacao.objects.select_related("operacao").all()
-
+        # queryset = Aplicacao.objects.select_related("operacao").filter(
+        #     operacao__programa=self.programa
+        # )
         if len(qs) > 0:
             for i in qs:
                 data_plantio = (
                     self.data_plantio if self.data_plantio else self.programa.start_date
                 )
                 produtos = []
-                query_filter = [x for x in queryset if x.operacao == i]
-                for dose_produto in query_filter:
+                if data_plantio:
+                    etapa = {
+                        "Estagio": i.estagio,
+                        "dap": i.prazo_dap,
+                        "Data Prevista": data_plantio
+                        + datetime.timedelta(days=i.prazo_dap),
+                        "produtos": produtos,
+                    }
+                    cronograma.append(etapa)
+                else:
+                    print(f"Sem Data de Plantio {data_plantio}")
+        return cronograma
+
+    get_cronograma_programa.fget.short_description = "Programação Programa"
+
+    @property
+    def get_detail_cronograma_and_aplication(self):
+        cronograma = [
+            {"Data Plantio": self.data_plantio, "Area_plantio": self.area_colheita}
+        ]
+        qs = Operacao.objects.select_related("programa").all()
+        qs = [x for x in qs if x.programa == self.programa]
+        queryset = Aplicacao.objects.select_related("operacao").filter(
+            operacao__programa=self.programa
+        )
+        if len(qs) > 0:
+            for i in qs:
+                data_plantio = (
+                    self.data_plantio if self.data_plantio else self.programa.start_date
+                )
+                produtos = []
+                for dose_produto in queryset:
                     produtos.append(
                         {
                             "produto": dose_produto.defensivo.produto,
@@ -479,7 +492,9 @@ class Plantio(Base):
                     print(f"Sem Data de Plantio {data_plantio}")
         return cronograma
 
-    get_cronograma_programa.fget.short_description = "Programação Programa"
+    get_detail_cronograma_and_aplication.fget.short_description = (
+        "Detalhes de Aplicações"
+    )
 
     @property
     def get_data_prevista_colheita_base_dap(self):

@@ -35,6 +35,8 @@ from colorama import Style
 
 import os
 from django.conf import settings
+from django.contrib.postgres.aggregates import ArrayAgg
+
 
 # --------------------- --------------------- START TALHAO API --------------------- --------------------- #
 
@@ -908,6 +910,65 @@ class PlantioViewSet(viewsets.ModelViewSet):
     # Plantio.objects.filter(talhao__id_unico="7B13").update(veiculos_carregados=4)
 
     # --------------------- ---------------------- UPDATE PLANTIO API --------------------- ----------------------#
+    @action(detail=False, methods=["GET"])
+    def get_plantio_cronograma_programa(self, request):
+        if request.user.is_authenticated:
+            try:
+                farmer_filter_id = 11
+                projeto = Projeto.objects.filter(id=farmer_filter_id)[0].nome
+
+                qs = Plantio.objects.values(
+                    "id",
+                    "talhao__id_talhao",
+                    "talhao_id",
+                    "talhao__fazenda__nome",
+                    "variedade__nome_fantasia",
+                    "area_colheita",
+                    "data_plantio",
+                    # "get_cronograma_programa",
+                ).filter(programa_id=6)
+                ids_list = qs.values("id")
+
+                crono_list = [
+                    x.get_cronograma_programa
+                    for x in Plantio.objects.filter(id__in=ids_list)
+                ]
+
+                final_return = []
+                for i in crono_list:
+                    dict_up = qs.filter(id=i[0]["id"])[0]
+                    dict_up.update({"cronograma": i})
+                    final_return.append(dict_up)
+
+                # final_return = [
+                #     {
+                #         "parcela": i.talhao.id_talhao,
+                #         "data plantio": i.data_plantio,
+                #         "area plantio": i.area_colheita,
+                #         "cultura": i.variedade.cultura.cultura,
+                #         "variedade": i.variedade.variedade,
+                #         "Cronograma": i.get_cronograma_programa,
+                #     }
+                #     for i in Plantio.objects.filter(
+                #         safra__safra="2023/2024",
+                #         ciclo__ciclo="1",
+                #         talhao__fazenda_id=farmer_filter_id,
+                #     )
+                # ]
+
+                response = {
+                    "msg": f"Consulta realizada com sucesso!!",
+                    "total_return": len(final_return),
+                    "projeto": projeto,
+                    "dados": final_return,
+                }
+                return Response(response, status=status.HTTP_200_OK)
+            except Exception as e:
+                response = {"message": f"Ocorreu um Erro: {e}"}
+                return Response(response, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            response = {"message": "Você precisa estar logado!!!"}
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
     # --------------------- ---------------------- DEFENSIVOS API START --------------------- ----------------------#
 
