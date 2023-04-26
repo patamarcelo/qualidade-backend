@@ -257,7 +257,11 @@ class DefensivoAdmin(admin.ModelAdmin):
 
 @admin.register(Aplicacao)
 class AplicacaoAdmin(admin.ModelAdmin):
-    list_display = ("operacao", "defensivo", "dose")
+    list_display = ("operacao", "defensivo", "defensivo__formulacao", "dose")
     search_fields = ["operacao", "defensivo", "dose"]
     raw_id_fields = ["operacao"]
     list_filter = ("defensivo", "operacao__programa", "operacao")
+
+    def defensivo__formulacao(self, obj):
+        return obj.defensivo.get_tipo_display()
+    defensivo__formulacao.short_description = "Tipo"
