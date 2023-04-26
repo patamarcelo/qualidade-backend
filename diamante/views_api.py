@@ -824,7 +824,9 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     safra_2022_2023 = 0
                     safra = Safra.objects.all()[safra_2022_2023]
                     ciclo_1 = 0
-                    ciclo = Ciclo.objects.all()[ciclo_1]
+                    ciclo_2 = 1
+                    ciclo_3 = 2
+                    ciclo = Ciclo.objects.all()[ciclo_3]
 
                     for col in worksheet.iter_rows(min_row=1, max_col=14, max_row=3000):
                         if col[1].value != None and col[0].value != "ID":
