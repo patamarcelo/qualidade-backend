@@ -821,8 +821,10 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     # DB CONSULT
                     talhao_list = Talhao.objects.all()
                     variedade_list = Variedade.objects.all()
-                    safra = Safra.objects.all()[0]
-                    # ciclo = Ciclo.objects.all()[2]
+                    safra_2022_2023 = 0
+                    safra = Safra.objects.all()[safra_2022_2023]
+                    ciclo_1 = 0
+                    ciclo = Ciclo.objects.all()[ciclo_1]
 
                     for col in worksheet.iter_rows(min_row=1, max_col=14, max_row=3000):
                         if col[1].value != None and col[0].value != "ID":
@@ -857,6 +859,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 ][0]
                                 print(
                                     safra,
+                                    ciclo,
                                     talhao_id,
                                     talhao_id.id_unico,
                                     variedade_id,
@@ -870,7 +873,11 @@ class PlantioViewSet(viewsets.ModelViewSet):
                             try:
                                 Plantio.objects.filter(
                                     talhao__id_unico=talhao_id.id_unico
-                                ).update(finalizado_colheita=finalizado)
+                                ).update(
+                                    finalizado_colheita=finalizado,
+                                    safra=safra,
+                                    ciclo=ciclo,
+                                )
 
                             except Exception as e:
                                 print(
