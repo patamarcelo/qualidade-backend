@@ -48,6 +48,7 @@ from colorama import Style
 import os
 from django.conf import settings
 from django.contrib.postgres.aggregates import ArrayAgg
+import math
 
 
 # --------------------- --------------------- START TALHAO API --------------------- --------------------- #
@@ -1113,7 +1114,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         {
                             k: {
                                 "area": 0,
-                                "dias_necessários": 1,
+                                "dias_necessários": 0,
                                 "data_inicial": None,
                                 "data_final": None,
                             }
@@ -1143,6 +1144,9 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                     days=prev_date[k]["dias_necessários"]
                                 )
                             }
+                        )
+                        prev_date[k]["dias_necessários"] = round(
+                            prev_date[k]["area"] / max_day
                         )
                         index = 0
                         for vvv in final_result[k][kk]["cronograma"]:
