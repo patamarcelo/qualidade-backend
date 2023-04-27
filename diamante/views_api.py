@@ -1025,8 +1025,10 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         "area_colheita",
                         "data_plantio",
                         "programa",
-                        "programa_id"
-                        # "get_cronograma_programa",
+                        "programa_id",
+                        "programa__start_date",
+                        "programa__end_date",
+                        "programa__nome",
                     )
                     .filter(~Q(programa_id=None))
                     .filter(safra=safra, ciclo=ciclo)
@@ -1068,7 +1070,10 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 "area_colheita": i["area_colheita"],
                                 "data_plantio": i["data_plantio"],
                                 "dap": get_dap(i["data_plantio"]),
-                                "programa": i["programa"],
+                                "programa_id": i["programa"],
+                                "programa": i["programa__nome"],
+                                "programa_start_date": i["programa__start_date"],
+                                "programa_start_end": i["programa__end_date"],
                                 "cronograma": [
                                     {
                                         "estagio": x["estagio"],
