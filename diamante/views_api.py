@@ -17,9 +17,21 @@ from django.db.models import Q, Sum
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 from decimal import *
+from django.db.models import Q
+from .utils import get_dap, get_prev_app_date, get_quantidade_aplicar
 
 
-from .models import Talhao, Projeto, Variedade, Plantio, Safra, Ciclo, Defensivo
+from .models import (
+    Talhao,
+    Projeto,
+    Variedade,
+    Plantio,
+    Safra,
+    Ciclo,
+    Defensivo,
+    Aplicacao,
+    Operacao,
+)
 
 from functools import reduce
 
@@ -942,9 +954,10 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 ).filter(programa_id=6)
                 ids_list = qs.values("id")
 
+                qs_filtered = Plantio.objects.filter(id__in=ids_list)
+
                 crono_list = [
-                    (x.get_cronograma_programa, x.get_dap)
-                    for x in Plantio.objects.filter(id__in=ids_list)
+                    (x.get_cronograma_programa, x.get_dap) for x in qs_filtered
                 ]
 
                 print(crono_list[0][1])
@@ -974,7 +987,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
 
                 response = {
                     "msg": f"Consulta realizada com sucesso!!",
-                    "total_return": len(final_return),
+                    "total_return": len(qs),
                     "projeto": projeto,
                     "dados": final_return,
                 }
@@ -992,34 +1005,120 @@ class PlantioViewSet(viewsets.ModelViewSet):
     def get_plantio_operacoes_detail(self, request):
         if request.user.is_authenticated:
             try:
-                qs = Plantio.objects.values(
-                    "id",
-                    "talhao__id_talhao",
-                    "talhao_id",
-                    "talhao__fazenda__nome",
-                    "variedade__nome_fantasia",
-                    "area_colheita",
-                    "data_plantio",
-                    # "get_cronograma_programa",
-                ).filter(programa_id=6)
-                ids_list = qs.values("id")
+                safra_2022_2023 = 0
+                safra_2023_2024 = 1
+                safra = Safra.objects.all()[safra_2023_2024]
+                ciclo_1 = 0
+                ciclo_2 = 1
+                ciclo_3 = 2
+                ciclo = Ciclo.objects.all()[ciclo_1]
+                qs_plantio = (
+                    Plantio.objects.values(
+                        "id",
+                        "talhao__id_talhao",
+                        "talhao_id",
+                        "safra__safra",
+                        "ciclo__ciclo",
+                        "talhao__fazenda__nome",
+                        "variedade__nome_fantasia",
+                        "variedade__cultura__cultura",
+                        "area_colheita",
+                        "data_plantio",
+                        "programa",
+                        "programa_id"
+                        # "get_cronograma_programa",
+                    )
+                    .filter(~Q(programa_id=None))
+                    .filter(safra=safra, ciclo=ciclo)
+                )
+                ids_list_plantio = qs_plantio.values("id")
+                qs_programas = Operacao.objects.values(
+                    "estagio", "programa_id", "prazo_dap", "id"
+                )
+                qs_aplicacoes = (
+                    Aplicacao.objects.values(
+                        "defensivo__produto",
+                        "dose",
+                        "operacao",
+                        "operacao__estagio",
+                        "operacao__prazo_dap",
+                        "operacao__programa",
+                        "operacao__programa__nome",
+                        "operacao__programa__safra__safra",
+                        "operacao__programa__ciclo__ciclo",
+                        "operacao__programa__cultura__cultura",
+                    )
+                    .filter(~Q(operacao__programa_id=None))
+                    .filter(
+                        operacao__programa__safra=safra, operacao__programa__ciclo=ciclo
+                    )
+                )
 
-                crono_list = [
-                    (x.get_detail_cronograma_and_aplication, x.get_dap)
-                    for x in Plantio.objects.filter(id__in=ids_list)
-                ]
+                final_result = {i["talhao__fazenda__nome"]: {} for i in qs_plantio}
 
-                final_return = []
-                for i in crono_list:
-                    dict_up = qs.filter(id=i[0][0]["id"])[0]
-                    dict_up.update({"DAP": i[1]})
-                    dict_up.update({"cronograma": i[0]})
-                    final_return.append(dict_up)
+                {
+                    final_result[i["talhao__fazenda__nome"]].update(
+                        {
+                            i["talhao__id_talhao"]: {
+                                "safra": i["safra__safra"],
+                                "ciclo": i["ciclo__ciclo"],
+                                "cultura": i["variedade__cultura__cultura"],
+                                "variedade": i["variedade__nome_fantasia"],
+                                "plantio_id": i["id"],
+                                "area_colheita": i["area_colheita"],
+                                "data_plantio": i["data_plantio"],
+                                "dap": get_dap(i["data_plantio"]),
+                                "programa": i["programa"],
+                                "cronograma": [
+                                    {
+                                        "estagio": x["estagio"],
+                                        "dap": x["prazo_dap"],
+                                        "data prevista": get_prev_app_date(
+                                            i["data_plantio"], x["prazo_dap"]
+                                        ),
+                                        "produtos": [
+                                            {
+                                                "produto": y["defensivo__produto"],
+                                                "dose": y["dose"],
+                                                "quantidade aplicar": get_quantidade_aplicar(
+                                                    y["dose"], i["area_colheita"]
+                                                ),
+                                            }
+                                            for y in qs_aplicacoes
+                                            if x["programa_id"] == i["programa"]
+                                            and y["operacao"] == x["id"]
+                                        ],
+                                    }
+                                    for x in qs_programas
+                                    if x["programa_id"] == i["programa"]
+                                ],
+                            }
+                        }
+                    )
+                    for i in qs_plantio
+                }
+
+                # crono_list = [
+                #     (x.get_detail_cronograma_and_aplication, x.get_dap)
+                #     for x in Plantio.objects.filter(id__in=ids_list)
+                # ]
+
+                # final_return = []
+                # for i in crono_list:
+                #     dict_up = qs.filter(id=i[0][0]["id"])[0]
+                #     dict_up.update({"DAP": i[1]})
+                #     dict_up.update({"cronograma": i[0]})
+                #     final_return.append(dict_up)
+
+                # fazendas = set([x["talhao__fazenda__nome"] for x in qs_plantio])
 
                 response = {
                     "msg": f"Consulta realizada com sucesso!!",
-                    "total_return": len(final_return),
-                    "dados": final_return,
+                    "fazendas": final_result,
+                    "total_return_plantio": len(qs_plantio),
+                    "dados_plantio": qs_plantio,
+                    "total_return_aplicacoes": len(qs_aplicacoes),
+                    "dados_aplicacoes": qs_aplicacoes,
                 }
                 return Response(response, status=status.HTTP_200_OK)
             except Exception as e:
