@@ -89,6 +89,7 @@ class PlantioAdmin(admin.ModelAdmin):
         "safra__safra",
         "ciclo__ciclo",
         "programa__nome",
+        "modificado",
     )
     list_display = (
         "talhao",
@@ -264,4 +265,5 @@ class AplicacaoAdmin(admin.ModelAdmin):
 
     def defensivo__formulacao(self, obj):
         return obj.defensivo.get_tipo_display()
+
     defensivo__formulacao.short_description = "Tipo"
