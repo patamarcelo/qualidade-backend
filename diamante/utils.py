@@ -1,6 +1,8 @@
 from datetime import timedelta
 import datetime
 
+today = datetime.date.today()
+
 
 def get_dap(data_plantio):
     dap = 0
@@ -26,3 +28,10 @@ def get_quantidade_aplicar(dose, area_colehita):
     else:
         print("problema em calcular o total a aplicar")
     return total
+
+
+def get_base_date(data_inicial, today=today):
+    if data_inicial > today:
+        return data_inicial
+    else:
+        return today

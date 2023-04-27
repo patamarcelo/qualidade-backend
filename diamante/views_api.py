@@ -14,11 +14,11 @@ import json
 from django.http import JsonResponse
 from django.core.serializers import serialize
 from django.db.models import Q, Sum
-from datetime import datetime, timedelta
+import datetime
 from dateutil.relativedelta import relativedelta
 from decimal import *
 from django.db.models import Q
-from .utils import get_dap, get_prev_app_date, get_quantidade_aplicar
+from .utils import get_dap, get_prev_app_date, get_quantidade_aplicar, get_base_date
 
 
 from .models import (
@@ -1073,7 +1073,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 "programa_id": i["programa"],
                                 "programa": i["programa__nome"],
                                 "programa_start_date": i["programa__start_date"],
-                                "programa_start_end": i["programa__end_date"],
+                                "programa_end_date": i["programa__end_date"],
                                 "cronograma": [
                                     {
                                         "estagio": x["estagio"],
@@ -1103,27 +1103,67 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     for i in qs_plantio
                 }
 
-                # crono_list = [
-                #     (x.get_detail_cronograma_and_aplication, x.get_dap)
-                #     for x in Plantio.objects.filter(id__in=ids_list)
-                # ]
+                prev_date = {}
+                # 50 ha por dia
+                max_day = 50
 
-                # final_return = []
-                # for i in crono_list:
-                #     dict_up = qs.filter(id=i[0][0]["id"])[0]
-                #     dict_up.update({"DAP": i[1]})
-                #     dict_up.update({"cronograma": i[0]})
-                #     final_return.append(dict_up)
+                # PROGRAMA PARA GERAR DATAS FUTURAS DE ACORDO COM A LÓGICA PARA
+                for k, v in final_result.items():
+                    prev_date.update(
+                        {
+                            k: {
+                                "area": 0,
+                                "dias_necessários": 1,
+                                "data_inicial": None,
+                                "data_final": None,
+                            }
+                        }
+                    )
+                    for kk, vv in v.items():
+                        data_plantio = vv["data_plantio"]
+                        area_colheita = vv["area_colheita"]
+                        start_date = vv["programa_start_date"]
+                        end_date = vv["programa_end_date"]
+                        cronograma = vv["cronograma"]
 
-                # fazendas = set([x["talhao__fazenda__nome"] for x in qs_plantio])
+                        prev_date[k]["area"] += vv["area_colheita"]
+                        prev_date[k]["dias_necessários"] = round(
+                            prev_date[k]["area"] / max_day
+                        )
+                        prev_date[k]["data_inicial"] = get_base_date(start_date)
+                        prev_date[k]["data_final"] = prev_date[k][
+                            "data_inicial"
+                        ] + datetime.timedelta(days=prev_date[k]["dias_necessários"])
+
+                        print(k)
+                        final_result[k][kk].update(
+                            {
+                                "data_plantio": prev_date[k]["data_inicial"]
+                                + datetime.timedelta(
+                                    days=prev_date[k]["dias_necessários"]
+                                )
+                            }
+                        )
+                        index = 0
+                        for vvv in final_result[k][kk]["cronograma"]:
+                            print(vvv["data prevista"])
+                            final_result[k][kk]["cronograma"][index].update(
+                                {
+                                    "data prevista": final_result[k][kk]["data_plantio"]
+                                    + datetime.timedelta(days=vvv["dap"])
+                                }
+                            )
+                            index += 1
+                        print(final_result[k][kk]["data_plantio"])
 
                 response = {
                     "msg": f"Consulta realizada com sucesso!!",
-                    "fazendas": final_result,
-                    "total_return_plantio": len(qs_plantio),
-                    "dados_plantio": qs_plantio,
-                    "total_return_aplicacoes": len(qs_aplicacoes),
-                    "dados_aplicacoes": qs_aplicacoes,
+                    "prev_date": prev_date,
+                    "total_return_plantio": len(final_result),
+                    "dados": final_result,
+                    # "dados_plantio": qs_plantio,
+                    # "total_return_aplicacoes": len(qs_aplicacoes),
+                    # "dados_aplicacoes": qs_aplicacoes,
                 }
                 return Response(response, status=status.HTTP_200_OK)
             except Exception as e:
