@@ -577,7 +577,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             try:
                 # file = request.FILES["plantio_arroz"]
                 # file_ = open(os.path.join(settings.BASE_DIR, 'filename'))
-                date_file = "2023-04-26"
+                date_file = "2023-04-28"
                 with open(f"static/files/dataset-{date_file}.json") as user_file:
                     file_contents = user_file.read()
                     parsed_json = json.loads(file_contents)
@@ -585,7 +585,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 # DB CONSULT
                 talhao_list = Talhao.objects.all()
                 variedade_list = Variedade.objects.all()
-                safra = Safra.objects.all()[1]
+                safa_2023_2024 = Safra.objects.all()[1]
                 ciclo_list = Ciclo.objects.all()
                 projetos = Projeto.objects.all()
 
@@ -647,7 +647,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     if cultura_planejada:
                         try:
                             field_to_update = Plantio.objects.filter(
-                                safra=safra, ciclo=ciclo, talhao=talhao_id
+                                safra=safa_2023_2024, ciclo=ciclo, talhao=talhao_id
                             )[0]
 
                             if date_plantio:
@@ -753,6 +753,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     )
                     .order_by("talhao__fazenda__nome", "talhao__id_talhao")
                     .filter(safra__safra="2023/2024", ciclo__ciclo="1")
+                    # .filter(~Q(data_plantio=None))
                 )
 
                 # ------------- ------------- START SEPARADO POR PROJETO ------------- -------------#
@@ -1136,7 +1137,6 @@ class PlantioViewSet(viewsets.ModelViewSet):
                             "data_inicial"
                         ] + datetime.timedelta(days=prev_date[k]["dias_necessários"])
 
-                        print(k)
                         final_result[k][kk].update(
                             {
                                 "data_plantio": prev_date[k]["data_inicial"]
@@ -1150,7 +1150,6 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         )
                         index = 0
                         for vvv in final_result[k][kk]["cronograma"]:
-                            print(vvv["data prevista"])
                             final_result[k][kk]["cronograma"][index].update(
                                 {
                                     "data prevista": final_result[k][kk]["data_plantio"]
@@ -1158,13 +1157,84 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 }
                             )
                             index += 1
-                        print(final_result[k][kk]["data_plantio"])
+
+                # RESUMO POR DIA COM TOTAIS DE APLICACOES
+                final_by_day = []
+
+                final = []
+
+                def find_exs(x):
+                    if x["data"]:
+                        return True
+                    else:
+                        return False
+
+                for k, v in final_result.items():
+                    for kk, vv in v.items():
+                        final.append({"fazenda": k, "parcela": kk, "dados": vv})
+                        cronograma = vv["cronograma"]
+                        for kkk in cronograma:
+                            data_prev_cronograma = kkk["data prevista"]
+                            produtos_cronograma = kkk["produtos"]
+                            exists = [
+                                [x["data"], ind]
+                                for ind, x in enumerate(final_by_day)
+                                if x["data"] == data_prev_cronograma
+                            ]
+                            if exists:
+                                indice_data_existente = exists[0][1]
+                                dict_to_update = final_by_day[exists[0][1]]["produtos"]
+
+                                for i in produtos_cronograma:
+                                    filtered = [
+                                        (index, x["produto"], x["quantidade"])
+                                        for index, x in enumerate(
+                                            final_by_day[exists[0][1]]["produtos"]
+                                        )
+                                        if x["produto"] == i["produto"]
+                                    ]
+
+                                    # add quantity to product that already exists
+                                    if filtered:
+                                        index_of = filtered[0][0]
+                                        value_of_upda = filtered[0][2]
+                                        final_by_day[exists[0][1]]["produtos"][
+                                            index_of
+                                        ].update(
+                                            {
+                                                "produto": i["produto"],
+                                                "quantidade": i["quantidade aplicar"]
+                                                + value_of_upda,
+                                            }
+                                        )
+                                    else:
+                                        dict_to_update.append(
+                                            {
+                                                "produto": i["produto"],
+                                                "quantidade": i["quantidade aplicar"],
+                                            }
+                                        )
+                            else:
+                                final_by_day.append(
+                                    {
+                                        "data": data_prev_cronograma,
+                                        "produtos": [
+                                            {
+                                                "produto": x["produto"],
+                                                "quantidade": x["quantidade aplicar"],
+                                            }
+                                            for x in produtos_cronograma
+                                        ],
+                                    }
+                                )
 
                 response = {
                     "msg": f"Consulta realizada com sucesso!!",
-                    "prev_date": prev_date,
+                    # "prev_date": prev_date,
+                    "app_date": final_by_day,
+                    "total_query_plantio": qs_plantio.count(),
                     "total_return_plantio": len(final_result),
-                    "dados": final_result,
+                    "dados": final,
                     # "dados_plantio": qs_plantio,
                     # "total_return_aplicacoes": len(qs_aplicacoes),
                     # "dados_aplicacoes": qs_aplicacoes,
