@@ -268,7 +268,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 try:
                     # file = request.FILES["plantio_arroz"]
                     # file_ = open(os.path.join(settings.BASE_DIR, 'filename'))
-                    with open("static/files/dataset-2023-2024.json") as user_file:
+                    date_file = "2023-05-01"
+                    with open(f"static/files/dataset-{date_file}.json") as user_file:
                         file_contents = user_file.read()
                         parsed_json = json.loads(file_contents)
                         new_list = parsed_json
@@ -437,7 +438,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
             try:
                 # file = request.FILES["plantio_arroz"]
                 # file_ = open(os.path.join(settings.BASE_DIR, 'filename'))
-                with open("static/files/dataset-2023-2024.json") as user_file:
+                date_file = "2023-05-01"
+                with open(f"static/files/dataset-{date_file}.json") as user_file:
                     file_contents = user_file.read()
                     parsed_json = json.loads(file_contents)
                     new_list = parsed_json
@@ -577,7 +579,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             try:
                 # file = request.FILES["plantio_arroz"]
                 # file_ = open(os.path.join(settings.BASE_DIR, 'filename'))
-                date_file = "2023-04-28"
+                date_file = "2023-05-01"
                 with open(f"static/files/dataset-{date_file}.json") as user_file:
                     file_contents = user_file.read()
                     parsed_json = json.loads(file_contents)
@@ -593,6 +595,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 for i in new_list:
                     state = i["state"]
                     date_plantio = i["date"]
+                    emergence_date = i["emergence_date"]
                     activation_date = ["activation_date"]
                     parcela = i["name"].replace(" ", "")
                     farm_name = i["farm_name"]
@@ -650,8 +653,14 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 safra=safa_2023_2024, ciclo=ciclo, talhao=talhao_id
                             )[0]
 
-                            if date_plantio:
-                                field_to_update.data_plantio = date_plantio
+                            if state == "active":
+                                if date_plantio:
+                                    field_to_update.data_plantio = date_plantio
+                                    field_to_update.finalizado_plantio = True
+                                    field_to_update.area_colheita = area
+
+                                if emergence_date:
+                                    field_to_update.data_emergencia = emergence_date
 
                             if variety_id:
                                 id_variedade_done = [
@@ -888,12 +897,10 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 print(f"variedade sem cadastro: {id_variedade}")
                             try:
                                 Plantio.objects.filter(
-                                    talhao__id_unico=talhao_id.id_unico
-                                ).update(
-                                    finalizado_colheita=finalizado,
+                                    talhao__id_unico=talhao_id.id_unico,
                                     safra=safra,
                                     ciclo=ciclo,
-                                )
+                                ).update(finalizado_colheita=finalizado)
 
                             except Exception as e:
                                 print(
@@ -1026,6 +1033,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         "variedade__cultura__cultura",
                         "area_colheita",
                         "data_plantio",
+                        "finalizado_plantio",
                         "programa",
                         "programa_id",
                         "programa__start_date",
@@ -1069,6 +1077,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 "cultura": i["variedade__cultura__cultura"],
                                 "variedade": i["variedade__nome_fantasia"],
                                 "plantio_id": i["id"],
+                                "plantio_finalizado": i["finalizado_plantio"],
                                 "area_colheita": i["area_colheita"],
                                 "data_plantio": i["data_plantio"],
                                 "dap": get_dap(i["data_plantio"]),

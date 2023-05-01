@@ -85,6 +85,7 @@ class PlantioAdmin(admin.ModelAdmin):
     list_filter = (
         "variedade",
         "finalizado_colheita",
+        "finalizado_plantio",
         "talhao__fazenda__nome",
         "safra__safra",
         "ciclo__ciclo",
@@ -258,7 +259,13 @@ class DefensivoAdmin(admin.ModelAdmin):
 
 @admin.register(Aplicacao)
 class AplicacaoAdmin(admin.ModelAdmin):
-    list_display = ("operacao","programa", "defensivo", "defensivo__formulacao", "dose")
+    list_display = (
+        "operacao",
+        "programa",
+        "defensivo",
+        "defensivo__formulacao",
+        "dose",
+    )
     search_fields = ["operacao__programa__nome", "defensivo__produto", "dose"]
     raw_id_fields = ["operacao"]
     list_filter = ("defensivo", "operacao__programa", "operacao")
@@ -267,7 +274,7 @@ class AplicacaoAdmin(admin.ModelAdmin):
         return obj.defensivo.get_tipo_display()
 
     defensivo__formulacao.short_description = "Tipo"
-    
+
     def programa(self, obj):
         return obj.operacao.programa
 
