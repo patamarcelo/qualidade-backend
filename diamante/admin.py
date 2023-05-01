@@ -258,8 +258,8 @@ class DefensivoAdmin(admin.ModelAdmin):
 
 @admin.register(Aplicacao)
 class AplicacaoAdmin(admin.ModelAdmin):
-    list_display = ("operacao", "defensivo", "defensivo__formulacao", "dose")
-    search_fields = ["operacao", "defensivo", "dose"]
+    list_display = ("operacao","programa", "defensivo", "defensivo__formulacao", "dose")
+    search_fields = ["operacao__programa__nome", "defensivo__produto", "dose"]
     raw_id_fields = ["operacao"]
     list_filter = ("defensivo", "operacao__programa", "operacao")
 
@@ -267,3 +267,8 @@ class AplicacaoAdmin(admin.ModelAdmin):
         return obj.defensivo.get_tipo_display()
 
     defensivo__formulacao.short_description = "Tipo"
+    
+    def programa(self, obj):
+        return obj.operacao.programa
+
+    programa.short_description = "Programa"
