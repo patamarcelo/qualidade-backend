@@ -1136,15 +1136,15 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         prev_date[k]["data_final"] = prev_date[k][
                             "data_inicial"
                         ] + datetime.timedelta(days=prev_date[k]["dias_necessários"])
-
-                        final_result[k][kk].update(
-                            {
-                                "data_plantio": prev_date[k]["data_inicial"]
-                                + datetime.timedelta(
-                                    days=prev_date[k]["dias_necessários"]
-                                )
-                            }
-                        )
+                        if data_plantio is None:
+                            final_result[k][kk].update(
+                                {
+                                    "data_plantio": prev_date[k]["data_inicial"]
+                                    + datetime.timedelta(
+                                        days=prev_date[k]["dias_necessários"]
+                                    )
+                                }
+                            )
                         prev_date[k]["dias_necessários"] = round(
                             prev_date[k]["area"] / max_day
                         )
