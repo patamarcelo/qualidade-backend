@@ -587,7 +587,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 # DB CONSULT
                 talhao_list = Talhao.objects.all()
                 variedade_list = Variedade.objects.all()
-                safa_2023_2024 = Safra.objects.all()[1]
+                safra_list = Safra.objects.all()
+                safra_list = [s for s in safra_list]
                 ciclo_list = Ciclo.objects.all()
                 projetos = Projeto.objects.all()
 
@@ -615,6 +616,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     ciclo_json = i["cycle"]
 
                     ciclo = ciclo_list[ciclo_json - 1]
+                    safra = [s for s in safra_list if s.safra == safra_farm][0]
 
                     id_talhao = [
                         x.id_d for x in projetos if x.id_farmbox == fazenda_id
@@ -650,7 +652,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     if cultura_planejada:
                         try:
                             field_to_update = Plantio.objects.filter(
-                                safra=safa_2023_2024, ciclo=ciclo, talhao=talhao_id
+                                safra=safra, ciclo=ciclo, talhao=talhao_id
                             )[0]
 
                             if state == "active":
@@ -1029,6 +1031,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         "safra__safra",
                         "ciclo__ciclo",
                         "talhao__fazenda__nome",
+                        "talhao__fazenda__fazenda__capacidade_plantio_ha_dia",
                         "variedade__nome_fantasia",
                         "variedade__cultura__cultura",
                         "area_colheita",
@@ -1085,6 +1088,9 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 "programa": i["programa__nome"],
                                 "programa_start_date": i["programa__start_date"],
                                 "programa_end_date": i["programa__end_date"],
+                                "capacidade_plantio_dia": i[
+                                    "talhao__fazenda__fazenda__capacidade_plantio_ha_dia"
+                                ],
                                 "cronograma": [
                                     {
                                         "estagio": x["estagio"],
@@ -1116,7 +1122,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
 
                 prev_date = {}
                 # 50 ha por dia
-                max_day = 50
+                # max_day = 50
 
                 # PROGRAMA PARA GERAR DATAS FUTURAS DE ACORDO COM A LÓGICA PARA
                 for k, v in final_result.items():
@@ -1136,10 +1142,11 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         start_date = vv["programa_start_date"]
                         end_date = vv["programa_end_date"]
                         cronograma = vv["cronograma"]
+                        capacidade_dia = vv["capacidade_plantio_dia"]
 
                         prev_date[k]["area"] += vv["area_colheita"]
                         prev_date[k]["dias_necessários"] = round(
-                            prev_date[k]["area"] / max_day
+                            prev_date[k]["area"] / capacidade_dia
                         )
                         prev_date[k]["data_inicial"] = get_base_date(start_date)
                         prev_date[k]["data_final"] = prev_date[k][
@@ -1155,7 +1162,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 }
                             )
                         prev_date[k]["dias_necessários"] = round(
-                            prev_date[k]["area"] / max_day
+                            prev_date[k]["area"] / capacidade_dia
                         )
                         index = 0
                         for vvv in final_result[k][kk]["cronograma"]:

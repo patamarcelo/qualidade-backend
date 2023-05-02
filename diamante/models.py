@@ -40,6 +40,12 @@ class Fazenda(Base):
     nome = models.CharField("Nome", max_length=100, help_text="Fazenda", unique=True)
     id_d = models.PositiveIntegerField("ID_D", unique=True)
 
+    capacidade_plantio_ha_dia = models.PositiveIntegerField(
+        "Quantidade ha Plantio / dia",
+        default=50,
+        help_text="Capacidade Projetada Plantio ha/dia",
+    )
+
     class Meta:
         ordering = ["nome"]
         verbose_name = "Fazenda"
@@ -77,6 +83,12 @@ class Projeto(Base):
         null=True,
         max_digits=10,
         decimal_places=2,
+    )
+
+    capacidade_plantio_ha_dia = models.PositiveIntegerField(
+        "Quantidade ha Plantio / dia",
+        default=50,
+        help_text="Capacidade Projetada Plantio ha/dia",
     )
 
     class Meta:

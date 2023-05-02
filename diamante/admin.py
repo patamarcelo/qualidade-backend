@@ -20,8 +20,13 @@ class DepositoAdmin(admin.ModelAdmin):
 
 @admin.register(Fazenda)
 class FazendaAdmin(admin.ModelAdmin):
-    list_display = ("nome", "id_d")
+    list_display = ("nome", "id_d", "get_plantio_dia")
     ordering = ("nome",)
+
+    def get_plantio_dia(self, obj):
+        return f"{obj.capacidade_plantio_ha_dia} ha/dia"
+
+    get_plantio_dia.short_description = "Plantio / Dia"
 
 
 @admin.register(Projeto)
