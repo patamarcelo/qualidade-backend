@@ -1027,10 +1027,12 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     Plantio.objects.values(
                         "id",
                         "talhao__id_talhao",
+                        "talhao__id_unico",
                         "talhao_id",
                         "safra__safra",
                         "ciclo__ciclo",
                         "talhao__fazenda__nome",
+                        "talhao__fazenda__fazenda__nome",
                         "talhao__fazenda__fazenda__capacidade_plantio_ha_dia",
                         "variedade__nome_fantasia",
                         "variedade__cultura__cultura",
@@ -1046,7 +1048,6 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     .filter(~Q(programa_id=None))
                     .filter(safra=safra, ciclo=ciclo)
                 )
-                ids_list_plantio = qs_plantio.values("id")
                 qs_programas = Operacao.objects.values(
                     "estagio", "programa_id", "prazo_dap", "id"
                 )
@@ -1080,6 +1081,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 "cultura": i["variedade__cultura__cultura"],
                                 "variedade": i["variedade__nome_fantasia"],
                                 "plantio_id": i["id"],
+                                "fazenda_grupo" : i["talhao__fazenda__fazenda__nome"],
+                                "talhao_id_unico" : i["talhao__id_unico"],
                                 "plantio_finalizado": i["finalizado_plantio"],
                                 "area_colheita": i["area_colheita"],
                                 "data_plantio": i["data_plantio"],
@@ -1246,7 +1249,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
 
                 response = {
                     "msg": f"Consulta realizada com sucesso!!",
-                    # "prev_date": prev_date,
+                    "prev_date": prev_date,
                     "app_date": final_by_day,
                     "total_query_plantio": qs_plantio.count(),
                     "total_return_plantio": len(final_result),
