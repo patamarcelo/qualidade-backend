@@ -138,6 +138,7 @@ TIPO_CHOICES = (
     ("fungicida", "Fungicida"),
     ("herbicida", "Herbicida"),
     ("inseticida", "Inseticida"),
+    ("lubrificante", "Lubrificante"),
     ("nutricao", "Nutrição"),
     ("oleo_mineral_vegetal", "Óleo Mineral/Vegetal"),
     ("regulador", "Regulador"),

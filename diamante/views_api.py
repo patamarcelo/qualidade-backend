@@ -579,7 +579,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             try:
                 # file = request.FILES["plantio_arroz"]
                 # file_ = open(os.path.join(settings.BASE_DIR, 'filename'))
-                date_file = "2023-05-01"
+                date_file = "2023-05-09-1"
                 with open(f"static/files/dataset-{date_file}.json") as user_file:
                     file_contents = user_file.read()
                     parsed_json = json.loads(file_contents)
@@ -654,7 +654,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                             field_to_update = Plantio.objects.filter(
                                 safra=safra, ciclo=ciclo, talhao=talhao_id
                             )[0]
-
+                            if area:
+                                field_to_update.area_colheita = area
                             if state == "active":
                                 if date_plantio:
                                     field_to_update.data_plantio = date_plantio
@@ -767,6 +768,15 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     # .filter(~Q(data_plantio=None))
                 )
 
+                qs_annotate = Plantio.objects.filter(
+                    safra__safra="2023/2024", ciclo__ciclo="1"
+                )
+                res1 = (
+                    qs_annotate.values("talhao__fazenda__nome", "variedade__variedade")
+                    .order_by("talhao__fazenda__nome")
+                    .annotate(area_total=Sum("area_colheita"))
+                )
+
                 # ------------- ------------- START SEPARADO POR PROJETO ------------- -------------#
                 resumo = {i["talhao__fazenda__nome"]: {} for i in qs}
 
@@ -814,11 +824,12 @@ class PlantioViewSet(viewsets.ModelViewSet):
 
                 # ------------- ------------- END SEPARADO POR FAZENDA > PROJETO ------------- -------------#
 
-                area_total = Plantio.objects.aggregate(Sum("area_colheita"))
+                area_total = qs_annotate.aggregate(Sum("area_colheita"))
 
                 response = {
                     "msg": f"Consulta realizada com sucesso!!",
                     "total_return": len(qs),
+                    "resumo_safra": res1,
                     "Area Total dos Talhoes Plantados": area_total,
                     "dados": resumo,
                 }
@@ -1054,6 +1065,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 qs_aplicacoes = (
                     Aplicacao.objects.values(
                         "defensivo__produto",
+                        "defensivo__tipo",
                         "dose",
                         "operacao",
                         "operacao__estagio",
@@ -1081,8 +1093,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 "cultura": i["variedade__cultura__cultura"],
                                 "variedade": i["variedade__nome_fantasia"],
                                 "plantio_id": i["id"],
-                                "fazenda_grupo" : i["talhao__fazenda__fazenda__nome"],
-                                "talhao_id_unico" : i["talhao__id_unico"],
+                                "fazenda_grupo": i["talhao__fazenda__fazenda__nome"],
+                                "talhao_id_unico": i["talhao__id_unico"],
                                 "plantio_finalizado": i["finalizado_plantio"],
                                 "area_colheita": i["area_colheita"],
                                 "data_plantio": i["data_plantio"],
@@ -1104,6 +1116,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                         "produtos": [
                                             {
                                                 "produto": y["defensivo__produto"],
+                                                "tipo": y["defensivo__tipo"],
                                                 "dose": y["dose"],
                                                 "quantidade aplicar": get_quantidade_aplicar(
                                                     y["dose"], i["area_colheita"]
@@ -1222,6 +1235,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                         ].update(
                                             {
                                                 "produto": i["produto"],
+                                                "tipo": i["tipo"],
                                                 "quantidade": i["quantidade aplicar"]
                                                 + value_of_upda,
                                             }
@@ -1230,6 +1244,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                         dict_to_update.append(
                                             {
                                                 "produto": i["produto"],
+                                                "tipo": i["tipo"],
                                                 "quantidade": i["quantidade aplicar"],
                                             }
                                         )

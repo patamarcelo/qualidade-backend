@@ -271,7 +271,7 @@ class AplicacaoAdmin(admin.ModelAdmin):
         "defensivo__formulacao",
         "dose",
     )
-    search_fields = ["operacao__programa__nome", "defensivo__produto", "dose"]
+    search_fields = ["operacao__programa__nome", "operacao__estagio", "defensivo__produto", "dose"]
     raw_id_fields = ["operacao"]
     list_filter = ("defensivo", "operacao__programa", "operacao")
 
