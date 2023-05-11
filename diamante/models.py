@@ -379,7 +379,12 @@ class Plantio(Base):
         blank=True,
         null=True,
     )
-    variedade = models.ForeignKey(Variedade, on_delete=models.PROTECT)
+    variedade = models.ForeignKey(
+        Variedade,
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+    )
     finalizado_plantio = models.BooleanField(
         "Finalizado Plantio", default=False, help_text="Finalizado o Plantio"
     )
