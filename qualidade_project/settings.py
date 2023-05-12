@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     "adminlte3",
     # Optional: Django admin theme (must be before django.contrib.admin)
     "adminlte3_theme",
+    # 'admin_material.apps.AdminMaterialDashboardConfig', # <-- NEW
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",

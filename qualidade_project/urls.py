@@ -44,4 +44,5 @@ if settings.DEBUG:
 
     urlpatterns += [
         path("__debug__/", include(debug_toolbar.urls)),
+        # path("", include("admin_material.urls")),
     ]

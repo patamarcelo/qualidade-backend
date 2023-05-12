@@ -579,7 +579,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             try:
                 # file = request.FILES["plantio_arroz"]
                 # file_ = open(os.path.join(settings.BASE_DIR, 'filename'))
-                date_file = "2023-05-10-1"
+                date_file = "2023-05-11-1"
                 with open(f"static/files/dataset-{date_file}.json") as user_file:
                     file_contents = user_file.read()
                     parsed_json = json.loads(file_contents)
@@ -684,11 +684,27 @@ class PlantioViewSet(viewsets.ModelViewSet):
                             print(
                                 f"{Fore.RED}Problema em salvar o plantio: {talhao_id} - {safra} - {ciclo}{Style.RESET_ALL}{e}"
                             )
-                qs_plantio = Plantio.objects.filter(safra__safra="2023/2024")
+                    else:
+                        try:
+                            field_to_update = Plantio.objects.filter(
+                                safra=safra, ciclo=ciclo, talhao=talhao_id
+                            )[0]
+                            if area:
+                                field_to_update.area_colheita = area
+                            field_to_update.variedade = None
+                            field_to_update.programa = None
+                            field_to_update.save()
+                            print(
+                                f"{Fore.YELLOW}Plantio Alterado com sucesso para SEM VARIEDADE: {field_to_update}{Style.RESET_ALL}"
+                            )
+                            print("\n")
+                            count_total += 1
+                        except Exception as e:
+                            print(
+                                f"{Fore.RED}Problema em salvar o plantio Não Planejado: {talhao_id} - {safra} - {ciclo}{Style.RESET_ALL}{e}"
+                            )
 
-                total_plantado = Plantio.objects.filter(
-                    safra__safra="2023/2024", ciclo__ciclo="1"
-                ).aggregate(Sum("area_colheita"))
+                qs_plantio = Plantio.objects.filter(safra__safra="2023/2024")
 
                 serializer_plantio = PlantioSerializer(qs_plantio, many=True)
                 response = {
