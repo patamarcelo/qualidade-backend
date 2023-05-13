@@ -1,0 +1,590 @@
+[
+    {
+        "id": 196377,
+        "variety_id": null,
+        "planned_variety_id": 20597,
+        "culture_id": null,
+        "planned_culture_id": 5,
+        "state": "active",
+        "date": null,
+        "planned_date": "2023-05-12T23:59:59.000-03:00",
+        "emergence_date": null,
+        "activation_date": "2023-05-01",
+        "area": 105.19,
+        "name": "Ia",
+        "farm_name": "Fazenda Campo Guapo",
+        "variety_name": null,
+        "planned_variety_name": "Mungo Verde",
+        "culture_name": null,
+        "culture_unit": null,
+        "culture_unit_per_ha": null,
+        "planned_culture_name": "Feij\u00e3o",
+        "harvest_name": "2023/2024",
+        "centroid": {
+            "lat": -10.850900452550924,
+            "lng": -49.947940752684104
+        },
+        "harvest_prediction_date": "2023-07-15",
+        "cycle": 1,
+        "observations": null,
+        "irrigated": false,
+        "updated_at": "2023-05-12T13:50:58.000-03:00",
+        "productivity": null,
+        "farm": {
+            "id": 11944,
+            "name": "Fazenda Campo Guapo",
+            "cnpj_cpf": "",
+            "ie": ""
+        },
+        "plot": {
+            "id": 81675,
+            "name": "I",
+            "farm_id": 11944,
+            "area": 243.12,
+            "updated_at": "2023-05-12T13:50:58.000-03:00",
+            "disabled_at": null,
+            "geo_points": [
+                {
+                    "latitude": "-10.855865",
+                    "longitude": "-49.9560979"
+                },
+                {
+                    "latitude": "-10.855776",
+                    "longitude": "-49.956074"
+                },
+                {
+                    "latitude": "-10.855805",
+                    "longitude": "-49.955435"
+                },
+                {
+                    "latitude": "-10.848164",
+                    "longitude": "-49.95516199999999"
+                },
+                {
+                    "latitude": "-10.848167",
+                    "longitude": "-49.95515199999999"
+                },
+                {
+                    "latitude": "-10.8558059",
+                    "longitude": "-49.95541599999999"
+                },
+                {
+                    "latitude": "-10.855885",
+                    "longitude": "-49.953665"
+                },
+                {
+                    "latitude": "-10.848445",
+                    "longitude": "-49.953359"
+                },
+                {
+                    "latitude": "-10.8484479",
+                    "longitude": "-49.953349"
+                },
+                {
+                    "latitude": "-10.855886",
+                    "longitude": "-49.95364689999999"
+                },
+                {
+                    "latitude": "-10.855969",
+                    "longitude": "-49.95181189999999"
+                },
+                {
+                    "latitude": "-10.848824",
+                    "longitude": "-49.95153200000001"
+                },
+                {
+                    "latitude": "-10.848827",
+                    "longitude": "-49.95152190000001"
+                },
+                {
+                    "latitude": "-10.855969",
+                    "longitude": "-49.951794"
+                },
+                {
+                    "latitude": "-10.856055",
+                    "longitude": "-49.949894"
+                },
+                {
+                    "latitude": "-10.853389",
+                    "longitude": "-49.949845"
+                },
+                {
+                    "latitude": "-10.8533919",
+                    "longitude": "-49.949835"
+                },
+                {
+                    "latitude": "-10.856056",
+                    "longitude": "-49.949876"
+                },
+                {
+                    "latitude": "-10.856392",
+                    "longitude": "-49.94241599999999"
+                },
+                {
+                    "latitude": "-10.855733",
+                    "longitude": "-49.942583"
+                },
+                {
+                    "latitude": "-10.852952",
+                    "longitude": "-49.94233099999999"
+                },
+                {
+                    "latitude": "-10.8517519",
+                    "longitude": "-49.943086"
+                },
+                {
+                    "latitude": "-10.8505699",
+                    "longitude": "-49.944071"
+                },
+                {
+                    "latitude": "-10.850167",
+                    "longitude": "-49.945462"
+                },
+                {
+                    "latitude": "-10.849206",
+                    "longitude": "-49.946556"
+                },
+                {
+                    "latitude": "-10.8484219",
+                    "longitude": "-49.946609"
+                },
+                {
+                    "latitude": "-10.848336",
+                    "longitude": "-49.945452"
+                },
+                {
+                    "latitude": "-10.84315",
+                    "longitude": "-49.94880999999999"
+                },
+                {
+                    "latitude": "-10.843119",
+                    "longitude": "-49.94927299999999"
+                },
+                {
+                    "latitude": "-10.841244",
+                    "longitude": "-49.9556449"
+                },
+                {
+                    "latitude": "-10.840248",
+                    "longitude": "-49.958837"
+                },
+                {
+                    "latitude": "-10.839881",
+                    "longitude": "-49.96031"
+                },
+                {
+                    "latitude": "-10.839971",
+                    "longitude": "-49.960379"
+                },
+                {
+                    "latitude": "-10.840852",
+                    "longitude": "-49.960076"
+                },
+                {
+                    "latitude": "-10.842624",
+                    "longitude": "-49.959826"
+                },
+                {
+                    "latitude": "-10.8433689",
+                    "longitude": "-49.959865"
+                },
+                {
+                    "latitude": "-10.844817",
+                    "longitude": "-49.960014"
+                },
+                {
+                    "latitude": "-10.848371",
+                    "longitude": "-49.960713"
+                },
+                {
+                    "latitude": "-10.848991",
+                    "longitude": "-49.96068300000001"
+                },
+                {
+                    "latitude": "-10.8498319",
+                    "longitude": "-49.96051199999999"
+                },
+                {
+                    "latitude": "-10.851607",
+                    "longitude": "-49.95927900000001"
+                },
+                {
+                    "latitude": "-10.852403",
+                    "longitude": "-49.95830599999999"
+                },
+                {
+                    "latitude": "-10.852456",
+                    "longitude": "-49.95762890000001"
+                },
+                {
+                    "latitude": "-10.8528",
+                    "longitude": "-49.957426"
+                },
+                {
+                    "latitude": "-10.8532899",
+                    "longitude": "-49.95750099999999"
+                },
+                {
+                    "latitude": "-10.8541519",
+                    "longitude": "-49.957379"
+                },
+                {
+                    "latitude": "-10.854903",
+                    "longitude": "-49.957293"
+                },
+                {
+                    "latitude": "-10.855247",
+                    "longitude": "-49.957201"
+                },
+                {
+                    "latitude": "-10.855675",
+                    "longitude": "-49.9572209"
+                },
+                {
+                    "latitude": "-10.8557849",
+                    "longitude": "-49.95715699999999"
+                },
+                {
+                    "latitude": "-10.855899",
+                    "longitude": "-49.9562779"
+                }
+            ]
+        },
+        "harvest": {
+            "id": 2607,
+            "name": "2023/2024",
+            "start_date": "2023-04-01",
+            "end_date": "2024-04-30"
+        },
+        "geo_points": [
+            {
+                "latitude": "-10.856039225147812",
+                "longitude": "-49.95182240740967"
+            },
+            {
+                "latitude": "-10.842467483155767",
+                "longitude": "-49.95130742327881"
+            },
+            {
+                "latitude": "-10.843141869972621",
+                "longitude": "-49.94920457141114"
+            },
+            {
+                "latitude": "-10.843184019098182",
+                "longitude": "-49.948732502624516"
+            },
+            {
+                "latitude": "-10.845818327660224",
+                "longitude": "-49.94708026187134"
+            },
+            {
+                "latitude": "-10.8483683162455",
+                "longitude": "-49.94542802111817"
+            },
+            {
+                "latitude": "-10.848410464634458",
+                "longitude": "-49.94662965075684"
+            },
+            {
+                "latitude": "-10.848895170680454",
+                "longitude": "-49.9465867354126"
+            },
+            {
+                "latitude": "-10.84923235703158",
+                "longitude": "-49.946479447052006"
+            },
+            {
+                "latitude": "-10.850222839738596",
+                "longitude": "-49.94534219042969"
+            },
+            {
+                "latitude": "-10.850412506265569",
+                "longitude": "-49.94461262957764"
+            },
+            {
+                "latitude": "-10.850644320746207",
+                "longitude": "-49.94392598406983"
+            },
+            {
+                "latitude": "-10.851866612307434",
+                "longitude": "-49.943003304168705"
+            },
+            {
+                "latitude": "-10.853004603405592",
+                "longitude": "-49.94233811633301"
+            },
+            {
+                "latitude": "-10.855744193830956",
+                "longitude": "-49.94259560839844"
+            },
+            {
+                "latitude": "-10.856418550698523",
+                "longitude": "-49.942295200988774"
+            }
+        ]
+    },
+    {
+        "id": 178118,
+        "variety_id": 21477,
+        "planned_variety_id": 21477,
+        "culture_id": 2,
+        "planned_culture_id": 2,
+        "state": "active",
+        "date": "2023-05-12",
+        "planned_date": "2023-05-12T23:59:59.000-03:00",
+        "emergence_date": null,
+        "activation_date": "2023-05-01",
+        "area": 18.4,
+        "name": "A11",
+        "farm_name": "Fazenda Cacique",
+        "variety_name": "TMG 2383 IPRO",
+        "planned_variety_name": "TMG 2383 IPRO",
+        "culture_name": "Soja",
+        "culture_unit": "Sc",
+        "culture_unit_per_ha": "Sc / Ha",
+        "planned_culture_name": "Soja",
+        "harvest_name": "2023/2024",
+        "centroid": {
+            "lat": -10.872600013082392,
+            "lng": -49.951312212508405
+        },
+        "harvest_prediction_date": "2023-09-01",
+        "cycle": 1,
+        "observations": null,
+        "irrigated": false,
+        "updated_at": "2023-05-12T17:08:08.000-03:00",
+        "productivity": null,
+        "farm": {
+            "id": 11945,
+            "name": "Fazenda Cacique",
+            "cnpj_cpf": "",
+            "ie": ""
+        },
+        "plot": {
+            "id": 81691,
+            "name": "A11",
+            "farm_id": 11945,
+            "area": 18.4,
+            "updated_at": "2023-05-12T17:08:09.000-03:00",
+            "disabled_at": null,
+            "geo_points": [
+                {
+                    "latitude": "-10.872043",
+                    "longitude": "-49.946374"
+                },
+                {
+                    "latitude": "-10.871598",
+                    "longitude": "-49.95609200000001"
+                },
+                {
+                    "latitude": "-10.873199",
+                    "longitude": "-49.9561709"
+                },
+                {
+                    "latitude": "-10.873567",
+                    "longitude": "-49.946453"
+                }
+            ]
+        },
+        "harvest": {
+            "id": 2607,
+            "name": "2023/2024",
+            "start_date": "2023-04-01",
+            "end_date": "2024-04-30"
+        },
+        "geo_points": [
+            {
+                "latitude": "-10.872043",
+                "longitude": "-49.946374"
+            },
+            {
+                "latitude": "-10.871598",
+                "longitude": "-49.95609200000001"
+            },
+            {
+                "latitude": "-10.873199",
+                "longitude": "-49.9561709"
+            },
+            {
+                "latitude": "-10.873567",
+                "longitude": "-49.946453"
+            }
+        ]
+    },
+    {
+        "id": 178120,
+        "variety_id": 21477,
+        "planned_variety_id": 21477,
+        "culture_id": 2,
+        "planned_culture_id": 2,
+        "state": "active",
+        "date": "2023-05-12",
+        "planned_date": "2023-05-09T23:59:59.000-03:00",
+        "emergence_date": null,
+        "activation_date": "2023-05-01",
+        "area": 18.1,
+        "name": "A13",
+        "farm_name": "Fazenda Cacique",
+        "variety_name": "TMG 2383 IPRO",
+        "planned_variety_name": "TMG 2383 IPRO",
+        "culture_name": "Soja",
+        "culture_unit": "Sc",
+        "culture_unit_per_ha": "Sc / Ha",
+        "planned_culture_name": "Soja",
+        "harvest_name": "2023/2024",
+        "centroid": {
+            "lat": -10.8695038871571,
+            "lng": -49.951207178979395
+        },
+        "harvest_prediction_date": "2023-09-01",
+        "cycle": 1,
+        "observations": null,
+        "irrigated": false,
+        "updated_at": "2023-05-12T17:08:08.000-03:00",
+        "productivity": null,
+        "farm": {
+            "id": 11945,
+            "name": "Fazenda Cacique",
+            "cnpj_cpf": "",
+            "ie": ""
+        },
+        "plot": {
+            "id": 81690,
+            "name": "A13",
+            "farm_id": 11945,
+            "area": 18.1,
+            "updated_at": "2023-05-12T17:08:09.000-03:00",
+            "disabled_at": null,
+            "geo_points": [
+                {
+                    "latitude": "-10.868954",
+                    "longitude": "-49.946215"
+                },
+                {
+                    "latitude": "-10.8685449",
+                    "longitude": "-49.95626799999999"
+                },
+                {
+                    "latitude": "-10.8700779",
+                    "longitude": "-49.956016"
+                },
+                {
+                    "latitude": "-10.870457",
+                    "longitude": "-49.946292"
+                }
+            ]
+        },
+        "harvest": {
+            "id": 2607,
+            "name": "2023/2024",
+            "start_date": "2023-04-01",
+            "end_date": "2024-04-30"
+        },
+        "geo_points": [
+            {
+                "latitude": "-10.868954",
+                "longitude": "-49.946215"
+            },
+            {
+                "latitude": "-10.8685449",
+                "longitude": "-49.95626799999999"
+            },
+            {
+                "latitude": "-10.8700779",
+                "longitude": "-49.956016"
+            },
+            {
+                "latitude": "-10.870457",
+                "longitude": "-49.946292"
+            }
+        ]
+    },
+    {
+        "id": 178119,
+        "variety_id": 21477,
+        "planned_variety_id": 21477,
+        "culture_id": 2,
+        "planned_culture_id": 2,
+        "state": "active",
+        "date": "2023-05-12",
+        "planned_date": "2023-05-13T23:59:59.000-03:00",
+        "emergence_date": null,
+        "activation_date": "2023-05-01",
+        "area": 17.75,
+        "name": "A12",
+        "farm_name": "Fazenda Cacique",
+        "variety_name": "TMG 2383 IPRO",
+        "planned_variety_name": "TMG 2383 IPRO",
+        "culture_name": "Soja",
+        "culture_unit": "Sc",
+        "culture_unit_per_ha": "Sc / Ha",
+        "planned_culture_name": "Soja",
+        "harvest_name": "2023/2024",
+        "centroid": {
+            "lat": -10.871045650567327,
+            "lng": -49.95115852883292
+        },
+        "harvest_prediction_date": "2023-09-01",
+        "cycle": 1,
+        "observations": null,
+        "irrigated": false,
+        "updated_at": "2023-05-12T17:08:08.000-03:00",
+        "productivity": null,
+        "farm": {
+            "id": 11945,
+            "name": "Fazenda Cacique",
+            "cnpj_cpf": "",
+            "ie": ""
+        },
+        "plot": {
+            "id": 81692,
+            "name": "A12",
+            "farm_id": 11945,
+            "area": 17.75,
+            "updated_at": "2023-05-12T17:08:10.000-03:00",
+            "disabled_at": null,
+            "geo_points": [
+                {
+                    "latitude": "-10.87048",
+                    "longitude": "-49.94629399999998"
+                },
+                {
+                    "latitude": "-10.870101",
+                    "longitude": "-49.95601699999999"
+                },
+                {
+                    "latitude": "-10.8715759",
+                    "longitude": "-49.95609"
+                },
+                {
+                    "latitude": "-10.8720199",
+                    "longitude": "-49.94637300000001"
+                }
+            ]
+        },
+        "harvest": {
+            "id": 2607,
+            "name": "2023/2024",
+            "start_date": "2023-04-01",
+            "end_date": "2024-04-30"
+        },
+        "geo_points": [
+            {
+                "latitude": "-10.87048",
+                "longitude": "-49.94629399999998"
+            },
+            {
+                "latitude": "-10.870101",
+                "longitude": "-49.95601699999999"
+            },
+            {
+                "latitude": "-10.8715759",
+                "longitude": "-49.95609"
+            },
+            {
+                "latitude": "-10.8720199",
+                "longitude": "-49.94637300000001"
+            }
+        ]
+    }
+]

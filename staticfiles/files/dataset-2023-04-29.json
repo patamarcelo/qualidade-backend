@@ -1,0 +1,4290 @@
+[
+    {
+        "id": 194529,
+        "variety_id": null,
+        "planned_variety_id": 20598,
+        "culture_id": null,
+        "planned_culture_id": 5,
+        "state": "planned",
+        "date": null,
+        "planned_date": null,
+        "emergence_date": null,
+        "activation_date": null,
+        "area": 6.37,
+        "name": "A02",
+        "farm_name": "Fazenda Novo Acordo",
+        "variety_name": null,
+        "planned_variety_name": "Caupi",
+        "culture_name": null,
+        "culture_unit": null,
+        "culture_unit_per_ha": null,
+        "planned_culture_name": "Feij\u00e3o",
+        "harvest_name": "2023/2024",
+        "centroid": {
+            "lat": -10.77278643997317,
+            "lng": -49.62203249623279
+        },
+        "harvest_prediction_date": null,
+        "cycle": 1,
+        "observations": null,
+        "irrigated": false,
+        "updated_at": "2023-04-29T07:41:01.000-03:00",
+        "productivity": null,
+        "farm": {
+            "id": 11950,
+            "name": "Fazenda Novo Acordo",
+            "cnpj_cpf": "",
+            "ie": ""
+        },
+        "plot": {
+            "id": 86908,
+            "name": "A02",
+            "farm_id": 11950,
+            "area": 6.33,
+            "updated_at": "2023-04-29T08:15:08.000-03:00",
+            "disabled_at": null,
+            "geo_points": [
+                {
+                    "latitude": "-10.773378791872867",
+                    "longitude": "-49.62016131779097"
+                },
+                {
+                    "latitude": "-10.773531693170034",
+                    "longitude": "-49.62020613313523"
+                },
+                {
+                    "latitude": "-10.773504721834968",
+                    "longitude": "-49.620611465816026"
+                },
+                {
+                    "latitude": "-10.773523015586122",
+                    "longitude": "-49.62089261384105"
+                },
+                {
+                    "latitude": "-10.773527983906913",
+                    "longitude": "-49.621433452219016"
+                },
+                {
+                    "latitude": "-10.773458362296909",
+                    "longitude": "-49.62211905373859"
+                },
+                {
+                    "latitude": "-10.773290209313421",
+                    "longitude": "-49.62264859871482"
+                },
+                {
+                    "latitude": "-10.773321824578488",
+                    "longitude": "-49.6226695816841"
+                },
+                {
+                    "latitude": "-10.773481699823542",
+                    "longitude": "-49.62221106506253"
+                },
+                {
+                    "latitude": "-10.773516306395429",
+                    "longitude": "-49.62198938754343"
+                },
+                {
+                    "latitude": "-10.773559707397032",
+                    "longitude": "-49.62133594493293"
+                },
+                {
+                    "latitude": "-10.77354939857796",
+                    "longitude": "-49.62064492757643"
+                },
+                {
+                    "latitude": "-10.773583228442563",
+                    "longitude": "-49.62022694705316"
+                },
+                {
+                    "latitude": "-10.773688406333767",
+                    "longitude": "-49.620216744516945"
+                },
+                {
+                    "latitude": "-10.773835743054445",
+                    "longitude": "-49.62017435547257"
+                },
+                {
+                    "latitude": "-10.773834329400035",
+                    "longitude": "-49.6221921053831"
+                },
+                {
+                    "latitude": "-10.772733571214083",
+                    "longitude": "-49.623264725690476"
+                },
+                {
+                    "latitude": "-10.77206725738234",
+                    "longitude": "-49.62422635281612"
+                },
+                {
+                    "latitude": "-10.771916622360086",
+                    "longitude": "-49.624415969178216"
+                },
+                {
+                    "latitude": "-10.771666278442208",
+                    "longitude": "-49.62465244512176"
+                },
+                {
+                    "latitude": "-10.771474789519234",
+                    "longitude": "-49.62468805524064"
+                },
+                {
+                    "latitude": "-10.771451937309877",
+                    "longitude": "-49.62467538559724"
+                },
+                {
+                    "latitude": "-10.772677808466623",
+                    "longitude": "-49.61999001972464"
+                },
+                {
+                    "latitude": "-10.772795877464084",
+                    "longitude": "-49.61997135758065"
+                },
+                {
+                    "latitude": "-10.77294001447856",
+                    "longitude": "-49.62005520494215"
+                },
+                {
+                    "latitude": "-10.773313826078903",
+                    "longitude": "-49.62012657767447"
+                }
+            ]
+        },
+        "harvest": {
+            "id": 2607,
+            "name": "2023/2024",
+            "start_date": "2023-04-01",
+            "end_date": "2024-04-30"
+        },
+        "geo_points": [
+            {
+                "latitude": "-10.773378791872867",
+                "longitude": "-49.62016131779097"
+            },
+            {
+                "latitude": "-10.773531693170034",
+                "longitude": "-49.62020613313523"
+            },
+            {
+                "latitude": "-10.773504721834968",
+                "longitude": "-49.620611465816026"
+            },
+            {
+                "latitude": "-10.773523015586122",
+                "longitude": "-49.62089261384105"
+            },
+            {
+                "latitude": "-10.773527983906913",
+                "longitude": "-49.621433452219016"
+            },
+            {
+                "latitude": "-10.773458362296909",
+                "longitude": "-49.62211905373859"
+            },
+            {
+                "latitude": "-10.773290209313421",
+                "longitude": "-49.62264859871482"
+            },
+            {
+                "latitude": "-10.773321824578488",
+                "longitude": "-49.6226695816841"
+            },
+            {
+                "latitude": "-10.773481699823542",
+                "longitude": "-49.62221106506253"
+            },
+            {
+                "latitude": "-10.773516306395429",
+                "longitude": "-49.62198938754343"
+            },
+            {
+                "latitude": "-10.773559707397032",
+                "longitude": "-49.62133594493293"
+            },
+            {
+                "latitude": "-10.77354939857796",
+                "longitude": "-49.62064492757643"
+            },
+            {
+                "latitude": "-10.773583228442563",
+                "longitude": "-49.62022694705316"
+            },
+            {
+                "latitude": "-10.773688406333767",
+                "longitude": "-49.620216744516945"
+            },
+            {
+                "latitude": "-10.773835743054445",
+                "longitude": "-49.62017435547257"
+            },
+            {
+                "latitude": "-10.773834329400035",
+                "longitude": "-49.6221921053831"
+            },
+            {
+                "latitude": "-10.772733571214083",
+                "longitude": "-49.623264725690476"
+            },
+            {
+                "latitude": "-10.77206725738234",
+                "longitude": "-49.62422635281612"
+            },
+            {
+                "latitude": "-10.771916622360086",
+                "longitude": "-49.624415969178216"
+            },
+            {
+                "latitude": "-10.771666278442208",
+                "longitude": "-49.62465244512176"
+            },
+            {
+                "latitude": "-10.771474789519234",
+                "longitude": "-49.62468805524064"
+            },
+            {
+                "latitude": "-10.771451937309877",
+                "longitude": "-49.62467538559724"
+            },
+            {
+                "latitude": "-10.772677808466623",
+                "longitude": "-49.61999001972464"
+            },
+            {
+                "latitude": "-10.772795877464084",
+                "longitude": "-49.61997135758065"
+            },
+            {
+                "latitude": "-10.77294001447856",
+                "longitude": "-49.62005520494215"
+            },
+            {
+                "latitude": "-10.773313826078903",
+                "longitude": "-49.62012657767447"
+            }
+        ]
+    },
+    {
+        "id": 194530,
+        "variety_id": null,
+        "planned_variety_id": 22128,
+        "culture_id": null,
+        "planned_culture_id": 24,
+        "state": "planned",
+        "date": null,
+        "planned_date": null,
+        "emergence_date": null,
+        "activation_date": null,
+        "area": 6.37,
+        "name": "A02",
+        "farm_name": "Fazenda Novo Acordo",
+        "variety_name": null,
+        "planned_variety_name": "BRS Pampeira",
+        "culture_name": null,
+        "culture_unit": null,
+        "culture_unit_per_ha": null,
+        "planned_culture_name": "Arroz",
+        "harvest_name": "2023/2024",
+        "centroid": {
+            "lat": -10.77278643997317,
+            "lng": -49.62203249623279
+        },
+        "harvest_prediction_date": null,
+        "cycle": 2,
+        "observations": null,
+        "irrigated": false,
+        "updated_at": "2023-04-29T07:41:01.000-03:00",
+        "productivity": null,
+        "farm": {
+            "id": 11950,
+            "name": "Fazenda Novo Acordo",
+            "cnpj_cpf": "",
+            "ie": ""
+        },
+        "plot": {
+            "id": 86908,
+            "name": "A02",
+            "farm_id": 11950,
+            "area": 6.33,
+            "updated_at": "2023-04-29T08:15:08.000-03:00",
+            "disabled_at": null,
+            "geo_points": [
+                {
+                    "latitude": "-10.773378791872867",
+                    "longitude": "-49.62016131779097"
+                },
+                {
+                    "latitude": "-10.773531693170034",
+                    "longitude": "-49.62020613313523"
+                },
+                {
+                    "latitude": "-10.773504721834968",
+                    "longitude": "-49.620611465816026"
+                },
+                {
+                    "latitude": "-10.773523015586122",
+                    "longitude": "-49.62089261384105"
+                },
+                {
+                    "latitude": "-10.773527983906913",
+                    "longitude": "-49.621433452219016"
+                },
+                {
+                    "latitude": "-10.773458362296909",
+                    "longitude": "-49.62211905373859"
+                },
+                {
+                    "latitude": "-10.773290209313421",
+                    "longitude": "-49.62264859871482"
+                },
+                {
+                    "latitude": "-10.773321824578488",
+                    "longitude": "-49.6226695816841"
+                },
+                {
+                    "latitude": "-10.773481699823542",
+                    "longitude": "-49.62221106506253"
+                },
+                {
+                    "latitude": "-10.773516306395429",
+                    "longitude": "-49.62198938754343"
+                },
+                {
+                    "latitude": "-10.773559707397032",
+                    "longitude": "-49.62133594493293"
+                },
+                {
+                    "latitude": "-10.77354939857796",
+                    "longitude": "-49.62064492757643"
+                },
+                {
+                    "latitude": "-10.773583228442563",
+                    "longitude": "-49.62022694705316"
+                },
+                {
+                    "latitude": "-10.773688406333767",
+                    "longitude": "-49.620216744516945"
+                },
+                {
+                    "latitude": "-10.773835743054445",
+                    "longitude": "-49.62017435547257"
+                },
+                {
+                    "latitude": "-10.773834329400035",
+                    "longitude": "-49.6221921053831"
+                },
+                {
+                    "latitude": "-10.772733571214083",
+                    "longitude": "-49.623264725690476"
+                },
+                {
+                    "latitude": "-10.77206725738234",
+                    "longitude": "-49.62422635281612"
+                },
+                {
+                    "latitude": "-10.771916622360086",
+                    "longitude": "-49.624415969178216"
+                },
+                {
+                    "latitude": "-10.771666278442208",
+                    "longitude": "-49.62465244512176"
+                },
+                {
+                    "latitude": "-10.771474789519234",
+                    "longitude": "-49.62468805524064"
+                },
+                {
+                    "latitude": "-10.771451937309877",
+                    "longitude": "-49.62467538559724"
+                },
+                {
+                    "latitude": "-10.772677808466623",
+                    "longitude": "-49.61999001972464"
+                },
+                {
+                    "latitude": "-10.772795877464084",
+                    "longitude": "-49.61997135758065"
+                },
+                {
+                    "latitude": "-10.77294001447856",
+                    "longitude": "-49.62005520494215"
+                },
+                {
+                    "latitude": "-10.773313826078903",
+                    "longitude": "-49.62012657767447"
+                }
+            ]
+        },
+        "harvest": {
+            "id": 2607,
+            "name": "2023/2024",
+            "start_date": "2023-04-01",
+            "end_date": "2024-04-30"
+        },
+        "geo_points": [
+            {
+                "latitude": "-10.773378791872867",
+                "longitude": "-49.62016131779097"
+            },
+            {
+                "latitude": "-10.773531693170034",
+                "longitude": "-49.62020613313523"
+            },
+            {
+                "latitude": "-10.773504721834968",
+                "longitude": "-49.620611465816026"
+            },
+            {
+                "latitude": "-10.773523015586122",
+                "longitude": "-49.62089261384105"
+            },
+            {
+                "latitude": "-10.773527983906913",
+                "longitude": "-49.621433452219016"
+            },
+            {
+                "latitude": "-10.773458362296909",
+                "longitude": "-49.62211905373859"
+            },
+            {
+                "latitude": "-10.773290209313421",
+                "longitude": "-49.62264859871482"
+            },
+            {
+                "latitude": "-10.773321824578488",
+                "longitude": "-49.6226695816841"
+            },
+            {
+                "latitude": "-10.773481699823542",
+                "longitude": "-49.62221106506253"
+            },
+            {
+                "latitude": "-10.773516306395429",
+                "longitude": "-49.62198938754343"
+            },
+            {
+                "latitude": "-10.773559707397032",
+                "longitude": "-49.62133594493293"
+            },
+            {
+                "latitude": "-10.77354939857796",
+                "longitude": "-49.62064492757643"
+            },
+            {
+                "latitude": "-10.773583228442563",
+                "longitude": "-49.62022694705316"
+            },
+            {
+                "latitude": "-10.773688406333767",
+                "longitude": "-49.620216744516945"
+            },
+            {
+                "latitude": "-10.773835743054445",
+                "longitude": "-49.62017435547257"
+            },
+            {
+                "latitude": "-10.773834329400035",
+                "longitude": "-49.6221921053831"
+            },
+            {
+                "latitude": "-10.772733571214083",
+                "longitude": "-49.623264725690476"
+            },
+            {
+                "latitude": "-10.77206725738234",
+                "longitude": "-49.62422635281612"
+            },
+            {
+                "latitude": "-10.771916622360086",
+                "longitude": "-49.624415969178216"
+            },
+            {
+                "latitude": "-10.771666278442208",
+                "longitude": "-49.62465244512176"
+            },
+            {
+                "latitude": "-10.771474789519234",
+                "longitude": "-49.62468805524064"
+            },
+            {
+                "latitude": "-10.771451937309877",
+                "longitude": "-49.62467538559724"
+            },
+            {
+                "latitude": "-10.772677808466623",
+                "longitude": "-49.61999001972464"
+            },
+            {
+                "latitude": "-10.772795877464084",
+                "longitude": "-49.61997135758065"
+            },
+            {
+                "latitude": "-10.77294001447856",
+                "longitude": "-49.62005520494215"
+            },
+            {
+                "latitude": "-10.773313826078903",
+                "longitude": "-49.62012657767447"
+            }
+        ]
+    },
+    {
+        "id": 187756,
+        "variety_id": 20598,
+        "planned_variety_id": 20598,
+        "culture_id": 5,
+        "planned_culture_id": 5,
+        "state": "active",
+        "date": "2023-05-01",
+        "planned_date": "2023-04-19T23:59:59.000-03:00",
+        "emergence_date": null,
+        "activation_date": "2023-05-01",
+        "area": 32.87,
+        "name": "B09",
+        "farm_name": "Fazenda Ben\u00e7\u00e3o de Deus",
+        "variety_name": "Caupi",
+        "planned_variety_name": "Caupi",
+        "culture_name": "Feij\u00e3o",
+        "culture_unit": "Sc",
+        "culture_unit_per_ha": "Sc / Ha",
+        "planned_culture_name": "Feij\u00e3o",
+        "harvest_name": "2023/2024",
+        "centroid": {
+            "lat": -11.145852358538724,
+            "lng": -49.630624143450675
+        },
+        "harvest_prediction_date": "2023-08-03",
+        "cycle": 1,
+        "observations": null,
+        "irrigated": false,
+        "updated_at": "2023-05-01T10:59:05.000-03:00",
+        "productivity": null,
+        "farm": {
+            "id": 11946,
+            "name": "Fazenda Ben\u00e7\u00e3o de Deus",
+            "cnpj_cpf": "",
+            "ie": ""
+        },
+        "plot": {
+            "id": 81431,
+            "name": "B09",
+            "farm_id": 11946,
+            "area": 32.87,
+            "updated_at": "2023-05-01T11:01:19.000-03:00",
+            "disabled_at": null,
+            "geo_points": [
+                {
+                    "latitude": "-11.1476351",
+                    "longitude": "-49.6339613"
+                },
+                {
+                    "latitude": "-11.1490279",
+                    "longitude": "-49.6288835"
+                },
+                {
+                    "latitude": "-11.1440137",
+                    "longitude": "-49.6273764"
+                },
+                {
+                    "latitude": "-11.1426666",
+                    "longitude": "-49.6322507"
+                }
+            ]
+        },
+        "harvest": {
+            "id": 2607,
+            "name": "2023/2024",
+            "start_date": "2023-04-01",
+            "end_date": "2024-04-30"
+        },
+        "geo_points": [
+            {
+                "latitude": "-11.1476351",
+                "longitude": "-49.6339613"
+            },
+            {
+                "latitude": "-11.1490279",
+                "longitude": "-49.6288835"
+            },
+            {
+                "latitude": "-11.1440137",
+                "longitude": "-49.6273764"
+            },
+            {
+                "latitude": "-11.1426666",
+                "longitude": "-49.6322507"
+            }
+        ]
+    },
+    {
+        "id": 190486,
+        "variety_id": null,
+        "planned_variety_id": 23736,
+        "culture_id": null,
+        "planned_culture_id": 41,
+        "state": "active",
+        "date": null,
+        "planned_date": "2023-05-01T23:59:59.000-03:00",
+        "emergence_date": null,
+        "activation_date": "2023-05-01",
+        "area": 53.84,
+        "name": "A07",
+        "farm_name": "Fazenda Ben\u00e7\u00e3o de Deus",
+        "variety_name": null,
+        "planned_variety_name": "GNPA G2",
+        "culture_name": null,
+        "culture_unit": null,
+        "culture_unit_per_ha": null,
+        "planned_culture_name": "Gergelim",
+        "harvest_name": "2023/2024",
+        "centroid": {
+            "lat": -11.151474399935271,
+            "lng": -49.65922390338572
+        },
+        "harvest_prediction_date": "2023-08-03",
+        "cycle": 1,
+        "observations": null,
+        "irrigated": false,
+        "updated_at": "2023-05-01T11:53:54.000-03:00",
+        "productivity": null,
+        "farm": {
+            "id": 11946,
+            "name": "Fazenda Ben\u00e7\u00e3o de Deus",
+            "cnpj_cpf": "",
+            "ie": ""
+        },
+        "plot": {
+            "id": 81415,
+            "name": "A07",
+            "farm_id": 11946,
+            "area": 53.84,
+            "updated_at": "2023-05-01T11:53:54.000-03:00",
+            "disabled_at": null,
+            "geo_points": [
+                {
+                    "latitude": "-11.1542729",
+                    "longitude": "-49.66387760000001"
+                },
+                {
+                    "latitude": "-11.1512549",
+                    "longitude": "-49.64926"
+                },
+                {
+                    "latitude": "-11.1508319",
+                    "longitude": "-49.6489878"
+                },
+                {
+                    "latitude": "-11.150703",
+                    "longitude": "-49.6497649"
+                },
+                {
+                    "latitude": "-11.149243",
+                    "longitude": "-49.6658447"
+                },
+                {
+                    "latitude": "-11.1493469",
+                    "longitude": "-49.6659466"
+                },
+                {
+                    "latitude": "-11.149338",
+                    "longitude": "-49.6659517"
+                },
+                {
+                    "latitude": "-11.1514377",
+                    "longitude": "-49.6650263"
+                },
+                {
+                    "latitude": "-11.1535943",
+                    "longitude": "-49.6641854"
+                }
+            ]
+        },
+        "harvest": {
+            "id": 2607,
+            "name": "2023/2024",
+            "start_date": "2023-04-01",
+            "end_date": "2024-04-30"
+        },
+        "geo_points": [
+            {
+                "latitude": "-11.1542729",
+                "longitude": "-49.66387760000001"
+            },
+            {
+                "latitude": "-11.1512549",
+                "longitude": "-49.64926"
+            },
+            {
+                "latitude": "-11.1508319",
+                "longitude": "-49.6489878"
+            },
+            {
+                "latitude": "-11.150703",
+                "longitude": "-49.6497649"
+            },
+            {
+                "latitude": "-11.149243",
+                "longitude": "-49.6658447"
+            },
+            {
+                "latitude": "-11.1493469",
+                "longitude": "-49.6659466"
+            },
+            {
+                "latitude": "-11.149338",
+                "longitude": "-49.6659517"
+            },
+            {
+                "latitude": "-11.1514377",
+                "longitude": "-49.6650263"
+            },
+            {
+                "latitude": "-11.1535943",
+                "longitude": "-49.6641854"
+            }
+        ]
+    },
+    {
+        "id": 187759,
+        "variety_id": null,
+        "planned_variety_id": 23736,
+        "culture_id": null,
+        "planned_culture_id": 41,
+        "state": "active",
+        "date": null,
+        "planned_date": "2023-05-02T23:59:59.000-03:00",
+        "emergence_date": null,
+        "activation_date": "2023-05-01",
+        "area": 31.47,
+        "name": "B11",
+        "farm_name": "Fazenda Ben\u00e7\u00e3o de Deus",
+        "variety_name": null,
+        "planned_variety_name": "GNPA G2",
+        "culture_name": null,
+        "culture_unit": null,
+        "culture_unit_per_ha": null,
+        "planned_culture_name": "Gergelim",
+        "harvest_name": "2023/2024",
+        "centroid": {
+            "lat": -11.148430332457972,
+            "lng": -49.621481094004885
+        },
+        "harvest_prediction_date": "2023-08-04",
+        "cycle": 1,
+        "observations": null,
+        "irrigated": false,
+        "updated_at": "2023-05-01T11:53:58.000-03:00",
+        "productivity": null,
+        "farm": {
+            "id": 11946,
+            "name": "Fazenda Ben\u00e7\u00e3o de Deus",
+            "cnpj_cpf": "",
+            "ie": ""
+        },
+        "plot": {
+            "id": 81433,
+            "name": "B11",
+            "farm_id": 11946,
+            "area": 31.47,
+            "updated_at": "2023-05-01T11:53:58.000-03:00",
+            "disabled_at": null,
+            "geo_points": [
+                {
+                    "latitude": "-11.1502164",
+                    "longitude": "-49.62465100000001"
+                },
+                {
+                    "latitude": "-11.15157",
+                    "longitude": "-49.6197777"
+                },
+                {
+                    "latitude": "-11.1515752",
+                    "longitude": "-49.6196999"
+                },
+                {
+                    "latitude": "-11.151482",
+                    "longitude": "-49.61964559999999"
+                },
+                {
+                    "latitude": "-11.1485114",
+                    "longitude": "-49.61891139999999"
+                },
+                {
+                    "latitude": "-11.1465909",
+                    "longitude": "-49.618628"
+                },
+                {
+                    "latitude": "-11.1465239",
+                    "longitude": "-49.6186338"
+                },
+                {
+                    "latitude": "-11.1464824",
+                    "longitude": "-49.6186565"
+                },
+                {
+                    "latitude": "-11.1464456",
+                    "longitude": "-49.61869109999999"
+                },
+                {
+                    "latitude": "-11.1462895",
+                    "longitude": "-49.61918439999998"
+                },
+                {
+                    "latitude": "-11.1452484",
+                    "longitude": "-49.6230718"
+                }
+            ]
+        },
+        "harvest": {
+            "id": 2607,
+            "name": "2023/2024",
+            "start_date": "2023-04-01",
+            "end_date": "2024-04-30"
+        },
+        "geo_points": [
+            {
+                "latitude": "-11.1502164",
+                "longitude": "-49.62465100000001"
+            },
+            {
+                "latitude": "-11.15157",
+                "longitude": "-49.6197777"
+            },
+            {
+                "latitude": "-11.1515752",
+                "longitude": "-49.6196999"
+            },
+            {
+                "latitude": "-11.151482",
+                "longitude": "-49.61964559999999"
+            },
+            {
+                "latitude": "-11.1485114",
+                "longitude": "-49.61891139999999"
+            },
+            {
+                "latitude": "-11.1465909",
+                "longitude": "-49.618628"
+            },
+            {
+                "latitude": "-11.1465239",
+                "longitude": "-49.6186338"
+            },
+            {
+                "latitude": "-11.1464824",
+                "longitude": "-49.6186565"
+            },
+            {
+                "latitude": "-11.1464456",
+                "longitude": "-49.61869109999999"
+            },
+            {
+                "latitude": "-11.1462895",
+                "longitude": "-49.61918439999998"
+            },
+            {
+                "latitude": "-11.1452484",
+                "longitude": "-49.6230718"
+            }
+        ]
+    },
+    {
+        "id": 190508,
+        "variety_id": null,
+        "planned_variety_id": 23736,
+        "culture_id": null,
+        "planned_culture_id": 41,
+        "state": "active",
+        "date": null,
+        "planned_date": "2023-05-02T23:59:59.000-03:00",
+        "emergence_date": null,
+        "activation_date": "2023-05-01",
+        "area": 53.48,
+        "name": "B12",
+        "farm_name": "Fazenda Ben\u00e7\u00e3o de Deus",
+        "variety_name": null,
+        "planned_variety_name": "GNPA G2",
+        "culture_name": null,
+        "culture_unit": null,
+        "culture_unit_per_ha": null,
+        "planned_culture_name": "Gergelim",
+        "harvest_name": "2023/2024",
+        "centroid": {
+            "lat": -11.15288657286085,
+            "lng": -49.610011814371326
+        },
+        "harvest_prediction_date": "2023-08-04",
+        "cycle": 1,
+        "observations": null,
+        "irrigated": false,
+        "updated_at": "2023-05-01T11:54:03.000-03:00",
+        "productivity": null,
+        "farm": {
+            "id": 11946,
+            "name": "Fazenda Ben\u00e7\u00e3o de Deus",
+            "cnpj_cpf": "",
+            "ie": ""
+        },
+        "plot": {
+            "id": 81434,
+            "name": "B12",
+            "farm_id": 11946,
+            "area": 53.48,
+            "updated_at": "2023-05-01T11:54:03.000-03:00",
+            "disabled_at": null,
+            "geo_points": [
+                {
+                    "latitude": "-11.1516357",
+                    "longitude": "-49.61942000000001"
+                },
+                {
+                    "latitude": "-11.1565554",
+                    "longitude": "-49.6016601"
+                },
+                {
+                    "latitude": "-11.1550127",
+                    "longitude": "-49.600901"
+                },
+                {
+                    "latitude": "-11.1514311",
+                    "longitude": "-49.60399890000001"
+                },
+                {
+                    "latitude": "-11.1513762",
+                    "longitude": "-49.604062"
+                },
+                {
+                    "latitude": "-11.1513723",
+                    "longitude": "-49.6041249"
+                },
+                {
+                    "latitude": "-11.1513904",
+                    "longitude": "-49.6041789"
+                },
+                {
+                    "latitude": "-11.152358",
+                    "longitude": "-49.6052515"
+                },
+                {
+                    "latitude": "-11.1524603",
+                    "longitude": "-49.605342"
+                },
+                {
+                    "latitude": "-11.1526242",
+                    "longitude": "-49.605433"
+                },
+                {
+                    "latitude": "-11.153761",
+                    "longitude": "-49.60564309999999"
+                },
+                {
+                    "latitude": "-11.1539193",
+                    "longitude": "-49.6057185"
+                },
+                {
+                    "latitude": "-11.1539956",
+                    "longitude": "-49.6058285"
+                },
+                {
+                    "latitude": "-11.1540561",
+                    "longitude": "-49.6059634"
+                },
+                {
+                    "latitude": "-11.1540564",
+                    "longitude": "-49.6060893"
+                },
+                {
+                    "latitude": "-11.1488117",
+                    "longitude": "-49.6186247"
+                },
+                {
+                    "latitude": "-11.1487953",
+                    "longitude": "-49.618674"
+                },
+                {
+                    "latitude": "-11.1488157",
+                    "longitude": "-49.6187333"
+                },
+                {
+                    "latitude": "-11.1488426",
+                    "longitude": "-49.6187577"
+                },
+                {
+                    "latitude": "-11.1489736",
+                    "longitude": "-49.61878559999999"
+                }
+            ]
+        },
+        "harvest": {
+            "id": 2607,
+            "name": "2023/2024",
+            "start_date": "2023-04-01",
+            "end_date": "2024-04-30"
+        },
+        "geo_points": [
+            {
+                "latitude": "-11.1516357",
+                "longitude": "-49.61942000000001"
+            },
+            {
+                "latitude": "-11.1565554",
+                "longitude": "-49.6016601"
+            },
+            {
+                "latitude": "-11.1550127",
+                "longitude": "-49.600901"
+            },
+            {
+                "latitude": "-11.1514311",
+                "longitude": "-49.60399890000001"
+            },
+            {
+                "latitude": "-11.1513762",
+                "longitude": "-49.604062"
+            },
+            {
+                "latitude": "-11.1513723",
+                "longitude": "-49.6041249"
+            },
+            {
+                "latitude": "-11.1513904",
+                "longitude": "-49.6041789"
+            },
+            {
+                "latitude": "-11.152358",
+                "longitude": "-49.6052515"
+            },
+            {
+                "latitude": "-11.1524603",
+                "longitude": "-49.605342"
+            },
+            {
+                "latitude": "-11.1526242",
+                "longitude": "-49.605433"
+            },
+            {
+                "latitude": "-11.153761",
+                "longitude": "-49.60564309999999"
+            },
+            {
+                "latitude": "-11.1539193",
+                "longitude": "-49.6057185"
+            },
+            {
+                "latitude": "-11.1539956",
+                "longitude": "-49.6058285"
+            },
+            {
+                "latitude": "-11.1540561",
+                "longitude": "-49.6059634"
+            },
+            {
+                "latitude": "-11.1540564",
+                "longitude": "-49.6060893"
+            },
+            {
+                "latitude": "-11.1488117",
+                "longitude": "-49.6186247"
+            },
+            {
+                "latitude": "-11.1487953",
+                "longitude": "-49.618674"
+            },
+            {
+                "latitude": "-11.1488157",
+                "longitude": "-49.6187333"
+            },
+            {
+                "latitude": "-11.1488426",
+                "longitude": "-49.6187577"
+            },
+            {
+                "latitude": "-11.1489736",
+                "longitude": "-49.61878559999999"
+            }
+        ]
+    },
+    {
+        "id": 190509,
+        "variety_id": null,
+        "planned_variety_id": 23736,
+        "culture_id": null,
+        "planned_culture_id": 41,
+        "state": "active",
+        "date": null,
+        "planned_date": "2023-05-03T23:59:59.000-03:00",
+        "emergence_date": null,
+        "activation_date": "2023-05-01",
+        "area": 14.14,
+        "name": "B13",
+        "farm_name": "Fazenda Ben\u00e7\u00e3o de Deus",
+        "variety_name": null,
+        "planned_variety_name": "GNPA G2",
+        "culture_name": null,
+        "culture_unit": null,
+        "culture_unit_per_ha": null,
+        "planned_culture_name": "Gergelim",
+        "harvest_name": "2023/2024",
+        "centroid": {
+            "lat": -11.157265855073874,
+            "lng": -49.607524951247356
+        },
+        "harvest_prediction_date": "2023-08-05",
+        "cycle": 1,
+        "observations": null,
+        "irrigated": false,
+        "updated_at": "2023-05-01T11:54:08.000-03:00",
+        "productivity": null,
+        "farm": {
+            "id": 11946,
+            "name": "Fazenda Ben\u00e7\u00e3o de Deus",
+            "cnpj_cpf": "",
+            "ie": ""
+        },
+        "plot": {
+            "id": 81435,
+            "name": "B13",
+            "farm_id": 11946,
+            "area": 14.14,
+            "updated_at": "2023-05-01T11:54:08.000-03:00",
+            "disabled_at": null,
+            "geo_points": [
+                {
+                    "latitude": "-11.1558347",
+                    "longitude": "-49.60483979999999"
+                },
+                {
+                    "latitude": "-11.1551291",
+                    "longitude": "-49.6074336"
+                },
+                {
+                    "latitude": "-11.1587277",
+                    "longitude": "-49.61032500000001"
+                },
+                {
+                    "latitude": "-11.1593658",
+                    "longitude": "-49.6077222"
+                },
+                {
+                    "latitude": "-11.1593612",
+                    "longitude": "-49.60764899999999"
+                },
+                {
+                    "latitude": "-11.1593372",
+                    "longitude": "-49.60761119999999"
+                },
+                {
+                    "latitude": "-11.1559498",
+                    "longitude": "-49.60477649999999"
+                },
+                {
+                    "latitude": "-11.1558735",
+                    "longitude": "-49.6047419"
+                },
+                {
+                    "latitude": "-11.155854",
+                    "longitude": "-49.6047782"
+                }
+            ]
+        },
+        "harvest": {
+            "id": 2607,
+            "name": "2023/2024",
+            "start_date": "2023-04-01",
+            "end_date": "2024-04-30"
+        },
+        "geo_points": [
+            {
+                "latitude": "-11.1558347",
+                "longitude": "-49.60483979999999"
+            },
+            {
+                "latitude": "-11.1551291",
+                "longitude": "-49.6074336"
+            },
+            {
+                "latitude": "-11.1587277",
+                "longitude": "-49.61032500000001"
+            },
+            {
+                "latitude": "-11.1593658",
+                "longitude": "-49.6077222"
+            },
+            {
+                "latitude": "-11.1593612",
+                "longitude": "-49.60764899999999"
+            },
+            {
+                "latitude": "-11.1593372",
+                "longitude": "-49.60761119999999"
+            },
+            {
+                "latitude": "-11.1559498",
+                "longitude": "-49.60477649999999"
+            },
+            {
+                "latitude": "-11.1558735",
+                "longitude": "-49.6047419"
+            },
+            {
+                "latitude": "-11.155854",
+                "longitude": "-49.6047782"
+            }
+        ]
+    },
+    {
+        "id": 190510,
+        "variety_id": null,
+        "planned_variety_id": 23736,
+        "culture_id": null,
+        "planned_culture_id": 41,
+        "state": "active",
+        "date": null,
+        "planned_date": "2023-05-04T23:59:59.000-03:00",
+        "emergence_date": null,
+        "activation_date": "2023-05-01",
+        "area": 13.15,
+        "name": "B14",
+        "farm_name": "Fazenda Ben\u00e7\u00e3o de Deus",
+        "variety_name": null,
+        "planned_variety_name": "GNPA G2",
+        "culture_name": null,
+        "culture_unit": null,
+        "culture_unit_per_ha": null,
+        "planned_culture_name": "Gergelim",
+        "harvest_name": "2023/2024",
+        "centroid": {
+            "lat": -11.15659650127096,
+            "lng": -49.6101671847739
+        },
+        "harvest_prediction_date": "2023-08-06",
+        "cycle": 1,
+        "observations": null,
+        "irrigated": false,
+        "updated_at": "2023-05-01T11:54:11.000-03:00",
+        "productivity": null,
+        "farm": {
+            "id": 11946,
+            "name": "Fazenda Ben\u00e7\u00e3o de Deus",
+            "cnpj_cpf": "",
+            "ie": ""
+        },
+        "plot": {
+            "id": 81436,
+            "name": "B14",
+            "farm_id": 11946,
+            "area": 13.15,
+            "updated_at": "2023-05-01T11:54:11.000-03:00",
+            "disabled_at": null,
+            "geo_points": [
+                {
+                    "latitude": "-11.1580955",
+                    "longitude": "-49.6128825"
+                },
+                {
+                    "latitude": "-11.1587146",
+                    "longitude": "-49.6103753"
+                },
+                {
+                    "latitude": "-11.1551137",
+                    "longitude": "-49.6074802"
+                },
+                {
+                    "latitude": "-11.1544469",
+                    "longitude": "-49.6099025"
+                }
+            ]
+        },
+        "harvest": {
+            "id": 2607,
+            "name": "2023/2024",
+            "start_date": "2023-04-01",
+            "end_date": "2024-04-30"
+        },
+        "geo_points": [
+            {
+                "latitude": "-11.1580955",
+                "longitude": "-49.6128825"
+            },
+            {
+                "latitude": "-11.1587146",
+                "longitude": "-49.6103753"
+            },
+            {
+                "latitude": "-11.1551137",
+                "longitude": "-49.6074802"
+            },
+            {
+                "latitude": "-11.1544469",
+                "longitude": "-49.6099025"
+            }
+        ]
+    },
+    {
+        "id": 190511,
+        "variety_id": null,
+        "planned_variety_id": 23736,
+        "culture_id": null,
+        "planned_culture_id": 41,
+        "state": "active",
+        "date": null,
+        "planned_date": "2023-05-04T23:59:59.000-03:00",
+        "emergence_date": null,
+        "activation_date": "2023-05-01",
+        "area": 29.53,
+        "name": "B15",
+        "farm_name": "Fazenda Ben\u00e7\u00e3o de Deus",
+        "variety_name": null,
+        "planned_variety_name": "GNPA G2",
+        "culture_name": null,
+        "culture_unit": null,
+        "culture_unit_per_ha": null,
+        "planned_culture_name": "Gergelim",
+        "harvest_name": "2023/2024",
+        "centroid": {
+            "lat": -11.155560351419428,
+            "lng": -49.614136666792746
+        },
+        "harvest_prediction_date": "2023-08-06",
+        "cycle": 1,
+        "observations": null,
+        "irrigated": false,
+        "updated_at": "2023-05-01T11:54:15.000-03:00",
+        "productivity": null,
+        "farm": {
+            "id": 11946,
+            "name": "Fazenda Ben\u00e7\u00e3o de Deus",
+            "cnpj_cpf": "",
+            "ie": ""
+        },
+        "plot": {
+            "id": 81437,
+            "name": "B15",
+            "farm_id": 11946,
+            "area": 29.53,
+            "updated_at": "2023-05-01T11:54:15.000-03:00",
+            "disabled_at": null,
+            "geo_points": [
+                {
+                    "latitude": "-11.1568004",
+                    "longitude": "-49.6182713"
+                },
+                {
+                    "latitude": "-11.1577612",
+                    "longitude": "-49.6145334"
+                },
+                {
+                    "latitude": "-11.1576959",
+                    "longitude": "-49.61450180000001"
+                },
+                {
+                    "latitude": "-11.1580847",
+                    "longitude": "-49.61293309999999"
+                },
+                {
+                    "latitude": "-11.1544334",
+                    "longitude": "-49.60995179999999"
+                },
+                {
+                    "latitude": "-11.1529457",
+                    "longitude": "-49.6153082"
+                }
+            ]
+        },
+        "harvest": {
+            "id": 2607,
+            "name": "2023/2024",
+            "start_date": "2023-04-01",
+            "end_date": "2024-04-30"
+        },
+        "geo_points": [
+            {
+                "latitude": "-11.1568004",
+                "longitude": "-49.6182713"
+            },
+            {
+                "latitude": "-11.1577612",
+                "longitude": "-49.6145334"
+            },
+            {
+                "latitude": "-11.1576959",
+                "longitude": "-49.61450180000001"
+            },
+            {
+                "latitude": "-11.1580847",
+                "longitude": "-49.61293309999999"
+            },
+            {
+                "latitude": "-11.1544334",
+                "longitude": "-49.60995179999999"
+            },
+            {
+                "latitude": "-11.1529457",
+                "longitude": "-49.6153082"
+            }
+        ]
+    },
+    {
+        "id": 190512,
+        "variety_id": null,
+        "planned_variety_id": 23736,
+        "culture_id": null,
+        "planned_culture_id": 41,
+        "state": "active",
+        "date": null,
+        "planned_date": "2023-05-04T23:59:59.000-03:00",
+        "emergence_date": null,
+        "activation_date": "2023-05-01",
+        "area": 19.63,
+        "name": "B16",
+        "farm_name": "Fazenda Ben\u00e7\u00e3o de Deus",
+        "variety_name": null,
+        "planned_variety_name": "GNPA G2",
+        "culture_name": null,
+        "culture_unit": null,
+        "culture_unit_per_ha": null,
+        "planned_culture_name": "Gergelim",
+        "harvest_name": "2023/2024",
+        "centroid": {
+            "lat": -11.154256645800537,
+            "lng": -49.61848545924606
+        },
+        "harvest_prediction_date": "2023-08-06",
+        "cycle": 1,
+        "observations": null,
+        "irrigated": false,
+        "updated_at": "2023-05-01T11:54:19.000-03:00",
+        "productivity": null,
+        "farm": {
+            "id": 11946,
+            "name": "Fazenda Ben\u00e7\u00e3o de Deus",
+            "cnpj_cpf": "",
+            "ie": ""
+        },
+        "plot": {
+            "id": 81438,
+            "name": "B16",
+            "farm_id": 11946,
+            "area": 19.63,
+            "updated_at": "2023-05-01T11:54:19.000-03:00",
+            "disabled_at": null,
+            "geo_points": [
+                {
+                    "latitude": "-11.1517761",
+                    "longitude": "-49.6194894"
+                },
+                {
+                    "latitude": "-11.1561304",
+                    "longitude": "-49.6210605"
+                },
+                {
+                    "latitude": "-11.1567877",
+                    "longitude": "-49.6183367"
+                },
+                {
+                    "latitude": "-11.1529279",
+                    "longitude": "-49.6153518"
+                }
+            ]
+        },
+        "harvest": {
+            "id": 2607,
+            "name": "2023/2024",
+            "start_date": "2023-04-01",
+            "end_date": "2024-04-30"
+        },
+        "geo_points": [
+            {
+                "latitude": "-11.1517761",
+                "longitude": "-49.6194894"
+            },
+            {
+                "latitude": "-11.1561304",
+                "longitude": "-49.6210605"
+            },
+            {
+                "latitude": "-11.1567877",
+                "longitude": "-49.6183367"
+            },
+            {
+                "latitude": "-11.1529279",
+                "longitude": "-49.6153518"
+            }
+        ]
+    },
+    {
+        "id": 190513,
+        "variety_id": null,
+        "planned_variety_id": 23736,
+        "culture_id": null,
+        "planned_culture_id": 41,
+        "state": "active",
+        "date": null,
+        "planned_date": "2023-05-05T23:59:59.000-03:00",
+        "emergence_date": null,
+        "activation_date": "2023-05-01",
+        "area": 10.48,
+        "name": "B17",
+        "farm_name": "Fazenda Ben\u00e7\u00e3o de Deus",
+        "variety_name": null,
+        "planned_variety_name": "GNPA G2",
+        "culture_name": null,
+        "culture_unit": null,
+        "culture_unit_per_ha": null,
+        "planned_culture_name": "Gergelim",
+        "harvest_name": "2023/2024",
+        "centroid": {
+            "lat": -11.153990071407744,
+            "lng": -49.62154827151868
+        },
+        "harvest_prediction_date": "2023-08-07",
+        "cycle": 1,
+        "observations": null,
+        "irrigated": false,
+        "updated_at": "2023-05-01T11:54:23.000-03:00",
+        "productivity": null,
+        "farm": {
+            "id": 11946,
+            "name": "Fazenda Ben\u00e7\u00e3o de Deus",
+            "cnpj_cpf": "",
+            "ie": ""
+        },
+        "plot": {
+            "id": 81439,
+            "name": "B17",
+            "farm_id": 11946,
+            "area": 10.48,
+            "updated_at": "2023-05-01T11:54:23.000-03:00",
+            "disabled_at": null,
+            "geo_points": [
+                {
+                    "latitude": "-11.1554324",
+                    "longitude": "-49.6238748"
+                },
+                {
+                    "latitude": "-11.1560867",
+                    "longitude": "-49.6212463"
+                },
+                {
+                    "latitude": "-11.1517331",
+                    "longitude": "-49.6196845"
+                },
+                {
+                    "latitude": "-11.1514604",
+                    "longitude": "-49.6206672"
+                }
+            ]
+        },
+        "harvest": {
+            "id": 2607,
+            "name": "2023/2024",
+            "start_date": "2023-04-01",
+            "end_date": "2024-04-30"
+        },
+        "geo_points": [
+            {
+                "latitude": "-11.1554324",
+                "longitude": "-49.6238748"
+            },
+            {
+                "latitude": "-11.1560867",
+                "longitude": "-49.6212463"
+            },
+            {
+                "latitude": "-11.1517331",
+                "longitude": "-49.6196845"
+            },
+            {
+                "latitude": "-11.1514604",
+                "longitude": "-49.6206672"
+            }
+        ]
+    },
+    {
+        "id": 190514,
+        "variety_id": null,
+        "planned_variety_id": 23736,
+        "culture_id": null,
+        "planned_culture_id": 41,
+        "state": "active",
+        "date": null,
+        "planned_date": "2023-05-05T23:59:59.000-03:00",
+        "emergence_date": null,
+        "activation_date": "2023-05-01",
+        "area": 15.74,
+        "name": "B18",
+        "farm_name": "Fazenda Ben\u00e7\u00e3o de Deus",
+        "variety_name": null,
+        "planned_variety_name": "GNPA G2",
+        "culture_name": null,
+        "culture_unit": null,
+        "culture_unit_per_ha": null,
+        "planned_culture_name": "Gergelim",
+        "harvest_name": "2023/2024",
+        "centroid": {
+            "lat": -11.153075276587355,
+            "lng": -49.62369426554808
+        },
+        "harvest_prediction_date": "2023-08-07",
+        "cycle": 1,
+        "observations": null,
+        "irrigated": false,
+        "updated_at": "2023-05-01T11:54:26.000-03:00",
+        "productivity": null,
+        "farm": {
+            "id": 11946,
+            "name": "Fazenda Ben\u00e7\u00e3o de Deus",
+            "cnpj_cpf": "",
+            "ie": ""
+        },
+        "plot": {
+            "id": 81440,
+            "name": "B18",
+            "farm_id": 11946,
+            "area": 15.74,
+            "updated_at": "2023-05-01T11:54:26.000-03:00",
+            "disabled_at": null,
+            "geo_points": [
+                {
+                    "latitude": "-11.1514489",
+                    "longitude": "-49.6207169"
+                },
+                {
+                    "latitude": "-11.1506946",
+                    "longitude": "-49.6234107"
+                },
+                {
+                    "latitude": "-11.1547295",
+                    "longitude": "-49.6266999"
+                },
+                {
+                    "latitude": "-11.1554199",
+                    "longitude": "-49.62392330000001"
+                }
+            ]
+        },
+        "harvest": {
+            "id": 2607,
+            "name": "2023/2024",
+            "start_date": "2023-04-01",
+            "end_date": "2024-04-30"
+        },
+        "geo_points": [
+            {
+                "latitude": "-11.1514489",
+                "longitude": "-49.6207169"
+            },
+            {
+                "latitude": "-11.1506946",
+                "longitude": "-49.6234107"
+            },
+            {
+                "latitude": "-11.1547295",
+                "longitude": "-49.6266999"
+            },
+            {
+                "latitude": "-11.1554199",
+                "longitude": "-49.62392330000001"
+            }
+        ]
+    },
+    {
+        "id": 190515,
+        "variety_id": null,
+        "planned_variety_id": 23736,
+        "culture_id": null,
+        "planned_culture_id": 41,
+        "state": "active",
+        "date": null,
+        "planned_date": "2023-05-05T23:59:59.000-03:00",
+        "emergence_date": null,
+        "activation_date": "2023-05-01",
+        "area": 15.38,
+        "name": "B19",
+        "farm_name": "Fazenda Ben\u00e7\u00e3o de Deus",
+        "variety_name": null,
+        "planned_variety_name": "GNPA G2",
+        "culture_name": null,
+        "culture_unit": null,
+        "culture_unit_per_ha": null,
+        "planned_culture_name": "Gergelim",
+        "harvest_name": "2023/2024",
+        "centroid": {
+            "lat": -11.152349814210053,
+            "lng": -49.62638440410917
+        },
+        "harvest_prediction_date": "2023-08-07",
+        "cycle": 1,
+        "observations": null,
+        "irrigated": false,
+        "updated_at": "2023-05-01T11:54:31.000-03:00",
+        "productivity": null,
+        "farm": {
+            "id": 11946,
+            "name": "Fazenda Ben\u00e7\u00e3o de Deus",
+            "cnpj_cpf": "",
+            "ie": ""
+        },
+        "plot": {
+            "id": 81441,
+            "name": "B19",
+            "farm_id": 11946,
+            "area": 15.38,
+            "updated_at": "2023-05-01T11:54:31.000-03:00",
+            "disabled_at": null,
+            "geo_points": [
+                {
+                    "latitude": "-11.1540453",
+                    "longitude": "-49.6293019"
+                },
+                {
+                    "latitude": "-11.1547183",
+                    "longitude": "-49.6267481"
+                },
+                {
+                    "latitude": "-11.1506815",
+                    "longitude": "-49.6234614"
+                },
+                {
+                    "latitude": "-11.1499766",
+                    "longitude": "-49.6260387"
+                }
+            ]
+        },
+        "harvest": {
+            "id": 2607,
+            "name": "2023/2024",
+            "start_date": "2023-04-01",
+            "end_date": "2024-04-30"
+        },
+        "geo_points": [
+            {
+                "latitude": "-11.1540453",
+                "longitude": "-49.6293019"
+            },
+            {
+                "latitude": "-11.1547183",
+                "longitude": "-49.6267481"
+            },
+            {
+                "latitude": "-11.1506815",
+                "longitude": "-49.6234614"
+            },
+            {
+                "latitude": "-11.1499766",
+                "longitude": "-49.6260387"
+            }
+        ]
+    },
+    {
+        "id": 190516,
+        "variety_id": null,
+        "planned_variety_id": 23736,
+        "culture_id": null,
+        "planned_culture_id": 41,
+        "state": "active",
+        "date": null,
+        "planned_date": "2023-05-06T23:59:59.000-03:00",
+        "emergence_date": null,
+        "activation_date": "2023-05-01",
+        "area": 18.12,
+        "name": "B20",
+        "farm_name": "Fazenda Ben\u00e7\u00e3o de Deus",
+        "variety_name": null,
+        "planned_variety_name": "GNPA G2",
+        "culture_name": null,
+        "culture_unit": null,
+        "culture_unit_per_ha": null,
+        "planned_culture_name": "Gergelim",
+        "harvest_name": "2023/2024",
+        "centroid": {
+            "lat": -11.151411709573411,
+            "lng": -49.6291135181429
+        },
+        "harvest_prediction_date": "2023-08-08",
+        "cycle": 1,
+        "observations": null,
+        "irrigated": false,
+        "updated_at": "2023-05-01T11:54:36.000-03:00",
+        "productivity": null,
+        "farm": {
+            "id": 11946,
+            "name": "Fazenda Ben\u00e7\u00e3o de Deus",
+            "cnpj_cpf": "",
+            "ie": ""
+        },
+        "plot": {
+            "id": 81442,
+            "name": "B20",
+            "farm_id": 11946,
+            "area": 18.12,
+            "updated_at": "2023-05-01T11:54:36.000-03:00",
+            "disabled_at": null,
+            "geo_points": [
+                {
+                    "latitude": "-11.1540321",
+                    "longitude": "-49.6293519"
+                },
+                {
+                    "latitude": "-11.1499575",
+                    "longitude": "-49.6260863"
+                },
+                {
+                    "latitude": "-11.1489308",
+                    "longitude": "-49.6298578"
+                },
+                {
+                    "latitude": "-11.1534907",
+                    "longitude": "-49.6315801"
+                }
+            ]
+        },
+        "harvest": {
+            "id": 2607,
+            "name": "2023/2024",
+            "start_date": "2023-04-01",
+            "end_date": "2024-04-30"
+        },
+        "geo_points": [
+            {
+                "latitude": "-11.1540321",
+                "longitude": "-49.6293519"
+            },
+            {
+                "latitude": "-11.1499575",
+                "longitude": "-49.6260863"
+            },
+            {
+                "latitude": "-11.1489308",
+                "longitude": "-49.6298578"
+            },
+            {
+                "latitude": "-11.1534907",
+                "longitude": "-49.6315801"
+            }
+        ]
+    },
+    {
+        "id": 190499,
+        "variety_id": null,
+        "planned_variety_id": 23736,
+        "culture_id": null,
+        "planned_culture_id": 41,
+        "state": "active",
+        "date": null,
+        "planned_date": "2023-05-06T23:59:59.000-03:00",
+        "emergence_date": null,
+        "activation_date": "2023-05-01",
+        "area": 52.53,
+        "name": "B21",
+        "farm_name": "Fazenda Ben\u00e7\u00e3o de Deus",
+        "variety_name": null,
+        "planned_variety_name": "GNPA G2",
+        "culture_name": null,
+        "culture_unit": null,
+        "culture_unit_per_ha": null,
+        "planned_culture_name": "Gergelim",
+        "harvest_name": "2023/2024",
+        "centroid": {
+            "lat": -11.150014960372927,
+            "lng": -49.6352842436119
+        },
+        "harvest_prediction_date": "2023-08-08",
+        "cycle": 1,
+        "observations": null,
+        "irrigated": false,
+        "updated_at": "2023-05-01T11:54:43.000-03:00",
+        "productivity": null,
+        "farm": {
+            "id": 11946,
+            "name": "Fazenda Ben\u00e7\u00e3o de Deus",
+            "cnpj_cpf": "",
+            "ie": ""
+        },
+        "plot": {
+            "id": 81443,
+            "name": "B21",
+            "farm_id": 11946,
+            "area": 52.53,
+            "updated_at": "2023-05-01T11:54:43.000-03:00",
+            "disabled_at": null,
+            "geo_points": [
+                {
+                    "latitude": "-11.1534512",
+                    "longitude": "-49.6317441"
+                },
+                {
+                    "latitude": "-11.1488871",
+                    "longitude": "-49.63001879999998"
+                },
+                {
+                    "latitude": "-11.146545",
+                    "longitude": "-49.6384456"
+                },
+                {
+                    "latitude": "-11.1465285",
+                    "longitude": "-49.63859979999999"
+                },
+                {
+                    "latitude": "-11.1465397",
+                    "longitude": "-49.6387235"
+                },
+                {
+                    "latitude": "-11.1512841",
+                    "longitude": "-49.6405196"
+                },
+                {
+                    "latitude": "-11.1526719",
+                    "longitude": "-49.63494429999999"
+                },
+                {
+                    "latitude": "-11.1515601",
+                    "longitude": "-49.6345182"
+                },
+                {
+                    "latitude": "-11.151567",
+                    "longitude": "-49.6344763"
+                },
+                {
+                    "latitude": "-11.1526828",
+                    "longitude": "-49.634897"
+                }
+            ]
+        },
+        "harvest": {
+            "id": 2607,
+            "name": "2023/2024",
+            "start_date": "2023-04-01",
+            "end_date": "2024-04-30"
+        },
+        "geo_points": [
+            {
+                "latitude": "-11.1534512",
+                "longitude": "-49.6317441"
+            },
+            {
+                "latitude": "-11.1488871",
+                "longitude": "-49.63001879999998"
+            },
+            {
+                "latitude": "-11.146545",
+                "longitude": "-49.6384456"
+            },
+            {
+                "latitude": "-11.1465285",
+                "longitude": "-49.63859979999999"
+            },
+            {
+                "latitude": "-11.1465397",
+                "longitude": "-49.6387235"
+            },
+            {
+                "latitude": "-11.1512841",
+                "longitude": "-49.6405196"
+            },
+            {
+                "latitude": "-11.1526719",
+                "longitude": "-49.63494429999999"
+            },
+            {
+                "latitude": "-11.1515601",
+                "longitude": "-49.6345182"
+            },
+            {
+                "latitude": "-11.151567",
+                "longitude": "-49.6344763"
+            },
+            {
+                "latitude": "-11.1526828",
+                "longitude": "-49.634897"
+            }
+        ]
+    },
+    {
+        "id": 190500,
+        "variety_id": null,
+        "planned_variety_id": 23736,
+        "culture_id": null,
+        "planned_culture_id": 41,
+        "state": "active",
+        "date": null,
+        "planned_date": "2023-05-07T23:59:59.000-03:00",
+        "emergence_date": null,
+        "activation_date": "2023-05-01",
+        "area": 59.69,
+        "name": "B22",
+        "farm_name": "Fazenda Ben\u00e7\u00e3o de Deus",
+        "variety_name": null,
+        "planned_variety_name": "GNPA G2",
+        "culture_name": null,
+        "culture_unit": null,
+        "culture_unit_per_ha": null,
+        "planned_culture_name": "Gergelim",
+        "harvest_name": "2023/2024",
+        "centroid": {
+            "lat": -11.155118225910932,
+            "lng": -49.63716182957012
+        },
+        "harvest_prediction_date": "2023-08-09",
+        "cycle": 1,
+        "observations": null,
+        "irrigated": false,
+        "updated_at": "2023-05-01T11:54:46.000-03:00",
+        "productivity": null,
+        "farm": {
+            "id": 11946,
+            "name": "Fazenda Ben\u00e7\u00e3o de Deus",
+            "cnpj_cpf": "",
+            "ie": ""
+        },
+        "plot": {
+            "id": 81444,
+            "name": "B22",
+            "farm_id": 11946,
+            "area": 59.69,
+            "updated_at": "2023-05-01T11:54:46.000-03:00",
+            "disabled_at": null,
+            "geo_points": [
+                {
+                    "latitude": "-11.1565429",
+                    "longitude": "-49.6425152"
+                },
+                {
+                    "latitude": "-11.1588011",
+                    "longitude": "-49.6337641"
+                },
+                {
+                    "latitude": "-11.1536525",
+                    "longitude": "-49.63181849999999"
+                },
+                {
+                    "latitude": "-11.151465",
+                    "longitude": "-49.6405883"
+                }
+            ]
+        },
+        "harvest": {
+            "id": 2607,
+            "name": "2023/2024",
+            "start_date": "2023-04-01",
+            "end_date": "2024-04-30"
+        },
+        "geo_points": [
+            {
+                "latitude": "-11.1565429",
+                "longitude": "-49.6425152"
+            },
+            {
+                "latitude": "-11.1588011",
+                "longitude": "-49.6337641"
+            },
+            {
+                "latitude": "-11.1536525",
+                "longitude": "-49.63181849999999"
+            },
+            {
+                "latitude": "-11.151465",
+                "longitude": "-49.6405883"
+            }
+        ]
+    },
+    {
+        "id": 190502,
+        "variety_id": null,
+        "planned_variety_id": 23736,
+        "culture_id": null,
+        "planned_culture_id": 41,
+        "state": "active",
+        "date": null,
+        "planned_date": "2023-05-08T23:59:59.000-03:00",
+        "emergence_date": null,
+        "activation_date": "2023-05-01",
+        "area": 71.56,
+        "name": "B23",
+        "farm_name": "Fazenda Ben\u00e7\u00e3o de Deus",
+        "variety_name": null,
+        "planned_variety_name": "GNPA G2",
+        "culture_name": null,
+        "culture_unit": null,
+        "culture_unit_per_ha": null,
+        "planned_culture_name": "Gergelim",
+        "harvest_name": "2023/2024",
+        "centroid": {
+            "lat": -11.157588168214005,
+            "lng": -49.627434565531836
+        },
+        "harvest_prediction_date": "2023-08-10",
+        "cycle": 1,
+        "observations": null,
+        "irrigated": false,
+        "updated_at": "2023-05-01T11:54:49.000-03:00",
+        "productivity": null,
+        "farm": {
+            "id": 11946,
+            "name": "Fazenda Ben\u00e7\u00e3o de Deus",
+            "cnpj_cpf": "",
+            "ie": ""
+        },
+        "plot": {
+            "id": 81445,
+            "name": "B23",
+            "farm_id": 11946,
+            "area": 71.56,
+            "updated_at": "2023-05-01T11:54:49.000-03:00",
+            "disabled_at": null,
+            "geo_points": [
+                {
+                    "latitude": "-11.1588455",
+                    "longitude": "-49.6335884"
+                },
+                {
+                    "latitude": "-11.1615204",
+                    "longitude": "-49.62321799999998"
+                },
+                {
+                    "latitude": "-11.1562689",
+                    "longitude": "-49.62132539999999"
+                },
+                {
+                    "latitude": "-11.1536926",
+                    "longitude": "-49.6316559"
+                }
+            ]
+        },
+        "harvest": {
+            "id": 2607,
+            "name": "2023/2024",
+            "start_date": "2023-04-01",
+            "end_date": "2024-04-30"
+        },
+        "geo_points": [
+            {
+                "latitude": "-11.1588455",
+                "longitude": "-49.6335884"
+            },
+            {
+                "latitude": "-11.1615204",
+                "longitude": "-49.62321799999998"
+            },
+            {
+                "latitude": "-11.1562689",
+                "longitude": "-49.62132539999999"
+            },
+            {
+                "latitude": "-11.1536926",
+                "longitude": "-49.6316559"
+            }
+        ]
+    },
+    {
+        "id": 190503,
+        "variety_id": null,
+        "planned_variety_id": 23736,
+        "culture_id": null,
+        "planned_culture_id": 41,
+        "state": "active",
+        "date": null,
+        "planned_date": "2023-05-10T23:59:59.000-03:00",
+        "emergence_date": null,
+        "activation_date": "2023-05-01",
+        "area": 85.25,
+        "name": "B24",
+        "farm_name": "Fazenda Ben\u00e7\u00e3o de Deus",
+        "variety_name": null,
+        "planned_variety_name": "GNPA G2",
+        "culture_name": null,
+        "culture_unit": null,
+        "culture_unit_per_ha": null,
+        "planned_culture_name": "Gergelim",
+        "harvest_name": "2023/2024",
+        "centroid": {
+            "lat": -11.16040643619498,
+            "lng": -49.61588885913946
+        },
+        "harvest_prediction_date": "2023-08-12",
+        "cycle": 1,
+        "observations": null,
+        "irrigated": false,
+        "updated_at": "2023-05-01T11:54:51.000-03:00",
+        "productivity": null,
+        "farm": {
+            "id": 11946,
+            "name": "Fazenda Ben\u00e7\u00e3o de Deus",
+            "cnpj_cpf": "",
+            "ie": ""
+        },
+        "plot": {
+            "id": 81446,
+            "name": "B24",
+            "farm_id": 11946,
+            "area": 85.25,
+            "updated_at": "2023-05-01T11:54:51.000-03:00",
+            "disabled_at": null,
+            "geo_points": [
+                {
+                    "latitude": "-11.1615704",
+                    "longitude": "-49.6230239"
+                },
+                {
+                    "latitude": "-11.1619043",
+                    "longitude": "-49.62174719999999"
+                },
+                {
+                    "latitude": "-11.1597317",
+                    "longitude": "-49.62028870000001"
+                },
+                {
+                    "latitude": "-11.1597521",
+                    "longitude": "-49.6202505"
+                },
+                {
+                    "latitude": "-11.1619207",
+                    "longitude": "-49.6217006"
+                },
+                {
+                    "latitude": "-11.1644236",
+                    "longitude": "-49.6119125"
+                },
+                {
+                    "latitude": "-11.1595803",
+                    "longitude": "-49.6077936"
+                },
+                {
+                    "latitude": "-11.1563173",
+                    "longitude": "-49.6211303"
+                }
+            ]
+        },
+        "harvest": {
+            "id": 2607,
+            "name": "2023/2024",
+            "start_date": "2023-04-01",
+            "end_date": "2024-04-30"
+        },
+        "geo_points": [
+            {
+                "latitude": "-11.1615704",
+                "longitude": "-49.6230239"
+            },
+            {
+                "latitude": "-11.1619043",
+                "longitude": "-49.62174719999999"
+            },
+            {
+                "latitude": "-11.1597317",
+                "longitude": "-49.62028870000001"
+            },
+            {
+                "latitude": "-11.1597521",
+                "longitude": "-49.6202505"
+            },
+            {
+                "latitude": "-11.1619207",
+                "longitude": "-49.6217006"
+            },
+            {
+                "latitude": "-11.1644236",
+                "longitude": "-49.6119125"
+            },
+            {
+                "latitude": "-11.1595803",
+                "longitude": "-49.6077936"
+            },
+            {
+                "latitude": "-11.1563173",
+                "longitude": "-49.6211303"
+            }
+        ]
+    },
+    {
+        "id": 190504,
+        "variety_id": null,
+        "planned_variety_id": 23736,
+        "culture_id": null,
+        "planned_culture_id": 41,
+        "state": "active",
+        "date": null,
+        "planned_date": "2023-05-11T23:59:59.000-03:00",
+        "emergence_date": null,
+        "activation_date": "2023-05-01",
+        "area": 53.36,
+        "name": "B25",
+        "farm_name": "Fazenda Ben\u00e7\u00e3o de Deus",
+        "variety_name": null,
+        "planned_variety_name": "GNPA G2",
+        "culture_name": null,
+        "culture_unit": null,
+        "culture_unit_per_ha": null,
+        "planned_culture_name": "Gergelim",
+        "harvest_name": "2023/2024",
+        "centroid": {
+            "lat": -11.16489408065551,
+            "lng": -49.61860797474681
+        },
+        "harvest_prediction_date": "2023-08-13",
+        "cycle": 1,
+        "observations": null,
+        "irrigated": false,
+        "updated_at": "2023-05-01T11:54:54.000-03:00",
+        "productivity": null,
+        "farm": {
+            "id": 11946,
+            "name": "Fazenda Ben\u00e7\u00e3o de Deus",
+            "cnpj_cpf": "",
+            "ie": ""
+        },
+        "plot": {
+            "id": 81447,
+            "name": "B25",
+            "farm_id": 11946,
+            "area": 53.36,
+            "updated_at": "2023-05-01T11:54:54.000-03:00",
+            "disabled_at": null,
+            "geo_points": [
+                {
+                    "latitude": "-11.1656412",
+                    "longitude": "-49.624496"
+                },
+                {
+                    "latitude": "-11.1679582",
+                    "longitude": "-49.6148378"
+                },
+                {
+                    "latitude": "-11.1645114",
+                    "longitude": "-49.61199969999999"
+                },
+                {
+                    "latitude": "-11.1616772",
+                    "longitude": "-49.6230641"
+                }
+            ]
+        },
+        "harvest": {
+            "id": 2607,
+            "name": "2023/2024",
+            "start_date": "2023-04-01",
+            "end_date": "2024-04-30"
+        },
+        "geo_points": [
+            {
+                "latitude": "-11.1656412",
+                "longitude": "-49.624496"
+            },
+            {
+                "latitude": "-11.1679582",
+                "longitude": "-49.6148378"
+            },
+            {
+                "latitude": "-11.1645114",
+                "longitude": "-49.61199969999999"
+            },
+            {
+                "latitude": "-11.1616772",
+                "longitude": "-49.6230641"
+            }
+        ]
+    },
+    {
+        "id": 190505,
+        "variety_id": null,
+        "planned_variety_id": 23736,
+        "culture_id": null,
+        "planned_culture_id": 41,
+        "state": "active",
+        "date": null,
+        "planned_date": "2023-05-12T23:59:59.000-03:00",
+        "emergence_date": null,
+        "activation_date": "2023-05-01",
+        "area": 50.08,
+        "name": "B26",
+        "farm_name": "Fazenda Ben\u00e7\u00e3o de Deus",
+        "variety_name": null,
+        "planned_variety_name": "GNPA G2",
+        "culture_name": null,
+        "culture_unit": null,
+        "culture_unit_per_ha": null,
+        "planned_culture_name": "Gergelim",
+        "harvest_name": "2023/2024",
+        "centroid": {
+            "lat": -11.162307489931843,
+            "lng": -49.629225568796095
+        },
+        "harvest_prediction_date": "2023-08-14",
+        "cycle": 1,
+        "observations": null,
+        "irrigated": false,
+        "updated_at": "2023-05-01T11:54:57.000-03:00",
+        "productivity": null,
+        "farm": {
+            "id": 11946,
+            "name": "Fazenda Ben\u00e7\u00e3o de Deus",
+            "cnpj_cpf": "",
+            "ie": ""
+        },
+        "plot": {
+            "id": 81448,
+            "name": "B26",
+            "farm_id": 11946,
+            "area": 50.08,
+            "updated_at": "2023-05-01T11:54:57.000-03:00",
+            "disabled_at": null,
+            "geo_points": [
+                {
+                    "latitude": "-11.1589511",
+                    "longitude": "-49.6336267"
+                },
+                {
+                    "latitude": "-11.1630812",
+                    "longitude": "-49.6351787"
+                },
+                {
+                    "latitude": "-11.1655998",
+                    "longitude": "-49.6246902"
+                },
+                {
+                    "latitude": "-11.1616273",
+                    "longitude": "-49.6232569"
+                }
+            ]
+        },
+        "harvest": {
+            "id": 2607,
+            "name": "2023/2024",
+            "start_date": "2023-04-01",
+            "end_date": "2024-04-30"
+        },
+        "geo_points": [
+            {
+                "latitude": "-11.1589511",
+                "longitude": "-49.6336267"
+            },
+            {
+                "latitude": "-11.1630812",
+                "longitude": "-49.6351787"
+            },
+            {
+                "latitude": "-11.1655998",
+                "longitude": "-49.6246902"
+            },
+            {
+                "latitude": "-11.1616273",
+                "longitude": "-49.6232569"
+            }
+        ]
+    },
+    {
+        "id": 190506,
+        "variety_id": null,
+        "planned_variety_id": 23736,
+        "culture_id": null,
+        "planned_culture_id": 41,
+        "state": "active",
+        "date": null,
+        "planned_date": "2023-05-13T23:59:59.000-03:00",
+        "emergence_date": null,
+        "activation_date": "2023-05-01",
+        "area": 49.19,
+        "name": "B27",
+        "farm_name": "Fazenda Ben\u00e7\u00e3o de Deus",
+        "variety_name": null,
+        "planned_variety_name": "GNPA G2",
+        "culture_name": null,
+        "culture_unit": null,
+        "culture_unit_per_ha": null,
+        "planned_culture_name": "Gergelim",
+        "harvest_name": "2023/2024",
+        "centroid": {
+            "lat": -11.159875144918253,
+            "lng": -49.63900012825807
+        },
+        "harvest_prediction_date": "2023-08-15",
+        "cycle": 1,
+        "observations": null,
+        "irrigated": false,
+        "updated_at": "2023-05-01T11:55:02.000-03:00",
+        "productivity": null,
+        "farm": {
+            "id": 11946,
+            "name": "Fazenda Ben\u00e7\u00e3o de Deus",
+            "cnpj_cpf": "",
+            "ie": ""
+        },
+        "plot": {
+            "id": 81449,
+            "name": "B27",
+            "farm_id": 11946,
+            "area": 49.19,
+            "updated_at": "2023-05-01T11:55:02.000-03:00",
+            "disabled_at": null,
+            "geo_points": [
+                {
+                    "latitude": "-11.1566464",
+                    "longitude": "-49.64255559999998"
+                },
+                {
+                    "latitude": "-11.1609237",
+                    "longitude": "-49.6441784"
+                },
+                {
+                    "latitude": "-11.163048",
+                    "longitude": "-49.6353678"
+                },
+                {
+                    "latitude": "-11.1589049",
+                    "longitude": "-49.6338036"
+                }
+            ]
+        },
+        "harvest": {
+            "id": 2607,
+            "name": "2023/2024",
+            "start_date": "2023-04-01",
+            "end_date": "2024-04-30"
+        },
+        "geo_points": [
+            {
+                "latitude": "-11.1566464",
+                "longitude": "-49.64255559999998"
+            },
+            {
+                "latitude": "-11.1609237",
+                "longitude": "-49.6441784"
+            },
+            {
+                "latitude": "-11.163048",
+                "longitude": "-49.6353678"
+            },
+            {
+                "latitude": "-11.1589049",
+                "longitude": "-49.6338036"
+            }
+        ]
+    },
+    {
+        "id": 190532,
+        "variety_id": null,
+        "planned_variety_id": 23736,
+        "culture_id": null,
+        "planned_culture_id": 41,
+        "state": "active",
+        "date": null,
+        "planned_date": "2023-05-14T23:59:59.000-03:00",
+        "emergence_date": null,
+        "activation_date": "2023-05-01",
+        "area": 52.67,
+        "name": "B30",
+        "farm_name": "Fazenda Ben\u00e7\u00e3o de Deus",
+        "variety_name": null,
+        "planned_variety_name": "GNPA G2",
+        "culture_name": null,
+        "culture_unit": null,
+        "culture_unit_per_ha": null,
+        "planned_culture_name": "Gergelim",
+        "harvest_name": "2023/2024",
+        "centroid": {
+            "lat": -11.169029933229131,
+            "lng": -49.620994692520995
+        },
+        "harvest_prediction_date": "2023-08-16",
+        "cycle": 1,
+        "observations": null,
+        "irrigated": false,
+        "updated_at": "2023-05-01T11:55:08.000-03:00",
+        "productivity": null,
+        "farm": {
+            "id": 11946,
+            "name": "Fazenda Ben\u00e7\u00e3o de Deus",
+            "cnpj_cpf": "",
+            "ie": ""
+        },
+        "plot": {
+            "id": 81452,
+            "name": "B30",
+            "farm_id": 11946,
+            "area": 52.67,
+            "updated_at": "2023-05-01T11:55:08.000-03:00",
+            "disabled_at": null,
+            "geo_points": [
+                {
+                    "latitude": "-11.1704525",
+                    "longitude": "-49.6262228"
+                },
+                {
+                    "latitude": "-11.172146",
+                    "longitude": "-49.6183434"
+                },
+                {
+                    "latitude": "-11.168078",
+                    "longitude": "-49.6149253"
+                },
+                {
+                    "latitude": "-11.1657788",
+                    "longitude": "-49.62454359999999"
+                }
+            ]
+        },
+        "harvest": {
+            "id": 2607,
+            "name": "2023/2024",
+            "start_date": "2023-04-01",
+            "end_date": "2024-04-30"
+        },
+        "geo_points": [
+            {
+                "latitude": "-11.1704525",
+                "longitude": "-49.6262228"
+            },
+            {
+                "latitude": "-11.172146",
+                "longitude": "-49.6183434"
+            },
+            {
+                "latitude": "-11.168078",
+                "longitude": "-49.6149253"
+            },
+            {
+                "latitude": "-11.1657788",
+                "longitude": "-49.62454359999999"
+            }
+        ]
+    },
+    {
+        "id": 190517,
+        "variety_id": null,
+        "planned_variety_id": 23736,
+        "culture_id": null,
+        "planned_culture_id": 41,
+        "state": "active",
+        "date": null,
+        "planned_date": "2023-05-15T23:59:59.000-03:00",
+        "emergence_date": null,
+        "activation_date": "2023-05-01",
+        "area": 27.82,
+        "name": "B31",
+        "farm_name": "Fazenda Ben\u00e7\u00e3o de Deus",
+        "variety_name": null,
+        "planned_variety_name": "GNPA G2",
+        "culture_name": null,
+        "culture_unit": null,
+        "culture_unit_per_ha": null,
+        "planned_culture_name": "Gergelim",
+        "harvest_name": "2023/2024",
+        "centroid": {
+            "lat": -11.170831968533108,
+            "lng": -49.61407668969453
+        },
+        "harvest_prediction_date": "2023-08-17",
+        "cycle": 1,
+        "observations": null,
+        "irrigated": false,
+        "updated_at": "2023-05-01T11:55:10.000-03:00",
+        "productivity": null,
+        "farm": {
+            "id": 11946,
+            "name": "Fazenda Ben\u00e7\u00e3o de Deus",
+            "cnpj_cpf": "",
+            "ie": ""
+        },
+        "plot": {
+            "id": 81453,
+            "name": "B31",
+            "farm_id": 11946,
+            "area": 27.82,
+            "updated_at": "2023-05-01T11:55:10.000-03:00",
+            "disabled_at": null,
+            "geo_points": [
+                {
+                    "latitude": "-11.1722402",
+                    "longitude": "-49.61803529999999"
+                },
+                {
+                    "latitude": "-11.1726507",
+                    "longitude": "-49.61583359999999"
+                },
+                {
+                    "latitude": "-11.1732654",
+                    "longitude": "-49.6128925"
+                },
+                {
+                    "latitude": "-11.1702058",
+                    "longitude": "-49.61023509999999"
+                },
+                {
+                    "latitude": "-11.16788",
+                    "longitude": "-49.6145495"
+                },
+                {
+                    "latitude": "-11.1720991",
+                    "longitude": "-49.6180427"
+                },
+                {
+                    "latitude": "-11.1721728",
+                    "longitude": "-49.6180779"
+                },
+                {
+                    "latitude": "-11.172203",
+                    "longitude": "-49.61807659999999"
+                }
+            ]
+        },
+        "harvest": {
+            "id": 2607,
+            "name": "2023/2024",
+            "start_date": "2023-04-01",
+            "end_date": "2024-04-30"
+        },
+        "geo_points": [
+            {
+                "latitude": "-11.1722402",
+                "longitude": "-49.61803529999999"
+            },
+            {
+                "latitude": "-11.1726507",
+                "longitude": "-49.61583359999999"
+            },
+            {
+                "latitude": "-11.1732654",
+                "longitude": "-49.6128925"
+            },
+            {
+                "latitude": "-11.1702058",
+                "longitude": "-49.61023509999999"
+            },
+            {
+                "latitude": "-11.16788",
+                "longitude": "-49.6145495"
+            },
+            {
+                "latitude": "-11.1720991",
+                "longitude": "-49.6180427"
+            },
+            {
+                "latitude": "-11.1721728",
+                "longitude": "-49.6180779"
+            },
+            {
+                "latitude": "-11.172203",
+                "longitude": "-49.61807659999999"
+            }
+        ]
+    },
+    {
+        "id": 190518,
+        "variety_id": null,
+        "planned_variety_id": 23736,
+        "culture_id": null,
+        "planned_culture_id": 41,
+        "state": "active",
+        "date": null,
+        "planned_date": "2023-05-17T23:59:59.000-03:00",
+        "emergence_date": null,
+        "activation_date": "2023-05-01",
+        "area": 25.13,
+        "name": "B32",
+        "farm_name": "Fazenda Ben\u00e7\u00e3o de Deus",
+        "variety_name": null,
+        "planned_variety_name": "GNPA G2",
+        "culture_name": null,
+        "culture_unit": null,
+        "culture_unit_per_ha": null,
+        "planned_culture_name": "Gergelim",
+        "harvest_name": "2023/2024",
+        "centroid": {
+            "lat": -11.167362529832864,
+            "lng": -49.610984929257846
+        },
+        "harvest_prediction_date": "2023-08-19",
+        "cycle": 1,
+        "observations": null,
+        "irrigated": false,
+        "updated_at": "2023-05-01T11:55:13.000-03:00",
+        "productivity": null,
+        "farm": {
+            "id": 11946,
+            "name": "Fazenda Ben\u00e7\u00e3o de Deus",
+            "cnpj_cpf": "",
+            "ie": ""
+        },
+        "plot": {
+            "id": 81454,
+            "name": "B32",
+            "farm_id": 11946,
+            "area": 25.13,
+            "updated_at": "2023-05-01T11:55:13.000-03:00",
+            "disabled_at": null,
+            "geo_points": [
+                {
+                    "latitude": "-11.170169",
+                    "longitude": "-49.61020359999999"
+                },
+                {
+                    "latitude": "-11.1670389",
+                    "longitude": "-49.6074691"
+                },
+                {
+                    "latitude": "-11.164469",
+                    "longitude": "-49.6116755"
+                },
+                {
+                    "latitude": "-11.1678415",
+                    "longitude": "-49.61451730000001"
+                }
+            ]
+        },
+        "harvest": {
+            "id": 2607,
+            "name": "2023/2024",
+            "start_date": "2023-04-01",
+            "end_date": "2024-04-30"
+        },
+        "geo_points": [
+            {
+                "latitude": "-11.170169",
+                "longitude": "-49.61020359999999"
+            },
+            {
+                "latitude": "-11.1670389",
+                "longitude": "-49.6074691"
+            },
+            {
+                "latitude": "-11.164469",
+                "longitude": "-49.6116755"
+            },
+            {
+                "latitude": "-11.1678415",
+                "longitude": "-49.61451730000001"
+            }
+        ]
+    },
+    {
+        "id": 190519,
+        "variety_id": null,
+        "planned_variety_id": 23736,
+        "culture_id": null,
+        "planned_culture_id": 41,
+        "state": "active",
+        "date": null,
+        "planned_date": "2023-05-16T23:59:59.000-03:00",
+        "emergence_date": null,
+        "activation_date": "2023-05-01",
+        "area": 27.14,
+        "name": "B33",
+        "farm_name": "Fazenda Ben\u00e7\u00e3o de Deus",
+        "variety_name": null,
+        "planned_variety_name": "GNPA G2",
+        "culture_name": null,
+        "culture_unit": null,
+        "culture_unit_per_ha": null,
+        "planned_culture_name": "Gergelim",
+        "harvest_name": "2023/2024",
+        "centroid": {
+            "lat": -11.16399102626607,
+            "lng": -49.60808002332892
+        },
+        "harvest_prediction_date": "2023-08-18",
+        "cycle": 1,
+        "observations": null,
+        "irrigated": false,
+        "updated_at": "2023-05-01T11:55:16.000-03:00",
+        "productivity": null,
+        "farm": {
+            "id": 11946,
+            "name": "Fazenda Ben\u00e7\u00e3o de Deus",
+            "cnpj_cpf": "",
+            "ie": ""
+        },
+        "plot": {
+            "id": 81455,
+            "name": "B33",
+            "farm_id": 11946,
+            "area": 27.14,
+            "updated_at": "2023-05-01T11:55:16.000-03:00",
+            "disabled_at": null,
+            "geo_points": [
+                {
+                    "latitude": "-11.1622737",
+                    "longitude": "-49.6066304"
+                },
+                {
+                    "latitude": "-11.160956",
+                    "longitude": "-49.60880419999999"
+                },
+                {
+                    "latitude": "-11.1644255",
+                    "longitude": "-49.61164119999999"
+                },
+                {
+                    "latitude": "-11.1670192",
+                    "longitude": "-49.60745"
+                },
+                {
+                    "latitude": "-11.1635868",
+                    "longitude": "-49.6044664"
+                }
+            ]
+        },
+        "harvest": {
+            "id": 2607,
+            "name": "2023/2024",
+            "start_date": "2023-04-01",
+            "end_date": "2024-04-30"
+        },
+        "geo_points": [
+            {
+                "latitude": "-11.1622737",
+                "longitude": "-49.6066304"
+            },
+            {
+                "latitude": "-11.160956",
+                "longitude": "-49.60880419999999"
+            },
+            {
+                "latitude": "-11.1644255",
+                "longitude": "-49.61164119999999"
+            },
+            {
+                "latitude": "-11.1670192",
+                "longitude": "-49.60745"
+            },
+            {
+                "latitude": "-11.1635868",
+                "longitude": "-49.6044664"
+            }
+        ]
+    },
+    {
+        "id": 190520,
+        "variety_id": null,
+        "planned_variety_id": 23736,
+        "culture_id": null,
+        "planned_culture_id": 41,
+        "state": "active",
+        "date": null,
+        "planned_date": "2023-05-17T23:59:59.000-03:00",
+        "emergence_date": null,
+        "activation_date": "2023-05-01",
+        "area": 13.41,
+        "name": "B34",
+        "farm_name": "Fazenda Ben\u00e7\u00e3o de Deus",
+        "variety_name": null,
+        "planned_variety_name": "GNPA G2",
+        "culture_name": null,
+        "culture_unit": null,
+        "culture_unit_per_ha": null,
+        "planned_culture_name": "Gergelim",
+        "harvest_name": "2023/2024",
+        "centroid": {
+            "lat": -11.16152767560157,
+            "lng": -49.605573757736785
+        },
+        "harvest_prediction_date": "2023-08-19",
+        "cycle": 1,
+        "observations": null,
+        "irrigated": false,
+        "updated_at": "2023-05-01T11:55:18.000-03:00",
+        "productivity": null,
+        "farm": {
+            "id": 11946,
+            "name": "Fazenda Ben\u00e7\u00e3o de Deus",
+            "cnpj_cpf": "",
+            "ie": ""
+        },
+        "plot": {
+            "id": 81456,
+            "name": "B34",
+            "farm_id": 11946,
+            "area": 13.41,
+            "updated_at": "2023-05-01T11:55:18.000-03:00",
+            "disabled_at": null,
+            "geo_points": [
+                {
+                    "latitude": "-11.1609234",
+                    "longitude": "-49.6087663"
+                },
+                {
+                    "latitude": "-11.1635503",
+                    "longitude": "-49.6044446"
+                },
+                {
+                    "latitude": "-11.1612615",
+                    "longitude": "-49.6024446"
+                },
+                {
+                    "latitude": "-11.1598777",
+                    "longitude": "-49.6078433"
+                }
+            ]
+        },
+        "harvest": {
+            "id": 2607,
+            "name": "2023/2024",
+            "start_date": "2023-04-01",
+            "end_date": "2024-04-30"
+        },
+        "geo_points": [
+            {
+                "latitude": "-11.1609234",
+                "longitude": "-49.6087663"
+            },
+            {
+                "latitude": "-11.1635503",
+                "longitude": "-49.6044446"
+            },
+            {
+                "latitude": "-11.1612615",
+                "longitude": "-49.6024446"
+            },
+            {
+                "latitude": "-11.1598777",
+                "longitude": "-49.6078433"
+            }
+        ]
+    },
+    {
+        "id": 190521,
+        "variety_id": null,
+        "planned_variety_id": 23736,
+        "culture_id": null,
+        "planned_culture_id": 41,
+        "state": "active",
+        "date": null,
+        "planned_date": "2023-05-17T23:59:59.000-03:00",
+        "emergence_date": null,
+        "activation_date": "2023-05-01",
+        "area": 15.22,
+        "name": "B35",
+        "farm_name": "Fazenda Ben\u00e7\u00e3o de Deus",
+        "variety_name": null,
+        "planned_variety_name": "GNPA G2",
+        "culture_name": null,
+        "culture_unit": null,
+        "culture_unit_per_ha": null,
+        "planned_culture_name": "Gergelim",
+        "harvest_name": "2023/2024",
+        "centroid": {
+            "lat": -11.159595024246624,
+            "lng": -49.60425375729646
+        },
+        "harvest_prediction_date": "2023-08-19",
+        "cycle": 1,
+        "observations": null,
+        "irrigated": false,
+        "updated_at": "2023-05-01T11:55:21.000-03:00",
+        "productivity": null,
+        "farm": {
+            "id": 11946,
+            "name": "Fazenda Ben\u00e7\u00e3o de Deus",
+            "cnpj_cpf": "",
+            "ie": ""
+        },
+        "plot": {
+            "id": 81457,
+            "name": "B35",
+            "farm_id": 11946,
+            "area": 15.22,
+            "updated_at": "2023-05-01T11:55:21.000-03:00",
+            "disabled_at": null,
+            "geo_points": [
+                {
+                    "latitude": "-11.1612201",
+                    "longitude": "-49.6024071"
+                },
+                {
+                    "latitude": "-11.159222",
+                    "longitude": "-49.6006659"
+                },
+                {
+                    "latitude": "-11.158058",
+                    "longitude": "-49.6063758"
+                },
+                {
+                    "latitude": "-11.1598369",
+                    "longitude": "-49.60781329999999"
+                }
+            ]
+        },
+        "harvest": {
+            "id": 2607,
+            "name": "2023/2024",
+            "start_date": "2023-04-01",
+            "end_date": "2024-04-30"
+        },
+        "geo_points": [
+            {
+                "latitude": "-11.1612201",
+                "longitude": "-49.6024071"
+            },
+            {
+                "latitude": "-11.159222",
+                "longitude": "-49.6006659"
+            },
+            {
+                "latitude": "-11.158058",
+                "longitude": "-49.6063758"
+            },
+            {
+                "latitude": "-11.1598369",
+                "longitude": "-49.60781329999999"
+            }
+        ]
+    },
+    {
+        "id": 190522,
+        "variety_id": null,
+        "planned_variety_id": 23736,
+        "culture_id": null,
+        "planned_culture_id": 41,
+        "state": "active",
+        "date": null,
+        "planned_date": "2023-05-18T23:59:59.000-03:00",
+        "emergence_date": null,
+        "activation_date": "2023-05-01",
+        "area": 15.71,
+        "name": "B36",
+        "farm_name": "Fazenda Ben\u00e7\u00e3o de Deus",
+        "variety_name": null,
+        "planned_variety_name": "GNPA G2",
+        "culture_name": null,
+        "culture_unit": null,
+        "culture_unit_per_ha": null,
+        "planned_culture_name": "Gergelim",
+        "harvest_name": "2023/2024",
+        "centroid": {
+            "lat": -11.157620158995304,
+            "lng": -49.60273778667425
+        },
+        "harvest_prediction_date": "2023-08-20",
+        "cycle": 1,
+        "observations": null,
+        "irrigated": false,
+        "updated_at": "2023-05-01T11:55:25.000-03:00",
+        "productivity": null,
+        "farm": {
+            "id": 11946,
+            "name": "Fazenda Ben\u00e7\u00e3o de Deus",
+            "cnpj_cpf": "",
+            "ie": ""
+        },
+        "plot": {
+            "id": 81458,
+            "name": "B36",
+            "farm_id": 11946,
+            "area": 15.71,
+            "updated_at": "2023-05-01T11:55:25.000-03:00",
+            "disabled_at": null,
+            "geo_points": [
+                {
+                    "latitude": "-11.1575454",
+                    "longitude": "-49.5992059"
+                },
+                {
+                    "latitude": "-11.157496",
+                    "longitude": "-49.59916209999999"
+                },
+                {
+                    "latitude": "-11.1574694",
+                    "longitude": "-49.5991589"
+                },
+                {
+                    "latitude": "-11.1574402",
+                    "longitude": "-49.59916570000001"
+                },
+                {
+                    "latitude": "-11.1574008",
+                    "longitude": "-49.5992283"
+                },
+                {
+                    "latitude": "-11.1559262",
+                    "longitude": "-49.60453509999999"
+                },
+                {
+                    "latitude": "-11.1559326",
+                    "longitude": "-49.60457109999999"
+                },
+                {
+                    "latitude": "-11.1559545",
+                    "longitude": "-49.6045923"
+                },
+                {
+                    "latitude": "-11.1563029",
+                    "longitude": "-49.6048593"
+                },
+                {
+                    "latitude": "-11.1580215",
+                    "longitude": "-49.6063385"
+                },
+                {
+                    "latitude": "-11.1591831",
+                    "longitude": "-49.6006335"
+                }
+            ]
+        },
+        "harvest": {
+            "id": 2607,
+            "name": "2023/2024",
+            "start_date": "2023-04-01",
+            "end_date": "2024-04-30"
+        },
+        "geo_points": [
+            {
+                "latitude": "-11.1575454",
+                "longitude": "-49.5992059"
+            },
+            {
+                "latitude": "-11.157496",
+                "longitude": "-49.59916209999999"
+            },
+            {
+                "latitude": "-11.1574694",
+                "longitude": "-49.5991589"
+            },
+            {
+                "latitude": "-11.1574402",
+                "longitude": "-49.59916570000001"
+            },
+            {
+                "latitude": "-11.1574008",
+                "longitude": "-49.5992283"
+            },
+            {
+                "latitude": "-11.1559262",
+                "longitude": "-49.60453509999999"
+            },
+            {
+                "latitude": "-11.1559326",
+                "longitude": "-49.60457109999999"
+            },
+            {
+                "latitude": "-11.1559545",
+                "longitude": "-49.6045923"
+            },
+            {
+                "latitude": "-11.1563029",
+                "longitude": "-49.6048593"
+            },
+            {
+                "latitude": "-11.1580215",
+                "longitude": "-49.6063385"
+            },
+            {
+                "latitude": "-11.1591831",
+                "longitude": "-49.6006335"
+            }
+        ]
+    },
+    {
+        "id": 190524,
+        "variety_id": null,
+        "planned_variety_id": 23736,
+        "culture_id": null,
+        "planned_culture_id": 41,
+        "state": "active",
+        "date": null,
+        "planned_date": "2023-05-18T23:59:59.000-03:00",
+        "emergence_date": null,
+        "activation_date": "2023-05-01",
+        "area": 16.42,
+        "name": "B37",
+        "farm_name": "Fazenda Ben\u00e7\u00e3o de Deus",
+        "variety_name": null,
+        "planned_variety_name": "GNPA G2",
+        "culture_name": null,
+        "culture_unit": null,
+        "culture_unit_per_ha": null,
+        "planned_culture_name": "Gergelim",
+        "harvest_name": "2023/2024",
+        "centroid": {
+            "lat": -11.160013245417124,
+            "lng": -49.59726825261206
+        },
+        "harvest_prediction_date": "2023-08-20",
+        "cycle": 1,
+        "observations": null,
+        "irrigated": false,
+        "updated_at": "2023-05-01T11:55:29.000-03:00",
+        "productivity": null,
+        "farm": {
+            "id": 11946,
+            "name": "Fazenda Ben\u00e7\u00e3o de Deus",
+            "cnpj_cpf": "",
+            "ie": ""
+        },
+        "plot": {
+            "id": 81459,
+            "name": "B37",
+            "farm_id": 11946,
+            "area": 16.42,
+            "updated_at": "2023-05-01T11:55:29.000-03:00",
+            "disabled_at": null,
+            "geo_points": [
+                {
+                    "latitude": "-11.1592945",
+                    "longitude": "-49.60042389999999"
+                },
+                {
+                    "latitude": "-11.1626513",
+                    "longitude": "-49.5953774"
+                },
+                {
+                    "latitude": "-11.1614744",
+                    "longitude": "-49.59468500000001"
+                },
+                {
+                    "latitude": "-11.1613615",
+                    "longitude": "-49.5946438"
+                },
+                {
+                    "latitude": "-11.1610783",
+                    "longitude": "-49.5946498"
+                },
+                {
+                    "latitude": "-11.1603793",
+                    "longitude": "-49.5948362"
+                },
+                {
+                    "latitude": "-11.1599425",
+                    "longitude": "-49.5949713"
+                },
+                {
+                    "latitude": "-11.1581064",
+                    "longitude": "-49.5980522"
+                },
+                {
+                    "latitude": "-11.1575057",
+                    "longitude": "-49.5988676"
+                }
+            ]
+        },
+        "harvest": {
+            "id": 2607,
+            "name": "2023/2024",
+            "start_date": "2023-04-01",
+            "end_date": "2024-04-30"
+        },
+        "geo_points": [
+            {
+                "latitude": "-11.1592945",
+                "longitude": "-49.60042389999999"
+            },
+            {
+                "latitude": "-11.1626513",
+                "longitude": "-49.5953774"
+            },
+            {
+                "latitude": "-11.1614744",
+                "longitude": "-49.59468500000001"
+            },
+            {
+                "latitude": "-11.1613615",
+                "longitude": "-49.5946438"
+            },
+            {
+                "latitude": "-11.1610783",
+                "longitude": "-49.5946498"
+            },
+            {
+                "latitude": "-11.1603793",
+                "longitude": "-49.5948362"
+            },
+            {
+                "latitude": "-11.1599425",
+                "longitude": "-49.5949713"
+            },
+            {
+                "latitude": "-11.1581064",
+                "longitude": "-49.5980522"
+            },
+            {
+                "latitude": "-11.1575057",
+                "longitude": "-49.5988676"
+            }
+        ]
+    },
+    {
+        "id": 190525,
+        "variety_id": null,
+        "planned_variety_id": 23736,
+        "culture_id": null,
+        "planned_culture_id": 41,
+        "state": "active",
+        "date": null,
+        "planned_date": "2023-05-18T23:59:59.000-03:00",
+        "emergence_date": null,
+        "activation_date": "2023-05-01",
+        "area": 33.25,
+        "name": "B38",
+        "farm_name": "Fazenda Ben\u00e7\u00e3o de Deus",
+        "variety_name": null,
+        "planned_variety_name": "GNPA G2",
+        "culture_name": null,
+        "culture_unit": null,
+        "culture_unit_per_ha": null,
+        "planned_culture_name": "Gergelim",
+        "harvest_name": "2023/2024",
+        "centroid": {
+            "lat": -11.162610800543273,
+            "lng": -49.599559395390536
+        },
+        "harvest_prediction_date": "2023-08-20",
+        "cycle": 1,
+        "observations": null,
+        "irrigated": false,
+        "updated_at": "2023-05-01T11:55:36.000-03:00",
+        "productivity": null,
+        "farm": {
+            "id": 11946,
+            "name": "Fazenda Ben\u00e7\u00e3o de Deus",
+            "cnpj_cpf": "",
+            "ie": ""
+        },
+        "plot": {
+            "id": 81460,
+            "name": "B38",
+            "farm_id": 11946,
+            "area": 33.25,
+            "updated_at": "2023-05-01T11:55:36.000-03:00",
+            "disabled_at": null,
+            "geo_points": [
+                {
+                    "latitude": "-11.1651811",
+                    "longitude": "-49.5968334"
+                },
+                {
+                    "latitude": "-11.1626946",
+                    "longitude": "-49.59540079999999"
+                },
+                {
+                    "latitude": "-11.15933",
+                    "longitude": "-49.60045479999999"
+                },
+                {
+                    "latitude": "-11.1636133",
+                    "longitude": "-49.6041807"
+                }
+            ]
+        },
+        "harvest": {
+            "id": 2607,
+            "name": "2023/2024",
+            "start_date": "2023-04-01",
+            "end_date": "2024-04-30"
+        },
+        "geo_points": [
+            {
+                "latitude": "-11.1651811",
+                "longitude": "-49.5968334"
+            },
+            {
+                "latitude": "-11.1626946",
+                "longitude": "-49.59540079999999"
+            },
+            {
+                "latitude": "-11.15933",
+                "longitude": "-49.60045479999999"
+            },
+            {
+                "latitude": "-11.1636133",
+                "longitude": "-49.6041807"
+            }
+        ]
+    },
+    {
+        "id": 190526,
+        "variety_id": null,
+        "planned_variety_id": 23736,
+        "culture_id": null,
+        "planned_culture_id": 41,
+        "state": "active",
+        "date": null,
+        "planned_date": "2023-05-19T23:59:59.000-03:00",
+        "emergence_date": null,
+        "activation_date": "2023-05-01",
+        "area": 36.94,
+        "name": "B39",
+        "farm_name": "Fazenda Ben\u00e7\u00e3o de Deus",
+        "variety_name": null,
+        "planned_variety_name": "GNPA G2",
+        "culture_name": null,
+        "culture_unit": null,
+        "culture_unit_per_ha": null,
+        "planned_culture_name": "Gergelim",
+        "harvest_name": "2023/2024",
+        "centroid": {
+            "lat": -11.16617621087933,
+            "lng": -49.60195384207433
+        },
+        "harvest_prediction_date": "2023-08-21",
+        "cycle": 1,
+        "observations": null,
+        "irrigated": false,
+        "updated_at": "2023-05-01T11:55:41.000-03:00",
+        "productivity": null,
+        "farm": {
+            "id": 11946,
+            "name": "Fazenda Ben\u00e7\u00e3o de Deus",
+            "cnpj_cpf": "",
+            "ie": ""
+        },
+        "plot": {
+            "id": 81461,
+            "name": "B39",
+            "farm_id": 11946,
+            "area": 36.94,
+            "updated_at": "2023-05-01T11:55:41.000-03:00",
+            "disabled_at": null,
+            "geo_points": [
+                {
+                    "latitude": "-11.1671379",
+                    "longitude": "-49.6072478"
+                },
+                {
+                    "latitude": "-11.1686661",
+                    "longitude": "-49.5988605"
+                },
+                {
+                    "latitude": "-11.1676467",
+                    "longitude": "-49.59828520000001"
+                },
+                {
+                    "latitude": "-11.167552",
+                    "longitude": "-49.59828220000001"
+                },
+                {
+                    "latitude": "-11.1674741",
+                    "longitude": "-49.5983439"
+                },
+                {
+                    "latitude": "-11.1672593",
+                    "longitude": "-49.5985957"
+                },
+                {
+                    "latitude": "-11.1670119",
+                    "longitude": "-49.5987134"
+                },
+                {
+                    "latitude": "-11.1668182",
+                    "longitude": "-49.59863120000001"
+                },
+                {
+                    "latitude": "-11.1667613",
+                    "longitude": "-49.5985233"
+                },
+                {
+                    "latitude": "-11.1665402",
+                    "longitude": "-49.5983804"
+                },
+                {
+                    "latitude": "-11.1663455",
+                    "longitude": "-49.5981417"
+                },
+                {
+                    "latitude": "-11.1663001",
+                    "longitude": "-49.5979935"
+                },
+                {
+                    "latitude": "-11.1663324",
+                    "longitude": "-49.597795"
+                },
+                {
+                    "latitude": "-11.1664396",
+                    "longitude": "-49.5976462"
+                },
+                {
+                    "latitude": "-11.1663833",
+                    "longitude": "-49.5975426"
+                },
+                {
+                    "latitude": "-11.1652232",
+                    "longitude": "-49.5968573"
+                },
+                {
+                    "latitude": "-11.1636519",
+                    "longitude": "-49.6042132"
+                }
+            ]
+        },
+        "harvest": {
+            "id": 2607,
+            "name": "2023/2024",
+            "start_date": "2023-04-01",
+            "end_date": "2024-04-30"
+        },
+        "geo_points": [
+            {
+                "latitude": "-11.1671379",
+                "longitude": "-49.6072478"
+            },
+            {
+                "latitude": "-11.1686661",
+                "longitude": "-49.5988605"
+            },
+            {
+                "latitude": "-11.1676467",
+                "longitude": "-49.59828520000001"
+            },
+            {
+                "latitude": "-11.167552",
+                "longitude": "-49.59828220000001"
+            },
+            {
+                "latitude": "-11.1674741",
+                "longitude": "-49.5983439"
+            },
+            {
+                "latitude": "-11.1672593",
+                "longitude": "-49.5985957"
+            },
+            {
+                "latitude": "-11.1670119",
+                "longitude": "-49.5987134"
+            },
+            {
+                "latitude": "-11.1668182",
+                "longitude": "-49.59863120000001"
+            },
+            {
+                "latitude": "-11.1667613",
+                "longitude": "-49.5985233"
+            },
+            {
+                "latitude": "-11.1665402",
+                "longitude": "-49.5983804"
+            },
+            {
+                "latitude": "-11.1663455",
+                "longitude": "-49.5981417"
+            },
+            {
+                "latitude": "-11.1663001",
+                "longitude": "-49.5979935"
+            },
+            {
+                "latitude": "-11.1663324",
+                "longitude": "-49.597795"
+            },
+            {
+                "latitude": "-11.1664396",
+                "longitude": "-49.5976462"
+            },
+            {
+                "latitude": "-11.1663833",
+                "longitude": "-49.5975426"
+            },
+            {
+                "latitude": "-11.1652232",
+                "longitude": "-49.5968573"
+            },
+            {
+                "latitude": "-11.1636519",
+                "longitude": "-49.6042132"
+            }
+        ]
+    },
+    {
+        "id": 190527,
+        "variety_id": null,
+        "planned_variety_id": 23736,
+        "culture_id": null,
+        "planned_culture_id": 41,
+        "state": "active",
+        "date": null,
+        "planned_date": "2023-05-20T23:59:59.000-03:00",
+        "emergence_date": null,
+        "activation_date": "2023-05-01",
+        "area": 38.01,
+        "name": "B40",
+        "farm_name": "Fazenda Ben\u00e7\u00e3o de Deus",
+        "variety_name": null,
+        "planned_variety_name": "GNPA G2",
+        "culture_name": null,
+        "culture_unit": null,
+        "culture_unit_per_ha": null,
+        "planned_culture_name": "Gergelim",
+        "harvest_name": "2023/2024",
+        "centroid": {
+            "lat": -11.169536723459881,
+            "lng": -49.60424832901615
+        },
+        "harvest_prediction_date": "2023-08-22",
+        "cycle": 1,
+        "observations": null,
+        "irrigated": false,
+        "updated_at": "2023-05-01T11:55:44.000-03:00",
+        "productivity": null,
+        "farm": {
+            "id": 11946,
+            "name": "Fazenda Ben\u00e7\u00e3o de Deus",
+            "cnpj_cpf": "",
+            "ie": ""
+        },
+        "plot": {
+            "id": 81462,
+            "name": "B40",
+            "farm_id": 11946,
+            "area": 38.01,
+            "updated_at": "2023-05-01T11:55:44.000-03:00",
+            "disabled_at": null,
+            "geo_points": [
+                {
+                    "latitude": "-11.1719171",
+                    "longitude": "-49.6007869"
+                },
+                {
+                    "latitude": "-11.1687084",
+                    "longitude": "-49.5988879"
+                },
+                {
+                    "latitude": "-11.1671757",
+                    "longitude": "-49.60728059999999"
+                },
+                {
+                    "latitude": "-11.1702555",
+                    "longitude": "-49.60996009999999"
+                }
+            ]
+        },
+        "harvest": {
+            "id": 2607,
+            "name": "2023/2024",
+            "start_date": "2023-04-01",
+            "end_date": "2024-04-30"
+        },
+        "geo_points": [
+            {
+                "latitude": "-11.1719171",
+                "longitude": "-49.6007869"
+            },
+            {
+                "latitude": "-11.1687084",
+                "longitude": "-49.5988879"
+            },
+            {
+                "latitude": "-11.1671757",
+                "longitude": "-49.60728059999999"
+            },
+            {
+                "latitude": "-11.1702555",
+                "longitude": "-49.60996009999999"
+            }
+        ]
+    },
+    {
+        "id": 190528,
+        "variety_id": null,
+        "planned_variety_id": 23736,
+        "culture_id": null,
+        "planned_culture_id": 41,
+        "state": "active",
+        "date": null,
+        "planned_date": "2023-05-20T23:59:59.000-03:00",
+        "emergence_date": null,
+        "activation_date": "2023-05-01",
+        "area": 42.6,
+        "name": "B41",
+        "farm_name": "Fazenda Ben\u00e7\u00e3o de Deus",
+        "variety_name": null,
+        "planned_variety_name": "GNPA G2",
+        "culture_name": null,
+        "culture_unit": null,
+        "culture_unit_per_ha": null,
+        "planned_culture_name": "Gergelim",
+        "harvest_name": "2023/2024",
+        "centroid": {
+            "lat": -11.172777402384268,
+            "lng": -49.6065152749012
+        },
+        "harvest_prediction_date": "2023-08-22",
+        "cycle": 1,
+        "observations": null,
+        "irrigated": false,
+        "updated_at": "2023-05-01T11:55:47.000-03:00",
+        "productivity": null,
+        "farm": {
+            "id": 11946,
+            "name": "Fazenda Ben\u00e7\u00e3o de Deus",
+            "cnpj_cpf": "",
+            "ie": ""
+        },
+        "plot": {
+            "id": 81463,
+            "name": "B41",
+            "farm_id": 11946,
+            "area": 42.6,
+            "updated_at": "2023-05-01T11:55:47.000-03:00",
+            "disabled_at": null,
+            "geo_points": [
+                {
+                    "latitude": "-11.1753293",
+                    "longitude": "-49.6031444"
+                },
+                {
+                    "latitude": "-11.1753541",
+                    "longitude": "-49.60296200000001"
+                },
+                {
+                    "latitude": "-11.1753389",
+                    "longitude": "-49.6028094"
+                },
+                {
+                    "latitude": "-11.175224",
+                    "longitude": "-49.6027098"
+                },
+                {
+                    "latitude": "-11.1719599",
+                    "longitude": "-49.6008108"
+                },
+                {
+                    "latitude": "-11.1702932",
+                    "longitude": "-49.609993"
+                },
+                {
+                    "latitude": "-11.1732408",
+                    "longitude": "-49.6125593"
+                },
+                {
+                    "latitude": "-11.1732865",
+                    "longitude": "-49.6125569"
+                },
+                {
+                    "latitude": "-11.1733473",
+                    "longitude": "-49.61249049999999"
+                }
+            ]
+        },
+        "harvest": {
+            "id": 2607,
+            "name": "2023/2024",
+            "start_date": "2023-04-01",
+            "end_date": "2024-04-30"
+        },
+        "geo_points": [
+            {
+                "latitude": "-11.1753293",
+                "longitude": "-49.6031444"
+            },
+            {
+                "latitude": "-11.1753541",
+                "longitude": "-49.60296200000001"
+            },
+            {
+                "latitude": "-11.1753389",
+                "longitude": "-49.6028094"
+            },
+            {
+                "latitude": "-11.175224",
+                "longitude": "-49.6027098"
+            },
+            {
+                "latitude": "-11.1719599",
+                "longitude": "-49.6008108"
+            },
+            {
+                "latitude": "-11.1702932",
+                "longitude": "-49.609993"
+            },
+            {
+                "latitude": "-11.1732408",
+                "longitude": "-49.6125593"
+            },
+            {
+                "latitude": "-11.1732865",
+                "longitude": "-49.6125569"
+            },
+            {
+                "latitude": "-11.1733473",
+                "longitude": "-49.61249049999999"
+            }
+        ]
+    },
+    {
+        "id": 193195,
+        "variety_id": null,
+        "planned_variety_id": 23736,
+        "culture_id": null,
+        "planned_culture_id": 41,
+        "state": "active",
+        "date": null,
+        "planned_date": "2023-05-21T23:59:59.000-03:00",
+        "emergence_date": null,
+        "activation_date": "2023-05-01",
+        "area": 110.81,
+        "name": "D08",
+        "farm_name": "Fazenda Ben\u00e7\u00e3o de Deus",
+        "variety_name": null,
+        "planned_variety_name": "GNPA G2",
+        "culture_name": null,
+        "culture_unit": null,
+        "culture_unit_per_ha": null,
+        "planned_culture_name": "Gergelim",
+        "harvest_name": "2023/2024",
+        "centroid": {
+            "lat": -11.181338762732203,
+            "lng": -49.673896210994585
+        },
+        "harvest_prediction_date": "2023-08-23",
+        "cycle": 1,
+        "observations": null,
+        "irrigated": false,
+        "updated_at": "2023-05-01T11:55:50.000-03:00",
+        "productivity": null,
+        "farm": {
+            "id": 11946,
+            "name": "Fazenda Ben\u00e7\u00e3o de Deus",
+            "cnpj_cpf": "",
+            "ie": ""
+        },
+        "plot": {
+            "id": 81493,
+            "name": "D08",
+            "farm_id": 11946,
+            "area": 110.81,
+            "updated_at": "2023-05-01T11:55:50.000-03:00",
+            "disabled_at": null,
+            "geo_points": [
+                {
+                    "latitude": "-11.193429",
+                    "longitude": "-49.678776"
+                },
+                {
+                    "latitude": "-11.176741",
+                    "longitude": "-49.6680688"
+                },
+                {
+                    "latitude": "-11.172863",
+                    "longitude": "-49.668762"
+                },
+                {
+                    "latitude": "-11.172647",
+                    "longitude": "-49.66872979999999"
+                },
+                {
+                    "latitude": "-11.173814",
+                    "longitude": "-49.6732808"
+                },
+                {
+                    "latitude": "-11.175148",
+                    "longitude": "-49.6744999"
+                },
+                {
+                    "latitude": "-11.182781",
+                    "longitude": "-49.6773667"
+                },
+                {
+                    "latitude": "-11.1831239",
+                    "longitude": "-49.67745600000001"
+                },
+                {
+                    "latitude": "-11.186959",
+                    "longitude": "-49.677219"
+                },
+                {
+                    "latitude": "-11.190851",
+                    "longitude": "-49.680555"
+                },
+                {
+                    "latitude": "-11.193429",
+                    "longitude": "-49.6787767"
+                }
+            ]
+        },
+        "harvest": {
+            "id": 2607,
+            "name": "2023/2024",
+            "start_date": "2023-04-01",
+            "end_date": "2024-04-30"
+        },
+        "geo_points": [
+            {
+                "latitude": "-11.193429",
+                "longitude": "-49.678776"
+            },
+            {
+                "latitude": "-11.176741",
+                "longitude": "-49.6680688"
+            },
+            {
+                "latitude": "-11.172863",
+                "longitude": "-49.668762"
+            },
+            {
+                "latitude": "-11.172647",
+                "longitude": "-49.66872979999999"
+            },
+            {
+                "latitude": "-11.173814",
+                "longitude": "-49.6732808"
+            },
+            {
+                "latitude": "-11.175148",
+                "longitude": "-49.6744999"
+            },
+            {
+                "latitude": "-11.182781",
+                "longitude": "-49.6773667"
+            },
+            {
+                "latitude": "-11.1831239",
+                "longitude": "-49.67745600000001"
+            },
+            {
+                "latitude": "-11.186959",
+                "longitude": "-49.677219"
+            },
+            {
+                "latitude": "-11.190851",
+                "longitude": "-49.680555"
+            },
+            {
+                "latitude": "-11.193429",
+                "longitude": "-49.6787767"
+            }
+        ]
+    },
+    {
+        "id": 190478,
+        "variety_id": null,
+        "planned_variety_id": 23736,
+        "culture_id": null,
+        "planned_culture_id": 41,
+        "state": "active",
+        "date": null,
+        "planned_date": "2023-05-26T23:59:59.000-03:00",
+        "emergence_date": null,
+        "activation_date": "2023-05-01",
+        "area": 44.82,
+        "name": "D11",
+        "farm_name": "Fazenda Ben\u00e7\u00e3o de Deus",
+        "variety_name": null,
+        "planned_variety_name": "GNPA G2",
+        "culture_name": null,
+        "culture_unit": null,
+        "culture_unit_per_ha": null,
+        "planned_culture_name": "Gergelim",
+        "harvest_name": "2023/2024",
+        "centroid": {
+            "lat": -11.201782953994297,
+            "lng": -49.67587437617973
+        },
+        "harvest_prediction_date": "2023-08-28",
+        "cycle": 1,
+        "observations": null,
+        "irrigated": false,
+        "updated_at": "2023-05-01T11:55:53.000-03:00",
+        "productivity": null,
+        "farm": {
+            "id": 11946,
+            "name": "Fazenda Ben\u00e7\u00e3o de Deus",
+            "cnpj_cpf": "",
+            "ie": ""
+        },
+        "plot": {
+            "id": 81498,
+            "name": "D11",
+            "farm_id": 11946,
+            "area": 44.82,
+            "updated_at": "2023-05-01T11:55:53.000-03:00",
+            "disabled_at": null,
+            "geo_points": [
+                {
+                    "latitude": "-11.1972708",
+                    "longitude": "-49.67618700000001"
+                },
+                {
+                    "latitude": "-11.200989",
+                    "longitude": "-49.6802579"
+                },
+                {
+                    "latitude": "-11.201207",
+                    "longitude": "-49.6804749"
+                },
+                {
+                    "latitude": "-11.201673",
+                    "longitude": "-49.68047"
+                },
+                {
+                    "latitude": "-11.2050939",
+                    "longitude": "-49.6751517"
+                },
+                {
+                    "latitude": "-11.205164",
+                    "longitude": "-49.6749207"
+                },
+                {
+                    "latitude": "-11.2047069",
+                    "longitude": "-49.67096"
+                }
+            ]
+        },
+        "harvest": {
+            "id": 2607,
+            "name": "2023/2024",
+            "start_date": "2023-04-01",
+            "end_date": "2024-04-30"
+        },
+        "geo_points": [
+            {
+                "latitude": "-11.1972708",
+                "longitude": "-49.67618700000001"
+            },
+            {
+                "latitude": "-11.200989",
+                "longitude": "-49.6802579"
+            },
+            {
+                "latitude": "-11.201207",
+                "longitude": "-49.6804749"
+            },
+            {
+                "latitude": "-11.201673",
+                "longitude": "-49.68047"
+            },
+            {
+                "latitude": "-11.2050939",
+                "longitude": "-49.6751517"
+            },
+            {
+                "latitude": "-11.205164",
+                "longitude": "-49.6749207"
+            },
+            {
+                "latitude": "-11.2047069",
+                "longitude": "-49.67096"
+            }
+        ]
+    },
+    {
+        "id": 193199,
+        "variety_id": null,
+        "planned_variety_id": 23736,
+        "culture_id": null,
+        "planned_culture_id": 41,
+        "state": "active",
+        "date": null,
+        "planned_date": "2023-05-27T23:59:59.000-03:00",
+        "emergence_date": null,
+        "activation_date": "2023-05-01",
+        "area": 24.26,
+        "name": "D12",
+        "farm_name": "Fazenda Ben\u00e7\u00e3o de Deus",
+        "variety_name": null,
+        "planned_variety_name": "GNPA G2",
+        "culture_name": null,
+        "culture_unit": null,
+        "culture_unit_per_ha": null,
+        "planned_culture_name": "Gergelim",
+        "harvest_name": "2023/2024",
+        "centroid": {
+            "lat": -11.196574839159739,
+            "lng": -49.67914003140279
+        },
+        "harvest_prediction_date": "2023-08-29",
+        "cycle": 1,
+        "observations": null,
+        "irrigated": false,
+        "updated_at": "2023-05-01T11:55:56.000-03:00",
+        "productivity": null,
+        "farm": {
+            "id": 11946,
+            "name": "Fazenda Ben\u00e7\u00e3o de Deus",
+            "cnpj_cpf": "",
+            "ie": ""
+        },
+        "plot": {
+            "id": 81497,
+            "name": "D12",
+            "farm_id": 11946,
+            "area": 24.26,
+            "updated_at": "2023-05-01T11:55:56.000-03:00",
+            "disabled_at": null,
+            "geo_points": [
+                {
+                    "latitude": "-11.20109622170354",
+                    "longitude": "-49.68045660372647"
+                },
+                {
+                    "latitude": "-11.1972557762751",
+                    "longitude": "-49.67621140498163"
+                },
+                {
+                    "latitude": "-11.19535961855292",
+                    "longitude": "-49.67752923107167"
+                },
+                {
+                    "latitude": "-11.19567009497707",
+                    "longitude": "-49.67804361635096"
+                },
+                {
+                    "latitude": "-11.19578542539523",
+                    "longitude": "-49.67838222104267"
+                },
+                {
+                    "latitude": "-11.19553291083423",
+                    "longitude": "-49.67888224722434"
+                },
+                {
+                    "latitude": "-11.1951229990561",
+                    "longitude": "-49.67912028729435"
+                },
+                {
+                    "latitude": "-11.19440845744436",
+                    "longitude": "-49.67905340483957"
+                },
+                {
+                    "latitude": "-11.19369340927982",
+                    "longitude": "-49.67869392211028"
+                },
+                {
+                    "latitude": "-11.19092656645115",
+                    "longitude": "-49.68057514437044"
+                }
+            ]
+        },
+        "harvest": {
+            "id": 2607,
+            "name": "2023/2024",
+            "start_date": "2023-04-01",
+            "end_date": "2024-04-30"
+        },
+        "geo_points": [
+            {
+                "latitude": "-11.20109622170354",
+                "longitude": "-49.68045660372647"
+            },
+            {
+                "latitude": "-11.1972557762751",
+                "longitude": "-49.67621140498163"
+            },
+            {
+                "latitude": "-11.19535961855292",
+                "longitude": "-49.67752923107167"
+            },
+            {
+                "latitude": "-11.19567009497707",
+                "longitude": "-49.67804361635096"
+            },
+            {
+                "latitude": "-11.19578542539523",
+                "longitude": "-49.67838222104267"
+            },
+            {
+                "latitude": "-11.19553291083423",
+                "longitude": "-49.67888224722434"
+            },
+            {
+                "latitude": "-11.1951229990561",
+                "longitude": "-49.67912028729435"
+            },
+            {
+                "latitude": "-11.19440845744436",
+                "longitude": "-49.67905340483957"
+            },
+            {
+                "latitude": "-11.19369340927982",
+                "longitude": "-49.67869392211028"
+            },
+            {
+                "latitude": "-11.19092656645115",
+                "longitude": "-49.68057514437044"
+            }
+        ]
+    }
+]
