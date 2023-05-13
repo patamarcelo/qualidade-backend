@@ -9,6 +9,10 @@ from django.utils.html import format_html
 from django.contrib import admin
 from .models import *
 
+import json
+from django.core.serializers.json import DjangoJSONEncoder
+from django.utils.safestring import mark_safe
+
 # admin.site.register(ValuRisk)
 
 
@@ -110,14 +114,83 @@ class PlantioAdmin(admin.ModelAdmin):
         "get_dap_description",
         "programa",
     )
-    readonly_fields = ("get_cronograma_programa",)
+
+    fieldsets = (
+        (
+            "Dados",
+            {
+                "fields": (
+                    ("get_data_plantio", "get_dap_description"),
+                    (
+                        "talhao",
+                        "ativo",
+                    ),
+                )
+            },
+        ),
+        (
+            "Plantio",
+            {
+                "fields": (
+                    ("safra", "ciclo"),
+                    ("variedade", "programa"),
+                    (
+                        "finalizado_plantio",
+                        "data_prevista_plantio",
+                    ),
+                    (
+                        "data_plantio",
+                        "data_emergencia",
+                    ),
+                    (
+                        "finalizado_colheita",
+                        "data_prevista_colheita",
+                    ),
+                )
+            },
+        ),
+        ("Programa", {"fields": ("get_cronograma_programa",)}),
+    )
+    readonly_fields = (
+        "get_cronograma_programa",
+        "criados",
+        "modificado",
+        "get_dap_description",
+        "get_data_plantio",
+    )
 
     ordering = ("data_plantio",)
+
+    def get_cronograma_programa(self, obj=None):
+        result = ""
+        if obj and obj.get_cronograma_programa:
+            result = json.dumps(
+                obj.get_cronograma_programa,
+                indent=4,
+                sort_keys=True,
+                cls=DjangoJSONEncoder,
+            )
+            # keep spaces
+            result_str = f"<pre>{result}</pre>"
+            result = mark_safe(result_str)
+        return result
+
+    get_cronograma_programa.short_description = "Programações"
+
+    def get_data_plantio(self, obj):
+        if obj.data_plantio:
+            return date_format(
+                obj.data_plantio, format="SHORT_DATE_FORMAT", use_l10n=True
+            )
+        else:
+            return " - "
+
+    get_data_plantio.short_description = "Data Plantio "
 
     def get_dap_description(self, obj):
         return obj.get_dap
 
-    get_dap_description.short_description = "DAP"
+    get_dap_description.short_description = "DAP "
 
     def get_description_finalizado_plantio(self, obj):
         return obj.finalizado_plantio
@@ -271,7 +344,12 @@ class AplicacaoAdmin(admin.ModelAdmin):
         "defensivo__formulacao",
         "dose",
     )
-    search_fields = ["operacao__programa__nome", "operacao__estagio", "defensivo__produto", "dose"]
+    search_fields = [
+        "operacao__programa__nome",
+        "operacao__estagio",
+        "defensivo__produto",
+        "dose",
+    ]
     raw_id_fields = ["operacao"]
     list_filter = ("defensivo", "operacao__programa", "operacao")
 
