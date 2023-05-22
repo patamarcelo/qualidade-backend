@@ -436,7 +436,7 @@ class Plantio(Base):
         today = datetime.date.today()
         if self.data_plantio:
             dap = today - self.data_plantio
-            dap = dap.days
+            dap = dap.days + 1
         return dap
 
     get_dap.fget.short_description = "DAP"

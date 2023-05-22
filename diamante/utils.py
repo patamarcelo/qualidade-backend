@@ -9,13 +9,15 @@ def get_dap(data_plantio):
     today = datetime.date.today()
     if data_plantio:
         dap = today - data_plantio
-        dap = dap.days
+        dap = dap.days + 1
     return dap
 
 
 def get_prev_app_date(data_plantio, prazo_dap):
+    real_prazo = prazo_dap - 1 if prazo_dap > 0 else 0
+    print(prazo_dap, real_prazo)
     if data_plantio:
-        prev_app = (data_plantio + datetime.timedelta(days=prazo_dap),)
+        prev_app = (data_plantio + datetime.timedelta(days=real_prazo),)
     else:
         prev_app = "Sem Data Plantio Informada"
     return prev_app

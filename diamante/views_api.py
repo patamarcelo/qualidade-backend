@@ -1198,7 +1198,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                             final_result[k][kk]["cronograma"][index].update(
                                 {
                                     "data prevista": final_result[k][kk]["data_plantio"]
-                                    + datetime.timedelta(days=vvv["dap"])
+                                    + datetime.timedelta(days=vvv["dap"] - 1)
                                 }
                             )
                             index += 1
