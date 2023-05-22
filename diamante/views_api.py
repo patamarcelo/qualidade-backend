@@ -563,9 +563,6 @@ class PlantioViewSet(viewsets.ModelViewSet):
             except Exception as e:
                 response = {"message": f"Ocorreu um Erro: {e}"}
                 return Response(response, status=status.HTTP_400_BAD_REQUEST)
-            else:
-                response = {"message": "Arquivo desconhecido"}
-                return Response(response, status=status.HTTP_400_BAD_REQUEST)
         else:
             response = {"message": "Você precisa estar logado!!!"}
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
@@ -579,7 +576,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             try:
                 # file = request.FILES["plantio_arroz"]
                 # file_ = open(os.path.join(settings.BASE_DIR, 'filename'))
-                date_file = "2023-05-12-1"
+                date_file = "2023-05-19 13:55"
                 with open(f"static/files/dataset-{date_file}.json") as user_file:
                     file_contents = user_file.read()
                     parsed_json = json.loads(file_contents)

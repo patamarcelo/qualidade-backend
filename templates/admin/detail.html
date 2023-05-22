@@ -1,0 +1,15 @@
+{% extends 'admin/index.html' %}
+
+{% block content %}
+
+    <h1>Order by {{ object }} </h1>
+    <div>
+            <p>
+                <span>
+                    {{object.area_colheita}}
+                </span>
+                    {{object.variedade}}
+            </p>
+    </div>
+
+{% endblock %}

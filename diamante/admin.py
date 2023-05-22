@@ -13,7 +13,37 @@ import json
 from django.core.serializers.json import DjangoJSONEncoder
 from django.utils.safestring import mark_safe
 
+
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.views.generic.detail import DetailView
+from django.urls import path, reverse
+
+
 # admin.site.register(ValuRisk)
+
+
+# class PlantioDetailView(LoginRequiredMixin, DetailView):
+#     login_url = "/login/"
+#     redirect_field_name = "/"
+#     template_name = "admin/calendar.html"
+#     model = Plantio
+
+#     def get_context_data(self, **kwargs):
+#         return {
+#             **super().get_context_data(**kwargs),
+#             **admin.site.each_context(self.request),
+#             "opts": self.model._meta,
+#         }
+
+
+class EstagiosProgramaInline(admin.TabularInline):
+    model = Operacao
+    extra = 1
+
+
+class AplicacoesProgramaInline(admin.TabularInline):
+    model = Aplicacao
+    extra = 1
 
 
 @admin.register(Deposito)
@@ -113,7 +143,22 @@ class PlantioAdmin(admin.ModelAdmin):
         "get_data",
         "get_dap_description",
         "programa",
+        # "detail",
     )
+
+    # def get_urls(self):
+    #     return [
+    #         path(
+    #             "<pk>/detail",
+    #             self.admin_site.admin_view(PlantioDetailView.as_view()),
+    #             name=f"products_order_detail",
+    #         ),
+    #         *super().get_urls(),
+    #     ]
+
+    # def detail(self, obj: Plantio) -> str:
+    #     url = reverse("admin:products_order_detail", args=[obj.pk])
+    #     return format_html(f'<a href="{url}">📝</a>')
 
     fieldsets = (
         (
@@ -132,6 +177,7 @@ class PlantioAdmin(admin.ModelAdmin):
             "Plantio",
             {
                 "fields": (
+                    ("area_colheita",),
                     ("safra", "ciclo"),
                     ("variedade", "programa"),
                     (
@@ -264,6 +310,7 @@ class ColheitaAdmin(admin.ModelAdmin):
 
 @admin.register(Programa)
 class ProgramaAdmin(admin.ModelAdmin):
+    # inlines = [EstagiosProgramaInline]
     list_display = (
         "nome",
         "safra_description",
@@ -299,6 +346,7 @@ class ProgramaAdmin(admin.ModelAdmin):
 
 @admin.register(Operacao)
 class OperacaoAdmin(admin.ModelAdmin):
+    # inlines = [AplicacoesProgramaInline]
     list_display = (
         "programa",
         "estagio",
@@ -343,6 +391,7 @@ class AplicacaoAdmin(admin.ModelAdmin):
         "defensivo",
         "defensivo__formulacao",
         "dose",
+        "get_operacao_prazo_dap",
     )
     search_fields = [
         "operacao__programa__nome",
@@ -351,12 +400,17 @@ class AplicacaoAdmin(admin.ModelAdmin):
         "dose",
     ]
     raw_id_fields = ["operacao"]
-    list_filter = ("defensivo", "operacao__programa", "operacao")
+    list_filter = ("defensivo", "operacao__programa", "operacao", "defensivo__tipo")
 
     def defensivo__formulacao(self, obj):
         return obj.defensivo.get_tipo_display()
 
     defensivo__formulacao.short_description = "Tipo"
+
+    def get_operacao_prazo_dap(self, obj):
+        return obj.operacao.prazo_dap
+
+    get_operacao_prazo_dap.short_description = "DAP"
 
     def programa(self, obj):
         return obj.operacao.programa
