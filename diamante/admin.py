@@ -261,8 +261,12 @@ class PlantioAdmin(admin.ModelAdmin):
     get_data.short_description = "Data Plantio"
 
     def variedade_description(self, obj):
-        variedade = obj.variedade.nome_fantasia if obj.variedade.nome_fantasia else "-"
+        if obj.variedade:
+            variedade = obj.variedade.nome_fantasia if obj.variedade.nome_fantasia else "-"
+        else:
+            variedade = 'Não Planejado'
         return variedade
+    
 
     variedade_description.short_description = "Variedade"
 
