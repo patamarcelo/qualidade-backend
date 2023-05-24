@@ -15,7 +15,6 @@ def get_dap(data_plantio):
 
 def get_prev_app_date(data_plantio, prazo_dap):
     real_prazo = prazo_dap - 1 if prazo_dap > 0 else 0
-    print(prazo_dap, real_prazo)
     if data_plantio:
         prev_app = (data_plantio + datetime.timedelta(days=real_prazo),)
     else:
