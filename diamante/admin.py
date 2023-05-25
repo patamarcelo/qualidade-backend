@@ -36,14 +36,15 @@ from django.urls import path, reverse
 #         }
 
 
-class EstagiosProgramaInline(admin.TabularInline):
+class EstagiosProgramaInline(admin.StackedInline):
     model = Operacao
-    extra = 1
+    extra = 0
 
 
-class AplicacoesProgramaInline(admin.TabularInline):
+class AplicacoesProgramaInline(admin.StackedInline):
     model = Aplicacao
-    extra = 1
+    extra = 0
+    fields = ["defensivo", "dose"]
 
 
 @admin.register(Deposito)
@@ -316,7 +317,7 @@ class ColheitaAdmin(admin.ModelAdmin):
 
 @admin.register(Programa)
 class ProgramaAdmin(admin.ModelAdmin):
-    # inlines = [EstagiosProgramaInline]
+    inlines = [EstagiosProgramaInline]
     list_display = (
         "nome",
         "safra_description",
@@ -352,7 +353,7 @@ class ProgramaAdmin(admin.ModelAdmin):
 
 @admin.register(Operacao)
 class OperacaoAdmin(admin.ModelAdmin):
-    # inlines = [AplicacoesProgramaInline]
+    inlines = [AplicacoesProgramaInline]
     list_display = (
         "programa",
         "estagio",
