@@ -262,11 +262,12 @@ class PlantioAdmin(admin.ModelAdmin):
 
     def variedade_description(self, obj):
         if obj.variedade:
-            variedade = obj.variedade.nome_fantasia if obj.variedade.nome_fantasia else "-"
+            variedade = (
+                obj.variedade.nome_fantasia if obj.variedade.nome_fantasia else "-"
+            )
         else:
-            variedade = 'Não Planejado'
+            variedade = "Não Planejado"
         return variedade
-    
 
     variedade_description.short_description = "Variedade"
 
@@ -287,7 +288,6 @@ class PlantioAdmin(admin.ModelAdmin):
 @admin.register(Colheita)
 class ColheitaAdmin(admin.ModelAdmin):
     list_display = (
-        "talhao_description",
         "data_colheita",
         "romaneio",
         "placa",
@@ -297,19 +297,21 @@ class ColheitaAdmin(admin.ModelAdmin):
         "deposito",
     )
 
+    raw_id_fields = ["plantio"]
+
     ordering = ("data_colheita",)
 
-    def talhao_description(self, obj):
-        return obj.plantio.talhao.id_talhao
-        talhao_description.short_description = "Talhao"
+    # def talhao_description(self, obj):
+    #     return obj.plantio.talhao.id_talhao
+    #     talhao_description.short_description = "Talhao"
 
-    def deposito_abrev(self, obj):
-        if "(" in obj.deposito.nome or ")" in obj.deposito.nome:
-            return obj.deposito.nome.replace("(", "").replace(")", "")
-        else:
-            return obj.deposito.nome
+    # def deposito_abrev(self, obj):
+    #     if "(" in obj.deposito.nome or ")" in obj.deposito.nome:
+    #         return obj.deposito.nome.replace("(", "").replace(")", "")
+    #     else:
+    #         return obj.deposito.nome
 
-    deposito_abrev.short_description = "CPF/CNPJ"
+    # deposito_abrev.short_description = "CPF/CNPJ"
 
 
 @admin.register(Programa)

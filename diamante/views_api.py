@@ -777,12 +777,12 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         "data_plantio",
                     )
                     .order_by("talhao__fazenda__nome", "talhao__id_talhao")
-                    .filter(safra__safra="2023/2024", ciclo__ciclo="1")
+                    .filter(safra__safra="2022/2023", ciclo__ciclo="3")
                     # .filter(~Q(data_plantio=None))
                 )
 
                 qs_annotate = Plantio.objects.filter(
-                    safra__safra="2023/2024", ciclo__ciclo="1"
+                    safra__safra="2022/2023", ciclo__ciclo="3"
                 )
                 res1 = (
                     qs_annotate.values("talhao__fazenda__nome", "variedade__variedade")
