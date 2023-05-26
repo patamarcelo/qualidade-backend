@@ -6,6 +6,7 @@ import datetime
 
 from django.db import connection
 
+
 connection.queries
 
 # Create your models here.
@@ -429,6 +430,8 @@ class Plantio(Base):
     )
 
     veiculos_carregados = models.IntegerField("Veículos Carregados / Talhao", default=0)
+    
+    cronograma_programa = models.JSONField(null=True)
 
     @property
     def get_dap(self):
@@ -507,6 +510,48 @@ class Plantio(Base):
                 if data_plantio:
                     etapa = {
                         "Estagio": i.estagio,
+                        "dap": i.prazo_dap,
+                        "Data Prevista": data_plantio
+                        + datetime.timedelta(days=i.prazo_dap),
+                        "produtos": produtos,
+                    }
+                    cronograma.append(etapa)
+                else:
+                    print(f"Sem Data de Plantio {data_plantio}")
+        return cronograma
+    
+    @property
+    def create_json_cronograma_aplications(self):
+        cronograma = [
+            {
+                "Data Plantio": self.data_plantio,
+                "Area_plantio": self.area_colheita,
+                "id": self.id,
+            }
+        ]
+        qs = Operacao.objects.select_related("programa").all()
+        qs = [x for x in qs if x.programa == self.programa]
+        queryset = Aplicacao.objects.select_related("operacao").filter(
+            operacao__programa=self.programa
+        )
+        if len(qs) > 0:
+            for i in qs:
+                data_plantio = (
+                    self.data_plantio if self.data_plantio else self.programa.start_date
+                )
+                produtos = []
+                for dose_produto in queryset:
+                    produtos.append(
+                        {
+                            "produto": dose_produto.defensivo.produto,
+                            "dose": dose_produto.dose,
+                            "quantidade_total": dose_produto.dose * self.area_colheita,
+                        }
+                    )
+                if data_plantio:
+                    etapa = {
+                        "Estagio": i.estagio,
+                        "realizado" : False,
                         "dap": i.prazo_dap,
                         "Data Prevista": data_plantio
                         + datetime.timedelta(days=i.prazo_dap),
