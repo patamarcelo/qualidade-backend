@@ -48,7 +48,9 @@ ipython_config.py
 !/media/.gitkeep
 
 /static/files
+/staticfiles/files
 !/static/.gitkeep
+
 
 # Secrets
 secrets.json
