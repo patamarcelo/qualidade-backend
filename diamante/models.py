@@ -549,7 +549,7 @@ class Plantio(Base):
                             {
                                 "produto": dose_produto.defensivo.produto,
                                 "dose": str(dose_produto.dose),
-                                "quantidade_total": str(dose_produto.dose * self.area_colheita),
+                                "quantidade_total": str(round((dose_produto.dose * self.area_colheita),3)),
                             }
                         )
                 if data_plantio:
