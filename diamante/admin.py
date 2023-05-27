@@ -18,6 +18,11 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic.detail import DetailView
 from django.urls import path, reverse
 
+from django_json_widget.widgets import JSONEditorWidget
+
+# from jsonsuit.widgets import JSONSuit
+# from prettyjson import PrettyJSONWidget
+
 
 # admin.site.register(ValuRisk)
 
@@ -110,6 +115,9 @@ admin.site.register(Ciclo)
 
 @admin.register(Plantio)
 class PlantioAdmin(admin.ModelAdmin):
+    formfield_overrides = {
+        models.JSONField: {"widget": JSONEditorWidget(width="200%")},
+    }
     search_fields = [
         "safra__safra",
         "talhao__id_unico",
@@ -196,6 +204,7 @@ class PlantioAdmin(admin.ModelAdmin):
                 )
             },
         ),
+        ("Programa", {"fields": ("cronograma_programa",)}),
         ("Programa", {"fields": ("get_cronograma_programa",)}),
     )
     readonly_fields = (

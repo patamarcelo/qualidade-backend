@@ -36,3 +36,13 @@ def get_base_date(data_inicial, today=today):
         return data_inicial
     else:
         return today
+
+
+def format_date_json(date, timedelta=None):
+    if timedelta:
+        date_formated = date + timedelta
+    else:
+        date_formated = date
+    date_formated = date_formated.strftime("%Y-%m-%d")
+    
+    return date_formated

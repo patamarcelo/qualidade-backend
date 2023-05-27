@@ -5,7 +5,9 @@ from datetime import timedelta
 import datetime
 
 from django.db import connection
+import json
 
+from .utils import format_date_json
 
 connection.queries
 
@@ -430,8 +432,8 @@ class Plantio(Base):
     )
 
     veiculos_carregados = models.IntegerField("Veículos Carregados / Talhao", default=0)
-    
-    cronograma_programa = models.JSONField(null=True)
+
+    cronograma_programa = models.JSONField(null=True, blank=True)
 
     @property
     def get_dap(self):
@@ -519,13 +521,13 @@ class Plantio(Base):
                 else:
                     print(f"Sem Data de Plantio {data_plantio}")
         return cronograma
-    
+
     @property
     def create_json_cronograma_aplications(self):
         cronograma = [
             {
-                "Data Plantio": self.data_plantio,
-                "Area_plantio": self.area_colheita,
+                "Data Plantio": format_date_json(self.data_plantio),
+                "Area_plantio": str(self.area_colheita),
                 "id": self.id,
             }
         ]
@@ -544,22 +546,24 @@ class Plantio(Base):
                     produtos.append(
                         {
                             "produto": dose_produto.defensivo.produto,
-                            "dose": dose_produto.dose,
-                            "quantidade_total": dose_produto.dose * self.area_colheita,
+                            "dose": str(dose_produto.dose),
+                            "quantidade_total": str(dose_produto.dose * self.area_colheita),
                         }
                     )
                 if data_plantio:
                     etapa = {
                         "Estagio": i.estagio,
-                        "realizado" : False,
+                        "realizado": False,
                         "dap": i.prazo_dap,
-                        "Data Prevista": data_plantio
-                        + datetime.timedelta(days=i.prazo_dap),
+                        "Data Prevista": format_date_json(
+                            data_plantio, datetime.timedelta(days=i.prazo_dap)
+                        ),
                         "produtos": produtos,
                     }
                     cronograma.append(etapa)
                 else:
                     print(f"Sem Data de Plantio {data_plantio}")
+
         return cronograma
 
     get_detail_cronograma_and_aplication.fget.short_description = (
