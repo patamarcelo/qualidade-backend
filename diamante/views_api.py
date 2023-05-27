@@ -1296,6 +1296,62 @@ class PlantioViewSet(viewsets.ModelViewSet):
 
     # --------------------- ---------------------- PLANTIO APLICACOES API END --------------------- ----------------------#
 
+    @action(detail=False, methods=["GET"])
+    def get_plantio_operacoes_detail_json_program(self, request):
+        if request.user.is_authenticated:
+            try:
+                safra_2022_2023 = 0
+                safra_2023_2024 = 1
+                safra = Safra.objects.all()[safra_2023_2024]
+                ciclo_1 = 0
+                ciclo_2 = 1
+                ciclo_3 = 2
+                ciclo = Ciclo.objects.all()[ciclo_1]
+                qs_plantio = (
+                    Plantio.objects.values(
+                        "id",
+                        "talhao__id_talhao",
+                        "talhao__id_unico",
+                        "talhao_id",
+                        "safra__safra",
+                        "ciclo__ciclo",
+                        "talhao__fazenda__nome",
+                        "talhao__fazenda__fazenda__nome",
+                        "talhao__fazenda__fazenda__capacidade_plantio_ha_dia",
+                        "variedade__nome_fantasia",
+                        "variedade__cultura__cultura",
+                        "area_colheita",
+                        "data_plantio",
+                        "finalizado_plantio",
+                        "programa",
+                        "programa_id",
+                        "programa__start_date",
+                        "programa__end_date",
+                        "programa__nome",
+                        "cronograma_programa",
+                    )
+                    .filter(~Q(programa_id=None))
+                    .filter(safra=safra, ciclo=ciclo)
+                    .filter(data_plantio__isnull=False)
+                )
+
+                response = {
+                    "msg": f"Retorno com os arquivos Json com Sucesso!!",
+                    "total_query_plantio": qs_plantio.count(),
+                    "dados_plantio": qs_plantio,
+                }
+                return Response(response, status=status.HTTP_200_OK)
+            except Exception as e:
+                response = {"message": f"Ocorreu um Erro: {e}"}
+                return Response(response, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            response = {"message": "Você precisa estar logado!!!"}
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+    # --------------------- ---------------------- PLANTIO APLICACOES TESTE JSON FIELD API START --------------------- ----------------------#
+
+    # --------------------- ---------------------- PLANTIO APLICACOES TESTE JSON FIELD API END --------------------- ----------------------#
+
     # --------------------- ---------------------- DEFENSIVOS API START --------------------- ----------------------#
 
 

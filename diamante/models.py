@@ -548,16 +548,17 @@ class Plantio(Base):
                         produtos.append(
                             {
                                 "produto": dose_produto.defensivo.produto,
+                                "tipo" : dose_produto.defensivo.tipo,
                                 "dose": str(dose_produto.dose),
-                                "quantidade_total": str(round((dose_produto.dose * self.area_colheita),3)),
+                                "quantidade aplicar": str(round((dose_produto.dose * self.area_colheita),3)),
                             }
                         )
                 if data_plantio:
                     etapa = {
-                        "Estagio": i.estagio,
+                        "estagio": i.estagio,
                         "aplicado": False,
                         "dap": i.prazo_dap,
-                        "Data Prevista": format_date_json(
+                        "data prevista": format_date_json(
                             data_plantio, datetime.timedelta(days=i.prazo_dap)
                         ),
                         "produtos": produtos,
@@ -576,6 +577,15 @@ class Plantio(Base):
     def get_data_prevista_colheita_base_dap(self):
         prazo = self.variedade.dias_ciclo
         return self.data_plantio + datetime.timedelta(days=prazo)
+    
+    def save(self, *args, **kwargs):
+        if self.pk is not None and self.cronograma_programa is None and self.data_plantio is not None:
+            if self.programa:
+                newVal = self.create_json_cronograma_aplications
+                self.cronograma_programa = newVal
+        if self.pk is not None and self.data_plantio is None and self.cronograma_programa is not None:
+            self.cronograma_programa = None
+        super(Plantio, self).save(*args, **kwargs)
 
     class Meta:
         unique_together = ("safra", "ciclo", "talhao")
