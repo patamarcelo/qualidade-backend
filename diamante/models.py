@@ -502,13 +502,14 @@ class Plantio(Base):
                 )
                 produtos = []
                 for dose_produto in queryset:
-                    produtos.append(
-                        {
-                            "produto": dose_produto.defensivo.produto,
-                            "dose": dose_produto.dose,
-                            "quantidade_total": dose_produto.dose * self.area_colheita,
-                        }
-                    )
+                    if i.estagio == dose_produto.operacao.estagio:
+                        produtos.append(
+                            {
+                                "produto": dose_produto.defensivo.produto,
+                                "dose": dose_produto.dose,
+                                "quantidade_total": dose_produto.dose * self.area_colheita,
+                            }
+                        )
                 if data_plantio:
                     etapa = {
                         "Estagio": i.estagio,
@@ -543,17 +544,18 @@ class Plantio(Base):
                 )
                 produtos = []
                 for dose_produto in queryset:
-                    produtos.append(
-                        {
-                            "produto": dose_produto.defensivo.produto,
-                            "dose": str(dose_produto.dose),
-                            "quantidade_total": str(dose_produto.dose * self.area_colheita),
-                        }
-                    )
+                    if i.estagio == dose_produto.operacao.estagio:
+                        produtos.append(
+                            {
+                                "produto": dose_produto.defensivo.produto,
+                                "dose": str(dose_produto.dose),
+                                "quantidade_total": str(dose_produto.dose * self.area_colheita),
+                            }
+                        )
                 if data_plantio:
                     etapa = {
                         "Estagio": i.estagio,
-                        "realizado": False,
+                        "aplicado": False,
                         "dap": i.prazo_dap,
                         "Data Prevista": format_date_json(
                             data_plantio, datetime.timedelta(days=i.prazo_dap)

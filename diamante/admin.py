@@ -116,7 +116,7 @@ admin.site.register(Ciclo)
 @admin.register(Plantio)
 class PlantioAdmin(admin.ModelAdmin):
     formfield_overrides = {
-        models.JSONField: {"widget": JSONEditorWidget(width="200%")},
+        models.JSONField: {"widget": JSONEditorWidget(width="200%", height="90vh")},
     }
     search_fields = [
         "safra__safra",
