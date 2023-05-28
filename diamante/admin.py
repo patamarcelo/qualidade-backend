@@ -115,6 +115,15 @@ admin.site.register(Ciclo)
 
 @admin.register(Plantio)
 class PlantioAdmin(admin.ModelAdmin):
+    def get_queryset(self, request):
+        return (
+            super(PlantioAdmin, self)
+            .get_queryset(request)
+            .select_related(
+                "talhao", "safra", "ciclo", "talhao__fazenda", "variedade", "programa"
+            )
+        )
+
     formfield_overrides = {
         models.JSONField: {"widget": JSONEditorWidget(width="200%", height="90vh")},
     }
@@ -146,7 +155,6 @@ class PlantioAdmin(admin.ModelAdmin):
         "variedade_description",
         "get_description_finalizado_plantio",
         "get_description_finalizado_colheita",
-        "area_aproveito",
         "area_colheita",
         "area_parcial",
         "get_data",
@@ -362,6 +370,12 @@ class ProgramaAdmin(admin.ModelAdmin):
 
 @admin.register(Operacao)
 class OperacaoAdmin(admin.ModelAdmin):
+    def get_queryset(self, request):
+        return (
+            super(OperacaoAdmin, self)
+            .get_queryset(request)
+            .select_related("programa","programa__cultura")
+        )
     inlines = [AplicacoesProgramaInline]
     list_display = (
         "programa",
@@ -401,6 +415,13 @@ class DefensivoAdmin(admin.ModelAdmin):
 
 @admin.register(Aplicacao)
 class AplicacaoAdmin(admin.ModelAdmin):
+    def get_queryset(self, request):
+        return (
+            super(AplicacaoAdmin, self)
+            .get_queryset(request)
+            .select_related("operacao", "defensivo", "operacao__programa")
+        )
+
     list_display = (
         "operacao",
         "programa",

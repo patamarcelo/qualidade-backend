@@ -1335,10 +1335,39 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     .filter(data_plantio__isnull=False)
                 )
 
+                result = [
+                    {
+                        "fazenda": i["talhao__fazenda__fazenda__nome"],
+                        "parcela": i["talhao__id_talhao"],
+                        "dados": {
+                            "safra": i["safra__safra"],
+                            "ciclo": i["ciclo__ciclo"],
+                            "cultura": i["variedade__cultura__cultura"],
+                            "variedade": i["variedade__nome_fantasia"],
+                            "plantio_id": i["id"],
+                            "fazenda_grupo": i["talhao__fazenda__fazenda__nome"],
+                            "talhao_id_unico": i["talhao__id_unico"],
+                            "plantio_finalizado": i["finalizado_plantio"],
+                            "area_colheita": i["area_colheita"],
+                            "data_plantio": i["data_plantio"],
+                            "dap": get_dap(i["data_plantio"]),
+                            "programa_id": i["programa"],
+                            "programa": i["programa__nome"],
+                            "programa_start_date": i["programa__start_date"],
+                            "programa_end_date": i["programa__end_date"],
+                            "capacidade_plantio_dia": i[
+                                "talhao__fazenda__fazenda__capacidade_plantio_ha_dia"
+                            ],
+                            "cronograma": i["cronograma_programa"][1:],
+                        },
+                    }
+                    for i in qs_plantio
+                ]
+
                 response = {
                     "msg": f"Retorno com os arquivos Json com Sucesso!!",
                     "total_query_plantio": qs_plantio.count(),
-                    "dados_plantio": qs_plantio,
+                    "dados_plantio": result,
                 }
                 return Response(response, status=status.HTTP_200_OK)
             except Exception as e:
