@@ -1071,6 +1071,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     )
                     .filter(~Q(programa_id=None))
                     .filter(safra=safra, ciclo=ciclo)
+                    .filter(Q(data_plantio=None))
                 )
                 qs_programas = Operacao.objects.values(
                     "estagio", "programa_id", "prazo_dap", "id"

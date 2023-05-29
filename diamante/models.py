@@ -508,7 +508,8 @@ class Plantio(Base):
                             {
                                 "produto": dose_produto.defensivo.produto,
                                 "dose": dose_produto.dose,
-                                "quantidade_total": dose_produto.dose * self.area_colheita,
+                                "quantidade_total": dose_produto.dose
+                                * self.area_colheita,
                             }
                         )
                 if data_plantio:
@@ -549,18 +550,29 @@ class Plantio(Base):
                         produtos.append(
                             {
                                 "produto": dose_produto.defensivo.produto,
-                                "tipo" : dose_produto.defensivo.tipo,
+                                "tipo": dose_produto.defensivo.tipo,
                                 "dose": str(dose_produto.dose),
-                                "quantidade aplicar": str(round((decimal.Decimal(dose_produto.dose) * decimal.Decimal(self.area_colheita)),3)),
+                                "quantidade aplicar": str(
+                                    round(
+                                        (
+                                            decimal.Decimal(dose_produto.dose)
+                                            * decimal.Decimal(self.area_colheita)
+                                        ),
+                                        3,
+                                    )
+                                ),
                             }
                         )
                 if data_plantio:
+                    time_delta_prazo = (
+                        i.prazo_dap if i.prazo_dap <= 0 else i.prazo_dap - 1
+                    )
                     etapa = {
                         "estagio": i.estagio,
                         "aplicado": False,
                         "dap": i.prazo_dap,
                         "data prevista": format_date_json(
-                            data_plantio, datetime.timedelta(days=i.prazo_dap)
+                            str(data_plantio), datetime.timedelta(days=time_delta_prazo)
                         ),
                         "produtos": produtos,
                     }
@@ -578,13 +590,21 @@ class Plantio(Base):
     def get_data_prevista_colheita_base_dap(self):
         prazo = self.variedade.dias_ciclo
         return self.data_plantio + datetime.timedelta(days=prazo)
-    
+
     def save(self, *args, **kwargs):
-        if self.pk is not None and self.cronograma_programa is None and self.data_plantio is not None:
+        if (
+            self.pk is not None
+            and self.cronograma_programa is None
+            and self.data_plantio is not None
+        ):
             if self.programa:
                 newVal = self.create_json_cronograma_aplications
                 self.cronograma_programa = newVal
-        if self.pk is not None and self.data_plantio is None and self.cronograma_programa is not None:
+        if (
+            self.pk is not None
+            and self.data_plantio is None
+            and self.cronograma_programa is not None
+        ):
             self.cronograma_programa = None
         super(Plantio, self).save(*args, **kwargs)
 

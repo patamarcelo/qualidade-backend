@@ -123,9 +123,12 @@ class PlantioAdmin(admin.ModelAdmin):
                 "talhao", "safra", "ciclo", "talhao__fazenda", "variedade", "programa"
             )
         )
+    inline_classes = ('collapse open',)
 
     formfield_overrides = {
-        models.JSONField: {"widget": JSONEditorWidget(width="200%", height="90vh")},
+        models.JSONField: {
+            "widget": JSONEditorWidget(width="200%", height="90vh", mode="tree")
+        },
     }
     search_fields = [
         "safra__safra",
@@ -374,8 +377,9 @@ class OperacaoAdmin(admin.ModelAdmin):
         return (
             super(OperacaoAdmin, self)
             .get_queryset(request)
-            .select_related("programa","programa__cultura")
+            .select_related("programa", "programa__cultura")
         )
+
     inlines = [AplicacoesProgramaInline]
     list_display = (
         "programa",
