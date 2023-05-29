@@ -1199,7 +1199,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 {
                                     "data prevista": final_result[k][kk]["data_plantio"]
                                     + datetime.timedelta(days=vvv["dap"] - 1),
-                                    "aplicado": False
+                                    "aplicado": False,
                                 }
                             )
                             index += 1
@@ -1338,7 +1338,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
 
                 result = [
                     {
-                        "fazenda": i["talhao__fazenda__fazenda__nome"],
+                        "fazenda": i["talhao__fazenda__nome"],
                         "parcela": i["talhao__id_talhao"],
                         "dados": {
                             "safra": i["safra__safra"],
