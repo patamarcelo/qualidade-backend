@@ -40,9 +40,9 @@ def get_base_date(data_inicial, today=today):
 
 def format_date_json(date, timedelta=None):
     if timedelta:
-        date_formated = date + timedelta
+        date_formated = datetime.datetime.strptime(date, "%Y-%m-%d") + timedelta
     else:
         date_formated = date
-    date_formated = date_formated.strftime("%Y-%m-%d")
-    
+    if type(date_formated) is not str:
+        date_formated = date_formated.strftime("%Y-%m-%d")
     return date_formated

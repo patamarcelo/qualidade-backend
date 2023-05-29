@@ -576,7 +576,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             try:
                 # file = request.FILES["plantio_arroz"]
                 # file_ = open(os.path.join(settings.BASE_DIR, 'filename'))
-                date_file = "2023-05-26 10:12"
+                date_file = "2023-05-27 09:11"
                 with open(f"static/files/dataset-{date_file}.json") as user_file:
                     file_contents = user_file.read()
                     parsed_json = json.loads(file_contents)
@@ -1198,7 +1198,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                             final_result[k][kk]["cronograma"][index].update(
                                 {
                                     "data prevista": final_result[k][kk]["data_plantio"]
-                                    + datetime.timedelta(days=vvv["dap"] - 1)
+                                    + datetime.timedelta(days=vvv["dap"] - 1),
+                                    "aplicado": False
                                 }
                             )
                             index += 1

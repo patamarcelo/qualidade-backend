@@ -8,6 +8,7 @@ from django.db import connection
 import json
 
 from .utils import format_date_json
+import decimal
 
 connection.queries
 
@@ -550,7 +551,7 @@ class Plantio(Base):
                                 "produto": dose_produto.defensivo.produto,
                                 "tipo" : dose_produto.defensivo.tipo,
                                 "dose": str(dose_produto.dose),
-                                "quantidade aplicar": str(round((dose_produto.dose * self.area_colheita),3)),
+                                "quantidade aplicar": str(round((decimal.Decimal(dose_produto.dose) * decimal.Decimal(self.area_colheita)),3)),
                             }
                         )
                 if data_plantio:
