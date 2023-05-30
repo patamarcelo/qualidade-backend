@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "csvexport",
     "debug_toolbar",
     "django_json_widget",
     "rest_framework",

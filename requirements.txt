@@ -1,6 +1,8 @@
+anytree==2.8.0
 asgiref==3.6.0
 colorama==0.4.6
 Django==4.1.7
+django-admin-csvexport==2.2
 django-admin-material-dashboard==1.0.10
 django-adminlte3==0.1.6
 django-cors-headers==3.14.0
@@ -8,6 +10,7 @@ django-environ==0.10.0
 django-json-widget==1.1.1
 django-jsonform==2.17.0
 django-jsonsuit==0.5.0
+django-modeltree==0.4
 django-prettyjson==0.4.1
 django_debug_toolbar==3.8.1
 djangorestframework==3.14.0

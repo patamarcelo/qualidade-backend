@@ -20,11 +20,8 @@ from django.urls import path, reverse
 
 from django_json_widget.widgets import JSONEditorWidget
 
-# from jsonsuit.widgets import JSONSuit
-# from prettyjson import PrettyJSONWidget
-
-
-# admin.site.register(ValuRisk)
+import csv
+from django.http import HttpResponse
 
 
 # class PlantioDetailView(LoginRequiredMixin, DetailView):
@@ -39,6 +36,24 @@ from django_json_widget.widgets import JSONEditorWidget
 #             **admin.site.each_context(self.request),
 #             "opts": self.model._meta,
 #         }
+
+
+class ExportCsvMixin:
+    def export_as_csv(self, request, queryset):
+        meta = self.model._meta
+        field_names = [field.name for field in meta.fields]
+
+        response = HttpResponse(content_type="text/csv")
+        response["Content-Disposition"] = "attachment; filename={}.csv".format(meta)
+        writer = csv.writer(response)
+
+        writer.writerow(field_names)
+        for obj in queryset:
+            row = writer.writerow([getattr(obj, field) for field in field_names])
+
+        return response
+
+    export_as_csv.short_description = "Export Selected"
 
 
 class EstagiosProgramaInline(admin.StackedInline):
@@ -114,7 +129,9 @@ admin.site.register(Ciclo)
 
 
 @admin.register(Plantio)
-class PlantioAdmin(admin.ModelAdmin):
+class PlantioAdmin(admin.ModelAdmin, ExportCsvMixin):
+    actions = ["export_as_csv"]
+
     def get_queryset(self, request):
         return (
             super(PlantioAdmin, self)
