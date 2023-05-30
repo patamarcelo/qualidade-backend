@@ -19,6 +19,10 @@
     min-height: 400px;
 }
 
+.field-talhao, .field-programa {
+    white-space: nowrap !important;
+  }
+  
 .change-list .filtered .results, .change-list .filtered .paginator,
 .filtered #toolbar, .filtered div.xfull {
     /* margin-right: 280px; */

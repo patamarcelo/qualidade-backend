@@ -120,7 +120,12 @@ class PlantioAdmin(admin.ModelAdmin):
             super(PlantioAdmin, self)
             .get_queryset(request)
             .select_related(
-                "talhao", "safra", "ciclo", "talhao__fazenda", "variedade", "programa"
+                "talhao",
+                "safra",
+                "ciclo",
+                "talhao__fazenda",
+                "variedade",
+                "programa",
             )
         )
 

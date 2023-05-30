@@ -21,6 +21,10 @@
     padding-left: 10px;
     padding-right: 10px;
 }
+.field-talhao {
+    white-space: nowrap !important;
+}
+  
 
 .module blockquote {
     margin-left: 12px;
