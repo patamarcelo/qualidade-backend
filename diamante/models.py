@@ -213,7 +213,7 @@ class Safra(Base):
     safra = models.CharField("Safra", max_length=100, help_text="Safra", unique=True)
 
     class Meta:
-        ordering = ["safra"]
+        # ordering = ["safra"]
         verbose_name = "Safra"
         verbose_name_plural = "Safras"
 
@@ -225,7 +225,7 @@ class Ciclo(Base):
     ciclo = models.PositiveBigIntegerField("ciclo", help_text="Ciclo", unique=True)
 
     class Meta:
-        ordering = ["ciclo"]
+        # ordering = ["ciclo"]
         verbose_name = "Ciclo"
         verbose_name_plural = "Ciclos"
 

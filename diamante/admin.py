@@ -123,7 +123,6 @@ class PlantioAdmin(admin.ModelAdmin):
                 "talhao", "safra", "ciclo", "talhao__fazenda", "variedade", "programa"
             )
         )
-    inline_classes = ('collapse open',)
 
     formfield_overrides = {
         models.JSONField: {
