@@ -174,7 +174,7 @@ AUTH_USER_MODEL = "usuario.CustomUsuario"
 # STATIC_URL = "static/"
 
 STATIC_URL = "/static/"
-STATIC_ROOT = os.path.join(BASE_DIR, "static")
+# STATIC_ROOT = os.path.join(BASE_DIR, "static")
 
 
 MEDIA_URL = "/media/"
