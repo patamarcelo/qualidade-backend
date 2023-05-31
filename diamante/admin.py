@@ -211,6 +211,7 @@ class PlantioAdmin(admin.ModelAdmin, ExportCsvMixin):
                         "talhao",
                         "ativo",
                     ),
+                    ("criados","modificado"),
                 )
             },
         ),
