@@ -86,6 +86,16 @@ class FazendaAdmin(admin.ModelAdmin):
 
 @admin.register(Projeto)
 class ProjetoAdmin(admin.ModelAdmin):
+    def get_queryset(self, request):
+        return (
+            super(ProjetoAdmin, self)
+            .get_queryset(request)
+            .select_related(
+                "fazenda",
+            )
+        )
+
+    show_full_result_count = False
     list_display = (
         "nome",
         "id_d",
@@ -131,6 +141,10 @@ admin.site.register(Ciclo)
 @admin.register(Plantio)
 class PlantioAdmin(admin.ModelAdmin, ExportCsvMixin):
     actions = ["export_as_csv"]
+    show_full_result_count = False
+
+    def get_ordering(self, request):
+        return ["data_plantio"]
 
     def get_queryset(self, request):
         return (
@@ -144,6 +158,7 @@ class PlantioAdmin(admin.ModelAdmin, ExportCsvMixin):
                 "variedade",
                 "programa",
             )
+            .order_by("data_plantio")
         )
 
     formfield_overrides = {
@@ -211,7 +226,7 @@ class PlantioAdmin(admin.ModelAdmin, ExportCsvMixin):
                         "talhao",
                         "ativo",
                     ),
-                    ("criados","modificado"),
+                    ("criados", "modificado"),
                 )
             },
         ),
@@ -455,6 +470,7 @@ class AplicacaoAdmin(admin.ModelAdmin):
         "defensivo__formulacao",
         "dose",
         "get_operacao_prazo_dap",
+        "ativo",
     )
     search_fields = [
         "operacao__programa__nome",
@@ -463,7 +479,18 @@ class AplicacaoAdmin(admin.ModelAdmin):
         "dose",
     ]
     raw_id_fields = ["operacao"]
-    list_filter = ("defensivo", "operacao__programa", "operacao", "defensivo__tipo")
+    list_filter = (
+        "defensivo",
+        "operacao__programa",
+        "operacao",
+        "defensivo__tipo",
+        "ativo",
+    )
+
+    readonly_fields = (
+        "criados",
+        "modificado",
+    )
 
     def defensivo__formulacao(self, obj):
         return obj.defensivo.get_tipo_display()

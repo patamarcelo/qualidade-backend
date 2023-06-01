@@ -503,7 +503,10 @@ class Plantio(Base):
                 )
                 produtos = []
                 for dose_produto in queryset:
-                    if i.estagio == dose_produto.operacao.estagio:
+                    if (
+                        i.estagio == dose_produto.operacao.estagio
+                        and dose_produto.ativo == True
+                    ):
                         produtos.append(
                             {
                                 "produto": dose_produto.defensivo.produto,
@@ -546,7 +549,10 @@ class Plantio(Base):
                 )
                 produtos = []
                 for dose_produto in queryset:
-                    if i.estagio == dose_produto.operacao.estagio:
+                    if (
+                        i.estagio == dose_produto.operacao.estagio
+                        and dose_produto.ativo == True
+                    ):
                         produtos.append(
                             {
                                 "produto": dose_produto.defensivo.produto,
