@@ -46,3 +46,189 @@ def format_date_json(date, timedelta=None):
     if type(date_formated) is not str:
         date_formated = date_formated.strftime("%Y-%m-%d")
     return date_formated
+
+
+def calc_total(area, dose):
+    areaF = float(area)
+    total = dose * areaF
+    totalF = round(total, 3)
+    return str(totalF)
+
+
+def get_index_dict_prod(lista_produtos, find_product):
+    # Lista Produtos: i.cronograma_programa[5]['produtos']
+    v4_prod = lista_produtos
+    # ork = [ (x,n) for x,n in enumerate( v4_prod) if n['produto'] == 'ORKESTRA']
+    ork = [(x, n) for x, n in enumerate(v4_prod) if n["produto"] == find_product]
+    if ork:
+        index = ork[0][0]
+    else:
+        index = None
+    return index
+    # i.cronograma_programa[5]['produtos'][index] = {'dose': '0.600', 'tipo': 'fungicida', 'produto': 'OPERA', 'quantidade aplicar': calc_total(i.area_colheita, 0.600)}
+
+
+v6_1_conv = {
+    "dap": 40,
+    "estagio": "6º TRIFOLIO ( V6.1 )",
+    "aplicado": False,
+    "produtos": [
+        {
+            "dose": "0.300",
+            "tipo": "oleo_mineral_vegetal",
+            "produto": "FIX OIL",
+            "quantidade aplicar": "",
+        },
+        {
+            "dose": "0.015",
+            "tipo": "adjuvante",
+            "produto": "LEGAT REDUCE",
+            "quantidade aplicar": "",
+        },
+        {
+            "dose": "1.000",
+            "tipo": "fungicida",
+            "produto": "MANCOZEB",
+            "quantidade aplicar": "",
+        },
+        {
+            "dose": "1.000",
+            "tipo": "inseticida",
+            "produto": "METOMIL",
+            "quantidade aplicar": "",
+        },
+        {
+            "dose": "1.500",
+            "tipo": "biologico",
+            "produto": "MIX BT's",
+            "quantidade aplicar": "",
+        },
+        {
+            "dose": "0.600",
+            "tipo": "fungicida",
+            "produto": "OPERA",
+            "quantidade aplicar": "",
+        },
+        {
+            "dose": "0.022",
+            "tipo": "inseticida",
+            "produto": "ABAMECTINA 400",
+            "quantidade aplicar": "",
+        },
+    ],
+    "data prevista": "",
+}
+v6_2_conv = {
+    "dap": 40,
+    "estagio": "6º TRIFOLIO ( V6.2 )",
+    "aplicado": False,
+    "produtos": [
+        {
+            "dose": "0.060",
+            "tipo": "nutricao",
+            "produto": "COBRE",
+            "quantidade aplicar": "",
+        },
+        {
+            "dose": "0.200",
+            "tipo": "nutricao",
+            "produto": "SÍLICA",
+            "quantidade aplicar": "",
+        },
+        {
+            "dose": "1.000",
+            "tipo": "nutricao",
+            "produto": "SULFATO DE MAGNÉSIO",
+            "quantidade aplicar": "",
+        },
+        {
+            "dose": "0.200",
+            "tipo": "nutricao",
+            "produto": "ORGANO BORO",
+            "quantidade aplicar": "",
+        },
+    ],
+    "data prevista": "",
+}
+v6_1_rr = {
+    "dap": 31,
+    "estagio": "6º TRIFOLIO ( V6.1 )",
+    "aplicado": False,
+    "produtos": [
+        {
+            "dose": "0.300",
+            "tipo": "oleo_mineral_vegetal",
+            "produto": "FIX OIL",
+            "quantidade aplicar": "",
+        },
+        {
+            "dose": "0.015",
+            "tipo": "adjuvante",
+            "produto": "LEGAT REDUCE",
+            "quantidade aplicar": "",
+        },
+        {
+            "dose": "1.000",
+            "tipo": "fungicida",
+            "produto": "MANCOZEB",
+            "quantidade aplicar": "",
+        },
+        {
+            "dose": "1.000",
+            "tipo": "inseticida",
+            "produto": "METOMIL",
+            "quantidade aplicar": "",
+        },
+        {
+            "dose": "1.500",
+            "tipo": "biologico",
+            "produto": "MIX BT's",
+            "quantidade aplicar": "",
+        },
+        {
+            "dose": "0.600",
+            "tipo": "fungicida",
+            "produto": "OPERA",
+            "quantidade aplicar": "",
+        },
+        {
+            "dose": "0.022",
+            "tipo": "inseticida",
+            "produto": "ABAMECTINA 400",
+            "quantidade aplicar": "",
+        },
+    ],
+    "data prevista": "",
+}
+v6_2_rr = {
+    "dap": 31,
+    "estagio": "6º TRIFOLIO ( V6.2 )",
+    "aplicado": False,
+    "produtos": [
+        {
+            "dose": "0.060",
+            "tipo": "nutricao",
+            "produto": "COBRE",
+            "quantidade aplicar": "",
+        },
+        {
+            "dose": "0.200",
+            "tipo": "nutricao",
+            "produto": "SÍLICA",
+            "quantidade aplicar": "",
+        },
+        {
+            "dose": "1.000",
+            "tipo": "nutricao",
+            "produto": "SULFATO DE MAGNÉSIO",
+            "quantidade aplicar": "",
+        },
+        {
+            "dose": "0.200",
+            "tipo": "nutricao",
+            "produto": "ORGANO BORO",
+            "quantidade aplicar": "",
+        },
+    ],
+    "data prevista": "",
+}

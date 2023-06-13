@@ -576,7 +576,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             try:
                 # file = request.FILES["plantio_arroz"]
                 # file_ = open(os.path.join(settings.BASE_DIR, 'filename'))
-                date_file = "2023-05-31 17:12"
+                date_file = "2023-06-10 11:26"
                 with open(f"static/files/dataset-{date_file}.json") as user_file:
                     file_contents = user_file.read()
                     parsed_json = json.loads(file_contents)
@@ -646,7 +646,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         print(
                             f"{Fore.RED}variedade sem cadastro: {id_variedade}{Style.RESET_ALL}"
                         )
-                    if cultura_planejada:
+                    if cultura_planejada or variety_id:
                         try:
                             field_to_update = Plantio.objects.filter(
                                 safra=safra, ciclo=ciclo, talhao=talhao_id
@@ -1330,6 +1330,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         "programa__start_date",
                         "programa__end_date",
                         "programa__nome",
+                        "programa__nome_fantasia",
                         "cronograma_programa",
                     )
                     .filter(~Q(programa_id=None))
@@ -1360,7 +1361,10 @@ class PlantioViewSet(viewsets.ModelViewSet):
                             "capacidade_plantio_dia": i[
                                 "talhao__fazenda__fazenda__capacidade_plantio_ha_dia"
                             ],
-                            "cronograma": i["cronograma_programa"][1:],
+                            "cronograma": [
+                                {**x, "estagio": x["estagio"] + "|" + i["programa__nome_fantasia"]}
+                                for x in i["cronograma_programa"][1:]
+                            ],
                         },
                     }
                     for i in qs_plantio

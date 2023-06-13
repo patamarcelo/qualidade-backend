@@ -163,7 +163,7 @@ class PlantioAdmin(admin.ModelAdmin, ExportCsvMixin):
 
     formfield_overrides = {
         models.JSONField: {
-            "widget": JSONEditorWidget(width="200%", height="90vh", mode="tree")
+            "widget": JSONEditorWidget(width="200%", height="100vh", mode="tree")
         },
     }
     search_fields = [
