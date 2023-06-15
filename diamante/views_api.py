@@ -858,12 +858,16 @@ class PlantioViewSet(viewsets.ModelViewSet):
 
     # --------------------- --------------------- START PLANTIO API DONE --------------------- --------------------- #
 
-    @action(detail=False, methods=["GET"])
+    @action(detail=False, methods=["GET", "POST"])
     def get_plantio_done(self, request):
         if request.user.is_authenticated:
             try:
-                safra_filter = "2023/2024"
-                cicle_filter = "1"
+                safra_filter = request.POST.get("safra")
+                cicle_filter = request.POST.get("ciclo")
+                # print(safra_from_request, ciclo_from_request)
+                safra_filter = "2023/2024" if safra_filter == None  else safra_filter
+                cicle_filter = "1" if cicle_filter == None  else cicle_filter
+                
                 qs = (
                     Plantio.objects.values(
                         "safra__safra",
