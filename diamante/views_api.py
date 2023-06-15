@@ -862,12 +862,14 @@ class PlantioViewSet(viewsets.ModelViewSet):
     def get_plantio_done(self, request):
         if request.user.is_authenticated:
             try:
-                safra_filter = request.POST.get("safra")
-                cicle_filter = request.POST.get("ciclo")
+                safra_filter = request.data["safra"]
+                cicle_filter = request.data["ciclo"]
+                # safra_filter = request.POST.get("safra")
+                # cicle_filter = request.POST.get("ciclo")
                 # print(safra_from_request, ciclo_from_request)
-                safra_filter = "2023/2024" if safra_filter == None  else safra_filter
-                cicle_filter = "1" if cicle_filter == None  else cicle_filter
-                
+                safra_filter = "2023/2024" if safra_filter == None else safra_filter
+                cicle_filter = "1" if cicle_filter == None else cicle_filter
+
                 qs = (
                     Plantio.objects.values(
                         "safra__safra",
@@ -899,7 +901,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 # ).annotate(area=Sum("area_colheita"))
 
                 response = {
-                    "msg": f"Consulta realizada com sucesso GetPlantioDone API!!",
+                    "msg": f"Consulta realizada com sucesso GetPlantioDone API!! - Safra: {safra_filter} - Ciclo: {cicle_filter}",
                     "total_return": len(qs),
                     "data": qs,
                     # "resume_by_farm": qsFarm,
