@@ -576,7 +576,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             try:
                 # file = request.FILES["plantio_arroz"]
                 # file_ = open(os.path.join(settings.BASE_DIR, 'filename'))
-                date_file = "2023-06-10 11:26"
+                date_file = "2023-06-14 09:42"
                 with open(f"static/files/dataset-{date_file}.json") as user_file:
                     file_contents = user_file.read()
                     parsed_json = json.loads(file_contents)
@@ -855,6 +855,60 @@ class PlantioViewSet(viewsets.ModelViewSet):
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
     # --------------------- --------------------- END PLANTIO API --------------------- --------------------- #
+
+    # --------------------- --------------------- START PLANTIO API DONE --------------------- --------------------- #
+
+    @action(detail=False, methods=["GET"])
+    def get_plantio_done(self, request):
+        if request.user.is_authenticated:
+            try:
+                safra_filter = "2023/2024"
+                cicle_filter = "1"
+                qs = (
+                    Plantio.objects.values(
+                        "safra__safra",
+                        "ciclo__ciclo",
+                        "talhao__id_talhao",
+                        "talhao__fazenda__nome",
+                        "talhao__fazenda__fazenda__nome",
+                        "variedade__cultura__cultura",
+                        "variedade__nome_fantasia",
+                        "variedade__variedade",
+                        "area_colheita",
+                        "data_plantio",
+                    )
+                    .order_by(
+                        "data_plantio", "talhao__fazenda__nome", "talhao__id_talhao"
+                    )
+                    .filter(safra__safra=safra_filter, ciclo__ciclo=cicle_filter)
+                    .filter(finalizado_plantio=True)
+                )
+
+                # qsFilt = Plantio.objects.filter(
+                #     safra__safra=safra_filter,
+                #     ciclo__ciclo=cicle_filter,
+                #     finalizado_plantio=True,
+                # )
+
+                # qsFarm = qsFilt.values(
+                #     "talhao__fazenda__nome", "variedade__variedade"
+                # ).annotate(area=Sum("area_colheita"))
+
+                response = {
+                    "msg": f"Consulta realizada com sucesso GetPlantioDone API!!",
+                    "total_return": len(qs),
+                    "data": qs,
+                    # "resume_by_farm": qsFarm,
+                }
+                return Response(response, status=status.HTTP_200_OK)
+            except Exception as e:
+                response = {"message": f"Ocorreu um Erro: {e}"}
+                return Response(response, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            response = {"message": "Você precisa estar logado!!!"}
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+    # --------------------- --------------------- END PLANTIO API DONE --------------------- --------------------- #
 
     @action(detail=True, methods=["POST"])
     def update_plantio_data(self, request, pk=None):
@@ -1362,7 +1416,12 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 "talhao__fazenda__fazenda__capacidade_plantio_ha_dia"
                             ],
                             "cronograma": [
-                                {**x, "estagio": x["estagio"] + "|" + i["programa__nome_fantasia"]}
+                                {
+                                    **x,
+                                    "estagio": x["estagio"]
+                                    + "|"
+                                    + i["programa__nome_fantasia"],
+                                }
                                 for x in i["cronograma_programa"][1:]
                             ],
                         },

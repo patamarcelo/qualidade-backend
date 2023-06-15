@@ -170,6 +170,7 @@ class PlantioAdmin(admin.ModelAdmin, ExportCsvMixin):
         "safra__safra",
         "talhao__id_unico",
         "talhao__fazenda__nome",
+        "talhao__fazenda__fazenda__nome",
         "variedade__variedade",
         "finalizado_plantio",
         "finalizado_colheita",
@@ -416,6 +417,15 @@ class OperacaoAdmin(admin.ModelAdmin):
             .get_queryset(request)
             .select_related("programa", "programa__cultura")
         )
+
+    search_fields = [
+        "programa__nome",
+        "programa__nome_fantasia",
+        "programa__cultura__cultura",
+        "estagio",
+        "prazo_dap",
+        "obs",
+    ]
 
     inlines = [AplicacoesProgramaInline]
     list_display = (
