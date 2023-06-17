@@ -1,7 +1,17 @@
 from datetime import timedelta
 import datetime
 
+
 today = datetime.date.today()
+
+
+# pr_mungo = Programa.objects.all()[2]
+# pr_caupi = Programa.objects.all()[1]
+# pr_rr = Programa.objects.all()[4]
+# pr_conven = Programa.objects.all()[3]
+
+# pl_rr = Plantio.objects.filter(safra__safra="2023/2024", ciclo__ciclo="1", variedade__cultura__cultura="Soja", finalizado_plantio=True).filter(programa=pr_rr)
+# pl_conv = Plantio.objects.filter(safra__safra="2023/2024", ciclo__ciclo="1", variedade__cultura__cultura="Soja", finalizado_plantio=True).filter(programa=pr_conven)
 
 
 def get_dap(data_plantio):

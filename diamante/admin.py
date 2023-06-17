@@ -77,6 +77,7 @@ class DepositoAdmin(admin.ModelAdmin):
 class FazendaAdmin(admin.ModelAdmin):
     list_display = ("nome", "id_d", "get_plantio_dia")
     ordering = ("nome",)
+    show_full_result_count = False
 
     def get_plantio_dia(self, obj):
         return f"{obj.capacidade_plantio_ha_dia} ha/dia"
@@ -121,6 +122,8 @@ class CulturaAdmin(admin.ModelAdmin):
 
 @admin.register(Variedade)
 class VariedadeAdmin(admin.ModelAdmin):
+    show_full_result_count = False
+
     list_display = (
         "variedade",
         "nome_fantasia",
@@ -375,6 +378,15 @@ class ColheitaAdmin(admin.ModelAdmin):
 
 @admin.register(Programa)
 class ProgramaAdmin(admin.ModelAdmin):
+    def get_queryset(self, request):
+        return (
+            super(ProgramaAdmin, self)
+            .get_queryset(request)
+            .select_related("safra", "ciclo")
+        )
+
+    show_full_result_count = False
+
     inlines = [EstagiosProgramaInline]
     list_display = (
         "nome",
@@ -417,6 +429,8 @@ class OperacaoAdmin(admin.ModelAdmin):
             .get_queryset(request)
             .select_related("programa", "programa__cultura")
         )
+
+    show_full_result_count = False
 
     search_fields = [
         "programa__nome",
@@ -462,6 +476,7 @@ class DefensivoAdmin(admin.ModelAdmin):
     ordering = ["produto"]
     search_fields = ["produto", "tipo"]
     list_filter = ("tipo",)
+    show_full_result_count = False
 
 
 @admin.register(Aplicacao)
@@ -472,6 +487,8 @@ class AplicacaoAdmin(admin.ModelAdmin):
             .get_queryset(request)
             .select_related("operacao", "defensivo", "operacao__programa")
         )
+
+    show_full_result_count = False
 
     list_display = (
         "operacao",
