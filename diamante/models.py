@@ -336,6 +336,23 @@ class Operacao(Base):
 
     obs = models.TextField("Observação", max_length=500, blank=True)
 
+    @property
+    def operation_to_dict(self):
+        query = Aplicacao.objects.select_related("operacao").filter(
+            ativo=True, operacao=self.id
+        )
+        produtos = [
+            {
+                "dose": str(dose_produto.dose),
+                "tipo": dose_produto.defensivo.tipo,
+                "produto": dose_produto.defensivo.produto,
+                "quantidade aplicar": "",
+            }
+            for dose_produto in query
+        ]
+
+        return produtos
+
     class Meta:
         ordering = ["programa", "operacao_numero"]
         verbose_name = "Programa - Operação"

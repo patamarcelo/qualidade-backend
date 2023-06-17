@@ -64,7 +64,7 @@ class EstagiosProgramaInline(admin.StackedInline):
 class AplicacoesProgramaInline(admin.StackedInline):
     model = Aplicacao
     extra = 0
-    fields = ["defensivo", "dose"]
+    fields = ["defensivo", "dose", 'ativo']
 
 
 @admin.register(Deposito)
