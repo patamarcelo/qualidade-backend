@@ -183,6 +183,9 @@ class Cultura(Base):
     map_color = models.CharField(
         "Cor no Mapa", max_length=150, null=True, blank=True, unique=True
     )
+    map_color_line = models.CharField(
+        "Cor do Contorno no Mapa", max_length=150, null=True, blank=True, unique=True
+    )
 
     class Meta:
         ordering = ["cultura"]

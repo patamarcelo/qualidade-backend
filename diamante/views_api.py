@@ -1007,6 +1007,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         "talhao__fazenda__nome",
                         "talhao__fazenda__fazenda__nome",
                         "variedade__cultura__cultura",
+                        "variedade__cultura__map_color",
                         "variedade__nome_fantasia",
                         "variedade__variedade",
                         "area_colheita",
