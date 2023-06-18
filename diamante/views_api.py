@@ -1004,6 +1004,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         "safra__safra",
                         "ciclo__ciclo",
                         "talhao__id_talhao",
+                        "talhao__id_unico",
                         "talhao__fazenda__nome",
                         "talhao__fazenda__map_centro_id",
                         "talhao__fazenda__fazenda__nome",
