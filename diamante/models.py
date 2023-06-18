@@ -95,6 +95,8 @@ class Projeto(Base):
         help_text="Capacidade Projetada Plantio ha/dia",
     )
 
+    map_centro_id = models.JSONField(null=True, blank=True)
+
     class Meta:
         ordering = ["nome"]
         verbose_name = "Projeto"

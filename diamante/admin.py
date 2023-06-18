@@ -64,7 +64,7 @@ class EstagiosProgramaInline(admin.StackedInline):
 class AplicacoesProgramaInline(admin.StackedInline):
     model = Aplicacao
     extra = 0
-    fields = ["defensivo", "dose", 'ativo']
+    fields = ["defensivo", "dose", "ativo"]
 
 
 @admin.register(Deposito)
@@ -96,6 +96,11 @@ class ProjetoAdmin(admin.ModelAdmin):
             )
         )
 
+    formfield_overrides = {
+        models.JSONField: {
+            "widget": JSONEditorWidget(width="200%", height="50vh", mode="tree")
+        },
+    }
     show_full_result_count = False
     list_display = (
         "nome",
@@ -103,7 +108,16 @@ class ProjetoAdmin(admin.ModelAdmin):
         "fazenda",
         "quantidade_area_produtiva",
         "quantidade_area_total",
+        "get_map_centro_id",
     )
+
+    def get_map_centro_id(self, obj):
+        if obj.map_centro_id:
+            return True
+        return False
+
+    get_map_centro_id.boolean = True
+    get_map_centro_id.short_description = "MAP ID"
     ordering = ("nome",)
 
 
@@ -257,7 +271,7 @@ class PlantioAdmin(admin.ModelAdmin, ExportCsvMixin):
             },
         ),
         ("Programa", {"fields": ("cronograma_programa",)}),
-        ("Display Map", {"fields": ("map_centro_id","map_geo_points")}),
+        ("Display Map", {"fields": ("map_centro_id", "map_geo_points")}),
         ("Cronograma Previsto", {"fields": ("get_cronograma_programa",)}),
     )
     readonly_fields = (
