@@ -178,6 +178,10 @@ class Cultura(Base):
         "Tipo Produção", max_length=20, null=True, blank=True
     )
 
+    map_color = models.CharField(
+        "Cor no Mapa", max_length=150, null=True, blank=True, unique=True
+    )
+
     class Meta:
         ordering = ["cultura"]
         verbose_name = "Cultura"
@@ -197,6 +201,10 @@ class Variedade(Base):
     dias_ciclo = models.PositiveIntegerField("Quantidade Dias do Ciclo", default=0)
     dias_germinacao = models.PositiveIntegerField(
         "Quantidade Dias da Germinação", default=5
+    )
+
+    map_oppacity = models.CharField(
+        "Opacidade no Mapa", max_length=150, null=True, blank=True
     )
 
     class Meta:
@@ -452,8 +460,8 @@ class Plantio(Base):
     veiculos_carregados = models.IntegerField("Veículos Carregados / Talhao", default=0)
 
     cronograma_programa = models.JSONField(null=True, blank=True)
-    map_centro_id       = models.JSONField(null=True, blank=True)
-    map_geo_points      = models.JSONField(null=True, blank=True)
+    map_centro_id = models.JSONField(null=True, blank=True)
+    map_geo_points = models.JSONField(null=True, blank=True)
 
     @property
     def get_dap(self):
