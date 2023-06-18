@@ -576,7 +576,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             try:
                 # file = request.FILES["plantio_arroz"]
                 # file_ = open(os.path.join(settings.BASE_DIR, 'filename'))
-                date_file = "2023-06-15 15:10"
+                date_file = "2023-06-16 09:23"
                 with open(f"static/files/dataset-{date_file}.json") as user_file:
                     file_contents = user_file.read()
                     parsed_json = json.loads(file_contents)
@@ -608,6 +608,9 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     fazenda_id = i["farm"]["id"]
                     variedade_planejada_id = i["planned_variety_id"]
                     cultura_planejada_id = i["planned_culture_id"]
+
+                    map_centro_id_farm = i["centroid"]
+                    map_geo_points_farm = i["plot"]["geo_points"]
 
                     safra_farm = i["harvest_name"]
                     ciclo_json = i["cycle"]
@@ -653,6 +656,13 @@ class PlantioViewSet(viewsets.ModelViewSet):
                             )[0]
                             if area:
                                 field_to_update.area_colheita = area
+
+                            if map_centro_id_farm:
+                                field_to_update.map_centro_id = map_centro_id_farm
+
+                            if map_geo_points_farm:
+                                field_to_update.map_geo_points = map_geo_points_farm
+
                             if state == "active":
                                 if date_plantio:
                                     field_to_update.data_plantio = date_plantio

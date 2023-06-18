@@ -257,7 +257,8 @@ class PlantioAdmin(admin.ModelAdmin, ExportCsvMixin):
             },
         ),
         ("Programa", {"fields": ("cronograma_programa",)}),
-        ("Programa", {"fields": ("get_cronograma_programa",)}),
+        ("Display Map", {"fields": ("map_centro_id","map_geo_points")}),
+        ("Cronograma Previsto", {"fields": ("get_cronograma_programa",)}),
     )
     readonly_fields = (
         "get_cronograma_programa",
