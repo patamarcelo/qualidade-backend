@@ -344,6 +344,8 @@ class Operacao(Base):
 
     obs = models.TextField("Observação", max_length=500, blank=True)
 
+    map_color = models.CharField("Cor no Mapa", max_length=150, null=True, blank=True)
+
     @property
     def operation_to_dict(self):
         query = Aplicacao.objects.select_related("operacao").filter(
