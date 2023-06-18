@@ -1005,16 +1005,17 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         "ciclo__ciclo",
                         "talhao__id_talhao",
                         "talhao__fazenda__nome",
+                        "talhao__fazenda__map_centro_id",
                         "talhao__fazenda__fazenda__nome",
                         "variedade__cultura__cultura",
                         "variedade__cultura__map_color",
+                        "variedade__cultura__map_color_line",
                         "variedade__nome_fantasia",
                         "variedade__variedade",
                         "area_colheita",
                         "data_plantio",
                         "map_centro_id",
-                        "map_geo_points"
-                        
+                        "map_geo_points",
                     )
                     .order_by(
                         "data_plantio", "talhao__fazenda__nome", "talhao__id_talhao"
@@ -1022,16 +1023,6 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     .filter(safra__safra=safra_filter, ciclo__ciclo=cicle_filter)
                     .filter(finalizado_plantio=True)
                 )
-
-                # qsFilt = Plantio.objects.filter(
-                #     safra__safra=safra_filter,
-                #     ciclo__ciclo=cicle_filter,
-                #     finalizado_plantio=True,
-                # )
-
-                # qsFarm = qsFilt.values(
-                #     "talhao__fazenda__nome", "variedade__variedade"
-                # ).annotate(area=Sum("area_colheita"))
 
                 response = {
                     "msg": f"Consulta realizada com sucesso GetPlantioDone API!! - Safra: {safra_filter} - Ciclo: {cicle_filter}",
