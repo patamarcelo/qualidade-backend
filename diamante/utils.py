@@ -12,6 +12,8 @@ today = datetime.date.today()
 
 # pl_rr = Plantio.objects.filter(safra__safra="2023/2024", ciclo__ciclo="1", variedade__cultura__cultura="Soja", finalizado_plantio=True).filter(programa=pr_rr)
 # pl_conv = Plantio.objects.filter(safra__safra="2023/2024", ciclo__ciclo="1", variedade__cultura__cultura="Soja", finalizado_plantio=True).filter(programa=pr_conven)
+# pl_caupi = Plantio.objects.filter(safra__safra="2023/2024", ciclo__ciclo="1", variedade__cultura__cultura="Feijão", finalizado_plantio=True).filter(programa=pr_caupi)
+# pl_mungo = Plantio.objects.filter(safra__safra="2023/2024", ciclo__ciclo="1", variedade__cultura__cultura="Feijão", finalizado_plantio=True).filter(programa=pr_mungo)
 
 
 def get_dap(data_plantio):
@@ -102,21 +104,27 @@ v6_1_conv = {
             "quantidade aplicar": "",
         },
         {
-            "dose": "1.000",
-            "tipo": "inseticida",
-            "produto": "METOMIL",
-            "quantidade aplicar": "",
-        },
-        {
-            "dose": "1.500",
-            "tipo": "biologico",
-            "produto": "MIX BT's",
+            "dose": "0.060",
+            "tipo": "nutricao",
+            "produto": "COBRE",
             "quantidade aplicar": "",
         },
         {
             "dose": "0.600",
             "tipo": "fungicida",
             "produto": "OPERA",
+            "quantidade aplicar": "",
+        },
+        {
+            "dose": "0.040",
+            "tipo": "inseticida",
+            "produto": "Bifentrina",
+            "quantidade aplicar": "",
+        },
+        {
+            "dose": "0.030",
+            "tipo": "inseticida",
+            "produto": "Demacor",
             "quantidade aplicar": "",
         },
         {
@@ -134,9 +142,9 @@ v6_2_conv = {
     "aplicado": False,
     "produtos": [
         {
-            "dose": "0.060",
-            "tipo": "nutricao",
-            "produto": "COBRE",
+            "dose": "1.500",
+            "tipo": "biologico",
+            "produto": "MIX BT's",
             "quantidade aplicar": "",
         },
         {
@@ -184,21 +192,27 @@ v6_1_rr = {
             "quantidade aplicar": "",
         },
         {
-            "dose": "1.000",
-            "tipo": "inseticida",
-            "produto": "METOMIL",
-            "quantidade aplicar": "",
-        },
-        {
-            "dose": "1.500",
-            "tipo": "biologico",
-            "produto": "MIX BT's",
+            "dose": "0.060",
+            "tipo": "nutricao",
+            "produto": "COBRE",
             "quantidade aplicar": "",
         },
         {
             "dose": "0.600",
             "tipo": "fungicida",
             "produto": "OPERA",
+            "quantidade aplicar": "",
+        },
+        {
+            "dose": "0.040",
+            "tipo": "inseticida",
+            "produto": "Bifentrina",
+            "quantidade aplicar": "",
+        },
+        {
+            "dose": "0.150",
+            "tipo": "inseticida",
+            "produto": "Lambda",
             "quantidade aplicar": "",
         },
         {
@@ -216,9 +230,9 @@ v6_2_rr = {
     "aplicado": False,
     "produtos": [
         {
-            "dose": "0.060",
-            "tipo": "nutricao",
-            "produto": "COBRE",
+            "dose": "1.500",
+            "tipo": "biologico",
+            "produto": "MIX BT's",
             "quantidade aplicar": "",
         },
         {

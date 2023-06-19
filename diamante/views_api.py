@@ -576,7 +576,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             try:
                 # file = request.FILES["plantio_arroz"]
                 # file_ = open(os.path.join(settings.BASE_DIR, 'filename'))
-                date_file = "2023-06-16 09:23"
+                date_file = "2023-06-18 11:22"
                 with open(f"static/files/dataset-{date_file}.json") as user_file:
                     file_contents = user_file.read()
                     parsed_json = json.loads(file_contents)
@@ -610,7 +610,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     cultura_planejada_id = i["planned_culture_id"]
 
                     map_centro_id_farm = i["centroid"]
-                    map_geo_points_farm = i["plot"]["geo_points"]
+                    map_geo_points_farm = i["geo_points"]
 
                     safra_farm = i["harvest_name"]
                     ciclo_json = i["cycle"]
@@ -772,7 +772,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     cultura_planejada_id = i["planned_culture_id"]
 
                     map_centro_id_farm = i["centroid"]
-                    map_geo_points_farm = i["plot"]["geo_points"]
+                    map_geo_points_farm = i["geo_points"]
 
                     safra_farm = i["harvest_name"]
                     ciclo_json = i["cycle"]
@@ -1503,10 +1503,13 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         "safra__safra",
                         "ciclo__ciclo",
                         "talhao__fazenda__nome",
+                        "talhao__fazenda__map_centro_id",
                         "talhao__fazenda__fazenda__nome",
                         "talhao__fazenda__fazenda__capacidade_plantio_ha_dia",
                         "variedade__nome_fantasia",
                         "variedade__cultura__cultura",
+                        "variedade__cultura__map_color",
+                        "variedade__cultura__map_color_line",
                         "area_colheita",
                         "data_plantio",
                         "finalizado_plantio",
@@ -1517,6 +1520,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         "programa__nome",
                         "programa__nome_fantasia",
                         "cronograma_programa",
+                        "map_geo_points",
                     )
                     .filter(~Q(programa_id=None))
                     .filter(safra=safra, ciclo=ciclo)
@@ -1538,6 +1542,14 @@ class PlantioViewSet(viewsets.ModelViewSet):
                             "plantio_finalizado": i["finalizado_plantio"],
                             "area_colheita": i["area_colheita"],
                             "data_plantio": i["data_plantio"],
+                            "map_geo_points": i["map_geo_points"],
+                            "variedade_color": i["variedade__cultura__map_color"],
+                            "variedade_color_line": i[
+                                "variedade__cultura__map_color_line"
+                            ],
+                            "projeto_map_centro_id": i[
+                                "talhao__fazenda__map_centro_id"
+                            ],
                             "dap": get_dap(i["data_plantio"]),
                             "programa_id": i["programa"],
                             "programa": i["programa__nome"],
