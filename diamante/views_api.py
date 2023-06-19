@@ -1253,6 +1253,10 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         "programa__start_date",
                         "programa__end_date",
                         "programa__nome",
+                        "map_geo_points",
+                        "talhao__fazenda__map_centro_id",
+                        "variedade__cultura__map_color",
+                        "variedade__cultura__map_color_line",
                     )
                     .filter(~Q(programa_id=None))
                     .filter(safra=safra, ciclo=ciclo)
@@ -1297,6 +1301,14 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 "plantio_finalizado": i["finalizado_plantio"],
                                 "area_colheita": i["area_colheita"],
                                 "data_plantio": i["data_plantio"],
+                                 "map_geo_points": i["map_geo_points"],
+                            "variedade_color": i["variedade__cultura__map_color"],
+                            "variedade_color_line": i[
+                                "variedade__cultura__map_color_line"
+                            ],
+                            "projeto_map_centro_id": i[
+                                "talhao__fazenda__map_centro_id"
+                            ],
                                 "dap": get_dap(i["data_plantio"]),
                                 "programa_id": i["programa"],
                                 "programa": i["programa__nome"],
