@@ -111,6 +111,10 @@ class ProjetoAdmin(admin.ModelAdmin):
         "get_map_centro_id",
     )
 
+    search_fields = ["fazenda__nome"]
+
+    list_filter = (("map_centro_id", admin.EmptyFieldListFilter),)
+
     def get_map_centro_id(self, obj):
         if obj.map_centro_id:
             return True
@@ -213,9 +217,10 @@ class PlantioAdmin(admin.ModelAdmin, ExportCsvMixin):
         "get_description_finalizado_plantio",
         "get_description_finalizado_colheita",
         "area_colheita",
-        "area_parcial",
+        # "area_parcial",
         "get_data",
         "get_dap_description",
+        "get_dias_ciclo",
         "programa",
         # "detail",
     )
@@ -309,6 +314,14 @@ class PlantioAdmin(admin.ModelAdmin, ExportCsvMixin):
             return " - "
 
     get_data_plantio.short_description = "Data Plantio "
+
+    def get_dias_ciclo(self, obj):
+        if obj.variedade:
+            return obj.variedade.dias_ciclo
+        else:
+            return 'Não Planejado'
+
+    get_dias_ciclo.short_description = "Ciclo "
 
     def get_dap_description(self, obj):
         return obj.get_dap

@@ -96,6 +96,14 @@ class Projeto(Base):
     )
 
     map_centro_id = models.JSONField(null=True, blank=True)
+    map_zoom = models.DecimalField(
+        "Zoom do Mapa",
+        help_text="Zoom do Mapa",
+        blank=True,
+        null=True,
+        max_digits=4,
+        decimal_places=2,
+    )
 
     class Meta:
         ordering = ["nome"]

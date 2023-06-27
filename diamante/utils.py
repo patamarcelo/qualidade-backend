@@ -80,8 +80,15 @@ def get_index_dict_prod(lista_produtos, find_product):
     # i.cronograma_programa[5]['produtos'][index] = {'dose': '0.600', 'tipo': 'fungicida', 'produto': 'OPERA', 'quantidade aplicar': calc_total(i.area_colheita, 0.600)}
 
 
+# for i in pl_rr:
+# ...     for j in i.cronograma_programa:
+# ...             if len(j) > 3 and j['aplicado'] == False:
+# ...                     index = get_index_dict_prod(j['produtos'], "MIX BT's")
+# ...                     if index:
+# ...                             print(j['produtos'][index]['dose'])
+
 v6_1_conv = {
-    "dap": 40,
+    "dap": 38,
     "estagio": "6º TRIFOLIO ( V6.1 )",
     "aplicado": False,
     "produtos": [
@@ -116,12 +123,6 @@ v6_1_conv = {
             "quantidade aplicar": "",
         },
         {
-            "dose": "0.040",
-            "tipo": "inseticida",
-            "produto": "Bifentrina",
-            "quantidade aplicar": "",
-        },
-        {
             "dose": "0.030",
             "tipo": "inseticida",
             "produto": "Demacor",
@@ -133,11 +134,17 @@ v6_1_conv = {
             "produto": "ABAMECTINA 400",
             "quantidade aplicar": "",
         },
+        {
+            "dose": "0.150",
+            "tipo": "inseticida",
+            "produto": "KAISO 250",
+            "quantidade aplicar": "",
+        },
     ],
     "data prevista": "",
 }
 v6_2_conv = {
-    "dap": 40,
+    "dap": 38,
     "estagio": "6º TRIFOLIO ( V6.2 )",
     "aplicado": False,
     "produtos": [
@@ -204,21 +211,21 @@ v6_1_rr = {
             "quantidade aplicar": "",
         },
         {
-            "dose": "0.040",
+            "dose": "0.022",
             "tipo": "inseticida",
-            "produto": "Bifentrina",
+            "produto": "ABAMECTINA 400",
+            "quantidade aplicar": "",
+        },
+        {
+            "dose": "0.020",
+            "tipo": "inseticida",
+            "produto": "Demacor",
             "quantidade aplicar": "",
         },
         {
             "dose": "0.150",
             "tipo": "inseticida",
-            "produto": "Lambda",
-            "quantidade aplicar": "",
-        },
-        {
-            "dose": "0.022",
-            "tipo": "inseticida",
-            "produto": "ABAMECTINA 400",
+            "produto": "KAISO 250",
             "quantidade aplicar": "",
         },
     ],
