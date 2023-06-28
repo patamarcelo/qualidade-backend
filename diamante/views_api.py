@@ -576,7 +576,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             try:
                 # file = request.FILES["plantio_arroz"]
                 # file_ = open(os.path.join(settings.BASE_DIR, 'filename'))
-                date_file = "2023-06-27 13:18"
+                date_file = "2023-06-28 09:02"
                 with open(f"static/files/dataset-{date_file}.json") as user_file:
                     file_contents = user_file.read()
                     parsed_json = json.loads(file_contents)
@@ -1253,10 +1253,6 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         "programa__start_date",
                         "programa__end_date",
                         "programa__nome",
-                        "map_geo_points",
-                        "talhao__fazenda__map_centro_id",
-                        "variedade__cultura__map_color",
-                        "variedade__cultura__map_color_line",
                     )
                     .filter(~Q(programa_id=None))
                     .filter(safra=safra, ciclo=ciclo)
@@ -1301,14 +1297,6 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 "plantio_finalizado": i["finalizado_plantio"],
                                 "area_colheita": i["area_colheita"],
                                 "data_plantio": i["data_plantio"],
-                                 "map_geo_points": i["map_geo_points"],
-                            "variedade_color": i["variedade__cultura__map_color"],
-                            "variedade_color_line": i[
-                                "variedade__cultura__map_color_line"
-                            ],
-                            "projeto_map_centro_id": i[
-                                "talhao__fazenda__map_centro_id"
-                            ],
                                 "dap": get_dap(i["data_plantio"]),
                                 "programa_id": i["programa"],
                                 "programa": i["programa__nome"],
@@ -1515,13 +1503,10 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         "safra__safra",
                         "ciclo__ciclo",
                         "talhao__fazenda__nome",
-                        "talhao__fazenda__map_centro_id",
                         "talhao__fazenda__fazenda__nome",
                         "talhao__fazenda__fazenda__capacidade_plantio_ha_dia",
                         "variedade__nome_fantasia",
                         "variedade__cultura__cultura",
-                        "variedade__cultura__map_color",
-                        "variedade__cultura__map_color_line",
                         "area_colheita",
                         "data_plantio",
                         "finalizado_plantio",
@@ -1532,7 +1517,6 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         "programa__nome",
                         "programa__nome_fantasia",
                         "cronograma_programa",
-                        "map_geo_points",
                     )
                     .filter(~Q(programa_id=None))
                     .filter(safra=safra, ciclo=ciclo)
@@ -1554,14 +1538,6 @@ class PlantioViewSet(viewsets.ModelViewSet):
                             "plantio_finalizado": i["finalizado_plantio"],
                             "area_colheita": i["area_colheita"],
                             "data_plantio": i["data_plantio"],
-                            "map_geo_points": i["map_geo_points"],
-                            "variedade_color": i["variedade__cultura__map_color"],
-                            "variedade_color_line": i[
-                                "variedade__cultura__map_color_line"
-                            ],
-                            "projeto_map_centro_id": i[
-                                "talhao__fazenda__map_centro_id"
-                            ],
                             "dap": get_dap(i["data_plantio"]),
                             "programa_id": i["programa"],
                             "programa": i["programa__nome"],
@@ -1598,6 +1574,89 @@ class PlantioViewSet(viewsets.ModelViewSet):
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
     # --------------------- ---------------------- PLANTIO APLICACOES TESTE JSON FIELD API START --------------------- ----------------------#
+
+    # --------------------- ---------------------- PLANTIO MAP GEO API END --------------------- ----------------------#
+
+    @action(detail=False, methods=["GET", "POST"])
+    def get_plantio_detail_map(self, request):
+        if request.user.is_authenticated:
+            try:
+                safra_filter = None
+                cicle_filter = None
+                try:
+                    safra_filter = request.data["safra"]
+                    cicle_filter = request.data["ciclo"]
+                except Exception as e:
+                    print(e)
+                print(safra_filter)
+                print(cicle_filter)
+                safra_filter = "2023/2024" if safra_filter == None else safra_filter
+                cicle_filter = "1" if cicle_filter == None else cicle_filter
+
+                qs_plantio = (
+                    Plantio.objects.values(
+                        "id",
+                        "talhao__id_talhao",
+                        "talhao__id_unico",
+                        "talhao_id",
+                        "safra__safra",
+                        "ciclo__ciclo",
+                        "talhao__fazenda__nome",
+                        "talhao__fazenda__map_centro_id",
+                        "talhao__fazenda__map_zoom",
+                        "talhao__fazenda__fazenda__nome",
+                        "variedade__nome_fantasia",
+                        "variedade__cultura__cultura",
+                        "variedade__cultura__map_color",
+                        "variedade__cultura__map_color_line",
+                        "area_colheita",
+                        "map_geo_points",
+                    )
+                    .filter(~Q(programa_id=None))
+                    .filter(safra__safra=safra_filter, ciclo__ciclo=cicle_filter)
+                )
+
+                result = [
+                    {
+                        "fazenda": i["talhao__fazenda__nome"],
+                        "parcela": i["talhao__id_talhao"],
+                        "dados": {
+                            "safra": i["safra__safra"],
+                            "ciclo": i["ciclo__ciclo"],
+                            "cultura": i["variedade__cultura__cultura"],
+                            "variedade": i["variedade__nome_fantasia"],
+                            "plantio_id": i["id"],
+                            "fazenda_grupo": i["talhao__fazenda__fazenda__nome"],
+                            "talhao_id_unico": i["talhao__id_unico"],
+                            "area_colheita": i["area_colheita"],
+                            "map_geo_points": i["map_geo_points"],
+                            "variedade_color": i["variedade__cultura__map_color"],
+                            "variedade_color_line": i[
+                                "variedade__cultura__map_color_line"
+                            ],
+                            "projeto_map_centro_id": i[
+                                "talhao__fazenda__map_centro_id"
+                            ],
+                            "projeto_map_zoom": i["talhao__fazenda__map_zoom"],
+                        },
+                    }
+                    for i in qs_plantio
+                ]
+
+                response = {
+                    "msg": f"Retorno com os arquivos DE MAPAS com Sucesso!!",
+                    "total_query_plantio": qs_plantio.count(),
+                    "dados_plantio": result,
+                }
+                return Response(response, status=status.HTTP_200_OK)
+            except Exception as e:
+                response = {"message": f"Ocorreu um Erro: {e}"}
+                return Response(response, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            response = {"message": "Você precisa estar logado!!!"}
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+    # --------------------- ---------------------- PLANTIO MAP JSON FIELD API START --------------------- ----------------------#
 
     # --------------------- ---------------------- PLANTIO APLICACOES TESTE JSON FIELD API END --------------------- ----------------------#
 
