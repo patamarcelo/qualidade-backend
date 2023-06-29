@@ -576,7 +576,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             try:
                 # file = request.FILES["plantio_arroz"]
                 # file_ = open(os.path.join(settings.BASE_DIR, 'filename'))
-                date_file = "2023-06-28 09:02"
+                date_file = "2023-06-28 16:10"
                 with open(f"static/files/dataset-{date_file}.json") as user_file:
                     file_contents = user_file.read()
                     parsed_json = json.loads(file_contents)
@@ -1593,28 +1593,25 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 safra_filter = "2023/2024" if safra_filter == None else safra_filter
                 cicle_filter = "1" if cicle_filter == None else cicle_filter
 
-                qs_plantio = (
-                    Plantio.objects.values(
-                        "id",
-                        "talhao__id_talhao",
-                        "talhao__id_unico",
-                        "talhao_id",
-                        "safra__safra",
-                        "ciclo__ciclo",
-                        "talhao__fazenda__nome",
-                        "talhao__fazenda__map_centro_id",
-                        "talhao__fazenda__map_zoom",
-                        "talhao__fazenda__fazenda__nome",
-                        "variedade__nome_fantasia",
-                        "variedade__cultura__cultura",
-                        "variedade__cultura__map_color",
-                        "variedade__cultura__map_color_line",
-                        "area_colheita",
-                        "map_geo_points",
-                    )
-                    .filter(~Q(programa_id=None))
-                    .filter(safra__safra=safra_filter, ciclo__ciclo=cicle_filter)
-                )
+                qs_plantio = Plantio.objects.values(
+                    "id",
+                    "talhao__id_talhao",
+                    "talhao__id_unico",
+                    "talhao_id",
+                    "safra__safra",
+                    "ciclo__ciclo",
+                    "talhao__fazenda__nome",
+                    "talhao__fazenda__map_centro_id",
+                    "talhao__fazenda__map_zoom",
+                    "talhao__fazenda__fazenda__nome",
+                    "variedade__nome_fantasia",
+                    "variedade__cultura__cultura",
+                    "variedade__cultura__map_color",
+                    "variedade__cultura__map_color_line",
+                    "area_colheita",
+                    "map_centro_id",
+                    "map_geo_points",
+                ).filter(safra__safra=safra_filter, ciclo__ciclo=cicle_filter)
 
                 result = [
                     {
@@ -1630,6 +1627,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                             "talhao_id_unico": i["talhao__id_unico"],
                             "area_colheita": i["area_colheita"],
                             "map_geo_points": i["map_geo_points"],
+                            "map_geo_points_center": i["map_centro_id"],
                             "variedade_color": i["variedade__cultura__map_color"],
                             "variedade_color_line": i[
                                 "variedade__cultura__map_color_line"
