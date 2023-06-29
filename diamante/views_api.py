@@ -1277,7 +1277,9 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     )
                     .filter(~Q(operacao__programa_id=None))
                     .filter(
-                        operacao__programa__safra=safra, operacao__programa__ciclo=ciclo
+                        operacao__programa__safra=safra,
+                        operacao__programa__ciclo=ciclo,
+                        ativo=True,
                     )
                 )
 
