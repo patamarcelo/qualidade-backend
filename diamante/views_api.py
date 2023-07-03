@@ -576,7 +576,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             try:
                 # file = request.FILES["plantio_arroz"]
                 # file_ = open(os.path.join(settings.BASE_DIR, 'filename'))
-                date_file = "2023-06-28 16:10"
+                date_file = "2023-07-03 13:41"
                 with open(f"static/files/dataset-{date_file}.json") as user_file:
                     file_contents = user_file.read()
                     parsed_json = json.loads(file_contents)
@@ -886,10 +886,21 @@ class PlantioViewSet(viewsets.ModelViewSet):
 
     # --------------------- ---------------------- UPDATE PLANTIO API --------------------- ----------------------#
 
-    @action(detail=False, methods=["GET"])
+    @action(detail=False, methods=["GET", "POST"])
     def get_plantio(self, request):
         if request.user.is_authenticated:
             try:
+                safra_filter = None
+                cicle_filter = None
+                try:
+                    safra_filter = request.data["safra"]
+                    cicle_filter = request.data["ciclo"]
+                except Exception as e:
+                    print(e)
+
+                safra_filter = "2023/2024" if safra_filter == None else safra_filter
+                cicle_filter = "1" if cicle_filter == None else cicle_filter
+
                 qs = (
                     Plantio.objects.values(
                         "safra__safra",
@@ -906,15 +917,15 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         "data_plantio",
                     )
                     .order_by("talhao__fazenda__nome", "talhao__id_talhao")
-                    .filter(safra__safra="2022/2023", ciclo__ciclo="3")
+                    .filter(safra__safra=safra_filter, ciclo__ciclo=cicle_filter, finalizado_plantio=True)
                     # .filter(~Q(data_plantio=None))
                 )
 
                 qs_annotate = Plantio.objects.filter(
-                    safra__safra="2022/2023", ciclo__ciclo="3"
+                    safra__safra=safra_filter, ciclo__ciclo=cicle_filter, finalizado_plantio=True
                 )
                 res1 = (
-                    qs_annotate.values("talhao__fazenda__nome", "variedade__variedade")
+                    qs_annotate.values("talhao__fazenda__nome", "variedade__cultura__cultura")
                     .order_by("talhao__fazenda__nome")
                     .annotate(area_total=Sum("area_colheita"))
                 )
@@ -1017,6 +1028,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         "data_plantio",
                         "map_centro_id",
                         "map_geo_points",
+                        "cronograma_programa__0"
                     )
                     .order_by(
                         "data_plantio", "talhao__fazenda__nome", "talhao__id_talhao"
@@ -1540,6 +1552,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                             "plantio_finalizado": i["finalizado_plantio"],
                             "area_colheita": i["area_colheita"],
                             "data_plantio": i["data_plantio"],
+                            "data_inicio_plantio": i["cronograma_programa"][0]["Data Plantio"],
                             "dap": get_dap(i["data_plantio"]),
                             "programa_id": i["programa"],
                             "programa": i["programa__nome"],

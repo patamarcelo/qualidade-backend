@@ -404,7 +404,7 @@ class Aplicacao(Base):
         verbose_name_plural = "Programas - Operações/Aplicações"
 
     def __str__(self):
-        return f"{self.defensivo} - {self.dose}"
+        return f"{self.defensivo} - {self.dose} - {self.ativo} - {self.operacao.programa.nome_fantasia}"
 
 
 #  ------------- ------------- xxxxxxxxxx -------------  -------------#

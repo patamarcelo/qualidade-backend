@@ -81,6 +81,19 @@ def get_index_dict_prod(lista_produtos, find_product):
     # i.cronograma_programa[5]['produtos'][index] = {'dose': '0.600', 'tipo': 'fungicida', 'produto': 'OPERA', 'quantidade aplicar': calc_total(i.area_colheita, 0.600)}
 
 
+def get_index_dict_estagio(lista_programa, find_estagio):
+    # Lista Produtos: i.cronograma_programa[5]['produtos']
+    v4_prod = lista_programa
+    # ork = [ (x,n) for x,n in enumerate( v4_prod) if n['produto'] == 'ORKESTRA']
+    ork = [(x, n) for x, n in enumerate(v4_prod[1:]) if n["estagio"] == find_estagio]
+    if ork:
+        index = ork[0][0] + 1
+    else:
+        index = None
+    return index
+    # i.cronograma_programa[5]['produtos'][index] = {'dose': '0.600', 'tipo': 'fungicida', 'produto': 'OPERA', 'quantidade aplicar': calc_total(i.area_colheita, 0.600)}
+
+
 # for i in pl_rr:
 # ...     for j in i.cronograma_programa:
 # ...             if len(j) > 3 and j['aplicado'] == False:
@@ -136,7 +149,7 @@ v6_1_conv = {
             "quantidade aplicar": "",
         },
         {
-            "dose": "0.150",
+            "dose": "0.080",
             "tipo": "inseticida",
             "produto": "KAISO 250",
             "quantidade aplicar": "",
@@ -156,7 +169,7 @@ v6_2_conv = {
             "quantidade aplicar": "",
         },
         {
-            "dose": "0.200",
+            "dose": "0.400",
             "tipo": "nutricao",
             "produto": "SÍLICA",
             "quantidade aplicar": "",
@@ -218,13 +231,13 @@ v6_1_rr = {
             "quantidade aplicar": "",
         },
         {
-            "dose": "0.020",
+            "dose": "0.030",
             "tipo": "inseticida",
             "produto": "Demacor",
             "quantidade aplicar": "",
         },
         {
-            "dose": "0.150",
+            "dose": "0.080",
             "tipo": "inseticida",
             "produto": "KAISO 250",
             "quantidade aplicar": "",
@@ -244,7 +257,7 @@ v6_2_rr = {
             "quantidade aplicar": "",
         },
         {
-            "dose": "0.200",
+            "dose": "0.400",
             "tipo": "nutricao",
             "produto": "SÍLICA",
             "quantidade aplicar": "",
