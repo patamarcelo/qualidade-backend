@@ -20,7 +20,12 @@ today = datetime.date.today()
 def get_dap(data_plantio):
     dap = 0
     today = datetime.date.today()
-    if data_plantio:
+    if type(data_plantio) == str:
+        date_ftime = datetime.datetime.strptime(data_plantio, "%Y-%m-%d")
+        today_st = datetime.datetime.now()
+        dap = today_st - date_ftime
+        dap = dap.days + 1
+    elif type(data_plantio) != str:
         dap = today - data_plantio
         dap = dap.days + 1
     return dap
