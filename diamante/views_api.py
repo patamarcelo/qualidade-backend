@@ -1706,10 +1706,11 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         index = get_index_dict_estagio(
                             update_field.cronograma_programa, i["estagio"]
                         )
-                        print(update_field.talhao.id_talhao)
+                        print(
+                            f"{update_field.talhao.fazenda.nome} - {update_field.talhao.id_talhao}"
+                        )
                         print(update_field.cronograma_programa[index]["estagio"])
                         print(update_field.cronograma_programa[index]["aplicado"])
-                        print(update_field.cronograma_programa[index]["produtos"])
                         print("\n")
 
                         if update_field.cronograma_programa[index]["aplicado"] == True:
