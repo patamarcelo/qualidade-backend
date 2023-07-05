@@ -582,7 +582,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             try:
                 # file = request.FILES["plantio_arroz"]
                 # file_ = open(os.path.join(settings.BASE_DIR, 'filename'))
-                date_file = "2023-07-05 08:03"
+                date_file = "2023-07-05 13:50"
                 with open(f"static/files/dataset-{date_file}.json") as user_file:
                     file_contents = user_file.read()
                     parsed_json = json.loads(file_contents)
@@ -1034,6 +1034,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         "talhao__fazenda__map_centro_id",
                         "talhao__fazenda__fazenda__nome",
                         "variedade__cultura__cultura",
+                        "variedade__dias_ciclo",
                         "variedade__cultura__map_color",
                         "variedade__cultura__map_color_line",
                         "variedade__nome_fantasia",
