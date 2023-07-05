@@ -18,7 +18,13 @@ import datetime
 from dateutil.relativedelta import relativedelta
 from decimal import *
 from django.db.models import Q
-from .utils import get_dap, get_prev_app_date, get_quantidade_aplicar, get_base_date
+from .utils import (
+    get_dap,
+    get_prev_app_date,
+    get_quantidade_aplicar,
+    get_base_date,
+    get_index_dict_estagio,
+)
 
 
 from .models import (
@@ -576,7 +582,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             try:
                 # file = request.FILES["plantio_arroz"]
                 # file_ = open(os.path.join(settings.BASE_DIR, 'filename'))
-                date_file = "2023-07-03 13:41"
+                date_file = "2023-07-04 14:09"
                 with open(f"static/files/dataset-{date_file}.json") as user_file:
                     file_contents = user_file.read()
                     parsed_json = json.loads(file_contents)
@@ -917,15 +923,23 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         "data_plantio",
                     )
                     .order_by("talhao__fazenda__nome", "talhao__id_talhao")
-                    .filter(safra__safra=safra_filter, ciclo__ciclo=cicle_filter, finalizado_plantio=True)
+                    .filter(
+                        safra__safra=safra_filter,
+                        ciclo__ciclo=cicle_filter,
+                        finalizado_plantio=True,
+                    )
                     # .filter(~Q(data_plantio=None))
                 )
 
                 qs_annotate = Plantio.objects.filter(
-                    safra__safra=safra_filter, ciclo__ciclo=cicle_filter, finalizado_plantio=True
+                    safra__safra=safra_filter,
+                    ciclo__ciclo=cicle_filter,
+                    finalizado_plantio=True,
                 )
                 res1 = (
-                    qs_annotate.values("talhao__fazenda__nome", "variedade__cultura__cultura")
+                    qs_annotate.values(
+                        "talhao__fazenda__nome", "variedade__cultura__cultura"
+                    )
                     .order_by("talhao__fazenda__nome")
                     .annotate(area_total=Sum("area_colheita"))
                 )
@@ -1028,7 +1042,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         "data_plantio",
                         "map_centro_id",
                         "map_geo_points",
-                        "cronograma_programa__0"
+                        "cronograma_programa__0",
                     )
                     .order_by(
                         "data_plantio", "talhao__fazenda__nome", "talhao__id_talhao"
@@ -1552,8 +1566,12 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 "plantio_finalizado": i["finalizado_plantio"],
                                 "area_colheita": i["area_colheita"],
                                 "data_plantio": i["data_plantio"],
-                                "data_inicio_plantio": i["cronograma_programa"][0]["Data Plantio"],
-                                "dap": get_dap(i["cronograma_programa"][0]["Data Plantio"]),
+                                "data_inicio_plantio": i["cronograma_programa"][0][
+                                    "Data Plantio"
+                                ],
+                                "dap": get_dap(
+                                    i["cronograma_programa"][0]["Data Plantio"]
+                                ),
                                 "programa_id": i["programa"],
                                 "programa": i["programa__nome"],
                                 "programa_start_date": i["programa__start_date"],
@@ -1575,7 +1593,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         for i in qs_plantio
                     ]
                 except Exception as e:
-                    print(f'erro ao gerar o cronograma {e}')
+                    print(f"erro ao gerar o cronograma {e}")
 
                 response = {
                     "msg": f"Retorno com os arquivos Json com Sucesso!!",
@@ -1671,9 +1689,47 @@ class PlantioViewSet(viewsets.ModelViewSet):
             response = {"message": "Você precisa estar logado!!!"}
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
-    # --------------------- ---------------------- PLANTIO MAP JSON FIELD API START --------------------- ----------------------#
+    # --------------------- ---------------------- PLANTIO UPDATE APLICATION FIELD API START --------------------- ----------------------#
 
-    # --------------------- ---------------------- PLANTIO APLICACOES TESTE JSON FIELD API END --------------------- ----------------------#
+    @action(detail=False, methods=["GET", "POST", "PUT"])
+    def update_aplication_plantio(sef, request, pk=None):
+        if request.user.is_authenticated:
+            try:
+                params = request.data["data"]
+                print(params)
+                id_list = [x["id"] for x in params]
+                print("list of IDS: ", id_list)
+
+                for i in params:
+                    update_field = Plantio.objects.get(pk=i["id"])
+                    index = get_index_dict_estagio(
+                        update_field.cronograma_programa, i["estagio"]
+                    )
+                    print(update_field.cronograma_programa[index]["estagio"])
+                    print(update_field.cronograma_programa[index]["aplicado"])
+                    print(update_field.cronograma_programa[index]["produtos"])
+                    print("\n")
+                    # if update_field.cronograma_programa[index]["aplicado"] == True:
+                    #     update_field.cronograma_programa[index]["aplicado"] = False
+                    # if update_field.cronograma_programa[index]["aplicado"] == False:
+                    #     update_field.cronograma_programa[index]["aplicado"] = True
+                    # update_field.save()
+
+                response = {
+                    "msg": "Atualização realizada com sucesso!",
+                    "data": params,
+                    # "result": result,
+                }
+                return Response(response, status=status.HTTP_200_OK)
+            except Exception as e:
+                response = {"message": f"Ocorreu um Erro: {e}"}
+                return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+        else:
+            response = {"message": "Você precisa estar logado!!!"}
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+    # --------------------- ---------------------- PLANTIO UPDATE APLICATION FIELD API END --------------------- ----------------------#
 
     # --------------------- ---------------------- DEFENSIVOS API START --------------------- ----------------------#
 
