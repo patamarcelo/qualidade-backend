@@ -582,7 +582,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             try:
                 # file = request.FILES["plantio_arroz"]
                 # file_ = open(os.path.join(settings.BASE_DIR, 'filename'))
-                date_file = "2023-07-04 14:09"
+                date_file = "2023-07-05 08:03"
                 with open(f"static/files/dataset-{date_file}.json") as user_file:
                     file_contents = user_file.read()
                     parsed_json = json.loads(file_contents)
@@ -1699,26 +1699,41 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 print(params)
                 id_list = [x["id"] for x in params]
                 print("list of IDS: ", id_list)
-
+                list_updated = []
                 for i in params:
-                    update_field = Plantio.objects.get(pk=i["id"])
-                    index = get_index_dict_estagio(
-                        update_field.cronograma_programa, i["estagio"]
-                    )
-                    print(update_field.cronograma_programa[index]["estagio"])
-                    print(update_field.cronograma_programa[index]["aplicado"])
-                    print(update_field.cronograma_programa[index]["produtos"])
-                    print("\n")
-                    # if update_field.cronograma_programa[index]["aplicado"] == True:
-                    #     update_field.cronograma_programa[index]["aplicado"] = False
-                    # if update_field.cronograma_programa[index]["aplicado"] == False:
-                    #     update_field.cronograma_programa[index]["aplicado"] = True
-                    # update_field.save()
+                    try:
+                        update_field = Plantio.objects.get(pk=i["id"])
+                        index = get_index_dict_estagio(
+                            update_field.cronograma_programa, i["estagio"]
+                        )
+                        print(update_field.talhao.id_talhao)
+                        print(update_field.cronograma_programa[index]["estagio"])
+                        print(update_field.cronograma_programa[index]["aplicado"])
+                        print(update_field.cronograma_programa[index]["produtos"])
+                        print("\n")
+
+                        if update_field.cronograma_programa[index]["aplicado"] == True:
+                            update_field.cronograma_programa[index]["aplicado"] = False
+                        if update_field.cronograma_programa[index]["aplicado"] == False:
+                            update_field.cronograma_programa[index]["aplicado"] = True
+                        update_field.save()
+                        updated = {
+                            "talhao": update_field.talhao.id_talhao,
+                            "estagio": update_field.cronograma_programa[index][
+                                "estagio"
+                            ],
+                            "situação": update_field.cronograma_programa[index][
+                                "aplicado"
+                            ],
+                        }
+                        list_updated.append(updated)
+                    except Exception as e:
+                        print("Erro ao atualizar a Ap no DB", e)
 
                 response = {
                     "msg": "Atualização realizada com sucesso!",
                     "data": params,
-                    # "result": result,
+                    "result": list_updated,
                 }
                 return Response(response, status=status.HTTP_200_OK)
             except Exception as e:

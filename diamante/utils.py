@@ -87,16 +87,15 @@ def get_index_dict_prod(lista_produtos, find_product):
 
 
 def get_index_dict_estagio(lista_programa, find_estagio):
-    # Lista Produtos: i.cronograma_programa[5]['produtos']
-    v4_prod = lista_programa
-    # ork = [ (x,n) for x,n in enumerate( v4_prod) if n['produto'] == 'ORKESTRA']
-    ork = [(x, n) for x, n in enumerate(v4_prod[1:]) if n["estagio"] == find_estagio]
-    if ork:
-        index = ork[0][0] + 1
-    else:
-        index = None
+    index = next(
+        (
+            i
+            for i, d in enumerate(lista_programa)
+            if "estagio" in d and d["estagio"] == find_estagio
+        ),
+        None,
+    )
     return index
-    # i.cronograma_programa[5]['produtos'][index] = {'dose': '0.600', 'tipo': 'fungicida', 'produto': 'OPERA', 'quantidade aplicar': calc_total(i.area_colheita, 0.600)}
 
 
 # for i in pl_rr:
