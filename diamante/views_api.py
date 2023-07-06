@@ -29,7 +29,7 @@ from .utils import (
 
 import qualidade_project.mongo_api as mongo_api
 
-from qualidade_project.settings import db_name
+# from qualidade_project.settings import db_name
 from .models import (
     Talhao,
     Projeto,
@@ -64,15 +64,6 @@ from rest_framework.decorators import api_view, permission_classes
 
 
 # --------------------- --------------------- START DEFENSIVOS MONGO API --------------------- --------------------- #
-
-
-def application_list(request):
-    try:
-        if request.method == "GET":
-            data = mongo_api.read_data_from_db(db_name)
-            return JsonResponse(data, safe=False)
-    except Exception as e:
-        print(f"Erro ao gerar a consulta - {e}")
 
 
 # --------------------- --------------------- END DEFENSIVOS MONGO API --------------------- --------------------- #
@@ -1769,24 +1760,24 @@ class PlantioViewSet(viewsets.ModelViewSet):
 
     # --------------------- ---------------------- PLANTIO UPDATE APLICATION FIELD API END --------------------- ----------------------#
 
-    @action(detail=False, methods=["GET"])
-    def get_new_information(self, request, pk=None):
-        if request.user.is_authenticated:
-            try:
-                print("successfull")
-                data = mongo_api.read_data_from_db(db_name)
-                response = {
-                    "msg": f"Consulta realizada com sucesso!!",
-                    "dados": data,
-                }
-                return Response(response, status=status.HTTP_200_OK)
-            except Exception as e:
-                print("error")
-                response = f"erro na requisição: {e}"
-                return Response(response, status=status.HTTP_400_BAD_REQUEST)
-        else:
-            response = {"message": "Você precisa estar logado!!!"}
-            return Response(response, status=status.HTTP_400_BAD_REQUEST)
+    # @action(detail=False, methods=["GET"])
+    # def get_new_information(self, request, pk=None):
+    #     if request.user.is_authenticated:
+    #         try:
+    #             print("successfull")
+    # data = mongo_api.read_data_from_db(db_name)
+    #             response = {
+    #                 "msg": f"Consulta realizada com sucesso!!",
+    #                 "dados": data,
+    #             }
+    #             return Response(response, status=status.HTTP_200_OK)
+    #         except Exception as e:
+    #             print("error")
+    #             response = f"erro na requisição: {e}"
+    #             return Response(response, status=status.HTTP_400_BAD_REQUEST)
+    #     else:
+    #         response = {"message": "Você precisa estar logado!!!"}
+    #         return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
 
 # --------------------- ---------------------- DEFENSIVOS API START --------------------- ----------------------#
