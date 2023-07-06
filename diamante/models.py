@@ -533,7 +533,7 @@ class Plantio(Base):
                 "id": self.id,
             }
         ]
-        qs = Operacao.objects.select_related("programa").all()
+        qs = Operacao.objects.select_related("programa").filter(ativo=True)
         qs = [x for x in qs if x.programa == self.programa]
         queryset = Aplicacao.objects.select_related("operacao").filter(
             operacao__programa=self.programa
@@ -579,7 +579,7 @@ class Plantio(Base):
                 "id": self.id,
             }
         ]
-        qs = Operacao.objects.select_related("programa").all()
+        qs = Operacao.objects.select_related("programa").filter(ativo=True)
         qs = [x for x in qs if x.programa == self.programa]
         queryset = Aplicacao.objects.select_related("operacao").filter(
             operacao__programa=self.programa

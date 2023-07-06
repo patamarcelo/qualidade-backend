@@ -9,6 +9,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 import json
 from django.http import JsonResponse
@@ -26,7 +27,9 @@ from .utils import (
     get_index_dict_estagio,
 )
 
+import qualidade_project.mongo_api as mongo_api
 
+from qualidade_project.settings import db_name
 from .models import (
     Talhao,
     Projeto,
@@ -55,6 +58,24 @@ import os
 from django.conf import settings
 from django.contrib.postgres.aggregates import ArrayAgg
 import math
+
+
+from rest_framework.decorators import api_view, permission_classes
+
+
+# --------------------- --------------------- START DEFENSIVOS MONGO API --------------------- --------------------- #
+
+
+def application_list(request):
+    try:
+        if request.method == "GET":
+            data = mongo_api.read_data_from_db(db_name)
+            return JsonResponse(data, safe=False)
+    except Exception as e:
+        print(f"Erro ao gerar a consulta - {e}")
+
+
+# --------------------- --------------------- END DEFENSIVOS MONGO API --------------------- --------------------- #
 
 
 # --------------------- --------------------- START TALHAO API --------------------- --------------------- #
@@ -582,7 +603,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             try:
                 # file = request.FILES["plantio_arroz"]
                 # file_ = open(os.path.join(settings.BASE_DIR, 'filename'))
-                date_file = "2023-07-05 13:50"
+                date_file = "2023-07-06 13:20"
                 with open(f"static/files/dataset-{date_file}.json") as user_file:
                     file_contents = user_file.read()
                     parsed_json = json.loads(file_contents)
@@ -1748,7 +1769,27 @@ class PlantioViewSet(viewsets.ModelViewSet):
 
     # --------------------- ---------------------- PLANTIO UPDATE APLICATION FIELD API END --------------------- ----------------------#
 
-    # --------------------- ---------------------- DEFENSIVOS API START --------------------- ----------------------#
+    @action(detail=False, methods=["GET"])
+    def get_new_information(self, request, pk=None):
+        if request.user.is_authenticated:
+            try:
+                print("successfull")
+                data = mongo_api.read_data_from_db(db_name)
+                response = {
+                    "msg": f"Consulta realizada com sucesso!!",
+                    "dados": data,
+                }
+                return Response(response, status=status.HTTP_200_OK)
+            except Exception as e:
+                print("error")
+                response = f"erro na requisição: {e}"
+                return Response(response, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            response = {"message": "Você precisa estar logado!!!"}
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+
+# --------------------- ---------------------- DEFENSIVOS API START --------------------- ----------------------#
 
 
 class DefensivoViewSet(viewsets.ModelViewSet):

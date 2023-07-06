@@ -14,6 +14,8 @@ from pathlib import Path
 import environ
 import os
 
+from .mongo_api import conect_mongo_db
+
 env = environ.Env()
 environ.Env.read_env()
 
@@ -23,7 +25,7 @@ PROJECT_ROOT = os.path.abspath(os.path.dirname(__file__))
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
+db_name = conect_mongo_db(env("MONGO_PASS_DEFENSIVOS"))
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.0/howto/deployment/checklist/
 
