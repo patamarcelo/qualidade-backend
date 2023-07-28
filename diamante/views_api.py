@@ -1051,6 +1051,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     )
                     .filter(safra__safra=safra_filter, ciclo__ciclo=cicle_filter)
                     .filter(finalizado_plantio=True)
+                    .filter(plantio_descontinuado=False)
                 )
 
                 response = {
@@ -1285,6 +1286,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     .filter(~Q(programa_id=None))
                     .filter(safra=safra, ciclo=ciclo)
                     .filter(Q(data_plantio=None))
+                    .filter(plantio_descontinuado=False)
                 )
                 qs_programas = Operacao.objects.values(
                     "estagio", "programa_id", "prazo_dap", "id"
@@ -1551,6 +1553,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     .filter(~Q(programa_id=None))
                     .filter(safra=safra, ciclo=ciclo)
                     .filter(data_plantio__isnull=False)
+                    .filter(plantio_descontinuado=False)
                 )
                 try:
                     result = [
