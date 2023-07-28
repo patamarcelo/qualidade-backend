@@ -272,6 +272,7 @@ class PlantioAdmin(admin.ModelAdmin, ExportCsvMixin):
                         "finalizado_colheita",
                         "data_prevista_colheita",
                     ),
+                    ("plantio_descontinuado",),
                 )
             },
         ),
@@ -319,7 +320,7 @@ class PlantioAdmin(admin.ModelAdmin, ExportCsvMixin):
         if obj.variedade:
             return obj.variedade.dias_ciclo
         else:
-            return 'Não Planejado'
+            return "Não Planejado"
 
     get_dias_ciclo.short_description = "Ciclo "
 

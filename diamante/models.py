@@ -474,6 +474,10 @@ class Plantio(Base):
 
     veiculos_carregados = models.IntegerField("Veículos Carregados / Talhao", default=0)
 
+    plantio_descontinuado = models.BooleanField(
+        "Plantio Descontinuado", default=False, help_text="Plantio interrompido ?"
+    )
+
     cronograma_programa = models.JSONField(null=True, blank=True)
     map_centro_id = models.JSONField(null=True, blank=True)
     map_geo_points = models.JSONField(null=True, blank=True)

@@ -281,169 +281,158 @@ class PlantioViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["POST"])
     def save_plantio_from_farmBox_json(self, request, pk=None):
         if request.user.is_authenticated:
-            print(request.data)
-            if request.data:
-                try:
-                    # file = request.FILES["plantio_arroz"]
-                    # file_ = open(os.path.join(settings.BASE_DIR, 'filename'))
-                    date_file = "2023-05-01"
-                    with open(f"static/files/dataset-{date_file}.json") as user_file:
-                        file_contents = user_file.read()
-                        parsed_json = json.loads(file_contents)
-                        new_list = parsed_json
-                    # DB CONSULT
-                    talhao_list = Talhao.objects.all()
-                    variedade_list = Variedade.objects.all()
-                    safra = Safra.objects.all()[1]
-                    ciclo_list = Ciclo.objects.all()
-                    projetos = Projeto.objects.all()
+            try:
+                # file = request.FILES["plantio_arroz"]
+                # file_ = open(os.path.join(settings.BASE_DIR, 'filename'))
+                date_file = "2023-07-26 09:36"
+                with open(f"static/files/dataset-{date_file}.json") as user_file:
+                    file_contents = user_file.read()
+                    parsed_json = json.loads(file_contents)
+                    new_list = parsed_json
+                # DB CONSULT
+                talhao_list = Talhao.objects.all()
+                variedade_list = Variedade.objects.all()
+                safra = Safra.objects.all()[1]
+                ciclo_list = Ciclo.objects.all()
+                projetos = Projeto.objects.all()
 
-                    area_total_1 = 0
-                    area_total_2 = 0
-                    area_total_3 = 0
-                    cultura_list = []
-                    ciclo_and_cultura = []
-                    ciclo_1 = {}
-                    ciclo_2 = {}
-                    ciclo_3 = {}
+                area_total_1 = 0
+                area_total_2 = 0
+                area_total_3 = 0
+                cultura_list = []
+                ciclo_and_cultura = []
+                ciclo_1 = {}
+                ciclo_2 = {}
+                ciclo_3 = {}
 
-                    for i in new_list:
-                        state = i["state"]
-                        date_plantio = i["date"]
-                        activation_date = ["activation_date"]
-                        parcela = i["name"].replace(" ", "")
-                        farm_name = i["farm_name"]
-                        variedade_name = i["variety_name"]
-                        area = i["area"]
+                for i in new_list:
+                    state = i["state"]
+                    date_plantio = i["date"]
+                    activation_date = ["activation_date"]
+                    parcela = i["name"].replace(" ", "")
+                    farm_name = i["farm_name"]
+                    variedade_name = i["variety_name"]
+                    area = i["area"]
 
-                        variedade_planejada = i["planned_variety_name"]
-                        cultura_planejada = i["planned_culture_name"]
+                    variedade_planejada = i["planned_variety_name"]
+                    cultura_planejada = i["planned_culture_name"]
 
-                        culture_id = i["culture_id"]
-                        variety_id = i["variety_id"]
-                        fazenda_id = i["farm"]["id"]
-                        variedade_planejada_id = i["planned_variety_id"]
-                        cultura_planejada_id = i["planned_culture_id"]
+                    culture_id = i["culture_id"]
+                    variety_id = i["variety_id"]
+                    fazenda_id = i["farm"]["id"]
+                    variedade_planejada_id = i["planned_variety_id"]
+                    cultura_planejada_id = i["planned_culture_id"]
 
-                        safra_farm = i["harvest_name"]
-                        ciclo_json = i["cycle"]
+                    safra_farm = i["harvest_name"]
+                    ciclo_json = i["cycle"]
 
-                        ciclo = ciclo_list[ciclo_json - 1]
+                    ciclo = ciclo_list[ciclo_json - 1]
 
-                        id_talhao = [
-                            x.id_d for x in projetos if x.id_farmbox == fazenda_id
-                        ][0]
+                    id_talhao = [
+                        x.id_d for x in projetos if x.id_farmbox == fazenda_id
+                    ][0]
+                    id_variedade = [
+                        x
+                        for x in variedade_list
+                        if x.id_farmbox == variedade_planejada_id
+                    ][0]
+
+                    if id_talhao:
+                        try:
+                            talhao_id = f"{id_talhao}{parcela}"
+                            talhao_id = [
+                                x for x in talhao_list if x.id_unico == talhao_id
+                            ][0]
+                        except Exception as e:
+                            print(f"id sem cadastro: {id_talhao}{parcela}")
+                    else:
+                        talhao_id = 0
+                    try:
+                        # variedade_id = [
+                        #     x for x in variedade_list if x.id == id_variedade
+                        # ][0]
                         id_variedade = [
                             x
                             for x in variedade_list
                             if x.id_farmbox == variedade_planejada_id
                         ][0]
-
-                        if id_talhao:
-                            try:
-                                talhao_id = f"{id_talhao}{parcela}"
-                                talhao_id = [
-                                    x for x in talhao_list if x.id_unico == talhao_id
-                                ][0]
-                            except Exception as e:
-                                print(f"id sem cadastro: {id_talhao}{parcela}")
-                        else:
-                            talhao_id = 0
+                    except Exception as e:
+                        print(
+                            f"{Fore.RED}variedade sem cadastro: {id_variedade}{Style.RESET_ALL}"
+                        )
+                    if cultura_planejada:
                         try:
-                            # variedade_id = [
-                            #     x for x in variedade_list if x.id == id_variedade
-                            # ][0]
-                            id_variedade = [
-                                x
-                                for x in variedade_list
-                                if x.id_farmbox == variedade_planejada_id
-                            ][0]
+                            novo_plantio = Plantio(
+                                safra=safra,
+                                ciclo=ciclo,
+                                talhao=talhao_id,
+                                variedade=id_variedade,
+                                area_colheita=area,
+                                # data_plantio=data_plantio,
+                            )
+
+                            novo_plantio.save()
+                            print(
+                                f"{Fore.GREEN}Novo Plantio salvo com sucesso: {novo_plantio}{Style.RESET_ALL}"
+                            )
+                            # print(
+                            #     f"{Fore.GREEN}Safra/Ciclo: {safra}-{ciclo} - Estado: {state} - Data Plantio: {date_plantio} - Parcela: {parcela} {Style.RESET_ALL}- Fazenda: {farm_name} - Cultura Planejada: {cultura_planejada} Variedade Planejada: {variedade_planejada}|{id_variedade} - Area: {area} - Cultura_ID: {culture_id} - Variedade_planejada_id: {variedade_planejada_id} - Fazenda_ID: {fazenda_id}"
+                            # )
+                            # print(
+                            #     f"{Fore.YELLOW}Safra:{safra}-Ciclo:{ciclo} - Parcela: {talhao_id} - Variedade: {id_variedade} - area: {area}{Style.RESET_ALL}"
+                            # )
+                            print("\n")
                         except Exception as e:
                             print(
-                                f"{Fore.RED}variedade sem cadastro: {id_variedade}{Style.RESET_ALL}"
+                                f"{Fore.RED}Problema em salvar o plantio: {id_variedade}{Style.RESET_ALL}{e}"
                             )
-                        if cultura_planejada:
-                            try:
-                                novo_plantio = Plantio(
-                                    safra=safra,
-                                    ciclo=ciclo,
-                                    talhao=talhao_id,
-                                    variedade=id_variedade,
-                                    area_colheita=area,
-                                    # data_plantio=data_plantio,
-                                )
+                        if ciclo_json == 1:
+                            if ciclo_1.get(cultura_planejada):
+                                area_total = ciclo_1.get(cultura_planejada) + area
+                                ciclo_1.update({cultura_planejada: round(area_total)})
+                            else:
+                                ciclo_1.update({cultura_planejada: round(area)})
+                        if ciclo_json == 2:
+                            if ciclo_2.get(cultura_planejada):
+                                area_total = ciclo_2.get(cultura_planejada) + area
+                                ciclo_2.update({cultura_planejada: round(area_total)})
+                            else:
+                                ciclo_2.update({cultura_planejada: round(area)})
+                        if ciclo_json == 3:
+                            if ciclo_3.get(cultura_planejada):
+                                area_total = ciclo_3.get(cultura_planejada) + area
+                                ciclo_3.update({cultura_planejada: round(area_total)})
+                            else:
+                                ciclo_3.update({cultura_planejada: round(area)})
 
-                                novo_plantio.save()
-                                print(
-                                    f"{Fore.GREEN}Novo Plantio salvo com sucesso: {novo_plantio}{Style.RESET_ALL}"
-                                )
-                                # print(
-                                #     f"{Fore.GREEN}Safra/Ciclo: {safra}-{ciclo} - Estado: {state} - Data Plantio: {date_plantio} - Parcela: {parcela} {Style.RESET_ALL}- Fazenda: {farm_name} - Cultura Planejada: {cultura_planejada} Variedade Planejada: {variedade_planejada}|{id_variedade} - Area: {area} - Cultura_ID: {culture_id} - Variedade_planejada_id: {variedade_planejada_id} - Fazenda_ID: {fazenda_id}"
-                                # )
-                                # print(
-                                #     f"{Fore.YELLOW}Safra:{safra}-Ciclo:{ciclo} - Parcela: {talhao_id} - Variedade: {id_variedade} - area: {area}{Style.RESET_ALL}"
-                                # )
-                                print("\n")
-                            except Exception as e:
-                                print(
-                                    f"{Fore.RED}Problema em salvar o plantio: {id_variedade}{Style.RESET_ALL}{e}"
-                                )
-                            if ciclo_json == 1:
-                                if ciclo_1.get(cultura_planejada):
-                                    area_total = ciclo_1.get(cultura_planejada) + area
-                                    ciclo_1.update(
-                                        {cultura_planejada: round(area_total)}
-                                    )
-                                else:
-                                    ciclo_1.update({cultura_planejada: round(area)})
-                            if ciclo_json == 2:
-                                if ciclo_2.get(cultura_planejada):
-                                    area_total = ciclo_2.get(cultura_planejada) + area
-                                    ciclo_2.update(
-                                        {cultura_planejada: round(area_total)}
-                                    )
-                                else:
-                                    ciclo_2.update({cultura_planejada: round(area)})
-                            if ciclo_json == 3:
-                                if ciclo_3.get(cultura_planejada):
-                                    area_total = ciclo_3.get(cultura_planejada) + area
-                                    ciclo_3.update(
-                                        {cultura_planejada: round(area_total)}
-                                    )
-                                else:
-                                    ciclo_3.update({cultura_planejada: round(area)})
+                print(f"Area Total da Soja Ciclo 1: {area_total_1}")
+                print(f"Area Total da Soja Ciclo 2: {area_total_2}")
+                print(f"Area Total da Soja Ciclo 3: {area_total_3}")
 
-                    print(f"Area Total da Soja Ciclo 1: {area_total_1}")
-                    print(f"Area Total da Soja Ciclo 2: {area_total_2}")
-                    print(f"Area Total da Soja Ciclo 3: {area_total_3}")
-
-                    print(set(cultura_list))
-                    print("Ciclo 1")
-                    for k, v in ciclo_1.items():
-                        print(f"Cultura: {k} - Area: {v}")
-                    print("Ciclo 2")
-                    for k, v in ciclo_2.items():
-                        print(f"Cultura: {k} - Area: {v}")
-                    print("Ciclo 3")
-                    for k, v in ciclo_3.items():
-                        print(f"Cultura: {k} - Area: {v}")
-                    qs_plantio = Plantio.objects.filter(safra__safra="2023/2024")
-                    total_plantado = Plantio.objects.filter(
-                        safra__safra="2023/2024"
-                    ).aggregate(Sum("area_colheita"))
-                    serializer_plantio = PlantioSerializer(qs_plantio, many=True)
-                    response = {
-                        "msg": f"Consulta realizada com sucesso!!",
-                        "total_return": len(qs_plantio),
-                        "Area Total dos Talhoes Plantados": total_plantado,
-                        "dados": serializer_plantio.data,
-                    }
-                    return Response(response, status=status.HTTP_200_OK)
-                except Exception as e:
-                    response = {"message": f"Ocorreu um Erro: {e}"}
-                    return Response(response, status=status.HTTP_400_BAD_REQUEST)
-            else:
-                response = {"message": "Arquivo desconhecido"}
+                print(set(cultura_list))
+                print("Ciclo 1")
+                for k, v in ciclo_1.items():
+                    print(f"Cultura: {k} - Area: {v}")
+                print("Ciclo 2")
+                for k, v in ciclo_2.items():
+                    print(f"Cultura: {k} - Area: {v}")
+                print("Ciclo 3")
+                for k, v in ciclo_3.items():
+                    print(f"Cultura: {k} - Area: {v}")
+                qs_plantio = Plantio.objects.filter(safra__safra="2023/2024")
+                total_plantado = Plantio.objects.filter(
+                    safra__safra="2023/2024"
+                ).aggregate(Sum("area_colheita"))
+                serializer_plantio = PlantioSerializer(qs_plantio, many=True)
+                response = {
+                    "msg": f"Consulta realizada com sucesso!!",
+                    "total_return": len(qs_plantio),
+                    "Area Total dos Talhoes Plantados": total_plantado,
+                    "dados": serializer_plantio.data,
+                }
+                return Response(response, status=status.HTTP_200_OK)
+            except Exception as e:
+                response = {"message": f"Ocorreu um Erro: {e}"}
                 return Response(response, status=status.HTTP_400_BAD_REQUEST)
         else:
             response = {"message": "Você precisa estar logado!!!"}
@@ -594,7 +583,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             try:
                 # file = request.FILES["plantio_arroz"]
                 # file_ = open(os.path.join(settings.BASE_DIR, 'filename'))
-                date_file = "2023-07-06 13:20"
+                date_file = "2023-07-26 09:36"
                 with open(f"static/files/dataset-{date_file}.json") as user_file:
                     file_contents = user_file.read()
                     parsed_json = json.loads(file_contents)
@@ -701,7 +690,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 field_to_update.variedade = id_variedade
                             field_to_update.save()
                             print(
-                                f"{Fore.GREEN}Plantio Alterado com sucesso: {field_to_update}{Style.RESET_ALL}"
+                                f"{Fore.GREEN}Plantio Alterado com sucesso: {field_to_update} - {safra} - {ciclo} - {Style.RESET_ALL}"
                             )
                             print("\n")
                             count_total += 1
