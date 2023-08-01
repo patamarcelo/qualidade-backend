@@ -384,24 +384,73 @@ class PlantioAdmin(admin.ModelAdmin, ExportCsvMixin):
 
 @admin.register(Colheita)
 class ColheitaAdmin(admin.ModelAdmin):
+    def get_queryset(self, request):
+        return (
+            super(ColheitaAdmin, self)
+            .get_queryset(request)
+            .select_related(
+                "plantio", "deposito", "plantio__talhao", "plantio__talhao__fazenda"
+            )
+        )
+
     list_display = (
-        "data_colheita",
         "romaneio",
-        "placa",
-        "motorista",
-        "deposito",
+        "get_data_colheita",
+        "get_placa",
+        "get_nome_motorista",
+        "get_projeto_origem",
+        "get_projeto_parcela",
+        "get_nome_fantasia",
         "ticket",
         "op",
-        "peso_tara",
         "peso_bruto",
+        "peso_tara",
         "umidade",
         "impureza",
         "peso_liquido",
+        "peso_scs_liquido",
     )
 
     raw_id_fields = ["plantio"]
 
+    readonly_fields = ("peso_liquido", "peso_scs_liquido")
+
     ordering = ("data_colheita",)
+
+    def get_data_colheita(self, obj):
+        if obj.data_colheita:
+            return date_format(
+                obj.data_colheita, format="SHORT_DATE_FORMAT", use_l10n=True
+            )
+        else:
+            return " - "
+
+    get_data_colheita.short_description = "Data"
+
+    def get_nome_fantasia(self, obj):
+        return obj.deposito.nome_fantasia
+
+    get_nome_fantasia.short_description = "Depósito"
+
+    def get_nome_motorista(self, obj):
+        return obj.motorista.upper()
+
+    get_nome_motorista.short_description = "Motorista"
+
+    def get_placa(self, obj):
+        return f"{obj.placa[0:3]}-{obj.placa[3:]}"
+
+    get_placa.short_description = "Placa"
+
+    def get_projeto_origem(self, obj):
+        return obj.plantio.talhao.fazenda.nome
+
+    get_projeto_origem.short_description = "Origem"
+
+    def get_projeto_parcela(self, obj):
+        return obj.plantio.talhao.id_talhao
+
+    get_projeto_parcela.short_description = "Parcela"
 
     # def talhao_description(self, obj):
     #     return obj.plantio.talhao.id_talhao

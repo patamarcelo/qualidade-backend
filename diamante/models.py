@@ -30,6 +30,14 @@ class Base(models.Model):
 class Deposito(Base):
     nome = models.CharField("Nome", max_length=100, help_text="Depósito", unique=True)
     id_d = models.PositiveIntegerField("ID_D", unique=True)
+    nome_fantasia = models.CharField(
+        "Nome Fantasia",
+        max_length=100,
+        help_text="Depósito / Fantasia",
+        unique=True,
+        blank=True,
+        null=True,
+    )
 
     class Meta:
         ordering = ["nome"]
@@ -723,6 +731,15 @@ class Colheita(Base):
         null=True,
     )
 
+    peso_scs_liquido = models.DecimalField(
+        "Sacos Liquido",
+        help_text="Peso Líquido Calculado em Sacos de 60Kg",
+        max_digits=8,
+        decimal_places=2,
+        blank=True,
+        null=True,
+    )
+
     deposito = models.ForeignKey(Deposito, on_delete=models.PROTECT)
 
     # @property
@@ -735,14 +752,36 @@ class Colheita(Base):
 
     def save(self, *args, **kwargs):
         if self.pk is None:
-            peso_liquido = self.peso_bruto - self.peso_tara
+            self.peso_liquido = decimal.Decimal(self.peso_bruto - self.peso_tara)
+            desc_impureza = 0
+            desc_umidade = 0
             if self.umidade:
-                desc_umidade = 0
-                peso_liquido -= desc_umidade
+                peso_liquido = decimal.Decimal(self.peso_bruto - self.peso_tara)
+                if self.umidade > 14:
+                    unit_d = decimal.Decimal(14 / 1000)
+                    desc_umidade = (
+                        ((self.umidade - 14) * 100 * unit_d) * peso_liquido / 100
+                    )
             if self.impureza:
-                desc_impureza = 0
-                peso_liquido -= desc_impureza
-            self.peso_liquido = peso_liquido
+                peso_liquido = decimal.Decimal(self.peso_bruto - self.peso_tara)
+                desc_impureza = (peso_liquido * self.impureza) / 100
+        if self.pk and self.impureza:
+            peso_liquido = decimal.Decimal(self.peso_bruto - self.peso_tara)
+            desc_impureza = (peso_liquido * self.impureza) / 100
+            print(desc_impureza)
+        if self.pk and self.umidade:
+            peso_liquido = decimal.Decimal(self.peso_bruto - self.peso_tara)
+            if self.umidade > 14:
+                unit_d = decimal.Decimal(14 / 1000)
+                desc_umidade = ((self.umidade - 14) * 100 * unit_d) * peso_liquido / 100
+                print(desc_umidade)
+
+        self.peso_liquido = (
+            decimal.Decimal(self.peso_bruto - self.peso_tara)
+            - desc_impureza
+            - desc_umidade
+        )
+        self.peso_scs_liquido = self.peso_liquido / 60
         super(Colheita, self).save(*args, **kwargs)
 
     class Meta:
