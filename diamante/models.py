@@ -11,6 +11,8 @@ from .utils import format_date_json
 import decimal
 
 connection.queries
+from django.core.validators import RegexValidator, MinLengthValidator
+
 
 # Create your models here.
 
@@ -679,12 +681,21 @@ class Plantio(Base):
 
 
 class Colheita(Base):
+    AlphanumericValidator = RegexValidator(
+        r"^[0-9a-zA-Z]*$", "Somente letras e números permitido."
+    )
+
     plantio = models.ForeignKey(Plantio, on_delete=models.PROTECT)
     data_colheita = models.DateField(help_text="dd/mm/aaaa", blank=True, null=True)
     romaneio = models.CharField(
         "Romaneio", max_length=40, help_text="Número do Romaneio"
     )
-    placa = models.CharField("Placa", max_length=40, help_text="Placa do Veículo")
+    placa = models.CharField(
+        "Placa",
+        max_length=7,
+        help_text="Placa do Veículo",
+        validators=[AlphanumericValidator, MinLengthValidator(7)],
+    )
     motorista = models.CharField(
         "Nome Motorista", max_length=40, help_text="Nome do Motorista"
     )
@@ -794,4 +805,4 @@ class Colheita(Base):
         verbose_name_plural = "Colheitas"
 
     def __str__(self):
-        return f"{self.romaneio} | {self.plantio.talhao.id_talhao} | {self.plantio.talhao.fazenda.nome} | {str(self.peso_liquido)}"
+        return f"{self.romaneio} | {self.plantio.talhao.id_talhao} | {self.plantio.talhao.fazenda.nome} | {str(round(self.peso_liquido,2))}"
