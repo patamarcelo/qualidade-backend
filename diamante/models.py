@@ -681,18 +681,48 @@ class Colheita(Base):
         "Nome Motorista", max_length=40, help_text="Nome do Motorista"
     )
 
-    peso_umido = models.DecimalField(
-        "Peso Úmido",
-        help_text="Peso Líquido Antes dos descontos",
-        max_digits=14,
-        decimal_places=2,
+    ticket = models.CharField(
+        "Ticket", max_length=20, blank=True, null=True, unique=True
     )
+    op = models.CharField("OP", max_length=20, blank=True, null=True, unique=True)
+
+    peso_tara = models.PositiveIntegerField(
+        "Peso Tara",
+        help_text="Informe o Peso Tara do Veículo",
+    )
+
+    peso_bruto = models.PositiveIntegerField(
+        "Peso Bruto",
+        help_text="Informe o Peso Bruto do Veículo",
+    )
+
+    umidade = models.DecimalField(
+        "Umidade",
+        help_text="Informa a Umidade da Carga",
+        max_digits=4,
+        decimal_places=2,
+        blank=True,
+        null=True,
+    )
+
+    impureza = models.DecimalField(
+        "Impureza",
+        help_text="Informa a impureza da Carga",
+        max_digits=4,
+        decimal_places=2,
+        blank=True,
+        null=True,
+    )
+
     peso_liquido = models.DecimalField(
-        "Peso Líquido",
-        help_text="Peso Líquido Depois dos descontos",
-        max_digits=14,
+        "Peso Liquido",
+        help_text="Peso Líquido Calculado",
+        max_digits=8,
         decimal_places=2,
+        blank=True,
+        null=True,
     )
+
     deposito = models.ForeignKey(Deposito, on_delete=models.PROTECT)
 
     # @property
@@ -702,6 +732,18 @@ class Colheita(Base):
     # @property
     # def peso_saco_liquido(self):
     #     return self.peso_liquido / 60
+
+    def save(self, *args, **kwargs):
+        if self.pk is None:
+            peso_liquido = self.peso_bruto - self.peso_tara
+            if self.umidade:
+                desc_umidade = 0
+                peso_liquido -= desc_umidade
+            if self.impureza:
+                desc_impureza = 0
+                peso_liquido -= desc_impureza
+            self.peso_liquido = peso_liquido
+        super(Colheita, self).save(*args, **kwargs)
 
     class Meta:
         unique_together = (

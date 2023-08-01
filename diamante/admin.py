@@ -244,7 +244,7 @@ class PlantioAdmin(admin.ModelAdmin, ExportCsvMixin):
             "Dados",
             {
                 "fields": (
-                    ("get_data_plantio", "get_dap_description"),
+                    ("get_data_plantio", "get_dap_description", "get_talhao__id_unico"),
                     (
                         "talhao",
                         "ativo",
@@ -286,9 +286,15 @@ class PlantioAdmin(admin.ModelAdmin, ExportCsvMixin):
         "modificado",
         "get_dap_description",
         "get_data_plantio",
+        "get_talhao__id_unico",
     )
 
     ordering = ("data_plantio",)
+
+    def get_talhao__id_unico(self, obj):
+        return obj.talhao.id_unico
+
+    get_talhao__id_unico.short_description = "ID Talhao"
 
     def get_cronograma_programa(self, obj=None):
         result = ""
@@ -383,9 +389,14 @@ class ColheitaAdmin(admin.ModelAdmin):
         "romaneio",
         "placa",
         "motorista",
-        "peso_umido",
-        "peso_liquido",
         "deposito",
+        "ticket",
+        "op",
+        "peso_tara",
+        "peso_bruto",
+        "umidade",
+        "impureza",
+        "peso_liquido",
     )
 
     raw_id_fields = ["plantio"]
