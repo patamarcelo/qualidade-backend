@@ -717,8 +717,17 @@ class Colheita(Base):
 
     umidade = models.DecimalField(
         "Umidade",
-        help_text="Informa a Umidade da Carga",
+        help_text="Informe a Umidade da Carga",
         max_digits=4,
+        decimal_places=2,
+        blank=True,
+        null=True,
+    )
+
+    desconto_umidade = models.DecimalField(
+        "Desc. Umidade",
+        help_text="Desconto Umidade Calculado",
+        max_digits=8,
         decimal_places=2,
         blank=True,
         null=True,
@@ -726,8 +735,17 @@ class Colheita(Base):
 
     impureza = models.DecimalField(
         "Impureza",
-        help_text="Informa a impureza da Carga",
+        help_text="Informe a impureza da Carga",
         max_digits=4,
+        decimal_places=2,
+        blank=True,
+        null=True,
+    )
+
+    desconto_impureza = models.DecimalField(
+        "Desc. Impureza",
+        help_text="Desconto Impureza Calculado",
+        max_digits=8,
         decimal_places=2,
         blank=True,
         null=True,
@@ -762,10 +780,9 @@ class Colheita(Base):
     #     return self.peso_liquido / 60
 
     def save(self, *args, **kwargs):
+        desc_impureza = 0
+        desc_umidade = 0
         if self.pk is None:
-            self.peso_liquido = decimal.Decimal(self.peso_bruto - self.peso_tara)
-            desc_impureza = 0
-            desc_umidade = 0
             if self.umidade:
                 peso_liquido = decimal.Decimal(self.peso_bruto - self.peso_tara)
                 if self.umidade > 14:
@@ -787,6 +804,8 @@ class Colheita(Base):
                 desc_umidade = ((self.umidade - 14) * 100 * unit_d) * peso_liquido / 100
                 print(desc_umidade)
 
+        self.desconto_impureza = desc_impureza
+        self.desconto_umidade = desc_umidade
         self.peso_liquido = (
             decimal.Decimal(self.peso_bruto - self.peso_tara)
             - desc_impureza

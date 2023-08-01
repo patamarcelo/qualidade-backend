@@ -393,6 +393,41 @@ class ColheitaAdmin(admin.ModelAdmin):
             )
         )
 
+    fieldsets = (
+        (
+            "Dados",
+            {
+                "fields": (
+                    ("ativo",),
+                    ("criados", "modificado"),
+                )
+            },
+        ),
+        (
+            "Carga",
+            {
+                "fields": (
+                    # ("get_projeto_origem", "get_projeto_parcela", "get_nome_fantasia"),
+                    ("plantio",),
+                    ("data_colheita",),
+                    ("placa", "motorista"),
+                    ("ticket", "op"),
+                    ("peso_bruto", "peso_tara"),
+                    ("peso_liquido", "peso_scs_liquido"),
+                )
+            },
+        ),
+        (
+            "Descontos",
+            {
+                "fields": (
+                    ("umidade", "desconto_umidade"),
+                    ("impureza", "desconto_impureza"),
+                )
+            },
+        ),
+    )
+
     list_display = (
         "romaneio",
         "get_data_colheita",
@@ -406,14 +441,23 @@ class ColheitaAdmin(admin.ModelAdmin):
         "peso_bruto",
         "peso_tara",
         "umidade",
+        "desconto_umidade",
         "impureza",
+        "desconto_impureza",
         "peso_liquido",
         "peso_scs_liquido",
     )
 
     raw_id_fields = ["plantio"]
 
-    readonly_fields = ("peso_liquido", "peso_scs_liquido")
+    readonly_fields = (
+        "peso_liquido",
+        "peso_scs_liquido",
+        "desconto_umidade",
+        "desconto_impureza",
+        "criados",
+        "modificado",
+    )
 
     ordering = ("data_colheita",)
 
