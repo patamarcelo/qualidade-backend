@@ -793,16 +793,24 @@ class Colheita(Base):
             if self.impureza:
                 peso_liquido = decimal.Decimal(self.peso_bruto - self.peso_tara)
                 desc_impureza = (peso_liquido * self.impureza) / 100
-        if self.pk and self.impureza:
-            peso_liquido = decimal.Decimal(self.peso_bruto - self.peso_tara)
-            desc_impureza = (peso_liquido * self.impureza) / 100
-            print(desc_impureza)
-        if self.pk and self.umidade:
-            peso_liquido = decimal.Decimal(self.peso_bruto - self.peso_tara)
-            if self.umidade > 14:
-                unit_d = decimal.Decimal(14 / 1000)
-                desc_umidade = ((self.umidade - 14) * 100 * unit_d) * peso_liquido / 100
-                print(desc_umidade)
+        if self.pk is not None:
+            orig = Colheita.objects.get(pk=self.pk)
+            if self.impureza != orig.impureza:
+                print("salvando a impureza")
+                if self.pk and self.impureza:
+                    peso_liquido = decimal.Decimal(self.peso_bruto - self.peso_tara)
+                    desc_impureza = (peso_liquido * self.impureza) / 100
+                    print(desc_impureza)
+            if self.umidade != orig.umidade:
+                print("salvando a umidade")
+                if self.pk and self.umidade:
+                    peso_liquido = decimal.Decimal(self.peso_bruto - self.peso_tara)
+                    if self.umidade > 14:
+                        unit_d = decimal.Decimal(14 / 1000)
+                        desc_umidade = (
+                            ((self.umidade - 14) * 100 * unit_d) * peso_liquido / 100
+                        )
+                        print(desc_umidade)
 
         self.desconto_impureza = desc_impureza
         self.desconto_umidade = desc_umidade
@@ -815,10 +823,7 @@ class Colheita(Base):
         super(Colheita, self).save(*args, **kwargs)
 
     class Meta:
-        unique_together = (
-            "plantio",
-            "romaneio",
-        )
+        unique_together = ("plantio", "romaneio", "ticket")
         ordering = ["data_colheita"]
         verbose_name = "Colheita"
         verbose_name_plural = "Colheitas"

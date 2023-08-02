@@ -268,9 +268,10 @@ class PlantioAdmin(admin.ModelAdmin, ExportCsvMixin):
                         "data_plantio",
                         "data_emergencia",
                     ),
+                    ("data_prevista_colheita",),
                     (
+                        "area_parcial",
                         "finalizado_colheita",
-                        "data_prevista_colheita",
                     ),
                     ("plantio_descontinuado",),
                 )
@@ -389,7 +390,13 @@ class ColheitaAdmin(admin.ModelAdmin):
             super(ColheitaAdmin, self)
             .get_queryset(request)
             .select_related(
-                "plantio", "deposito", "plantio__talhao", "plantio__talhao__fazenda"
+                "plantio",
+                "deposito",
+                "plantio__talhao",
+                "plantio__talhao__fazenda",
+                "plantio__variedade",
+                "plantio__safra",
+                "plantio__ciclo",
             )
         )
 
@@ -407,9 +414,8 @@ class ColheitaAdmin(admin.ModelAdmin):
             "Carga",
             {
                 "fields": (
-                    # ("get_projeto_origem", "get_projeto_parcela", "get_nome_fantasia"),
-                    ("plantio",),
-                    ("data_colheita",),
+                    ("plantio", "deposito"),
+                    ("data_colheita", "romaneio"),
                     ("placa", "motorista"),
                     ("ticket", "op"),
                     ("peso_bruto", "peso_tara"),
@@ -433,6 +439,7 @@ class ColheitaAdmin(admin.ModelAdmin):
         "get_data_colheita",
         "get_placa",
         "get_nome_motorista",
+        "get_plantio_variedade",
         "get_projeto_origem",
         "get_projeto_parcela",
         "get_nome_fantasia",
@@ -457,6 +464,23 @@ class ColheitaAdmin(admin.ModelAdmin):
         "desconto_impureza",
         "criados",
         "modificado",
+    )
+
+    search_fields = [
+        "romaneio",
+        "placa",
+        "motorista",
+        "plantio__talhao__id_unico",
+        "plantio__talhao__fazenda__nome",
+        "plantio__talhao__fazenda__fazenda__nome",
+        "plantio__variedade__variedade",
+    ]
+
+    list_filter = (
+        "plantio__safra__safra",
+        "plantio__ciclo__ciclo",
+        "plantio__talhao__fazenda__nome",
+        "plantio__variedade__variedade",
     )
 
     ordering = ("data_colheita",)
@@ -490,6 +514,11 @@ class ColheitaAdmin(admin.ModelAdmin):
         return obj.plantio.talhao.fazenda.nome
 
     get_projeto_origem.short_description = "Origem"
+
+    def get_plantio_variedade(self, obj):
+        return obj.plantio.variedade.variedade
+
+    get_plantio_variedade.short_description = "Variedade"
 
     def get_projeto_parcela(self, obj):
         return obj.plantio.talhao.id_talhao
