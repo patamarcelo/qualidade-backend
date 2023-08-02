@@ -392,11 +392,14 @@ def export_cargas(modeladmin, request, queryset):
     writer.writerow(
         [
             "Romaneio",
+            "Data",
             "Ticket",
             "OP",
             "Origem",
             "Destino",
             "Parcela",
+            "Cultura",
+            "Variedade",
             "Placa",
             "Motorista",
             "Peso Tara",
@@ -410,11 +413,14 @@ def export_cargas(modeladmin, request, queryset):
     )
     cargas = queryset.values_list(
         "romaneio",
+        "data_colheita",
         "ticket",
         "op",
         "plantio__talhao__fazenda__nome",
         "deposito__nome_fantasia",
         "plantio__talhao__id_talhao",
+        "plantio__variedade__variedade",
+        "plantio__variedade__cultura__cultura",
         "placa",
         "motorista",
         "peso_tara",
@@ -427,11 +433,11 @@ def export_cargas(modeladmin, request, queryset):
     )
     for carga in cargas:
         cargas_detail = list(carga)
-        cargas_detail[10] = str(carga[10]).replace(".", ",")
-        cargas_detail[11] = str(carga[11]).replace(".", ",")
-        cargas_detail[12] = str(carga[12]).replace(".", ",")
         cargas_detail[13] = str(carga[13]).replace(".", ",")
         cargas_detail[14] = str(carga[14]).replace(".", ",")
+        cargas_detail[15] = str(carga[15]).replace(".", ",")
+        cargas_detail[16] = str(carga[16]).replace(".", ",")
+        cargas_detail[17] = str(carga[17]).replace(".", ",")
         carga = tuple(cargas_detail)
         writer.writerow(carga)
     return response
