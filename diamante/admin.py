@@ -623,6 +623,15 @@ class ProgramaAdmin(admin.ModelAdmin):
         "end_date_description",
     )
 
+    search_fields = [
+        "nome",
+    ]
+
+    list_filter = (
+        "safra__safra",
+        "ciclo__ciclo",
+    )
+
     ordering = ("safra", "ciclo")
 
     def safra_description(self, obj):
