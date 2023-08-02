@@ -22,6 +22,7 @@ from django_json_widget.widgets import JSONEditorWidget
 
 import csv
 from django.http import HttpResponse
+import codecs
 
 
 # class PlantioDetailView(LoginRequiredMixin, DetailView):
@@ -383,6 +384,62 @@ class PlantioAdmin(admin.ModelAdmin, ExportCsvMixin):
     # talhao_description.short_description = "Parcela"
 
 
+def export_cargas(modeladmin, request, queryset):
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = 'attachment; filename="Cargas.csv"'
+    # response.write(codecs.BOM_UTF8)
+    writer = csv.writer(response, delimiter=";")
+    writer.writerow(
+        [
+            "Romaneio",
+            "Ticket",
+            "OP",
+            "Origem",
+            "Destino",
+            "Parcela",
+            "Placa",
+            "Motorista",
+            "Peso Tara",
+            "Peso Bruto",
+            "Umidade",
+            "Desc. Umidade",
+            "Impureza",
+            "Desc. Impureza",
+            "Peso Liquido",
+        ]
+    )
+    cargas = queryset.values_list(
+        "romaneio",
+        "ticket",
+        "op",
+        "plantio__talhao__fazenda__nome",
+        "deposito__nome_fantasia",
+        "plantio__talhao__id_talhao",
+        "placa",
+        "motorista",
+        "peso_tara",
+        "peso_bruto",
+        "umidade",
+        "desconto_umidade",
+        "impureza",
+        "desconto_impureza",
+        "peso_liquido",
+    )
+    for carga in cargas:
+        cargas_detail = list(carga)
+        cargas_detail[10] = str(carga[10]).replace(".", ",")
+        cargas_detail[11] = str(carga[11]).replace(".", ",")
+        cargas_detail[12] = str(carga[12]).replace(".", ",")
+        cargas_detail[13] = str(carga[13]).replace(".", ",")
+        cargas_detail[14] = str(carga[14]).replace(".", ",")
+        carga = tuple(cargas_detail)
+        writer.writerow(carga)
+    return response
+
+
+export_cargas.short_description = "Export to csv"
+
+
 @admin.register(Colheita)
 class ColheitaAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
@@ -400,6 +457,9 @@ class ColheitaAdmin(admin.ModelAdmin):
             )
         )
 
+    actions = [
+        export_cargas,
+    ]
     fieldsets = (
         (
             "Dados",
