@@ -284,7 +284,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             try:
                 # file = request.FILES["plantio_arroz"]
                 # file_ = open(os.path.join(settings.BASE_DIR, 'filename'))
-                date_file = "2023-07-26 09:36"
+                date_file = "2023-08-04 08:01"
                 with open(f"static/files/dataset-{date_file}.json") as user_file:
                     file_contents = user_file.read()
                     parsed_json = json.loads(file_contents)
@@ -322,6 +322,9 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     fazenda_id = i["farm"]["id"]
                     variedade_planejada_id = i["planned_variety_id"]
                     cultura_planejada_id = i["planned_culture_id"]
+
+                    map_centro_id_farm = i["centroid"]
+                    map_geo_points_farm = i["geo_points"]
 
                     safra_farm = i["harvest_name"]
                     ciclo_json = i["cycle"]
@@ -368,6 +371,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 talhao=talhao_id,
                                 variedade=id_variedade,
                                 area_colheita=area,
+                                map_centro_id=map_centro_id_farm,
+                                map_geo_points=map_geo_points_farm
                                 # data_plantio=data_plantio,
                             )
 
@@ -583,7 +588,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             try:
                 # file = request.FILES["plantio_arroz"]
                 # file_ = open(os.path.join(settings.BASE_DIR, 'filename'))
-                date_file = "2023-08-01 06:58"
+                date_file = "2023-08-04 08:01"
                 with open(f"static/files/dataset-{date_file}.json") as user_file:
                     file_contents = user_file.read()
                     parsed_json = json.loads(file_contents)
@@ -628,6 +633,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     id_talhao = [
                         x.id_d for x in projetos if x.id_farmbox == fazenda_id
                     ][0]
+
                     id_variedade = [
                         x
                         for x in variedade_list
@@ -1019,6 +1025,9 @@ class PlantioViewSet(viewsets.ModelViewSet):
             try:
                 safra_filter = request.data["safra"]
                 cicle_filter = request.data["ciclo"]
+
+                print(safra_filter)
+                print(cicle_filter)
                 # safra_filter = request.POST.get("safra")
                 # cicle_filter = request.POST.get("ciclo")
                 # print(safra_from_request, ciclo_from_request)
@@ -1045,12 +1054,15 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         "map_centro_id",
                         "map_geo_points",
                         "cronograma_programa__0",
+                        "finalizado_plantio",
+                        "finalizado_colheita",
+                        "plantio_descontinuado",
                     )
                     .order_by(
                         "data_plantio", "talhao__fazenda__nome", "talhao__id_talhao"
                     )
                     .filter(safra__safra=safra_filter, ciclo__ciclo=cicle_filter)
-                    .filter(finalizado_plantio=True)
+                    # .filter(finalizado_plantio=True)
                     .filter(plantio_descontinuado=False)
                 )
 

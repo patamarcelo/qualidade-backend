@@ -682,7 +682,7 @@ class OperacaoAdmin(admin.ModelAdmin):
     list_display = (
         "programa",
         "estagio",
-        "prazo_dap",
+        "get_prazo_dap",
         "get_cultura_description",
         "get_obs_description",
     )
@@ -697,6 +697,11 @@ class OperacaoAdmin(admin.ModelAdmin):
         return obj.programa.cultura.cultura
 
     get_cultura_description.short_description = "Cultura"
+
+    def get_prazo_dap(self, obj):
+        return obj.prazo_dap
+
+    get_prazo_dap.short_description = "DAP"
 
     def get_obs_description(self, obj):
         if obj.obs:

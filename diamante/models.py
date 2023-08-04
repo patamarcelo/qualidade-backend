@@ -780,45 +780,29 @@ class Colheita(Base):
     #     return self.peso_liquido / 60
 
     def save(self, *args, **kwargs):
-        desc_impureza = 0
-        desc_umidade = 0
-        if self.pk is None:
-            if self.umidade:
-                peso_liquido = decimal.Decimal(self.peso_bruto - self.peso_tara)
-                if self.umidade > 14:
-                    unit_d = decimal.Decimal(14 / 1000)
-                    desc_umidade = (
-                        ((self.umidade - 14) * 100 * unit_d) * peso_liquido / 100
-                    )
-            if self.impureza:
-                peso_liquido = decimal.Decimal(self.peso_bruto - self.peso_tara)
-                desc_impureza = (peso_liquido * self.impureza) / 100
-        if self.pk is not None:
-            orig = Colheita.objects.get(pk=self.pk)
-            if self.impureza != orig.impureza:
-                print("salvando a impureza")
-                if self.pk and self.impureza:
-                    peso_liquido = decimal.Decimal(self.peso_bruto - self.peso_tara)
-                    desc_impureza = (peso_liquido * self.impureza) / 100
-                    print(desc_impureza)
-            if self.umidade != orig.umidade:
-                print("salvando a umidade")
-                if self.pk and self.umidade:
-                    peso_liquido = decimal.Decimal(self.peso_bruto - self.peso_tara)
-                    if self.umidade > 14:
-                        unit_d = decimal.Decimal(14 / 1000)
-                        desc_umidade = (
-                            ((self.umidade - 14) * 100 * unit_d) * peso_liquido / 100
-                        )
-                        print(desc_umidade)
+        if self.umidade:
+            peso_liquido = decimal.Decimal(self.peso_bruto - self.peso_tara)
+            if self.umidade > 14:
+                unit_d = decimal.Decimal(14 / 1000)
+                desconto_umidade = (
+                    ((self.umidade - 14) * 100 * unit_d) * peso_liquido / 100
+                )
+                self.desconto_umidade = desconto_umidade
+                print(desconto_umidade)
 
-        self.desconto_impureza = desc_impureza
-        self.desconto_umidade = desc_umidade
-        self.peso_liquido = (
-            decimal.Decimal(self.peso_bruto - self.peso_tara)
-            - desc_impureza
-            - desc_umidade
-        )
+        if self.impureza:
+            peso_liquido = decimal.Decimal(self.peso_bruto - self.peso_tara)
+            desconto_impureza = (peso_liquido * self.impureza) / 100
+            self.desconto_impureza = desconto_impureza
+            print(desconto_impureza)
+
+        self.peso_liquido = decimal.Decimal(self.peso_bruto - self.peso_tara)
+
+        if self.desconto_umidade:
+            self.peso_liquido = self.peso_liquido - self.desconto_umidade
+        if self.desconto_impureza:
+            self.peso_liquido = self.peso_liquido - self.desconto_impureza
+        print(self.desconto_umidade)
         self.peso_scs_liquido = self.peso_liquido / 60
         super(Colheita, self).save(*args, **kwargs)
 
