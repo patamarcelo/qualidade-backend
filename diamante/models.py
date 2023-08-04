@@ -13,6 +13,7 @@ import decimal
 connection.queries
 from django.core.validators import RegexValidator, MinLengthValidator
 
+from django.db.models import Count
 
 # Create your models here.
 
@@ -685,7 +686,9 @@ class Colheita(Base):
         r"^[0-9a-zA-Z]*$", "Somente letras e números permitido."
     )
 
-    plantio = models.ForeignKey(Plantio, on_delete=models.PROTECT)
+    plantio = models.ForeignKey(
+        Plantio, on_delete=models.PROTECT, related_name="plantio_colheita"
+    )
     data_colheita = models.DateField(help_text="dd/mm/aaaa", blank=True, null=True)
     romaneio = models.CharField(
         "Romaneio", max_length=40, help_text="Número do Romaneio"

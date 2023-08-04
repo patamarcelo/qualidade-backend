@@ -25,6 +25,9 @@ from django.http import HttpResponse
 import codecs
 
 
+from django.db.models import Subquery, OuterRef
+
+
 # class PlantioDetailView(LoginRequiredMixin, DetailView):
 #     login_url = "/login/"
 #     redirect_field_name = "/"
@@ -180,6 +183,7 @@ class PlantioAdmin(admin.ModelAdmin, ExportCsvMixin):
                 "variedade",
                 "programa",
             )
+            .prefetch_related("plantio_colheita")
             .order_by("data_plantio")
         )
 
@@ -218,6 +222,7 @@ class PlantioAdmin(admin.ModelAdmin, ExportCsvMixin):
         "get_description_finalizado_plantio",
         "get_description_finalizado_colheita",
         "area_colheita",
+        "get_total_colheita_cargas",
         # "area_parcial",
         "get_data",
         "get_dap_description",
@@ -292,6 +297,13 @@ class PlantioAdmin(admin.ModelAdmin, ExportCsvMixin):
     )
 
     ordering = ("data_plantio",)
+
+    total_c = [x for x in Colheita.objects.values_list("plantio__id", flat=True)]
+
+    def get_total_colheita_cargas(self, obj):
+        return self.total_c.count(obj.id)
+
+    get_total_colheita_cargas.short_description = "Cargas"
 
     def get_talhao__id_unico(self, obj):
         return obj.talhao.id_unico
@@ -577,7 +589,10 @@ class ColheitaAdmin(admin.ModelAdmin):
     get_placa.short_description = "Placa"
 
     def get_projeto_origem(self, obj):
-        return obj.plantio.talhao.fazenda.nome
+        if "Projeto" in obj.plantio.talhao.fazenda.nome:
+            return obj.plantio.talhao.fazenda.nome.split("Projeto")[-1]
+        else:
+            return obj.plantio.talhao.fazenda.nome
 
     get_projeto_origem.short_description = "Origem"
 
