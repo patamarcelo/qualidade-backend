@@ -27,6 +27,7 @@ import codecs
 
 from django.db.models import Subquery, OuterRef
 from django.utils.formats import localize
+from import_export.admin import ImportExportModelAdmin
 
 
 # class PlantioDetailView(LoginRequiredMixin, DetailView):
@@ -164,9 +165,93 @@ admin.site.register(Safra)
 admin.site.register(Ciclo)
 
 
+def export_plantio(modeladmin, request, queryset):
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = 'attachment; filename="Plantio.csv"'
+    writer = csv.writer(response, delimiter=";")
+    writer.writerow(
+        [
+            "Projeto",
+            "Talhao",
+            "Safra",
+            "Ciclo",
+            "Cultura",
+            "Variedade",
+            "Plantio Finalizado",
+            "Colheita Finalizada",
+            "Area",
+            "Data Plantio",
+            # "Dap",
+            "Ciclo Variedade",
+            "Programa",
+            "Cargas Carregadas",
+            "Carregado Kg",
+            "Produtividade",
+        ]
+    )
+
+    plantios = queryset.values_list(
+        "pk",
+        "talhao__fazenda__nome",
+        "talhao__id_talhao",
+        "safra__safra",
+        "ciclo__ciclo",
+        "variedade__cultura__cultura",
+        "variedade__variedade",
+        "finalizado_plantio",
+        "finalizado_colheita",
+        "area_colheita",
+        "data_plantio",
+        "variedade__dias_ciclo",
+        "programa__nome",
+        "area_parcial",
+    )
+    cargas_list = modeladmin.total_c_2
+
+    def get_total_prod(total_c_2, plantio):
+        total_filt_list = sum([x[1] for x in total_c_2 if plantio[0] == x[0]])
+        prod_scs = None
+        if plantio[7]:
+            try:
+                prod = total_filt_list / plantio[9]
+                prod_scs = prod / 60
+            except ZeroDivisionError:
+                value = float("Inf")
+        if plantio[13]:
+            try:
+                prod = total_filt_list / plantio[13]
+                prod_scs = prod / 60
+            except ZeroDivisionError:
+                value = float("Inf")
+        if prod_scs:
+            print(type(round(prod_scs, 2)))
+            return localize(round(prod_scs, 2))
+        else:
+            return " - "
+
+    for plantio in plantios:
+        plantio_detail = list(plantio)
+        plantio_detail[9] = localize(plantio_detail[9])
+        cargas_carregadas_filter = [
+            x[1] for x in cargas_list if plantio_detail[0] == x[0]
+        ]
+        cargas_carregadas_kg = localize(sum(cargas_carregadas_filter))
+        cargas_carregadas_quantidade = len(cargas_carregadas_filter)
+        produtividade = get_total_prod(cargas_list, plantio)
+        plantio_detail.pop(13)
+        plantio_detail.append(cargas_carregadas_quantidade)
+        plantio_detail.append(cargas_carregadas_kg)
+        plantio_detail.append(produtividade)
+
+        plantio_detail.pop(0)
+        plantio = tuple(plantio_detail)
+        writer.writerow(plantio)
+    return response
+
+
 @admin.register(Plantio)
-class PlantioAdmin(admin.ModelAdmin, ExportCsvMixin):
-    actions = ["export_as_csv"]
+class PlantioAdmin(admin.ModelAdmin):
+    actions = [export_plantio]
     show_full_result_count = False
 
     def get_ordering(self, request):
