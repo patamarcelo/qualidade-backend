@@ -26,6 +26,7 @@ import codecs
 
 
 from django.db.models import Subquery, OuterRef
+from django.utils.formats import localize
 
 
 # class PlantioDetailView(LoginRequiredMixin, DetailView):
@@ -183,7 +184,6 @@ class PlantioAdmin(admin.ModelAdmin, ExportCsvMixin):
                 "variedade",
                 "programa",
             )
-            .prefetch_related("plantio_colheita")
             .order_by("data_plantio")
         )
 
@@ -223,6 +223,8 @@ class PlantioAdmin(admin.ModelAdmin, ExportCsvMixin):
         "get_description_finalizado_colheita",
         "area_colheita",
         "get_total_colheita_cargas",
+        "get_total_colheita_cargas_kg",
+        "get_total_prod",
         # "area_parcial",
         "get_data",
         "get_dap_description",
@@ -299,11 +301,44 @@ class PlantioAdmin(admin.ModelAdmin, ExportCsvMixin):
     ordering = ("data_plantio",)
 
     total_c = [x for x in Colheita.objects.values_list("plantio__id", flat=True)]
+    total_c_2 = [x for x in Colheita.objects.values_list("plantio__id", "peso_liquido")]
 
+    # TOTAL DE CARGAS CARREGADAS PARA O PLANTIO
     def get_total_colheita_cargas(self, obj):
         return self.total_c.count(obj.id)
 
     get_total_colheita_cargas.short_description = "Cargas"
+
+    # TOTAL DE CARGAS CARREGADAS PARA O PLANTIO E KG
+    def get_total_colheita_cargas_kg(self, obj):
+        filtered_list = [x[1] for x in self.total_c_2 if obj.id == x[0]]
+        return sum(filtered_list)
+
+    get_total_colheita_cargas_kg.short_description = "Peso Carr."
+
+    # PRODUTIVIDADE TOTAL DO PLANTIO
+    def get_total_prod(self, obj):
+        total_filt_list = sum([x[1] for x in self.total_c_2 if obj.id == x[0]])
+        prod_scs = None
+        if obj.finalizado_plantio:
+            try:
+                prod = total_filt_list / obj.area_colheita
+                prod_scs = prod / 60
+            except ZeroDivisionError:
+                value = float("Inf")
+        if obj.area_parcial:
+            try:
+                prod = total_filt_list / obj.area_parcial
+                prod_scs = prod / 60
+            except ZeroDivisionError:
+                value = float("Inf")
+        if prod_scs:
+            print(type(round(prod_scs, 2)))
+            return f"{localize(round(prod_scs,2))} Scs/ha"
+        else:
+            return " - "
+
+    get_total_prod.short_description = "Produtividade"
 
     def get_talhao__id_unico(self, obj):
         return obj.talhao.id_unico
