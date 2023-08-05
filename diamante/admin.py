@@ -307,6 +307,7 @@ class PlantioAdmin(admin.ModelAdmin):
         "get_description_finalizado_plantio",
         "get_description_finalizado_colheita",
         "area_colheita",
+        "get_data_primeira_carga",
         "get_total_colheita_cargas",
         "get_total_colheita_cargas_kg",
         "get_total_prod",
@@ -385,12 +386,32 @@ class PlantioAdmin(admin.ModelAdmin):
 
     ordering = ("data_plantio",)
 
-    total_c = [x for x in Colheita.objects.values_list("plantio__id", flat=True)]
-    total_c_2 = [x for x in Colheita.objects.values_list("plantio__id", "peso_liquido")]
+    total_c_2 = [
+        x
+        for x in Colheita.objects.values_list(
+            "plantio__id", "peso_liquido", "data_colheita"
+        )
+    ]
+
+    print(total_c_2)
+
+    # DATA PRIMEIRA CARGA CARREGADA
+    def get_data_primeira_carga(self, obj):
+        filtered_list = [x[2] for x in self.total_c_2 if obj.id == x[0]]
+        sorted_list = sorted(filtered_list)
+        if len(sorted_list) > 0:
+            return date_format(
+                sorted_list[0], format="SHORT_DATE_FORMAT", use_l10n=True
+            )
+        else:
+            return "-"
+
+    get_data_primeira_carga.short_description = "1ª Carga"
 
     # TOTAL DE CARGAS CARREGADAS PARA O PLANTIO
     def get_total_colheita_cargas(self, obj):
-        return self.total_c.count(obj.id)
+        filtered_list = [x[1] for x in self.total_c_2 if obj.id == x[0]]
+        return len(filtered_list)
 
     get_total_colheita_cargas.short_description = "Cargas"
 
@@ -418,7 +439,6 @@ class PlantioAdmin(admin.ModelAdmin):
             except ZeroDivisionError:
                 value = float("Inf")
         if prod_scs:
-            print(type(round(prod_scs, 2)))
             return f"{localize(round(prod_scs,2))} Scs/ha"
         else:
             return " - "
