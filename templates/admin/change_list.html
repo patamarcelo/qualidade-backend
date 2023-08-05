@@ -137,7 +137,19 @@ $(function () {
   
 
 </script>
-
+<script>
+    $(document).on('change', '#result_list', () => {
+        let val = 0
+        $('.selected .field-peso_liquido').each((i, e) =>{
+            const value = e.innerHTML.replace('.',"").replace(',',".")
+            console.log(value)
+            val += parseFloat(value)
+        })
+        const total = "Total Selecionado "
+        $('.select-result-total').html(total + val.toLocaleString('pt-br',{  minimumFractionDigits: 2,
+            maximumFractionDigits: 2}) + " Kg")
+    })
+</script>
 <script>
     $(document).ready(function(){
         $.each($('#result_list_wrapper').children().filter(':last-child').children(), function( k, v ) {
