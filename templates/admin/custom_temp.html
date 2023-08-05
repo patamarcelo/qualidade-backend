@@ -1,0 +1,43 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+
+{% block content_title %}
+<div style="display: flex; justify-content: center">
+    <h1>Acompanhamento X: Safra Y</h1>
+</div>
+{% endblock %}
+{% block result_list %}
+    <div class="container"
+        <br>
+        <div>
+            {% for i in summary %}
+                <div style="display: flex; gap: 10px">
+                    <p> {{i.talhao__fazenda__nome}}</p>
+                    <p> {{i.variedade__cultura__cultura}}</p>
+                    <p> {{i.area_total}}</p>
+
+                </div>
+            {% endfor %}
+        </div>
+        <hr/>
+        
+            <div style="display: flex; justify-content: center">
+                <h1>Acompanhamento X: Colheita Y</h1>
+            </div>
+        
+        <div>
+            {% for i in colheita %}
+                <div style="display: flex">
+                    <p>{{i.plantio__talhao__id_talhao}}</p>
+                    <p>{{i.peso_liquido}}</p>
+                    <p>{{i.data_colheita}}</p>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+
+{% endblock %}
+{% endblock %}
+
+{% block pagination %}{% endblock %}

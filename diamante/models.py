@@ -817,3 +817,10 @@ class Colheita(Base):
 
     def __str__(self):
         return f"{self.romaneio} | {self.plantio.talhao.id_talhao} | {self.plantio.talhao.fazenda.nome} | {str(round(self.peso_liquido,2))}"
+
+
+class PlantioDetail(Plantio):
+    class Meta:
+        proxy = True
+        verbose_name = "Plantio Detail"
+        verbose_name_plural = "Plantio Details"

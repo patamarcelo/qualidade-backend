@@ -24,23 +24,65 @@ import csv
 from django.http import HttpResponse
 import codecs
 
+from django.db.models import Q, Sum
 
 from django.db.models import Subquery, OuterRef
 from django.utils.formats import localize
 
 
-# class PlantioDetailView(LoginRequiredMixin, DetailView):
-#     login_url = "/login/"
-#     redirect_field_name = "/"
-#     template_name = "admin/calendar.html"
-#     model = Plantio
+@admin.register(PlantioDetail)
+class PlantioDetailAdmin(admin.ModelAdmin):
+    model = PlantioDetail
+    change_list_template = "admin/custom_temp.html"
 
-#     def get_context_data(self, **kwargs):
-#         return {
-#             **super().get_context_data(**kwargs),
-#             **admin.site.each_context(self.request),
-#             "opts": self.model._meta,
-#         }
+    cargas_model = [
+        x
+        for x in Colheita.objects.values(
+            "plantio__talhao__id_talhao", "plantio__id", "peso_liquido", "data_colheita"
+        )
+    ]
+
+    def get_queryset(self, request):
+        return (
+            super(PlantioDetailAdmin, self)
+            .get_queryset(request)
+            .select_related(
+                "talhao",
+                "safra",
+                "ciclo",
+                "talhao__fazenda",
+                "variedade",
+                "programa",
+            )
+            .order_by("data_plantio")
+        )
+
+    def changelist_view(self, request, extra_context=None):
+        response = super().changelist_view(
+            request,
+            extra_context=extra_context,
+        )
+
+        try:
+            qs = response.context_data["cl"].queryset
+        except (AttributeError, KeyError):
+            return response
+
+        response.context_data["summary"] = (
+            qs.values("talhao__fazenda__nome", "variedade__cultura__cultura")
+            .filter(
+                safra__safra="2023/2024",
+                ciclo__ciclo="1",
+                finalizado_plantio=True,
+                plantio_descontinuado=False,
+            )
+            .annotate(area_total=Sum("area_colheita"))
+            .order_by("talhao__fazenda__nome")
+        )
+
+        response.context_data["colheita"] = self.cargas_model
+
+        return response
 
 
 class ExportCsvMixin:
