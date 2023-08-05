@@ -27,7 +27,6 @@ import codecs
 
 from django.db.models import Subquery, OuterRef
 from django.utils.formats import localize
-from import_export.admin import ImportExportModelAdmin
 
 
 # class PlantioDetailView(LoginRequiredMixin, DetailView):
@@ -392,8 +391,6 @@ class PlantioAdmin(admin.ModelAdmin):
             "plantio__id", "peso_liquido", "data_colheita"
         )
     ]
-
-    print(total_c_2)
 
     # DATA PRIMEIRA CARGA CARREGADA
     def get_data_primeira_carga(self, obj):
