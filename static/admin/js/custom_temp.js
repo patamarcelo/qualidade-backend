@@ -18,12 +18,7 @@ var app = new Vue({
 		colheita: colheita,
 		variedades: [...new Set(filterVar)],
 		filteredCutulre: "Todas",
-		selected: "",
-		options: [
-			{ id: 0, labels: "Vegetables" },
-			{ id: 1, labels: "Cheese" },
-			{ id: 2, labels: "Fruits" }
-		]
+		selected: ""
 	},
 	methods: {
 		greet: function (name) {
@@ -32,7 +27,6 @@ var app = new Vue({
 	},
 	computed: {
 		filteredArray() {
-			console.log(this.plantio);
 			const newDict = this.plantio
 				.filter((data) =>
 					this.filteredCutulre == "Todas"
@@ -67,37 +61,52 @@ var app = new Vue({
 					}
 					return acc;
 				}, {});
-			this.colheita
-				.filter((data) =>
-					this.filteredCutulre == "Todas"
-						? data.variedade__cultura__cultura !== "nenhuma"
-						: data.variedade__cultura__cultura ===
-						  this.filteredCutulre
-				)
-				.map((data, i) => {
-					const area =
-						newDict[
-							data.plantio__talhao__fazenda__nome +
-								"|" +
-								data.plantio__variedade__cultura__cultura
-						].areaColheita;
+			for (let i = 0; i < this.colheita.length; i++) {
+				const nameDict =
+					`${this.colheita[i]["plantio__talhao__fazenda__nome"]}` +
+					"|" +
+					`${this.colheita[i]["plantio__variedade__cultura__cultura"]}`;
 
-					newDict[
-						data.plantio__talhao__fazenda__nome +
-							"|" +
-							data.plantio__variedade__cultura__cultura
-					].pesoColhido = Number(data.peso_scs);
-
-					newDict[
-						data.plantio__talhao__fazenda__nome +
-							"|" +
-							data.plantio__variedade__cultura__cultura
-					].produtividade = Number(
-						Number(data.peso_scs) / Number(area)
+				if (newDict[nameDict]) {
+					newDict[nameDict]["pesoColhido"] = Number(
+						this.colheita[i].peso_scs
 					);
-				});
+					newDict[nameDict]["produtividade"] =
+						Number(this.colheita[i].peso_scs) /
+						Number(newDict[nameDict]["areaColheita"]);
+				}
+			}
 			console.log(newDict);
 			return newDict;
+		},
+		newTotals() {
+			let newTotals = {};
+			for (const [key, value] of Object.entries(this.filteredArray)) {
+				if (!newTotals["areaColhida"]) {
+					newTotals["areaColhida"] = value.areaColheita;
+				} else {
+					newTotals["areaColhida"] += value.areaColheita;
+				}
+
+				if (!newTotals["areaTotal"]) {
+					newTotals["areaTotal"] = value.areaTotal;
+				} else {
+					newTotals["areaTotal"] += value.areaTotal;
+				}
+
+				if (!newTotals["saldoColheita"]) {
+					newTotals["saldoColheita"] = value.saldoColheita;
+				} else {
+					newTotals["saldoColheita"] += value.saldoColheita;
+				}
+
+				if (!newTotals["pesoColhido"]) {
+					newTotals["pesoColhido"] = Number(value.pesoColhido);
+				} else {
+					newTotals["pesoColhido"] += Number(value.pesoColhido);
+				}
+			}
+			return newTotals;
 		}
 	}
 });
