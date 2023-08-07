@@ -30,16 +30,34 @@ from django.db.models import Subquery, OuterRef
 from django.utils.formats import localize
 
 
+from django.db.models import Case, When, DecimalField, Value
+from django.db.models.functions import Coalesce, Round
+
+from django.core import serializers
+
+
 @admin.register(PlantioDetail)
 class PlantioDetailAdmin(admin.ModelAdmin):
     model = PlantioDetail
     change_list_template = "admin/custom_temp.html"
 
+    # cargas_model = [
+    #     x
+    #     for x in Colheita.objects.values(
+    #         "plantio__talhao__id_talhao", "plantio__id", "peso_liquido", "data_colheita"
+    #     )
+    # ]
+
     cargas_model = [
         x
         for x in Colheita.objects.values(
-            "plantio__talhao__id_talhao", "plantio__id", "peso_liquido", "data_colheita"
+            "plantio__talhao__fazenda__nome",
         )
+        .annotate(
+            peso=Sum("peso_liquido"),
+            peso_kg=Round((Sum("peso_liquido") / 60), precision=2),
+        )
+        .order_by("plantio__talhao__fazenda__nome")
     ]
 
     def get_queryset(self, request):
@@ -68,16 +86,39 @@ class PlantioDetailAdmin(admin.ModelAdmin):
         except (AttributeError, KeyError):
             return response
 
-        response.context_data["summary"] = (
-            qs.values("talhao__fazenda__nome", "variedade__cultura__cultura")
-            .filter(
+        metrics = {
+            "area_total": Sum("area_colheita"),
+            "area_finalizada": Case(
+                When(finalizado_colheita=True, then=Coalesce(Sum("area_colheita"), 0)),
+                default=Value(0),
+                output_field=DecimalField(),
+            ),
+            "area_parcial": Case(
+                When(finalizado_colheita=False, then=Coalesce(Sum("area_parcial"), 0)),
+                default=Value(0),
+                output_field=DecimalField(),
+            ),
+        }
+
+        query_data = (
+            qs.filter(
                 safra__safra="2023/2024",
                 ciclo__ciclo="1",
                 finalizado_plantio=True,
                 plantio_descontinuado=False,
             )
-            .annotate(area_total=Sum("area_colheita"))
+            .values("talhao__fazenda__nome", "variedade__cultura__cultura")
+            .annotate(**metrics)
             .order_by("talhao__fazenda__nome")
+        )
+
+        response.context_data["summary"] = query_data
+        response.context_data["summary_2"] = json.dumps(
+            list(query_data), cls=DjangoJSONEncoder
+        )
+
+        response.context_data["colheita_2"] = json.dumps(
+            self.cargas_model, cls=DjangoJSONEncoder
         )
 
         response.context_data["colheita"] = self.cargas_model

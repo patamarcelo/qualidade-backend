@@ -1,4 +1,5 @@
 {% extends "admin/base_site.html" %}
+{% load static %}
 
 {% block content %}
 
@@ -16,6 +17,8 @@
                     <p> {{i.talhao__fazenda__nome}}</p>
                     <p> {{i.variedade__cultura__cultura}}</p>
                     <p> {{i.area_total}}</p>
+                    <p> {{i.area_colheita}}</p>
+                    <p> {{i.area_parcial}}</p>
 
                 </div>
             {% endfor %}
@@ -28,14 +31,22 @@
         
         <div>
             {% for i in colheita %}
-                <div style="display: flex">
-                    <p>{{i.plantio__talhao__id_talhao}}</p>
-                    <p>{{i.peso_liquido}}</p>
-                    <p>{{i.data_colheita}}</p>
+                <div style="display: flex; gap: 10px">
+                    <p>{{i.plantio__talhao__fazenda__nome}}</p>
+                    <p>{{i.peso}} Kg</p>
+                    <p>{{i.peso_kg}} Scs </p>
                 </div>
             {% endfor %}
         </div>
     </div>
+
+    
+        <script type="text/javascript">
+            // construct js objects
+            var plantio = {{ summary_2|safe }}
+            var colheita = {{ colheita_2|safe }}
+         </script>
+         <script src="{% static 'admin/js/custom_temp.js' %}"></script>
 
 {% endblock %}
 {% endblock %}
