@@ -9,14 +9,66 @@
 </div>
 {% endblock %}
 {% block result_list %}
-<script src="https://unpkg.com/vue@3.0.0-rc.5/dist/vue.global.prod.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
     <div id="app">
-        [[message]]
         <div class="container">
-            <div v-for="col in plantio">
-                <p>[[ col.talhao__fazenda__nome ]]</p>
-            </div>
+            [[variedades]]
+        </div>
+        <div class="container-fluid">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Projeto</th>
+                        <th>Cultura</th>
+                        <th>Area Plantada</th>
+                        <th>Area Colhida</th>
+                        <th>Area a Colher</th>
+                        <th>Peso Colhido (Scs)</th>
+                        <th>Produtividade</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-for="(col,i) in plantio">
+                    <td>[[ i.split("|")[0] ]]</td>
+                    <td>[[ i.split("|")[1] ]]</td>
+                    <td>[[ col.areaTotal.toLocaleString("pt-br", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                    }) ]]</td>
+                    <td>[[ col.areaColheita.toLocaleString("pt-br", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                    }) ]]</td>
+                    <td>[[ col.saldoColheita.toLocaleString("pt-br", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                    }) ]]</td>
+                    <td>[[ col.pesoColhido.toLocaleString("pt-br", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                    }) ]]</td>
+                    <td>[[ col.produtividade.toLocaleString("pt-br", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                    }) ]]</td>
+                </tr>
+
+                </tbody>
+            </table>
+                <div v-for="(col,i) in plantio" 
+                style="display: flex; flex-direction: row; gap: 10px; width: 80%;
+                    justify-content: space-between
+                ">
+                    <span>[[ i.split("|")[0] ]]</span>
+                    <span>[[ i.split("|")[1] ]]</span>
+                    <span>[[ col.areaTotal.toFixed(2) ]]</span>
+                    <span>[[ col.areaColheita.toFixed(2) ]]</span>
+                    <span>[[ col.saldoColheita.toFixed(2) ]]</span>
+                    <span>[[ col.pesoColhido ]]</span>
+                    <span>[[ col.produtividade.toFixed(2) ]]</span>
+                </div>
             <br>
+            <hr>
             <div>
                 {% for i in summary %}
                     <div style="display: flex; gap: 10px">

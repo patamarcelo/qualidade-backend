@@ -52,10 +52,11 @@ class PlantioDetailAdmin(admin.ModelAdmin):
         x
         for x in Colheita.objects.values(
             "plantio__talhao__fazenda__nome",
+            "plantio__variedade__cultura__cultura",
         )
         .annotate(
-            peso=Sum("peso_liquido"),
-            peso_kg=Round((Sum("peso_liquido") / 60), precision=2),
+            peso_kg=Sum("peso_liquido"),
+            peso_scs=Round((Sum("peso_liquido") / 60), precision=2),
         )
         .order_by("plantio__talhao__fazenda__nome")
     ]
