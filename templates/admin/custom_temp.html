@@ -2,52 +2,58 @@
 {% load static %}
 
 {% block content %}
+<script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+    <script src="https://unpkg.com/vue-select@latest"></script>
+    <div id="app">
 
 {% block content_title %}
 <div style="display: flex; justify-content: center">
-    <h1>Acompanhamento X: Safra Y</h1>
+    <h1>Acompanhamento [[filteredCutulre]]: Safra Y</h1>
 </div>
 {% endblock %}
 {% block result_list %}
-    <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
-    <div id="app">
-        <div class="container">
-            [[variedades]]
+    
+        
+        <div class="container-fluid">
+            <select class="form-select form-select-lg" aria-label=".form-select-lg example" v-model="filteredCutulre">
+                <option v-for="cultura in variedades" :value="cultura">[[cultura]]</option>
+            </select>
         </div>
+        
         <div class="container-fluid">
             <table class="table table-striped">
                 <thead>
                     <tr>
                         <th>Projeto</th>
-                        <th>Cultura</th>
-                        <th>Area Plantada</th>
-                        <th>Area Colhida</th>
-                        <th>Area a Colher</th>
-                        <th>Peso Colhido (Scs)</th>
-                        <th>Produtividade</th>
+                        <th style="text-align: center">Cultura</th>
+                        <th style="text-align: center">Area Plantada</th>
+                        <th style="text-align: center">Area Colhida</th>
+                        <th style="text-align: center">Area a Colher</th>
+                        <th style="text-align: center">Peso Colhido (Scs)</th>
+                        <th style="text-align: center">Produtividade</th>
                     </tr>
                 </thead>
-                <tbody>
-                    <tr v-for="(col,i) in plantio">
+                <tbody v-if="filteredArray">
+                    <tr v-for="(col,i) in filteredArray">
                     <td>[[ i.split("|")[0] ]]</td>
-                    <td>[[ i.split("|")[1] ]]</td>
-                    <td>[[ col.areaTotal.toLocaleString("pt-br", {
+                    <td style="text-align: center">[[ i.split("|")[1] ]]</td>
+                    <td style="text-align: center">[[ col.areaTotal.toLocaleString("pt-br", {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2
                     }) ]]</td>
-                    <td>[[ col.areaColheita.toLocaleString("pt-br", {
+                    <td style="text-align: center">[[ col.areaColheita.toLocaleString("pt-br", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                    }) ]] ha</td>
+                    <td style="text-align: center">[[ col.saldoColheita.toLocaleString("pt-br", {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2
                     }) ]]</td>
-                    <td>[[ col.saldoColheita.toLocaleString("pt-br", {
+                    <td style="text-align: center">[[ Number(col.pesoColhido).toLocaleString("pt-br", {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2
-                    }) ]]</td>
-                    <td>[[ col.pesoColhido.toLocaleString("pt-br", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2
-                    }) ]]</td>
-                    <td>[[ col.produtividade.toLocaleString("pt-br", {
+                    }) ]] Scs</td>
+                    <td style="text-align: center">[[ col.produtividade.toLocaleString("pt-br", {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2
                     }) ]]</td>
@@ -55,7 +61,7 @@
 
                 </tbody>
             </table>
-                <div v-for="(col,i) in plantio" 
+                <!-- <div v-for="(col,i) in plantio" 
                 style="display: flex; flex-direction: row; gap: 10px; width: 80%;
                     justify-content: space-between
                 ">
@@ -66,7 +72,7 @@
                     <span>[[ col.saldoColheita.toFixed(2) ]]</span>
                     <span>[[ col.pesoColhido ]]</span>
                     <span>[[ col.produtividade.toFixed(2) ]]</span>
-                </div>
+                </div> -->
             <br>
             <hr>
             <div>

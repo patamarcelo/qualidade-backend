@@ -822,5 +822,5 @@ class Colheita(Base):
 class PlantioDetail(Plantio):
     class Meta:
         proxy = True
-        verbose_name = "Plantio Detail"
-        verbose_name_plural = "Plantio Details"
+        verbose_name = "Plantio - Resumo"
+        verbose_name_plural = "Plantios - Resumo"
