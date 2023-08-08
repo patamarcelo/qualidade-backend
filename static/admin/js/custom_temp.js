@@ -1,8 +1,3 @@
-console.log("Plantio");
-console.log(plantio);
-console.log("Colheita");
-console.log(colheita);
-
 const filterVariedades = plantio.map((data, i) => {
 	return data.variedade__cultura__cultura;
 });
@@ -76,7 +71,6 @@ var app = new Vue({
 						Number(newDict[nameDict]["areaColheita"]);
 				}
 			}
-			console.log(newDict);
 			return newDict;
 		},
 		newTotals() {
