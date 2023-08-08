@@ -36,18 +36,7 @@ from django.db.models.functions import Coalesce, Round
 from django.core import serializers
 
 
-@admin.register(PlantioDetail)
-class PlantioDetailAdmin(admin.ModelAdmin):
-    model = PlantioDetail
-    change_list_template = "admin/custom_temp.html"
-
-    # cargas_model = [
-    #     x
-    #     for x in Colheita.objects.values(
-    #         "plantio__talhao__id_talhao", "plantio__id", "peso_liquido", "data_colheita"
-    #     )
-    # ]
-    print(Colheita.objects.all())
+def get_cargas_model():
     cargas_model = [
         x
         for x in Colheita.objects.values(
@@ -60,6 +49,20 @@ class PlantioDetailAdmin(admin.ModelAdmin):
         )
         .order_by("plantio__talhao__fazenda__nome")
     ]
+    return cargas_model
+
+
+@admin.register(PlantioDetail)
+class PlantioDetailAdmin(admin.ModelAdmin):
+    model = PlantioDetail
+    change_list_template = "admin/custom_temp.html"
+
+    # cargas_model = [
+    #     x
+    #     for x in Colheita.objects.values(
+    #         "plantio__talhao__id_talhao", "plantio__id", "peso_liquido", "data_colheita"
+    #     )
+    # ]
 
     def get_queryset(self, request):
         return (
@@ -113,16 +116,13 @@ class PlantioDetailAdmin(admin.ModelAdmin):
             .order_by("talhao__fazenda__nome")
         )
 
-        response.context_data["summary"] = query_data
         response.context_data["summary_2"] = json.dumps(
             list(query_data), cls=DjangoJSONEncoder
         )
 
         response.context_data["colheita_2"] = json.dumps(
-            self.cargas_model, cls=DjangoJSONEncoder
+            get_cargas_model(), cls=DjangoJSONEncoder
         )
-
-        response.context_data["colheita"] = self.cargas_model
 
         return response
 
