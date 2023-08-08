@@ -637,6 +637,7 @@ def export_cargas(modeladmin, request, queryset):
             "Motorista",
             "Peso Tara",
             "Peso Bruto",
+            "Peso",
             "Umidade",
             "Desc. Umidade",
             "Impureza",
@@ -671,6 +672,8 @@ def export_cargas(modeladmin, request, queryset):
         cargas_detail[15] = str(carga[15]).replace(".", ",")
         cargas_detail[16] = str(carga[16]).replace(".", ",")
         cargas_detail[17] = str(carga[17]).replace(".", ",")
+        peso = cargas_detail[12] - cargas_detail[11]
+        cargas_detail.insert(13, peso)
         carga = tuple(cargas_detail)
         writer.writerow(carga)
     return response
@@ -746,6 +749,7 @@ class ColheitaAdmin(admin.ModelAdmin):
         "op",
         "peso_bruto",
         "peso_tara",
+        "get_peso_liquido",
         "umidade",
         "desconto_umidade",
         "impureza",
@@ -783,6 +787,11 @@ class ColheitaAdmin(admin.ModelAdmin):
     )
 
     ordering = ("data_colheita",)
+
+    def get_peso_liquido(self, obj):
+        return obj.peso_bruto - obj.peso_tara
+
+    get_peso_liquido.short_description = "Peso"
 
     def get_data_colheita(self, obj):
         if obj.data_colheita:
