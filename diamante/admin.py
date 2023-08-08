@@ -47,7 +47,7 @@ class PlantioDetailAdmin(admin.ModelAdmin):
     #         "plantio__talhao__id_talhao", "plantio__id", "peso_liquido", "data_colheita"
     #     )
     # ]
-
+    print(Colheita.objects.all())
     cargas_model = [
         x
         for x in Colheita.objects.values(
