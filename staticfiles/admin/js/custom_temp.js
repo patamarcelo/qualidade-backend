@@ -2,7 +2,12 @@ const filterVariedades = plantio.map((data, i) => {
 	return data.variedade__cultura__cultura;
 });
 
+const filterVariedadesDif = plantio.map((data, i) => {
+	return `${data.variedade__cultura__cultura} - ${data.variedade__variedade}`;
+});
+
 const filterVar = ["Todas", ...filterVariedades];
+const filterVarDif = ["Todas", ...filterVariedadesDif];
 
 var app = new Vue({
 	delimiters: ["[[", "]]"],
@@ -12,7 +17,9 @@ var app = new Vue({
 		plantio: plantio,
 		colheita: colheita,
 		variedades: [...new Set(filterVar)],
+		variedadesDif: [...new Set(filterVarDif)],
 		filteredCutulre: "Todas",
+		filteredCutulreDif: "",
 		selected: ""
 	},
 	methods: {
@@ -20,9 +27,51 @@ var app = new Vue({
 			console.log("Hello from " + name + "!");
 		}
 	},
+	watch: {
+		filteredCutulre() {
+			if (this.filteredCutulre === "Todas") {
+				this.filteredCutulreDif = "";
+			} else {
+				console.log(
+					"thisvar",
+					this.variedadesDif
+						.filter((data) =>
+							data.includes(this.filteredCutulre)
+						)[0]
+						.split("-")[1]
+						.trim()
+				);
+				this.filteredCutulreDif = this.variedadesDif
+					.filter((data) => data.includes(this.filteredCutulre))[0]
+					.split("-")[1]
+					.trim();
+			}
+		}
+	},
 	computed: {
+		titleAcomp() {
+			if (this.filteredCutulreDif) {
+				return this.filteredCutulreDif;
+			}
+
+			if (this.filteredCutulre !== "Todas") {
+				return this.filteredCutulre;
+			}
+
+			return " ";
+		},
 		filteredArray() {
-			const newDict = this.plantio
+			let filtPlantio = [];
+			if (this.filteredCutulreDif) {
+				filtPlantio = this.plantio.filter(
+					(data) =>
+						data.variedade__variedade ===
+						this.filteredCutulreDif.trim()
+				);
+			} else {
+				filtPlantio = this.plantio;
+			}
+			const newDict = filtPlantio
 				.filter((data) =>
 					this.filteredCutulre == "Todas"
 						? data.variedade__cultura__cultura !== "nenhuma"
@@ -38,36 +87,45 @@ var app = new Vue({
 						acc[newObj] = {
 							variedade: curr.variedade__cultura__cultura,
 							areaTotal: Number(curr.area_total),
-							areaColheita:
-								Number(curr.area_parcial) +
-								Number(curr.area_finalizada),
+							areaColheita: Number(curr.area_finalizada),
 							saldoColheita:
 								Number(curr.area_total) -
-								Number(curr.area_parcial) -
 								Number(curr.area_finalizada),
 							pesoColhido: 0,
 							produtividade: 0
 						};
 					} else {
 						acc[newObj]["areaTotal"] += Number(curr.area_total);
-						acc[newObj]["areaColheita"] +=
-							Number(curr.area_parcial) +
-							Number(curr.area_finalizada);
+						acc[newObj]["areaColheita"] += Number(
+							curr.area_finalizada
+						);
 					}
 					return acc;
 				}, {});
-			for (let i = 0; i < this.colheita.length; i++) {
+
+			let filtColheita = [];
+			if (this.filteredCutulreDif) {
+				filtColheita = this.colheita.filter(
+					(data) =>
+						data.plantio__variedade__variedade ===
+						this.filteredCutulreDif.trim()
+				);
+			} else {
+				filtColheita = this.colheita;
+			}
+
+			for (let i = 0; i < filtColheita.length; i++) {
 				const nameDict =
-					`${this.colheita[i]["plantio__talhao__fazenda__nome"]}` +
+					`${filtColheita[i]["plantio__talhao__fazenda__nome"]}` +
 					"|" +
-					`${this.colheita[i]["plantio__variedade__cultura__cultura"]}`;
+					`${filtColheita[i]["plantio__variedade__cultura__cultura"]}`;
 
 				if (newDict[nameDict]) {
 					newDict[nameDict]["pesoColhido"] = Number(
-						this.colheita[i].peso_scs
+						filtColheita[i].peso_scs
 					);
 					newDict[nameDict]["produtividade"] =
-						Number(this.colheita[i].peso_scs) /
+						Number(filtColheita[i].peso_scs) /
 						Number(newDict[nameDict]["areaColheita"]);
 				}
 			}
@@ -101,6 +159,15 @@ var app = new Vue({
 				}
 			}
 			return newTotals;
+		},
+		filterVariedadesDif() {
+			var filteVar =
+				this.filteredCutulre === "Todas"
+					? this.variedadesDif
+					: this.variedadesDif.filter((data) =>
+							data.includes(this.filteredCutulre)
+					  );
+			return filteVar.map((data) => data.split("-")[1]);
 		}
 	}
 });

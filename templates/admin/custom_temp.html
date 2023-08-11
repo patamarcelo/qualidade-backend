@@ -8,8 +8,10 @@
 
 
 <div style="display: flex; justify-content: center">
-    <h1>Acompanhamento [[filteredCutulre]]</h1>
+    <h1>Acompanhamento [[titleAcomp]]</h1>
 </div>
+
+
 {% endblock %}
 {% block result_list %}
     
@@ -17,6 +19,10 @@
         <div class="container-fluid">
             <select class="form-select form-select-lg" aria-label=".form-select-lg example" v-model="filteredCutulre">
                 <option v-for="cultura in variedades" :value="cultura">[[cultura]]</option>
+            </select>
+            
+            <select class="form-select form-select-lg" aria-label=".form-select-lg example" v-model="filteredCutulreDif">
+                <option v-for="variedade in filterVariedadesDif" :value="variedade">[[variedade]]</option>
             </select>
         </div>
         
@@ -37,23 +43,23 @@
                     <tr v-for="(col,i) in filteredArray">
                     <td>[[ i.split("|")[0] ]]</td>
                     <td style="text-align: center">[[ i.split("|")[1] ]]</td>
-                    <td style="text-align: center">[[ col.areaTotal.toLocaleString("pt-br", {
+                    <td style="text-align: center">[[ col?.areaTotal?.toLocaleString("pt-br", {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2
                     }) ]] ha</td>
-                    <td style="text-align: center">[[ col.areaColheita.toLocaleString("pt-br", {
+                    <td style="text-align: center">[[ col?.areaColheita?.toLocaleString("pt-br", {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2
                     }) ]] ha</td>
-                    <td style="text-align: center">[[ col.saldoColheita.toLocaleString("pt-br", {
+                    <td style="text-align: center">[[ col?.saldoColheita?.toLocaleString("pt-br", {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2
                     }) ]] ha</td>
-                    <td style="text-align: center">[[ Number(col.pesoColhido).toLocaleString("pt-br", {
+                    <td style="text-align: center">[[ Number(col.pesoColhido)?.toLocaleString("pt-br", {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2
                     }) ]] Scs</td>
-                    <td style="text-align: center">[[ col.produtividade.toLocaleString("pt-br", {
+                    <td style="text-align: center">[[ col?.produtividade?.toLocaleString("pt-br", {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2
                     }) ]] Scs/ha</td>
@@ -63,19 +69,19 @@
                 <tfoot>
                     <th scope="row">Totais</th>
                     <td style="text-align: center"></td>
-                    <td style="text-align: center; font-weight: bold">[[newTotals.areaTotal.toLocaleString("pt-br", {
+                    <td style="text-align: center; font-weight: bold">[[newTotals?.areaTotal?.toLocaleString("pt-br", {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2
                     })]] ha</td>
-                    <td style="text-align: center; font-weight: bold">[[newTotals.areaColhida.toLocaleString("pt-br", {
+                    <td style="text-align: center; font-weight: bold">[[newTotals?.areaColhida?.toLocaleString("pt-br", {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2
                     })]] ha</td>
-                    <td style="text-align: center; font-weight: bold">[[newTotals.saldoColheita.toLocaleString("pt-br", {
+                    <td style="text-align: center; font-weight: bold">[[newTotals?.saldoColheita?.toLocaleString("pt-br", {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2
                     })]] ha</td>
-                    <td style="text-align: center; font-weight: bold">[[newTotals.pesoColhido.toLocaleString("pt-br", {
+                    <td style="text-align: center; font-weight: bold">[[newTotals?.pesoColhido?.toLocaleString("pt-br", {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2
                     })]] Scs</td>

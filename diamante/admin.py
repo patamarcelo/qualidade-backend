@@ -42,6 +42,7 @@ def get_cargas_model():
         for x in Colheita.objects.values(
             "plantio__talhao__fazenda__nome",
             "plantio__variedade__cultura__cultura",
+            "plantio__variedade__variedade",
         )
         .annotate(
             peso_kg=Sum("peso_liquido"),
@@ -94,13 +95,14 @@ class PlantioDetailAdmin(admin.ModelAdmin):
             "area_total": Sum("area_colheita"),
             "area_finalizada": Case(
                 When(finalizado_colheita=True, then=Coalesce(Sum("area_colheita"), 0)),
-                default=Value(0),
-                output_field=DecimalField(),
-            ),
-            "area_parcial": Case(
                 When(finalizado_colheita=False, then=Coalesce(Sum("area_parcial"), 0)),
                 default=Value(0),
                 output_field=DecimalField(),
+                # ),
+                # "area_parcial": Case(
+                #     When(finalizado_colheita=False, then=Coalesce(Sum("area_parcial"), 0)),
+                #     default=Value(0),
+                #     output_field=DecimalField(),
             ),
         }
 
@@ -111,7 +113,11 @@ class PlantioDetailAdmin(admin.ModelAdmin):
                 finalizado_plantio=True,
                 plantio_descontinuado=False,
             )
-            .values("talhao__fazenda__nome", "variedade__cultura__cultura")
+            .values(
+                "talhao__fazenda__nome",
+                "variedade__cultura__cultura",
+                "variedade__variedade",
+            )
             .annotate(**metrics)
             .order_by("talhao__fazenda__nome")
         )
@@ -388,8 +394,9 @@ class PlantioAdmin(admin.ModelAdmin):
         "safra_description",
         "variedade_description",
         "get_description_finalizado_plantio",
-        "get_description_finalizado_colheita",
         "area_colheita",
+        "get_description_finalizado_colheita",
+        "area_parcial",
         "get_data_primeira_carga",
         "get_total_colheita_cargas",
         "get_total_colheita_cargas_kg",

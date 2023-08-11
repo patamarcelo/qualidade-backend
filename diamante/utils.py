@@ -10,24 +10,17 @@ today = datetime.date.today()
 # pr_rr = Programa.objects.all()[4]
 # pr_conven = Programa.objects.all()[3]
 
+# pl_mungo = Plantio.objects.filter(safra__safra="2023/2024", ciclo__ciclo="1", variedade__cultura__cultura="Feijão", finalizado_plantio=True).filter(programa=pr_mungo)
+# pl_caupi = Plantio.objects.filter(safra__safra="2023/2024", ciclo__ciclo="1", variedade__cultura__cultura="Feijão", finalizado_plantio=True).filter(programa=pr_caupi)
 # pl_rr = Plantio.objects.filter(safra__safra="2023/2024", ciclo__ciclo="1", variedade__cultura__cultura="Soja", finalizado_plantio=True).filter(programa=pr_rr)
 # pl_conv = Plantio.objects.filter(safra__safra="2023/2024", ciclo__ciclo="1", variedade__cultura__cultura="Soja", finalizado_plantio=True).filter(programa=pr_conven)
-# pl_caupi = Plantio.objects.filter(safra__safra="2023/2024", ciclo__ciclo="1", variedade__cultura__cultura="Feijão", finalizado_plantio=True).filter(programa=pr_caupi)
-# pl_mungo = Plantio.objects.filter(safra__safra="2023/2024", ciclo__ciclo="1", variedade__cultura__cultura="Feijão", finalizado_plantio=True).filter(programa=pr_mungo)
+
 # op = Operacao.objects.filter(estagio=current_op, programa=)[0].operation_to_dict
 
 # index = get_index_dict_estagio(i.cronograma_programa, current_op)
 # if i.cronograma_programa[index]['aplicado'] == False:
 # i.cronograma_programa[index]['produtos'] = op
 # i.save()
-
-
-def alter_programa_and_save(query, operation, current_op_products):
-    for i in query:
-        index = get_index_dict_estagio(i.cronograma_programa, operation)
-        if i.cronograma_programa[index]["aplicado"] == False:
-            i.cronograma_programa[index]["produtos"] = current_op_products
-            i.save()
 
 
 def get_dap(data_plantio):
@@ -109,6 +102,18 @@ def get_index_dict_estagio(lista_programa, find_estagio):
         None,
     )
     return index
+
+
+def alter_programa_and_save(query, operation, current_op_products):
+    for i in query:
+        try:
+            index = get_index_dict_estagio(i.cronograma_programa, operation)
+            if i.cronograma_programa[index]["aplicado"] == False:
+                i.cronograma_programa[index]["produtos"] = current_op_products
+                i.save()
+                print(f"Alteração de programa salva com sucesso: {i}")
+        except Exception as e:
+            print("Erro ao Salvar a alteração no programa do  plantio", e)
 
 
 # for i in pl_rr:
