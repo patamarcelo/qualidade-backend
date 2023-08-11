@@ -24,12 +24,11 @@
     
         
 
-        <div style="display: flex; justify-content: center">
-            <h1><span class="badge badge-pill badge-dark">Colheita [[titleAcomp]]</span></h1>
+        <div style="display: flex; justify-content: center; margin-bottom: 45px">
+            <h1><span class="badge badge-pill badge-success">Colheita [[titleAcomp]]</span></h1>
         </div>
-        
         <div class="container-fluid">
-            <table class="table table-striped">
+            <table class="table table-striped table-hover">
                 <thead>
                     <tr>
                         <th>Projeto</th>
@@ -92,33 +91,6 @@
                 </tfoot>
             </table>     
             <hr>
-            <!-- <div>
-                {% for i in summary %}
-                    <div style="display: flex; gap: 10px">
-                        <p> {{i.talhao__fazenda__nome}}</p>
-                        <p> {{i.variedade__cultura__cultura}}</p>
-                        <p> {{i.area_total}}</p>
-                        <p> {{i.area_colheita}}</p>
-                        <p> {{i.area_parcial}}</p>
-
-                    </div>
-                {% endfor %}
-            </div>
-            <hr/>
-            
-                <div style="display: flex; justify-content: center">
-                    <h1>Acompanhamento X: Colheita Y</h1>
-                </div>
-            
-            <div>
-                {% for i in colheita %}
-                    <div style="display: flex; gap: 10px">
-                        <p>{{i.plantio__talhao__fazenda__nome}}</p>
-                        <p>{{i.peso_kg}} Kg</p>
-                        <p>{{i.peso_scs}} Scs </p>
-                    </div>
-                {% endfor %}
-            </div> -->
         </div>
     </div>
 
