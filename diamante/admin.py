@@ -381,6 +381,7 @@ class PlantioAdmin(admin.ModelAdmin):
     raw_id_fields = ["talhao"]
     list_filter = (
         "variedade",
+        "variedade__cultura",
         "finalizado_plantio",
         "finalizado_colheita",
         "talhao__fazenda__nome",
@@ -1001,11 +1002,11 @@ class AplicacaoAdmin(admin.ModelAdmin):
     ]
     raw_id_fields = ["operacao"]
     list_filter = (
-        "defensivo",
         "operacao__programa",
+        "ativo",
+        "defensivo",
         "operacao",
         "defensivo__tipo",
-        "ativo",
     )
 
     readonly_fields = (
