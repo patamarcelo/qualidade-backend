@@ -7,23 +7,25 @@
 {% block content_title %}
 
 
-<div style="display: flex; justify-content: center">
-    <h1>Acompanhamento [[titleAcomp]]</h1>
+<div class="container-fluid">
+    <select class="form-select form-select-lg" aria-label=".form-select-lg example" v-model="filteredCutulre">
+        <option v-for="cultura in variedades" :value="cultura">[[cultura]]</option>
+    </select>
+    
+    <select class="form-select form-select-lg" aria-label=".form-select-lg example" v-model="filteredCutulreDif">
+        <option v-for="variedade in filterVariedadesDif" :value="variedade">[[variedade]]</option>
+    </select>
 </div>
+
 
 
 {% endblock %}
 {% block result_list %}
     
         
-        <div class="container-fluid">
-            <select class="form-select form-select-lg" aria-label=".form-select-lg example" v-model="filteredCutulre">
-                <option v-for="cultura in variedades" :value="cultura">[[cultura]]</option>
-            </select>
-            
-            <select class="form-select form-select-lg" aria-label=".form-select-lg example" v-model="filteredCutulreDif">
-                <option v-for="variedade in filterVariedadesDif" :value="variedade">[[variedade]]</option>
-            </select>
+
+        <div style="display: flex; justify-content: center">
+            <h1><span class="badge badge-pill badge-dark">Colheita [[titleAcomp]]</span></h1>
         </div>
         
         <div class="container-fluid">
