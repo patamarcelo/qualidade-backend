@@ -278,13 +278,151 @@ class PlantioViewSet(viewsets.ModelViewSet):
             response = {"message": "Você precisa estar logado!!!"}
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
+    # --------------------- ---------------------- UPDATE PLANTIO API --------------------- ----------------------#
+    @action(detail=True, methods=["GET"])
+    def get_plantio_from_farmBox(self, request, pk=None):
+        if request.user.is_authenticated:
+            try:
+                # file = request.FILES["plantio_arroz"]
+                # file_ = open(os.path.join(settings.BASE_DIR, 'filename'))
+                date_file = "2023-05-01"
+                with open(f"static/files/dataset-{date_file}.json") as user_file:
+                    file_contents = user_file.read()
+                    parsed_json = json.loads(file_contents)
+                    new_list = parsed_json
+                # DB CONSULT
+                talhao_list = Talhao.objects.all()
+                variedade_list = Variedade.objects.all()
+                safra = Safra.objects.all()[1]
+                ciclo_list = Ciclo.objects.all()
+                projetos = Projeto.objects.all()
+
+                area_total_1 = 0
+                area_total_2 = 0
+                area_total_3 = 0
+                cultura_list = []
+                ciclo_and_cultura = []
+                ciclo_1 = {}
+                ciclo_2 = {}
+                ciclo_3 = {}
+
+                for i in new_list:
+                    state = i["state"]
+                    date_plantio = i["date"]
+                    activation_date = ["activation_date"]
+                    parcela = i["name"].replace(" ", "")
+                    farm_name = i["farm_name"]
+                    variedade_name = i["variety_name"]
+                    area = i["area"]
+
+                    variedade_planejada = i["planned_variety_name"]
+                    cultura_planejada = i["planned_culture_name"]
+
+                    culture_id = i["culture_id"]
+                    variety_id = i["variety_id"]
+                    fazenda_id = i["farm"]["id"]
+                    variedade_planejada_id = i["planned_variety_id"]
+                    cultura_planejada_id = i["planned_culture_id"]
+
+                    safra_farm = i["harvest_name"]
+                    ciclo_json = i["cycle"]
+
+                    ciclo = ciclo_list[ciclo_json - 1]
+
+                    id_talhao = [
+                        x.id_d for x in projetos if x.id_farmbox == fazenda_id
+                    ][0]
+                    id_variedade = [
+                        x
+                        for x in variedade_list
+                        if x.id_farmbox == variedade_planejada_id
+                    ][0]
+
+                    if id_talhao:
+                        try:
+                            talhao_id = f"{id_talhao}{parcela}"
+                            talhao_id = [
+                                x for x in talhao_list if x.id_unico == talhao_id
+                            ][0]
+                        except Exception as e:
+                            print(
+                                f"{Fore.RED}id sem cadastro: {id_talhao}{parcela} - {farm_name} - Ciclo: {ciclo}{Style.RESET_ALL}"
+                            )
+                    else:
+                        talhao_id = 0
+                    try:
+                        id_variedade = [
+                            x
+                            for x in variedade_list
+                            if x.id_farmbox == variedade_planejada_id
+                        ][0]
+                    except Exception as e:
+                        print(
+                            f"{Fore.RED}variedade sem cadastro: {id_variedade}{Style.RESET_ALL}"
+                        )
+                    if cultura_planejada:
+                        if ciclo_json == 1:
+                            if ciclo_1.get(cultura_planejada):
+                                area_total = ciclo_1.get(cultura_planejada) + area
+                                ciclo_1.update({cultura_planejada: round(area_total)})
+                            else:
+                                ciclo_1.update({cultura_planejada: round(area)})
+                        if ciclo_json == 2:
+                            if ciclo_2.get(cultura_planejada):
+                                area_total = ciclo_2.get(cultura_planejada) + area
+                                ciclo_2.update({cultura_planejada: round(area_total)})
+                            else:
+                                ciclo_2.update({cultura_planejada: round(area)})
+                        if ciclo_json == 3:
+                            if ciclo_3.get(cultura_planejada):
+                                area_total = ciclo_3.get(cultura_planejada) + area
+                                ciclo_3.update({cultura_planejada: round(area_total)})
+                            else:
+                                ciclo_3.update({cultura_planejada: round(area)})
+                print(f"Area Total da Soja Ciclo 1: {area_total_1}")
+                print(f"Area Total da Soja Ciclo 2: {area_total_2}")
+                print(f"Area Total da Soja Ciclo 3: {area_total_3}")
+
+                print(set(cultura_list))
+                print("Ciclo 1")
+                for k, v in ciclo_1.items():
+                    print(f"Cultura: {k} - Area: {v}")
+                print("Ciclo 2")
+                for k, v in ciclo_2.items():
+                    print(f"Cultura: {k} - Area: {v}")
+                print("Ciclo 3")
+                for k, v in ciclo_3.items():
+                    print(f"Cultura: {k} - Area: {v}")
+                qs_plantio = Plantio.objects.filter(safra__safra="2023/2024")
+
+                total_plantado = Plantio.objects.filter(
+                    safra__safra="2023/2024", ciclo__ciclo="1"
+                ).aggregate(Sum("area_colheita"))
+
+                serializer_plantio = PlantioSerializer(qs_plantio, many=True)
+                response = {
+                    "msg": f"Consulta realizada com sucesso!!",
+                    "total_return": len(qs_plantio),
+                    "Area Total dos Talhoes Plantados": total_plantado,
+                    "dados": serializer_plantio.data,
+                }
+                return Response(response, status=status.HTTP_200_OK)
+            except Exception as e:
+                response = {"message": f"Ocorreu um Erro: {e}"}
+                return Response(response, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            response = {"message": "Você precisa estar logado!!!"}
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+    # --------------------- ---------------------- UPDATE PLANTIO API --------------------- ----------------------#
+
     @action(detail=True, methods=["POST"])
     def save_plantio_from_farmBox_json(self, request, pk=None):
         if request.user.is_authenticated:
             try:
                 # file = request.FILES["plantio_arroz"]
                 # file_ = open(os.path.join(settings.BASE_DIR, 'filename'))
-                date_file = "2023-08-11 08:19"
+                date_file = "2023-08-11 17:31"
                 with open(f"static/files/dataset-{date_file}.json") as user_file:
                     file_contents = user_file.read()
                     parsed_json = json.loads(file_contents)
@@ -443,144 +581,6 @@ class PlantioViewSet(viewsets.ModelViewSet):
             response = {"message": "Você precisa estar logado!!!"}
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
-    # --------------------- ---------------------- UPDATE PLANTIO API --------------------- ----------------------#
-    @action(detail=True, methods=["GET"])
-    def get_plantio_from_farmBox(self, request, pk=None):
-        if request.user.is_authenticated:
-            try:
-                # file = request.FILES["plantio_arroz"]
-                # file_ = open(os.path.join(settings.BASE_DIR, 'filename'))
-                date_file = "2023-05-01"
-                with open(f"static/files/dataset-{date_file}.json") as user_file:
-                    file_contents = user_file.read()
-                    parsed_json = json.loads(file_contents)
-                    new_list = parsed_json
-                # DB CONSULT
-                talhao_list = Talhao.objects.all()
-                variedade_list = Variedade.objects.all()
-                safra = Safra.objects.all()[1]
-                ciclo_list = Ciclo.objects.all()
-                projetos = Projeto.objects.all()
-
-                area_total_1 = 0
-                area_total_2 = 0
-                area_total_3 = 0
-                cultura_list = []
-                ciclo_and_cultura = []
-                ciclo_1 = {}
-                ciclo_2 = {}
-                ciclo_3 = {}
-
-                for i in new_list:
-                    state = i["state"]
-                    date_plantio = i["date"]
-                    activation_date = ["activation_date"]
-                    parcela = i["name"].replace(" ", "")
-                    farm_name = i["farm_name"]
-                    variedade_name = i["variety_name"]
-                    area = i["area"]
-
-                    variedade_planejada = i["planned_variety_name"]
-                    cultura_planejada = i["planned_culture_name"]
-
-                    culture_id = i["culture_id"]
-                    variety_id = i["variety_id"]
-                    fazenda_id = i["farm"]["id"]
-                    variedade_planejada_id = i["planned_variety_id"]
-                    cultura_planejada_id = i["planned_culture_id"]
-
-                    safra_farm = i["harvest_name"]
-                    ciclo_json = i["cycle"]
-
-                    ciclo = ciclo_list[ciclo_json - 1]
-
-                    id_talhao = [
-                        x.id_d for x in projetos if x.id_farmbox == fazenda_id
-                    ][0]
-                    id_variedade = [
-                        x
-                        for x in variedade_list
-                        if x.id_farmbox == variedade_planejada_id
-                    ][0]
-
-                    if id_talhao:
-                        try:
-                            talhao_id = f"{id_talhao}{parcela}"
-                            talhao_id = [
-                                x for x in talhao_list if x.id_unico == talhao_id
-                            ][0]
-                        except Exception as e:
-                            print(
-                                f"{Fore.RED}id sem cadastro: {id_talhao}{parcela} - {farm_name} - Ciclo: {ciclo}{Style.RESET_ALL}"
-                            )
-                    else:
-                        talhao_id = 0
-                    try:
-                        id_variedade = [
-                            x
-                            for x in variedade_list
-                            if x.id_farmbox == variedade_planejada_id
-                        ][0]
-                    except Exception as e:
-                        print(
-                            f"{Fore.RED}variedade sem cadastro: {id_variedade}{Style.RESET_ALL}"
-                        )
-                    if cultura_planejada:
-                        if ciclo_json == 1:
-                            if ciclo_1.get(cultura_planejada):
-                                area_total = ciclo_1.get(cultura_planejada) + area
-                                ciclo_1.update({cultura_planejada: round(area_total)})
-                            else:
-                                ciclo_1.update({cultura_planejada: round(area)})
-                        if ciclo_json == 2:
-                            if ciclo_2.get(cultura_planejada):
-                                area_total = ciclo_2.get(cultura_planejada) + area
-                                ciclo_2.update({cultura_planejada: round(area_total)})
-                            else:
-                                ciclo_2.update({cultura_planejada: round(area)})
-                        if ciclo_json == 3:
-                            if ciclo_3.get(cultura_planejada):
-                                area_total = ciclo_3.get(cultura_planejada) + area
-                                ciclo_3.update({cultura_planejada: round(area_total)})
-                            else:
-                                ciclo_3.update({cultura_planejada: round(area)})
-                print(f"Area Total da Soja Ciclo 1: {area_total_1}")
-                print(f"Area Total da Soja Ciclo 2: {area_total_2}")
-                print(f"Area Total da Soja Ciclo 3: {area_total_3}")
-
-                print(set(cultura_list))
-                print("Ciclo 1")
-                for k, v in ciclo_1.items():
-                    print(f"Cultura: {k} - Area: {v}")
-                print("Ciclo 2")
-                for k, v in ciclo_2.items():
-                    print(f"Cultura: {k} - Area: {v}")
-                print("Ciclo 3")
-                for k, v in ciclo_3.items():
-                    print(f"Cultura: {k} - Area: {v}")
-                qs_plantio = Plantio.objects.filter(safra__safra="2023/2024")
-
-                total_plantado = Plantio.objects.filter(
-                    safra__safra="2023/2024", ciclo__ciclo="1"
-                ).aggregate(Sum("area_colheita"))
-
-                serializer_plantio = PlantioSerializer(qs_plantio, many=True)
-                response = {
-                    "msg": f"Consulta realizada com sucesso!!",
-                    "total_return": len(qs_plantio),
-                    "Area Total dos Talhoes Plantados": total_plantado,
-                    "dados": serializer_plantio.data,
-                }
-                return Response(response, status=status.HTTP_200_OK)
-            except Exception as e:
-                response = {"message": f"Ocorreu um Erro: {e}"}
-                return Response(response, status=status.HTTP_400_BAD_REQUEST)
-        else:
-            response = {"message": "Você precisa estar logado!!!"}
-            return Response(response, status=status.HTTP_400_BAD_REQUEST)
-
-    # --------------------- ---------------------- UPDATE PLANTIO API --------------------- ----------------------#
-
     # --------------------- ---------------------- UPDATE PLANTIO API FROM FARMBOX START --------------------- ----------------------#
     @action(detail=True, methods=["GET"])
     def update_plantio_from_farmBox(self, request, pk=None):
@@ -588,7 +588,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             try:
                 # file = request.FILES["plantio_arroz"]
                 # file_ = open(os.path.join(settings.BASE_DIR, 'filename'))
-                date_file = "2023-08-11 08:07"
+                date_file = "2023-08-11 17:31"
                 with open(f"static/files/dataset-{date_file}.json") as user_file:
                     file_contents = user_file.read()
                     parsed_json = json.loads(file_contents)
@@ -715,7 +715,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                             field_to_update.programa = None
                             field_to_update.save()
                             print(
-                                f"{Fore.YELLOW}Plantio Alterado com sucesso para SEM VARIEDADE: {field_to_update}{Style.RESET_ALL}"
+                                f"{Fore.YELLOW}Plantio Alterado com sucesso para SEM VARIEDADE: {field_to_update}- {safra} - {ciclo}{Style.RESET_ALL}"
                             )
                             print("\n")
                             count_total += 1
@@ -1262,17 +1262,17 @@ class PlantioViewSet(viewsets.ModelViewSet):
 
     # --------------------- ---------------------- PLANTIO APLICACOES API START --------------------- ----------------------#
 
-    @action(detail=False, methods=["GET"])
+    @action(detail=False, methods=["GET", "POST"])
     def get_plantio_operacoes_detail(self, request):
         if request.user.is_authenticated:
             try:
-                safra_2022_2023 = 0
-                safra_2023_2024 = 1
-                safra = Safra.objects.all()[safra_2023_2024]
-                ciclo_1 = 0
-                ciclo_2 = 1
-                ciclo_3 = 2
-                ciclo = Ciclo.objects.all()[ciclo_1]
+                safra_filter = request.data["safra"]
+                cicle_filter = request.data["ciclo"]
+                print(safra_filter)
+                print(cicle_filter)
+                safra_filter = "2023/2024" if safra_filter == None else safra_filter
+                cicle_filter = "1" if cicle_filter == None else cicle_filter
+
                 qs_plantio = (
                     Plantio.objects.values(
                         "id",
@@ -1296,7 +1296,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         "programa__nome",
                     )
                     .filter(~Q(programa_id=None))
-                    .filter(safra=safra, ciclo=ciclo)
+                    .filter(safra__safra=safra_filter, ciclo__ciclo=cicle_filter)
                     .filter(Q(data_plantio=None))
                     .filter(plantio_descontinuado=False)
                 )
@@ -1319,65 +1319,69 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     )
                     .filter(~Q(operacao__programa_id=None))
                     .filter(
-                        operacao__programa__safra=safra,
-                        operacao__programa__ciclo=ciclo,
+                        operacao__programa__safra__safra=safra_filter,
+                        operacao__programa__ciclo__ciclo=cicle_filter,
                         ativo=True,
                     )
                 )
 
                 final_result = {i["talhao__fazenda__nome"]: {} for i in qs_plantio}
-
-                {
-                    final_result[i["talhao__fazenda__nome"]].update(
-                        {
-                            i["talhao__id_talhao"]: {
-                                "safra": i["safra__safra"],
-                                "ciclo": i["ciclo__ciclo"],
-                                "cultura": i["variedade__cultura__cultura"],
-                                "variedade": i["variedade__nome_fantasia"],
-                                "plantio_id": i["id"],
-                                "fazenda_grupo": i["talhao__fazenda__fazenda__nome"],
-                                "talhao_id_unico": i["talhao__id_unico"],
-                                "plantio_finalizado": i["finalizado_plantio"],
-                                "area_colheita": i["area_colheita"],
-                                "data_plantio": i["data_plantio"],
-                                "dap": get_dap(i["data_plantio"]),
-                                "programa_id": i["programa"],
-                                "programa": i["programa__nome"],
-                                "programa_start_date": i["programa__start_date"],
-                                "programa_end_date": i["programa__end_date"],
-                                "capacidade_plantio_dia": i[
-                                    "talhao__fazenda__fazenda__capacidade_plantio_ha_dia"
-                                ],
-                                "cronograma": [
-                                    {
-                                        "estagio": x["estagio"],
-                                        "dap": x["prazo_dap"],
-                                        "data prevista": get_prev_app_date(
-                                            i["data_plantio"], x["prazo_dap"]
-                                        ),
-                                        "produtos": [
-                                            {
-                                                "produto": y["defensivo__produto"],
-                                                "tipo": y["defensivo__tipo"],
-                                                "dose": y["dose"],
-                                                "quantidade aplicar": get_quantidade_aplicar(
-                                                    y["dose"], i["area_colheita"]
-                                                ),
-                                            }
-                                            for y in qs_aplicacoes
-                                            if x["programa_id"] == i["programa"]
-                                            and y["operacao"] == x["id"]
-                                        ],
-                                    }
-                                    for x in qs_programas
-                                    if x["programa_id"] == i["programa"]
-                                ],
+                try:
+                    {
+                        final_result[i["talhao__fazenda__nome"]].update(
+                            {
+                                i["talhao__id_talhao"]: {
+                                    "safra": i["safra__safra"],
+                                    "ciclo": i["ciclo__ciclo"],
+                                    "cultura": i["variedade__cultura__cultura"],
+                                    "variedade": i["variedade__nome_fantasia"],
+                                    "plantio_id": i["id"],
+                                    "fazenda_grupo": i[
+                                        "talhao__fazenda__fazenda__nome"
+                                    ],
+                                    "talhao_id_unico": i["talhao__id_unico"],
+                                    "plantio_finalizado": i["finalizado_plantio"],
+                                    "area_colheita": i["area_colheita"],
+                                    "data_plantio": i["data_plantio"],
+                                    "dap": get_dap(i["data_plantio"]),
+                                    "programa_id": i["programa"],
+                                    "programa": i["programa__nome"],
+                                    "programa_start_date": i["programa__start_date"],
+                                    "programa_end_date": i["programa__end_date"],
+                                    "capacidade_plantio_dia": i[
+                                        "talhao__fazenda__fazenda__capacidade_plantio_ha_dia"
+                                    ],
+                                    "cronograma": [
+                                        {
+                                            "estagio": x["estagio"],
+                                            "dap": x["prazo_dap"],
+                                            "data prevista": get_prev_app_date(
+                                                i["data_plantio"], x["prazo_dap"]
+                                            ),
+                                            "produtos": [
+                                                {
+                                                    "produto": y["defensivo__produto"],
+                                                    "tipo": y["defensivo__tipo"],
+                                                    "dose": y["dose"],
+                                                    "quantidade aplicar": get_quantidade_aplicar(
+                                                        y["dose"], i["area_colheita"]
+                                                    ),
+                                                }
+                                                for y in qs_aplicacoes
+                                                if x["programa_id"] == i["programa"]
+                                                and y["operacao"] == x["id"]
+                                            ],
+                                        }
+                                        for x in qs_programas
+                                        if x["programa_id"] == i["programa"]
+                                    ],
+                                }
                             }
-                        }
-                    )
-                    for i in qs_plantio
-                }
+                        )
+                        for i in qs_plantio
+                    }
+                except Exception as e:
+                    print("erro ao gerar", e)
 
                 prev_date = {}
                 # 50 ha por dia
@@ -1527,17 +1531,19 @@ class PlantioViewSet(viewsets.ModelViewSet):
 
     # --------------------- ---------------------- PLANTIO APLICACOES API END --------------------- ----------------------#
 
-    @action(detail=False, methods=["GET"])
+    @action(detail=False, methods=["GET", "POST"])
     def get_plantio_operacoes_detail_json_program(self, request):
         if request.user.is_authenticated:
             try:
-                safra_2022_2023 = 0
-                safra_2023_2024 = 1
-                safra = Safra.objects.all()[safra_2023_2024]
-                ciclo_1 = 0
-                ciclo_2 = 1
-                ciclo_3 = 2
-                ciclo = Ciclo.objects.all()[ciclo_1]
+                safra_filter = request.data["safra"]
+                cicle_filter = request.data["ciclo"]
+
+                print(safra_filter)
+                print(cicle_filter)
+
+                safra_filter = "2023/2024" if safra_filter == None else safra_filter
+                cicle_filter = "1" if cicle_filter == None else cicle_filter
+
                 qs_plantio = (
                     Plantio.objects.values(
                         "id",
@@ -1563,7 +1569,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         "cronograma_programa",
                     )
                     .filter(~Q(programa_id=None))
-                    .filter(safra=safra, ciclo=ciclo)
+                    .filter(safra__safra=safra_filter, ciclo__ciclo=cicle_filter)
                     .filter(data_plantio__isnull=False)
                     .filter(plantio_descontinuado=False)
                 )

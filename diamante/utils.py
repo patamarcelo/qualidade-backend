@@ -45,17 +45,20 @@ pl_soja = pl.filter(variedade__cultura__cultura="Soja")
 
 
 def get_dap(data_plantio):
-    dap = 0
-    today = datetime.date.today()
-    if type(data_plantio) == str:
-        date_ftime = datetime.datetime.strptime(data_plantio, "%Y-%m-%d")
-        today_st = datetime.datetime.now()
-        dap = today_st - date_ftime
-        dap = dap.days + 1
-    elif type(data_plantio) != str:
-        dap = today - data_plantio
-        dap = dap.days + 1
-    return dap
+    if data_plantio:
+        dap = 0
+        today = datetime.date.today()
+        if type(data_plantio) == str:
+            date_ftime = datetime.datetime.strptime(data_plantio, "%Y-%m-%d")
+            today_st = datetime.datetime.now()
+            dap = today_st - date_ftime
+            dap = dap.days + 1
+        elif type(data_plantio) != str:
+            dap = today - data_plantio
+            dap = dap.days + 1
+        return dap
+    else:
+        return 0
 
 
 def get_prev_app_date(data_plantio, prazo_dap):
