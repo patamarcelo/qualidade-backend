@@ -159,6 +159,7 @@ TIPO_CHOICES = (
     ("acaricida", "Acaricida"),
     ("adjuvante", "Adjuvante"),
     ("biologico", "Biológico"),
+    ("cobertura", "Cobertura"),
     ("fertilizante", "Fertilizante"),
     ("fungicida", "Fungicida"),
     ("herbicida", "Herbicida"),
@@ -167,7 +168,7 @@ TIPO_CHOICES = (
     ("nutricao", "Nutrição"),
     ("oleo_mineral_vegetal", "Óleo Mineral/Vegetal"),
     ("protetor", "Protetor"),
-    ("regulador", "Regulador")
+    ("regulador", "Regulador"),
 )
 
 
