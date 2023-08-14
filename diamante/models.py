@@ -632,7 +632,7 @@ class Plantio(Base):
                     )
                     etapa = {
                         "estagio": i.estagio,
-                        "aplicado": False,
+                        "aplicado": True if i.prazo_dap <= 0 else False,
                         "dap": i.prazo_dap,
                         "data prevista": format_date_json(
                             str(data_plantio), datetime.timedelta(days=time_delta_prazo)

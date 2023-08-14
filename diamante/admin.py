@@ -154,6 +154,7 @@ class ExportCsvMixin:
 class EstagiosProgramaInline(admin.StackedInline):
     model = Operacao
     extra = 0
+    fields = ["ativo", "estagio", "operacao_numero", "prazo_dap"]
 
 
 class AplicacoesProgramaInline(admin.StackedInline):
