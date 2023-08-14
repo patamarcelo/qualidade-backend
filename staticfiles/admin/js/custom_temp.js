@@ -99,6 +99,7 @@ var app = new Vue({
 						acc[newObj]["areaColheita"] += Number(
 							curr.area_finalizada
 						);
+						acc[newObj]["saldoColheita"] += Number(curr.area_total) - Number(curr.area_finalizada);
 					}
 					return acc;
 				}, {});
