@@ -166,7 +166,8 @@ TIPO_CHOICES = (
     ("lubrificante", "Lubrificante"),
     ("nutricao", "Nutrição"),
     ("oleo_mineral_vegetal", "Óleo Mineral/Vegetal"),
-    ("regulador", "Regulador"),
+    ("protetor", "Protetor"),
+    ("regulador", "Regulador")
 )
 
 
