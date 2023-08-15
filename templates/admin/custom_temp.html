@@ -44,6 +44,7 @@
                     <tr v-for="(col,i) in filteredArray">
                     <td>[[ i.split("|")[0] ]]</td>
                     <td style="text-align: center">[[ i.split("|")[1] ]]</td>
+                    <!-- <td style="text-align: center"><img src="{% static 'images/icons/soy.png' %}" /> </td> -->
                     <td style="text-align: center">[[ col?.areaTotal?.toLocaleString("pt-br", {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2

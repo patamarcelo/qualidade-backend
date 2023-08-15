@@ -381,14 +381,14 @@ class PlantioAdmin(admin.ModelAdmin):
     ]
     raw_id_fields = ["talhao"]
     list_filter = (
-        "variedade",
+        "safra__safra",
+        "ciclo__ciclo",
         "variedade__cultura",
         "finalizado_plantio",
         "finalizado_colheita",
-        "talhao__fazenda__nome",
-        "safra__safra",
-        "ciclo__ciclo",
         "programa__nome",
+        "talhao__fazenda__nome",
+        "variedade",
         "modificado",
     )
     list_display = (
@@ -782,6 +782,7 @@ class ColheitaAdmin(admin.ModelAdmin):
         "romaneio",
         "placa",
         "motorista",
+        "deposito__nome_fantasia",
         "plantio__talhao__id_unico",
         "plantio__talhao__fazenda__nome",
         "plantio__talhao__fazenda__fazenda__nome",
