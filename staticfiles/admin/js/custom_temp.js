@@ -20,7 +20,11 @@ var app = new Vue({
 		variedadesDif: [...new Set(filterVarDif)],
 		filteredCutulre: "Todas",
 		filteredCutulreDif: "",
-		selected: ""
+		selected: "",
+		style: {
+			color: "whitesmoke",
+			backgroundColor: "blue"
+		}
 	},
 	methods: {
 		greet: function (name) {
@@ -29,6 +33,18 @@ var app = new Vue({
 	},
 	watch: {
 		filteredCutulre() {
+			if (this.filteredCutulre === "Todas") {
+				console.log("todas", this.filteredCutulre);
+				this.style.backgroundColor = "blue";
+			}
+			if (this.filteredCutulre === "Soja") {
+				console.log("Soja", this.filteredCutulre);
+				this.style.backgroundColor = "green";
+			}
+			if (this.filteredCutulre === "Feijão") {
+				console.log("Feijão", this.filteredCutulre);
+				this.style.backgroundColor = "rgb(119,63,27)";
+			}
 			if (this.filteredCutulre === "Todas") {
 				this.filteredCutulreDif = "";
 			} else {

@@ -7,7 +7,7 @@
 {% block content_title %}
 
 
-<div class="container-fluid">
+<div class="container-fluid mb-4">
     <select class="form-select form-select-lg" aria-label=".form-select-lg example" v-model="filteredCutulre">
         <option v-for="cultura in variedades" :value="cultura">[[cultura]]</option>
     </select>
@@ -25,7 +25,7 @@
         
 
         <div style="display: flex; justify-content: center; margin-bottom: 45px">
-            <h1><span class="badge badge-pill badge-success">Colheita [[titleAcomp]]</span></h1>
+            <h1><span class="badge badge-pill badge-success" :style="style">Colheita [[titleAcomp]]</span></h1>
         </div>
         <div class="container-fluid">
             <table class="table table-striped table-hover">

@@ -729,7 +729,7 @@ class ColheitaAdmin(admin.ModelAdmin):
                     ("data_colheita", "romaneio"),
                     ("placa", "motorista"),
                     ("ticket", "op"),
-                    ("peso_bruto", "peso_tara"),
+                    ("peso_tara", "peso_bruto"),
                     ("peso_liquido", "peso_scs_liquido"),
                 )
             },
