@@ -24,11 +24,20 @@ var app = new Vue({
 		style: {
 			color: "whitesmoke",
 			backgroundColor: "blue"
-		}
+		},
+		imageField: "soy"
 	},
 	methods: {
 		greet: function (name) {
 			console.log("Hello from " + name + "!");
+		},
+		customIcon(cultura) {
+			if (cultura === "Soja") {
+				return "/static/images/icons/soy.png";
+			}
+			if (cultura === "Feijão") {
+				return "/static/images/icons/beans2.png";
+			}
 		}
 	},
 	watch: {

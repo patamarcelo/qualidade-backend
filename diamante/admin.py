@@ -49,6 +49,7 @@ def get_cargas_model():
             peso_scs=Round((Sum("peso_liquido") / 60), precision=2),
         )
         .order_by("plantio__talhao__fazenda__nome")
+        .filter(~Q(plantio__variedade__cultura__cultura="Milheto"))
     ]
     return cargas_model
 
@@ -113,6 +114,7 @@ class PlantioDetailAdmin(admin.ModelAdmin):
                 finalizado_plantio=True,
                 plantio_descontinuado=False,
             )
+            .filter(~Q(variedade__cultura__cultura="Milheto"))
             .values(
                 "talhao__fazenda__nome",
                 "variedade__cultura__cultura",
