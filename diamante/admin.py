@@ -34,6 +34,7 @@ from django.db.models import Case, When, DecimalField, Value
 from django.db.models.functions import Coalesce, Round
 
 from django.core import serializers
+from django.contrib.admin import SimpleListFilter
 
 
 def get_cargas_model():
@@ -341,6 +342,34 @@ def export_plantio(modeladmin, request, queryset):
     return response
 
 
+class ColheitaFilter(SimpleListFilter):
+    title = "Cargas"  # or use _('country') for translated title
+    parameter_name = "cargas"
+
+    def lookups(self, request, model_admin):
+        # id_list = [x['plantio__id'] for x in model_admin.total_c_2]
+        # filtered_query = model_admin.model.objects.filter(id__in=id_list)
+        # return filtered_query
+        return [
+            ("Carregados", "Carregados"),
+            ("Sem Cargas", "Sem Cargas"),
+        ]
+
+    total_c_2 = [
+        x
+        for x in Colheita.objects.values_list(
+            "plantio__id", "peso_liquido", "data_colheita"
+        )
+    ]
+
+    def queryset(self, request, queryset):
+        id_list = [x[0] for x in self.total_c_2]
+        if self.value() == "Carregados":
+            return queryset.filter(id__in=id_list)
+        if self.value() == "Sem Cargas":
+            return queryset.exclude(id__in=id_list)
+
+
 @admin.register(Plantio)
 class PlantioAdmin(admin.ModelAdmin):
     actions = [export_plantio]
@@ -392,6 +421,7 @@ class PlantioAdmin(admin.ModelAdmin):
         "talhao__fazenda__nome",
         "variedade",
         "modificado",
+        ColheitaFilter,
     )
     list_display = (
         "talhao",
@@ -518,10 +548,11 @@ class PlantioAdmin(admin.ModelAdmin):
     def get_total_prod(self, obj):
         total_filt_list = sum([x[1] for x in self.total_c_2 if obj.id == x[0]])
         prod_scs = None
-        if obj.finalizado_plantio:
+        if obj.finalizado_colheita:
             try:
                 prod = total_filt_list / obj.area_colheita
                 prod_scs = prod / 60
+                return f"{localize(round(prod_scs,2))} Scs/ha"
             except ZeroDivisionError:
                 value = float("Inf")
         if obj.area_parcial:
@@ -943,7 +974,7 @@ class OperacaoAdmin(admin.ModelAdmin):
         "get_cultura_description",
         "get_obs_description",
     )
-    list_filter = ["programa", "programa__safra", "programa__ciclo"]
+    list_filter = ["programa", "programa__safra", "programa__ciclo", "modificado"]
 
     ordering = (
         "programa",

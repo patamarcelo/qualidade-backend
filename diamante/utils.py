@@ -23,7 +23,7 @@ today = datetime.date.today()
 # i.save()
 
 
-# -------------- SAFRA 2023/2024 - CICLO=2 --------------#
+# ------------------------------------------------------------------------------------ SAFRA 2023/2024 - CICLO=2 --------------#
 
 """
 from diamante.models import Plantio, Programa, Operacao
@@ -41,7 +41,21 @@ pl_soja = pl.filter(variedade__cultura__cultura="Soja")
 
 """
 
-# -------------- SAFRA 2023/2024 - CICLO=2 --------------#
+# ------------------------------------------------------------------------------------ SAFRA 2023/2024 - CICLO=2 --------------#
+
+
+# ------------------------------------------------------------------------------------ SAFRA 2023/2024 - CICLO=3 --------------#
+
+"""
+from diamante.models import Plantio, Programa, Operacao
+from diamante.utils import *
+pr_arroz = Programa.objects.filter(safra__safra="2023/2024", ciclo__ciclo="3", cultura__cultura="Arroz")[0]
+
+pl = Plantio.objects.filter(safra__safra="2023/2024", ciclo__ciclo="3")
+pl_arroz = pl.filter(variedade__cultura__cultura="Arroz")
+
+"""
+# ------------------------------------------------------------------------------------ SAFRA 2023/2024 - CICLO=3 --------------#
 
 
 def get_dap(data_plantio):
