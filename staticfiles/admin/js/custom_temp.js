@@ -143,18 +143,28 @@ var app = new Vue({
 			}
 
 			for (let i = 0; i < filtColheita.length; i++) {
+				console.log(filtColheita[i]);
 				const nameDict =
 					`${filtColheita[i]["plantio__talhao__fazenda__nome"]}` +
 					"|" +
 					`${filtColheita[i]["plantio__variedade__cultura__cultura"]}`;
 
 				if (newDict[nameDict]) {
-					newDict[nameDict]["pesoColhido"] = Number(
-						filtColheita[i].peso_scs
-					);
-					newDict[nameDict]["produtividade"] =
-						Number(filtColheita[i].peso_scs) /
-						Number(newDict[nameDict]["areaColheita"]);
+					if (newDict[nameDict]["pesoColhido"] > 0) {
+						newDict[nameDict]["pesoColhido"] += Number(
+							filtColheita[i].peso_scs
+						);
+						newDict[nameDict]["produtividade"] =
+							newDict[nameDict]["pesoColhido"] /
+							Number(newDict[nameDict]["areaColheita"]);
+					} else {
+						newDict[nameDict]["pesoColhido"] = Number(
+							filtColheita[i].peso_scs
+						);
+						newDict[nameDict]["produtividade"] =
+							Number(filtColheita[i].peso_scs) /
+							Number(newDict[nameDict]["areaColheita"]);
+					}
 				}
 			}
 			return newDict;

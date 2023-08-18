@@ -756,6 +756,24 @@ class Colheita(Base):
         null=True,
     )
 
+    bandinha = models.DecimalField(
+        "Bandinha",
+        help_text="Informe a Bandinha da Carga",
+        max_digits=4,
+        decimal_places=2,
+        blank=True,
+        null=True,
+    )
+
+    desconto_bandinha = models.DecimalField(
+        "Desc. Bandinha",
+        help_text="Desconto Bandinha Calculado",
+        max_digits=8,
+        decimal_places=2,
+        blank=True,
+        null=True,
+    )
+
     peso_liquido = models.DecimalField(
         "Peso Liquido",
         help_text="Peso Líquido Calculado",
@@ -801,13 +819,21 @@ class Colheita(Base):
             self.desconto_impureza = desconto_impureza
             print(desconto_impureza)
 
+        if self.bandinha:
+            peso_liquido = decimal.Decimal(self.peso_bruto - self.peso_tara)
+            desconto_bandinha = (peso_liquido * self.bandinha) / 100
+            self.desconto_bandinha = desconto_bandinha
+            print(desconto_bandinha)
+
         self.peso_liquido = decimal.Decimal(self.peso_bruto - self.peso_tara)
 
         if self.desconto_umidade:
             self.peso_liquido = self.peso_liquido - self.desconto_umidade
         if self.desconto_impureza:
             self.peso_liquido = self.peso_liquido - self.desconto_impureza
-        print(self.desconto_umidade)
+        if self.desconto_bandinha:
+            self.peso_liquido = self.peso_liquido - self.desconto_bandinha
+
         self.peso_scs_liquido = self.peso_liquido / 60
         super(Colheita, self).save(*args, **kwargs)
 

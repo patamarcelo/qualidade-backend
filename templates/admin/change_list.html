@@ -151,7 +151,8 @@ $(function () {
         if (pesoLiquido.length > 0){
             const total = "Total Selecionado "
             $('.select-result-total').html(total + val.toLocaleString('pt-br',{  minimumFractionDigits: 2,
-                maximumFractionDigits: 2}) + " Kg")
+                maximumFractionDigits: 2}) + " Kg" + " | " + `${(val / 60).toLocaleString('pt-br',{  minimumFractionDigits: 2,
+                    maximumFractionDigits: 2})} Scs`)
         }
 
         $('.selected .field-area_colheita').each((i, e) =>{

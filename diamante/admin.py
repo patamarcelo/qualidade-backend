@@ -342,6 +342,16 @@ def export_plantio(modeladmin, request, queryset):
     return response
 
 
+def get_cargas_colheita():
+    total_c_2 = [
+        x
+        for x in Colheita.objects.values_list(
+            "plantio__id", "peso_liquido", "data_colheita"
+        )
+    ]
+    return total_c_2
+
+
 class ColheitaFilter(SimpleListFilter):
     title = "Cargas"  # or use _('country') for translated title
     parameter_name = "cargas"
@@ -355,15 +365,8 @@ class ColheitaFilter(SimpleListFilter):
             ("Sem Cargas", "Sem Cargas"),
         ]
 
-    total_c_2 = [
-        x
-        for x in Colheita.objects.values_list(
-            "plantio__id", "peso_liquido", "data_colheita"
-        )
-    ]
-
     def queryset(self, request, queryset):
-        id_list = [x[0] for x in self.total_c_2]
+        id_list = [x[0] for x in get_cargas_colheita()]
         if self.value() == "Carregados":
             return queryset.filter(id__in=id_list)
         if self.value() == "Sem Cargas":
@@ -374,6 +377,16 @@ class ColheitaFilter(SimpleListFilter):
 class PlantioAdmin(admin.ModelAdmin):
     actions = [export_plantio]
     show_full_result_count = False
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.total_c_2 = [
+            x
+            for x in Colheita.objects.values_list(
+                "plantio__id", "peso_liquido", "data_colheita"
+            )
+        ]
+        print(self.total_c_2)
 
     def get_ordering(self, request):
         return ["data_plantio"]
@@ -509,13 +522,6 @@ class PlantioAdmin(admin.ModelAdmin):
     )
 
     ordering = ("data_plantio",)
-
-    total_c_2 = [
-        x
-        for x in Colheita.objects.values_list(
-            "plantio__id", "peso_liquido", "data_colheita"
-        )
-    ]
 
     # DATA PRIMEIRA CARGA CARREGADA
     def get_data_primeira_carga(self, obj):
@@ -773,6 +779,7 @@ class ColheitaAdmin(admin.ModelAdmin):
                 "fields": (
                     ("umidade", "desconto_umidade"),
                     ("impureza", "desconto_impureza"),
+                    ("bandinha", "desconto_bandinha"),
                 )
             },
         ),
@@ -796,6 +803,8 @@ class ColheitaAdmin(admin.ModelAdmin):
         "desconto_umidade",
         "impureza",
         "desconto_impureza",
+        "bandinha",
+        "desconto_bandinha",
         "peso_liquido",
         "peso_scs_liquido",
     )
@@ -807,6 +816,7 @@ class ColheitaAdmin(admin.ModelAdmin):
         "peso_scs_liquido",
         "desconto_umidade",
         "desconto_impureza",
+        "desconto_bandinha",
         "criados",
         "modificado",
     )
