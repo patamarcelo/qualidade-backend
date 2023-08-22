@@ -838,7 +838,7 @@ class Colheita(Base):
         super(Colheita, self).save(*args, **kwargs)
 
     class Meta:
-        unique_together = ("plantio", "romaneio", "ticket")
+        unique_together = (("plantio", "romaneio", "ticket"), ("romaneio", "plantio"))
         ordering = ["data_colheita"]
         verbose_name = "Colheita"
         verbose_name_plural = "Colheitas"
