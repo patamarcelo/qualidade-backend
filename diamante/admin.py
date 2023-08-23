@@ -37,6 +37,20 @@ from django.core import serializers
 from django.contrib.admin import SimpleListFilter
 
 
+from admin_extra_buttons.api import (
+    ExtraButtonsMixin,
+    button,
+    confirm_action,
+    link,
+    view,
+)
+from admin_extra_buttons.utils import HttpResponseRedirectToReferrer
+from django.http import HttpResponse, JsonResponse
+from django.contrib import admin
+from django.views.decorators.clickjacking import xframe_options_sameorigin
+from django.views.decorators.csrf import csrf_exempt
+
+
 def get_cargas_model():
     cargas_model = [
         x
@@ -374,7 +388,7 @@ class ColheitaFilter(SimpleListFilter):
 
 
 @admin.register(Plantio)
-class PlantioAdmin(admin.ModelAdmin):
+class PlantioAdmin(ExtraButtonsMixin, admin.ModelAdmin):
     actions = [export_plantio]
     show_full_result_count = False
 
@@ -386,7 +400,22 @@ class PlantioAdmin(admin.ModelAdmin):
                 "plantio__id", "peso_liquido", "data_colheita"
             )
         ]
-        print(self.total_c_2)
+
+    @button(
+        change_form=True,
+        html_attrs={
+            "class": "btn btn-outline-info btn-sm",
+        },
+    )
+    def atualizar_colheita(self, request):
+        self.message_user(request, "Dados da Colheita Atualizado")
+        self.total_c_2 = [
+            x
+            for x in Colheita.objects.values_list(
+                "plantio__id", "peso_liquido", "data_colheita"
+            )
+        ]
+        return HttpResponseRedirectToReferrer(request)
 
     def get_ordering(self, request):
         return ["data_plantio"]
@@ -428,13 +457,13 @@ class PlantioAdmin(admin.ModelAdmin):
         "safra__safra",
         "ciclo__ciclo",
         "variedade__cultura",
+        ColheitaFilter,
         "finalizado_plantio",
         "finalizado_colheita",
         "programa__nome",
         "talhao__fazenda__nome",
         "variedade",
         "modificado",
-        ColheitaFilter,
     )
     list_display = (
         "talhao",

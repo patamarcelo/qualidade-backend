@@ -68,6 +68,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "usuario",
     "diamante",
+    "admin_extra_buttons",
 ]
 
 MIDDLEWARE = [
