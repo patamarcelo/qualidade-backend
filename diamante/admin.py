@@ -473,10 +473,11 @@ class PlantioAdmin(ExtraButtonsMixin, admin.ModelAdmin):
         "area_colheita",
         "get_description_finalizado_colheita",
         "area_parcial",
-        "get_data_primeira_carga",
-        "get_total_colheita_cargas",
         "get_total_colheita_cargas_kg",
         "get_total_prod",
+        "get_data_primeira_carga",
+        "get_data_ultima_carga",
+        "get_total_colheita_cargas",
         # "area_parcial",
         "get_data",
         "get_dap_description",
@@ -564,6 +565,19 @@ class PlantioAdmin(ExtraButtonsMixin, admin.ModelAdmin):
             return "-"
 
     get_data_primeira_carga.short_description = "1ª Carga"
+
+    # DATA ÚLTIMA CARGA CARREGADA
+    def get_data_ultima_carga(self, obj):
+        filtered_list = [x[2] for x in self.total_c_2 if obj.id == x[0]]
+        sorted_list = sorted(filtered_list)
+        if len(sorted_list) > 0:
+            return date_format(
+                sorted_list[-1], format="SHORT_DATE_FORMAT", use_l10n=True
+            )
+        else:
+            return "-"
+
+    get_data_ultima_carga.short_description = "últ. Carga"
 
     # TOTAL DE CARGAS CARREGADAS PARA O PLANTIO
     def get_total_colheita_cargas(self, obj):
@@ -706,6 +720,7 @@ def export_cargas(modeladmin, request, queryset):
             "Ticket",
             "OP",
             "Origem",
+            "Origem - Projeto",
             "Destino",
             "Parcela",
             "Cultura",
@@ -719,6 +734,8 @@ def export_cargas(modeladmin, request, queryset):
             "Desc. Umidade",
             "Impureza",
             "Desc. Impureza",
+            "Bandinha",
+            "Desc. Bandinha",
             "Peso Liquido",
         ]
     )
@@ -727,6 +744,7 @@ def export_cargas(modeladmin, request, queryset):
         "data_colheita",
         "ticket",
         "op",
+        "plantio__talhao__fazenda__fazenda__nome",
         "plantio__talhao__fazenda__nome",
         "deposito__nome_fantasia",
         "plantio__talhao__id_talhao",
@@ -740,17 +758,21 @@ def export_cargas(modeladmin, request, queryset):
         "desconto_umidade",
         "impureza",
         "desconto_impureza",
+        "bandinha",
+        "desconto_bandinha",
         "peso_liquido",
     )
     for carga in cargas:
         cargas_detail = list(carga)
-        cargas_detail[13] = str(carga[13]).replace(".", ",")
         cargas_detail[14] = str(carga[14]).replace(".", ",")
-        cargas_detail[15] = str(carga[15]).replace(".", ",")
+        cargas_detail[15] = 0 if carga[15] == None else str(carga[15]).replace(".", ",")
         cargas_detail[16] = str(carga[16]).replace(".", ",")
         cargas_detail[17] = str(carga[17]).replace(".", ",")
-        peso = cargas_detail[12] - cargas_detail[11]
-        cargas_detail.insert(13, peso)
+        cargas_detail[18] = 0 if carga[18] == None else str(carga[18]).replace(".", ",")
+        cargas_detail[19] = 0 if carga[19] == None else str(carga[19]).replace(".", ",")
+        cargas_detail[20] = 0 if carga[20] == None else str(carga[20]).replace(".", ",")
+        peso = cargas_detail[13] - cargas_detail[12]
+        cargas_detail.insert(14, peso)
         carga = tuple(cargas_detail)
         writer.writerow(carga)
     return response
@@ -859,6 +881,7 @@ class ColheitaAdmin(admin.ModelAdmin):
         "plantio__talhao__fazenda__nome",
         "plantio__talhao__fazenda__fazenda__nome",
         "plantio__variedade__variedade",
+        "plantio__variedade__cultura__cultura",
     ]
 
     list_filter = (

@@ -21,6 +21,7 @@ var app = new Vue({
 		filteredCutulre: "Todas",
 		filteredCutulreDif: "",
 		selected: "",
+		viewAllVareidades: true,
 		style: {
 			color: "whitesmoke",
 			backgroundColor: "blue"
@@ -28,6 +29,11 @@ var app = new Vue({
 		imageField: "soy"
 	},
 	methods: {
+		viewVaris() {
+			console.log("Working");
+			console.log(this.getFilteredChildren("Cervo"));
+			this.viewAllVareidades = !this.viewAllVareidades;
+		},
 		greet: function (name) {
 			console.log("Hello from " + name + "!");
 		},
@@ -38,6 +44,11 @@ var app = new Vue({
 			if (cultura === "Feijão") {
 				return "/static/images/icons/beans2.png";
 			}
+		},
+		getFilteredChildren(filter) {
+			console.log(filter);
+			console.log(this.filteredArrayByVariedade);
+			return "teste 1 ";
 		}
 	},
 	watch: {
@@ -74,6 +85,17 @@ var app = new Vue({
 		}
 	},
 	computed: {
+		onlyFarm() {
+			const onlyFarmSetS = this.plantio.map((data) => {
+				console.log(data);
+				const name =
+					data.talhao__fazenda__nome +
+					"|" +
+					data.variedade__cultura__cultura;
+				return name;
+			});
+			return [...new Set(onlyFarmSetS)];
+		},
 		titleAcomp() {
 			if (this.filteredCutulreDif) {
 				return this.filteredCutulreDif;
@@ -143,11 +165,98 @@ var app = new Vue({
 			}
 
 			for (let i = 0; i < filtColheita.length; i++) {
-				console.log(filtColheita[i]);
 				const nameDict =
 					`${filtColheita[i]["plantio__talhao__fazenda__nome"]}` +
 					"|" +
 					`${filtColheita[i]["plantio__variedade__cultura__cultura"]}`;
+
+				if (newDict[nameDict]) {
+					if (newDict[nameDict]["pesoColhido"] > 0) {
+						newDict[nameDict]["pesoColhido"] += Number(
+							filtColheita[i].peso_scs
+						);
+						newDict[nameDict]["produtividade"] =
+							newDict[nameDict]["pesoColhido"] /
+							Number(newDict[nameDict]["areaColheita"]);
+					} else {
+						newDict[nameDict]["pesoColhido"] = Number(
+							filtColheita[i].peso_scs
+						);
+						newDict[nameDict]["produtividade"] =
+							Number(filtColheita[i].peso_scs) /
+							Number(newDict[nameDict]["areaColheita"]);
+					}
+				}
+			}
+			return newDict;
+		},
+		filteredArrayByVariedade() {
+			let filtPlantio = [];
+			if (this.filteredCutulreDif) {
+				filtPlantio = this.plantio.filter(
+					(data) =>
+						data.variedade__variedade ===
+						this.filteredCutulreDif.trim()
+				);
+			} else {
+				filtPlantio = this.plantio;
+			}
+			const newDict = filtPlantio
+				.filter((data) =>
+					this.filteredCutulre == "Todas"
+						? data.variedade__cultura__cultura !== "nenhuma"
+						: data.variedade__cultura__cultura ===
+						  this.filteredCutulre
+				)
+				.reduce((acc, curr) => {
+					const newObj =
+						curr.talhao__fazenda__nome +
+						"|" +
+						curr.variedade__cultura__cultura +
+						"|" +
+						curr.variedade__variedade;
+					if (!acc[newObj]) {
+						acc[newObj] = {
+							cultura: curr.variedade__cultura__cultura,
+							variedade: curr.variedade__variedade,
+							areaTotal: Number(curr.area_total),
+							areaColheita: Number(curr.area_finalizada),
+							saldoColheita:
+								Number(curr.area_total) -
+								Number(curr.area_finalizada),
+							pesoColhido: 0,
+							produtividade: 0
+						};
+					} else {
+						acc[newObj]["areaTotal"] += Number(curr.area_total);
+						acc[newObj]["areaColheita"] += Number(
+							curr.area_finalizada
+						);
+						acc[newObj]["saldoColheita"] +=
+							Number(curr.area_total) -
+							Number(curr.area_finalizada);
+					}
+					return acc;
+				}, {});
+
+			let filtColheita = [];
+			if (this.filteredCutulreDif) {
+				filtColheita = this.colheita.filter(
+					(data) =>
+						data.plantio__variedade__variedade ===
+						this.filteredCutulreDif.trim()
+				);
+			} else {
+				filtColheita = this.colheita;
+			}
+
+			for (let i = 0; i < filtColheita.length; i++) {
+				const nameDict =
+					`${filtColheita[i]["plantio__talhao__fazenda__nome"]}` +
+					"|" +
+					`${filtColheita[i]["plantio__variedade__cultura__cultura"]}` +
+					"|" +
+					`${filtColheita[i]["plantio__variedade__variedade"]}`;
 
 				if (newDict[nameDict]) {
 					if (newDict[nameDict]["pesoColhido"] > 0) {
