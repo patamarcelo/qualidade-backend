@@ -891,7 +891,7 @@ class ColheitaAdmin(admin.ModelAdmin):
         "plantio__variedade__variedade",
     )
 
-    ordering = ("data_colheita",)
+    ordering = ("-data_colheita",)
 
     def get_peso_liquido(self, obj):
         return obj.peso_bruto - obj.peso_tara

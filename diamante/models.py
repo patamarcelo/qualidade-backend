@@ -317,7 +317,7 @@ class Programa(Base):
         verbose_name_plural = "Programas"
 
     def __str__(self):
-        return self.nome_fantasia
+        return f'{self.nome_fantasia} - {self.safra.safra.replace("20", "")} - {self.ciclo}'
 
 
 class Operacao(Base):

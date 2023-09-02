@@ -588,7 +588,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             try:
                 # file = request.FILES["plantio_arroz"]
                 # file_ = open(os.path.join(settings.BASE_DIR, 'filename'))
-                date_file = "2023-08-25 10:15"
+                date_file = "2023-09-02 07:41"
                 with open(f"static/files/dataset-{date_file}.json") as user_file:
                     file_contents = user_file.read()
                     parsed_json = json.loads(file_contents)
@@ -711,6 +711,10 @@ class PlantioViewSet(viewsets.ModelViewSet):
                             )[0]
                             if area:
                                 field_to_update.area_colheita = area
+                            if map_centro_id_farm:
+                                field_to_update.map_centro_id = map_centro_id_farm
+                            if map_geo_points_farm:
+                                field_to_update.map_geo_points = map_geo_points_farm
                             field_to_update.variedade = None
                             field_to_update.programa = None
                             field_to_update.save()
