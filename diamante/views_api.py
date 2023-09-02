@@ -586,9 +586,11 @@ class PlantioViewSet(viewsets.ModelViewSet):
     def update_plantio_from_farmBox(self, request, pk=None):
         if request.user.is_authenticated:
             try:
+                date_file = request.data["filename"]
+                print(date_file)
                 # file = request.FILES["plantio_arroz"]
                 # file_ = open(os.path.join(settings.BASE_DIR, 'filename'))
-                date_file = "2023-09-02 07:41"
+                # date_file = "2023-09-02 07:41"
                 with open(f"static/files/dataset-{date_file}.json") as user_file:
                     file_contents = user_file.read()
                     parsed_json = json.loads(file_contents)

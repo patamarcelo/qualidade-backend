@@ -140,17 +140,26 @@ $(function () {
 <script>
     $(document).on('change', '#result_list', () => {
         let val = 0
+        let valBruto = 0
         $('.selected .field-peso_liquido').each((i, e) =>{
             const value = e.innerHTML.replace('.',"").replace(',',".")
 
             console.log(value)
             val += parseFloat(value)
         })
+        
+        $('.selected .field-get_peso_liquido').each((i, e) =>{
+            const valueBruto = e.innerHTML.replace('.',"").replace(',',".")
+
+            valBruto += parseFloat(valueBruto)
+        })
         const pesoLiquido = $('.field-peso_liquido')
+        const pesoBruto = $('.field-get_peso_liquido')
         
         if (pesoLiquido.length > 0){
-            const total = "Total Selecionado "
-            $('.select-result-total').html(total + val.toLocaleString('pt-br',{  minimumFractionDigits: 2,
+            const total = "Total Selecionado: "
+            $('.select-result-total').html(total + "Peso " + valBruto.toLocaleString('pt-br',{  minimumFractionDigits: 2,
+                maximumFractionDigits: 2}) + " Kg" + " | Líquido " + val.toLocaleString('pt-br',{  minimumFractionDigits: 2,
                 maximumFractionDigits: 2}) + " Kg" + " | " + `${(val / 60).toLocaleString('pt-br',{  minimumFractionDigits: 2,
                     maximumFractionDigits: 2})} Scs`)
         }
