@@ -387,6 +387,23 @@ class ColheitaFilter(SimpleListFilter):
             return queryset.exclude(id__in=id_list)
 
 
+class ColheitaFilterNoProgram(SimpleListFilter):
+    title = "Sem Programa"  # or use _('country') for translated title
+    parameter_name = "programas"
+
+    def lookups(self, request, model_admin):
+        return [
+            ("Com Programa", "Programa"),
+            ("Sem Programa", "Sem Programa"),
+        ]
+
+    def queryset(self, request, queryset):
+        if self.value() == "Programa":
+            return queryset.filter(~Q(programa_id=None))
+        if self.value() == "Sem Programa":
+            return queryset.filter(Q(programa_id=None))
+
+
 @admin.register(Plantio)
 class PlantioAdmin(ExtraButtonsMixin, admin.ModelAdmin):
     actions = [export_plantio]
@@ -458,6 +475,7 @@ class PlantioAdmin(ExtraButtonsMixin, admin.ModelAdmin):
         "ciclo__ciclo",
         "variedade__cultura",
         ColheitaFilter,
+        ColheitaFilterNoProgram,
         "finalizado_plantio",
         "finalizado_colheita",
         "programa__nome",
@@ -472,7 +490,7 @@ class PlantioAdmin(ExtraButtonsMixin, admin.ModelAdmin):
         "get_description_finalizado_plantio",
         "area_colheita",
         "get_description_finalizado_colheita",
-        "area_parcial",
+        "get_area_parcial",
         "get_total_colheita_cargas_kg",
         "get_total_prod",
         "get_data_primeira_carga",
@@ -553,6 +571,14 @@ class PlantioAdmin(ExtraButtonsMixin, admin.ModelAdmin):
 
     ordering = ("data_plantio",)
 
+
+    def get_area_parcial(self, obj):
+        if obj.finalizado_colheita:
+            return " - "
+        else:
+            return obj.area_parcial
+    get_area_parcial.short_description = 'Area  Parcial'
+    
     # DATA PRIMEIRA CARGA CARREGADA
     def get_data_primeira_carga(self, obj):
         filtered_list = [x[2] for x in self.total_c_2 if obj.id == x[0]]

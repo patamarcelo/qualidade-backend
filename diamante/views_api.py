@@ -14,7 +14,7 @@ from rest_framework.views import APIView
 import json
 from django.http import JsonResponse
 from django.core.serializers import serialize
-from django.db.models import Q, Sum
+from django.db.models import Q, Sum, DecimalField
 import datetime
 from dateutil.relativedelta import relativedelta
 from decimal import *
@@ -40,6 +40,7 @@ from .models import (
     Defensivo,
     Aplicacao,
     Operacao,
+    Colheita,
 )
 
 from functools import reduce
@@ -58,6 +59,8 @@ import os
 from django.conf import settings
 from django.contrib.postgres.aggregates import ArrayAgg
 import math
+
+from django.db.models.functions import Round
 
 
 from rest_framework.decorators import api_view, permission_classes
@@ -1719,6 +1722,93 @@ class PlantioViewSet(viewsets.ModelViewSet):
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
     # --------------------- ---------------------- PLANTIO UPDATE APLICATION FIELD API START --------------------- ----------------------#
+
+    # --------------------- ---------------------- PLANTIO PRODUTIVIDADE MAP API START --------------------- ----------------------#
+    @action(detail=False, methods=["GET", "POST"])
+    def get_produtividade_plantio(self, request):
+        if request.user.is_authenticated:
+            try:
+                safra_filter = None
+                cicle_filter = None
+                try:
+                    safra_filter = request.data["safra"]
+                    cicle_filter = request.data["ciclo"]
+                except Exception as e:
+                    print(e)
+                safra_filter = "2023/2024" if safra_filter == None else safra_filter
+                cicle_filter = "1" if cicle_filter == None else cicle_filter
+                qs_colheita = Colheita.objects.values(
+                    "plantio__id",
+                    "plantio__talhao__fazenda__nome",
+                    "plantio__talhao__id_talhao",
+                    "plantio__area_colheita",
+                    "plantio__finalizado_colheita",
+                    "plantio__area_parcial",
+                ).annotate(
+                    peso_kg=Sum("peso_liquido"),
+                    peso_scs=Round((Sum("peso_liquido") / 60), precision=2),
+                    # produtividade=Round(
+                    #     ("peso_scs" / "plantio__area_colheita"),
+                    #     precision=2,
+                    #     output_field=DecimalField(),
+                    # ),
+                )
+                qs_plantio = Plantio.objects.values(
+                    "id",
+                    "talhao__id_talhao",
+                    "talhao__id_unico",
+                    "talhao_id",
+                    "safra__safra",
+                    "ciclo__ciclo",
+                    "talhao__fazenda__nome",
+                    "talhao__fazenda__map_centro_id",
+                    "talhao__fazenda__map_zoom",
+                    "talhao__fazenda__fazenda__nome",
+                    "variedade__nome_fantasia",
+                    "variedade__cultura__cultura",
+                    "variedade__cultura__map_color",
+                    "variedade__cultura__map_color_line",
+                    "area_colheita",
+                    "area_parcial",
+                    "map_centro_id",
+                    "map_geo_points",
+                ).filter(safra__safra=safra_filter, ciclo__ciclo=cicle_filter)
+
+                result = [x for x in qs_plantio]
+                for i in qs_colheita:
+                    for j in result:
+                        if i["plantio__id"] == j["id"]:
+                            j["peso_kg"] = i["peso_kg"]
+                            j["peso_scs"] = i["peso_scs"]
+                            if i["plantio__finalizado_colheita"] == True:
+                                j["produtividade"] = (
+                                    i["peso_scs"] / i["plantio__area_colheita"]
+                                )
+                            else:
+                                area_parcial = (
+                                    i["plantio__area_parcial"]
+                                    if i["plantio__area_parcial"]
+                                    else None
+                                )
+                                j["produtividade"] = (
+                                    i["peso_scs"] / area_parcial if area_parcial else 0
+                                )
+
+                response = {
+                    "msg": f"Retorno com os arquivos DE MAPAS e Produtividades com Sucesso!!",
+                    # "total_query_plantio": qs_plantio.count(),
+                    # "dados_colheita": qs_colheita,
+                    "dados_plantio": result,
+                }
+                return Response(response, status=status.HTTP_200_OK)
+            except Exception as e:
+                response = {"message": f"Ocorreu um Erro: {e}"}
+                return Response(response, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            response = {"message": "Você precisa estar logado!!!"}
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+    # --------------------- ---------------------- PLANTIO PRODUTIVIDADE MAP API END --------------------- ----------------------#
 
     @action(detail=False, methods=["GET", "POST", "PUT"])
     def update_aplication_plantio(sef, request, pk=None):
