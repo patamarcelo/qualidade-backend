@@ -1768,6 +1768,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "variedade__cultura__cultura",
                     "variedade__cultura__map_color",
                     "variedade__cultura__map_color_line",
+                    "finalizado_plantio",
+                    "finalizado_colheita",
                     "area_colheita",
                     "area_parcial",
                     "map_centro_id",
