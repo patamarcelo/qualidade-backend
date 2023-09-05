@@ -571,14 +571,14 @@ class PlantioAdmin(ExtraButtonsMixin, admin.ModelAdmin):
 
     ordering = ("data_plantio",)
 
-
     def get_area_parcial(self, obj):
         if obj.finalizado_colheita:
             return " - "
         else:
             return obj.area_parcial
-    get_area_parcial.short_description = 'Area  Parcial'
-    
+
+    get_area_parcial.short_description = "Area  Parcial"
+
     # DATA PRIMEIRA CARGA CARREGADA
     def get_data_primeira_carga(self, obj):
         filtered_list = [x[2] for x in self.total_c_2 if obj.id == x[0]]
@@ -749,6 +749,8 @@ def export_cargas(modeladmin, request, queryset):
             "Origem - Projeto",
             "Destino",
             "Parcela",
+            "Safra",
+            "Ciclo",
             "Cultura",
             "Variedade",
             "Placa",
@@ -763,6 +765,7 @@ def export_cargas(modeladmin, request, queryset):
             "Bandinha",
             "Desc. Bandinha",
             "Peso Liquido",
+            "Peso Líquido Scs",
         ]
     )
     cargas = queryset.values_list(
@@ -774,6 +777,8 @@ def export_cargas(modeladmin, request, queryset):
         "plantio__talhao__fazenda__nome",
         "deposito__nome_fantasia",
         "plantio__talhao__id_talhao",
+        "plantio__safra__safra",
+        "plantio__ciclo__ciclo",
         "plantio__variedade__variedade",
         "plantio__variedade__cultura__cultura",
         "placa",
@@ -790,15 +795,23 @@ def export_cargas(modeladmin, request, queryset):
     )
     for carga in cargas:
         cargas_detail = list(carga)
-        cargas_detail[14] = str(carga[14]).replace(".", ",")
-        cargas_detail[15] = 0 if carga[15] == None else str(carga[15]).replace(".", ",")
-        cargas_detail[16] = str(carga[16]).replace(".", ",")
-        cargas_detail[17] = str(carga[17]).replace(".", ",")
+        # cargas_detail[16] = str(carga[16]).replace(".", ",")
+        # cargas_detail[17] = str(carga[17]).replace(".", ",")
+        cargas_detail[16] = 0 if carga[16] == None else str(carga[18]).replace(".", ",")
+        cargas_detail[17] = 0 if carga[17] == None else str(carga[18]).replace(".", ",")
         cargas_detail[18] = 0 if carga[18] == None else str(carga[18]).replace(".", ",")
         cargas_detail[19] = 0 if carga[19] == None else str(carga[19]).replace(".", ",")
         cargas_detail[20] = 0 if carga[20] == None else str(carga[20]).replace(".", ",")
-        peso = cargas_detail[13] - cargas_detail[12]
-        cargas_detail.insert(14, peso)
+        cargas_detail[21] = 0 if carga[21] == None else str(carga[20]).replace(".", ",")
+        cargas_detail[22] = 0 if carga[22] == None else str(carga[15]).replace(".", ",")
+        peso = cargas_detail[15] - cargas_detail[14]
+        cargas_detail.insert(16, peso)
+        cargas_detail.insert(
+            24,
+            str(round((float(cargas_detail[23].replace(",", ".")) / 60), 2)).replace(
+                ".", ","
+            ),
+        )
         carga = tuple(cargas_detail)
         writer.writerow(carga)
     return response
