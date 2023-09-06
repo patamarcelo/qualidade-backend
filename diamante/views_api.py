@@ -701,7 +701,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 field_to_update.variedade = id_variedade
                             field_to_update.save()
                             print(
-                                f"{Fore.GREEN}Plantio Alterado com sucesso: {field_to_update} - {safra} - {ciclo} - {Style.RESET_ALL}"
+                                f"{Fore.GREEN}Plantio Alterado com sucesso: {field_to_update} - {safra} - {ciclo} | {Fore.BLUE}{field_to_update.variedade} | {field_to_update.programa}{Style.RESET_ALL}"
                             )
                             print("\n")
                             count_total += 1
@@ -1675,6 +1675,9 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "variedade__cultura__cultura",
                     "variedade__cultura__map_color",
                     "variedade__cultura__map_color_line",
+                    "finalizado_plantio",
+                    "finalizado_colheita",
+                    "plantio_descontinuado",
                     "area_colheita",
                     "map_centro_id",
                     "map_geo_points",
@@ -1690,6 +1693,9 @@ class PlantioViewSet(viewsets.ModelViewSet):
                             "cultura": i["variedade__cultura__cultura"],
                             "variedade": i["variedade__nome_fantasia"],
                             "plantio_id": i["id"],
+                            "finalizado_plantio": i["finalizado_plantio"],
+                            "finalizado_colheita": i['finalizado_colheita'],
+                            "plantio_descontinuado": i["plantio_descontinuado"],
                             "fazenda_grupo": i["talhao__fazenda__fazenda__nome"],
                             "talhao_id_unico": i["talhao__id_unico"],
                             "area_colheita": i["area_colheita"],
@@ -1774,7 +1780,11 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "area_parcial",
                     "map_centro_id",
                     "map_geo_points",
-                ).filter(safra__safra=safra_filter, ciclo__ciclo=cicle_filter)
+                ).filter(
+                    safra__safra=safra_filter,
+                    ciclo__ciclo=cicle_filter,
+                    plantio_descontinuado=False,
+                )
 
                 result = [x for x in qs_plantio]
                 for i in qs_colheita:

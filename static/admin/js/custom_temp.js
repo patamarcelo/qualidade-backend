@@ -9,6 +9,7 @@ const filterVariedadesDif = plantio.map((data, i) => {
 const filterVar = ["Todas", ...filterVariedades];
 const filterVarDif = ["Todas", ...filterVariedadesDif];
 
+console.log(colheita)
 var app = new Vue({
 	delimiters: ["[[", "]]"],
 	el: "#app",

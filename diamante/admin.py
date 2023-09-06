@@ -797,13 +797,13 @@ def export_cargas(modeladmin, request, queryset):
         cargas_detail = list(carga)
         # cargas_detail[16] = str(carga[16]).replace(".", ",")
         # cargas_detail[17] = str(carga[17]).replace(".", ",")
-        cargas_detail[16] = 0 if carga[16] == None else str(carga[18]).replace(".", ",")
-        cargas_detail[17] = 0 if carga[17] == None else str(carga[18]).replace(".", ",")
+        cargas_detail[16] = 0 if carga[16] == None else str(carga[16]).replace(".", ",")
+        cargas_detail[17] = 0 if carga[17] == None else str(carga[17]).replace(".", ",")
         cargas_detail[18] = 0 if carga[18] == None else str(carga[18]).replace(".", ",")
         cargas_detail[19] = 0 if carga[19] == None else str(carga[19]).replace(".", ",")
         cargas_detail[20] = 0 if carga[20] == None else str(carga[20]).replace(".", ",")
-        cargas_detail[21] = 0 if carga[21] == None else str(carga[20]).replace(".", ",")
-        cargas_detail[22] = 0 if carga[22] == None else str(carga[15]).replace(".", ",")
+        cargas_detail[21] = 0 if carga[21] == None else str(carga[21]).replace(".", ",")
+        cargas_detail[22] = 0 if carga[22] == None else str(carga[22]).replace(".", ",")
         peso = cargas_detail[15] - cargas_detail[14]
         cargas_detail.insert(16, peso)
         cargas_detail.insert(
