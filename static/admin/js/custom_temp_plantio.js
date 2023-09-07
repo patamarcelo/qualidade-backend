@@ -217,19 +217,19 @@ var app = new Vue({
 							cultura: curr.variedade__cultura__cultura,
 							variedade: curr.variedade__variedade,
 							areaTotal: Number(curr.area_total),
-							areaColheita: Number(curr.area_finalizada),
-							saldoColheita:
+							areaPlantada: Number(curr.area_plantada),
+							saldoPlantio:
 								Number(curr.area_total) -
-								Number(curr.area_finalizada)
+								Number(curr.area_plantada)
 						};
 					} else {
 						acc[newObj]["areaTotal"] += Number(curr.area_total);
-						acc[newObj]["areaColheita"] += Number(
-							curr.area_finalizada
+						acc[newObj]["areaPlantada"] += Number(
+							curr.area_plantada
 						);
-						acc[newObj]["saldoColheita"] +=
+						acc[newObj]["saldoPlantio"] +=
 							Number(curr.area_total) -
-							Number(curr.area_finalizada);
+							Number(curr.area_plantada);
 					}
 					return acc;
 				}, {});
