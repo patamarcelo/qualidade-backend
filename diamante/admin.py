@@ -51,7 +51,7 @@ from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.views.decorators.csrf import csrf_exempt
 
 
-def get_cargas_model():
+def get_cargas_model(safra_filter, ciclo_filter):
     cargas_model = [
         x
         for x in Colheita.objects.values(
@@ -65,6 +65,7 @@ def get_cargas_model():
         )
         .order_by("plantio__talhao__fazenda__nome")
         .filter(~Q(plantio__variedade__cultura__cultura="Milheto"))
+        .filter(plantio__safra__safra=safra_filter, plantio__ciclo__ciclo=ciclo_filter)
     ]
     return cargas_model
 
@@ -101,7 +102,8 @@ class PlantioDetailAdmin(admin.ModelAdmin):
             request,
             extra_context=extra_context,
         )
-
+        safra_filter = "2023/2024"
+        ciclo_filter = "1"
         try:
             qs = response.context_data["cl"].queryset
         except (AttributeError, KeyError):
@@ -124,8 +126,8 @@ class PlantioDetailAdmin(admin.ModelAdmin):
 
         query_data = (
             qs.filter(
-                safra__safra="2023/2024",
-                ciclo__ciclo="1",
+                safra__safra=safra_filter,
+                ciclo__ciclo=ciclo_filter,
                 finalizado_plantio=True,
                 plantio_descontinuado=False,
             )
@@ -144,7 +146,94 @@ class PlantioDetailAdmin(admin.ModelAdmin):
         )
 
         response.context_data["colheita_2"] = json.dumps(
-            get_cargas_model(), cls=DjangoJSONEncoder
+            get_cargas_model(safra_filter, ciclo_filter), cls=DjangoJSONEncoder
+        )
+
+        return response
+
+
+@admin.register(PlantioDetailPlantio)
+class PlantioDetailPlantioAdmin(admin.ModelAdmin):
+    model = PlantioDetailPlantio
+    change_list_template = "admin/custom_temp_plantio.html"
+
+    # cargas_model = [
+    #     x
+    #     for x in Colheita.objects.values(
+    #         "plantio__talhao__id_talhao", "plantio__id", "peso_liquido", "data_colheita"
+    #     )
+    # ]
+
+    def get_queryset(self, request):
+        return (
+            super(PlantioDetailPlantioAdmin, self)
+            .get_queryset(request)
+            .select_related(
+                "talhao",
+                "safra",
+                "ciclo",
+                "talhao__fazenda",
+                "variedade",
+                "programa",
+            )
+            .order_by("data_plantio")
+        )
+
+    def changelist_view(self, request, extra_context=None):
+        response = super().changelist_view(
+            request,
+            extra_context=extra_context,
+        )
+        safra_filter = "2023/2024"
+        ciclo_filter = "2"
+        try:
+            qs = response.context_data["cl"].queryset
+        except (AttributeError, KeyError):
+            return response
+
+        metrics = {
+            "area_total": Sum("area_colheita"),
+            "area_plantada": Case(
+                When(finalizado_plantio=True, then=Coalesce(Sum("area_colheita"), 0)),
+                default=Value(0),
+                output_field=DecimalField(),
+            ),
+            "area_projetada": Case(
+                When(finalizado_plantio=False, then=Coalesce(Sum("area_colheita"), 0)),
+                default=Value(0),
+                output_field=DecimalField(),
+                # ),
+                # "area_parcial": Case(
+                #     When(finalizado_colheita=False, then=Coalesce(Sum("area_parcial"), 0)),
+                #     default=Value(0),
+                #     output_field=DecimalField(),
+            ),
+        }
+
+        query_data = (
+            qs.filter(
+                safra__safra=safra_filter,
+                ciclo__ciclo=ciclo_filter,
+                plantio_descontinuado=False,
+            )
+            .filter(~Q(variedade__cultura__cultura="Milheto"))
+            .filter(~Q(variedade=None))
+            .values(
+                "talhao__fazenda__nome",
+                "variedade__cultura__cultura",
+                "variedade__variedade",
+                "finalizado_plantio",
+            )
+            .annotate(**metrics)
+            .order_by("talhao__fazenda__nome")
+        )
+
+        response.context_data["summary_2"] = json.dumps(
+            list(query_data), cls=DjangoJSONEncoder
+        )
+
+        response.context_data["colheita_2"] = json.dumps(
+            get_cargas_model(safra_filter, ciclo_filter), cls=DjangoJSONEncoder
         )
 
         return response

@@ -9,7 +9,7 @@ const filterVariedadesDif = plantio.map((data, i) => {
 const filterVar = ["Todas", ...filterVariedades];
 const filterVarDif = ["Todas", ...filterVariedadesDif];
 
-console.log(colheita)
+console.log(colheita);
 var app = new Vue({
 	delimiters: ["[[", "]]"],
 	el: "#app",
@@ -135,21 +135,17 @@ var app = new Vue({
 						acc[newObj] = {
 							variedade: curr.variedade__cultura__cultura,
 							areaTotal: Number(curr.area_total),
-							areaColheita: Number(curr.area_finalizada),
-							saldoColheita:
+							areaPlantada: +curr.area_plantada,
+							saldoPlantio:
 								Number(curr.area_total) -
-								Number(curr.area_finalizada),
-							pesoColhido: 0,
-							produtividade: 0
+								Number(curr.area_plantada)
 						};
 					} else {
 						acc[newObj]["areaTotal"] += Number(curr.area_total);
-						acc[newObj]["areaColheita"] += Number(
-							curr.area_finalizada
-						);
-						acc[newObj]["saldoColheita"] +=
+						acc[newObj]["areaPlantada"] += +curr.area_plantada;
+						acc[newObj]["saldoPlantio"] +=
 							Number(curr.area_total) -
-							Number(curr.area_finalizada);
+							Number(curr.area_plantada);
 					}
 					return acc;
 				}, {});
@@ -165,30 +161,30 @@ var app = new Vue({
 				filtColheita = this.colheita;
 			}
 
-			for (let i = 0; i < filtColheita.length; i++) {
-				const nameDict =
-					`${filtColheita[i]["plantio__talhao__fazenda__nome"]}` +
-					"|" +
-					`${filtColheita[i]["plantio__variedade__cultura__cultura"]}`;
+			// for (let i = 0; i < filtColheita.length; i++) {
+			// 	const nameDict =
+			// 		`${filtColheita[i]["plantio__talhao__fazenda__nome"]}` +
+			// 		"|" +
+			// 		`${filtColheita[i]["plantio__variedade__cultura__cultura"]}`;
 
-				if (newDict[nameDict]) {
-					if (newDict[nameDict]["pesoColhido"] > 0) {
-						newDict[nameDict]["pesoColhido"] += Number(
-							filtColheita[i].peso_scs
-						);
-						newDict[nameDict]["produtividade"] =
-							newDict[nameDict]["pesoColhido"] /
-							Number(newDict[nameDict]["areaColheita"]);
-					} else {
-						newDict[nameDict]["pesoColhido"] = Number(
-							filtColheita[i].peso_scs
-						);
-						newDict[nameDict]["produtividade"] =
-							Number(filtColheita[i].peso_scs) /
-							Number(newDict[nameDict]["areaColheita"]);
-					}
-				}
-			}
+			// 	if (newDict[nameDict]) {
+			// 		if (newDict[nameDict]["pesoColhido"] > 0) {
+			// 			newDict[nameDict]["pesoColhido"] += Number(
+			// 				filtColheita[i].peso_scs
+			// 			);
+			// 			newDict[nameDict]["produtividade"] =
+			// 				newDict[nameDict]["pesoColhido"] /
+			// 				Number(newDict[nameDict]["areaColheita"]);
+			// 		} else {
+			// 			newDict[nameDict]["pesoColhido"] = Number(
+			// 				filtColheita[i].peso_scs
+			// 			);
+			// 			newDict[nameDict]["produtividade"] =
+			// 				Number(filtColheita[i].peso_scs) /
+			// 				Number(newDict[nameDict]["areaColheita"]);
+			// 		}
+			// 	}
+			// }
 			return newDict;
 		},
 		filteredArrayByVariedade() {
@@ -224,9 +220,7 @@ var app = new Vue({
 							areaColheita: Number(curr.area_finalizada),
 							saldoColheita:
 								Number(curr.area_total) -
-								Number(curr.area_finalizada),
-							pesoColhido: 0,
-							produtividade: 0
+								Number(curr.area_finalizada)
 						};
 					} else {
 						acc[newObj]["areaTotal"] += Number(curr.area_total);
@@ -251,41 +245,15 @@ var app = new Vue({
 				filtColheita = this.colheita;
 			}
 
-			for (let i = 0; i < filtColheita.length; i++) {
-				const nameDict =
-					`${filtColheita[i]["plantio__talhao__fazenda__nome"]}` +
-					"|" +
-					`${filtColheita[i]["plantio__variedade__cultura__cultura"]}` +
-					"|" +
-					`${filtColheita[i]["plantio__variedade__variedade"]}`;
-
-				if (newDict[nameDict]) {
-					if (newDict[nameDict]["pesoColhido"] > 0) {
-						newDict[nameDict]["pesoColhido"] += Number(
-							filtColheita[i].peso_scs
-						);
-						newDict[nameDict]["produtividade"] =
-							newDict[nameDict]["pesoColhido"] /
-							Number(newDict[nameDict]["areaColheita"]);
-					} else {
-						newDict[nameDict]["pesoColhido"] = Number(
-							filtColheita[i].peso_scs
-						);
-						newDict[nameDict]["produtividade"] =
-							Number(filtColheita[i].peso_scs) /
-							Number(newDict[nameDict]["areaColheita"]);
-					}
-				}
-			}
 			return newDict;
 		},
 		newTotals() {
 			let newTotals = {};
 			for (const [key, value] of Object.entries(this.filteredArray)) {
-				if (!newTotals["areaColhida"]) {
-					newTotals["areaColhida"] = value.areaColheita;
+				if (!newTotals["saldoPlantio"]) {
+					newTotals["saldoPlantio"] = value.saldoPlantio;
 				} else {
-					newTotals["areaColhida"] += value.areaColheita;
+					newTotals["saldoPlantio"] += value.saldoPlantio;
 				}
 
 				if (!newTotals["areaTotal"]) {
@@ -294,16 +262,10 @@ var app = new Vue({
 					newTotals["areaTotal"] += value.areaTotal;
 				}
 
-				if (!newTotals["saldoColheita"]) {
-					newTotals["saldoColheita"] = value.saldoColheita;
+				if (!newTotals["areaPlantada"]) {
+					newTotals["areaPlantada"] = value.areaPlantada;
 				} else {
-					newTotals["saldoColheita"] += value.saldoColheita;
-				}
-
-				if (!newTotals["pesoColhido"]) {
-					newTotals["pesoColhido"] = Number(value.pesoColhido);
-				} else {
-					newTotals["pesoColhido"] += Number(value.pesoColhido);
+					newTotals["areaPlantada"] += value.areaPlantada;
 				}
 			}
 			return newTotals;

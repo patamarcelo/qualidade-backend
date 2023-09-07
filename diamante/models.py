@@ -317,7 +317,7 @@ class Programa(Base):
         verbose_name_plural = "Programas"
 
     def __str__(self):
-        return f'{self.nome}'
+        return f"{self.nome}"
 
 
 class Operacao(Base):
@@ -850,5 +850,12 @@ class Colheita(Base):
 class PlantioDetail(Plantio):
     class Meta:
         proxy = True
-        verbose_name = "Plantio - Resumo"
-        verbose_name_plural = "Plantios - Resumo"
+        verbose_name = "Plantio - Resumo Colheita"
+        verbose_name_plural = "Plantios - Resumo Colheita"
+
+
+class PlantioDetailPlantio(Plantio):
+    class Meta:
+        proxy = True
+        verbose_name = "Plantio - Resumo Plantio"
+        verbose_name_plural = "Plantios - Resumo Plantio"
