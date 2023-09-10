@@ -9,7 +9,7 @@ const filterVariedadesDif = plantio.map((data, i) => {
 const filterVar = ["Todas", ...filterVariedades];
 const filterVarDif = ["Todas", ...filterVariedadesDif];
 
-console.log(colheita)
+console.log(colheita);
 var app = new Vue({
 	delimiters: ["[[", "]]"],
 	el: "#app",
@@ -23,20 +23,29 @@ var app = new Vue({
 		filteredCutulreDif: "",
 		selected: "",
 		viewAllVareidades: true,
+		excludeFarm: [],
 		style: {
 			color: "whitesmoke",
 			backgroundColor: "blue"
 		},
+		styleTitle: {
+			color: "whitesmoke",
+			backgroundColor: "grenn"
+		},
 		imageField: "soy"
 	},
 	methods: {
+		resetPlantio() {
+			this.plantio = plantio;
+		},
 		viewVaris() {
 			console.log("Working");
 			console.log(this.getFilteredChildren("Cervo"));
 			this.viewAllVareidades = !this.viewAllVareidades;
 		},
 		greet: function (name) {
-			console.log("Hello from " + name + "!");
+			console.log(this.excludeFarm);
+			console.log(plantio);
 		},
 		customIcon(cultura) {
 			if (cultura === "Soja") {
@@ -44,6 +53,9 @@ var app = new Vue({
 			}
 			if (cultura === "Feijão") {
 				return "/static/images/icons/beans2.png";
+			}
+			if (cultura === "Arroz") {
+				return "/static/images/icons/rice.png";
 			}
 		},
 		getFilteredChildren(filter) {
@@ -53,6 +65,13 @@ var app = new Vue({
 		}
 	},
 	watch: {
+		excludeFarm() {
+			if (this.excludeFarm.length > 0) {
+				this.excludeFarm.map((data) => {
+					console.log("excluiir a fazenda", data);
+				});
+			}
+		},
 		filteredCutulre() {
 			if (this.filteredCutulre === "Todas") {
 				console.log("todas", this.filteredCutulre);
@@ -65,6 +84,9 @@ var app = new Vue({
 			if (this.filteredCutulre === "Feijão") {
 				console.log("Feijão", this.filteredCutulre);
 				this.style.backgroundColor = "rgb(119,63,27)";
+			}
+			if (this.filteredCutulre === "Arroz") {
+				this.style.backgroundColor = "rgb(214, 220, 38)";
 			}
 			if (this.filteredCutulre === "Todas") {
 				this.filteredCutulreDif = "";
@@ -86,6 +108,13 @@ var app = new Vue({
 		}
 	},
 	computed: {
+		onlyFarmWhitoutVariedade() {
+			const onlyFarmSetSOut = this.plantio.map((data) => {
+				const name = data.talhao__fazenda__nome;
+				return name;
+			});
+			return [...new Set(onlyFarmSetSOut)];
+		},
 		onlyFarm() {
 			const onlyFarmSetS = this.plantio.map((data) => {
 				console.log(data);
@@ -110,6 +139,12 @@ var app = new Vue({
 		},
 		filteredArray() {
 			let filtPlantio = [];
+			if (this.excludeFarm.length > 0) {
+				this.plantio = this.plantio.filter(
+					(data) =>
+						!this.excludeFarm.includes(data.talhao__fazenda__nome)
+				);
+			}
 			if (this.filteredCutulreDif) {
 				filtPlantio = this.plantio.filter(
 					(data) =>

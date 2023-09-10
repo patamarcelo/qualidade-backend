@@ -132,6 +132,7 @@ class PlantioDetailAdmin(admin.ModelAdmin):
                 plantio_descontinuado=False,
             )
             .filter(~Q(variedade__cultura__cultura="Milheto"))
+            # .filter(~Q(talhao__fazenda__nome="Projeto Lago Verde"))
             .values(
                 "talhao__fazenda__nome",
                 "variedade__cultura__cultura",
@@ -567,6 +568,7 @@ class PlantioAdmin(ExtraButtonsMixin, admin.ModelAdmin):
         ColheitaFilterNoProgram,
         "finalizado_plantio",
         "finalizado_colheita",
+        "plantio_descontinuado",
         "programa__nome",
         "talhao__fazenda__nome",
         "variedade",
