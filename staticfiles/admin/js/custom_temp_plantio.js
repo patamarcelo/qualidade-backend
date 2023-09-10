@@ -27,6 +27,10 @@ var app = new Vue({
 			color: "whitesmoke",
 			backgroundColor: "blue"
 		},
+		styleTitle: {
+			color: "whitesmoke",
+			backgroundColor: "blue"
+		},
 		imageField: "soy"
 	},
 	methods: {
@@ -45,6 +49,9 @@ var app = new Vue({
 			if (cultura === "Feijão") {
 				return "/static/images/icons/beans2.png";
 			}
+			if (cultura === "Arroz") {
+				return "/static/images/icons/rice.png";
+			}
 		},
 		getFilteredChildren(filter) {
 			console.log(filter);
@@ -55,16 +62,16 @@ var app = new Vue({
 	watch: {
 		filteredCutulre() {
 			if (this.filteredCutulre === "Todas") {
-				console.log("todas", this.filteredCutulre);
 				this.style.backgroundColor = "blue";
 			}
 			if (this.filteredCutulre === "Soja") {
-				console.log("Soja", this.filteredCutulre);
 				this.style.backgroundColor = "green";
 			}
 			if (this.filteredCutulre === "Feijão") {
-				console.log("Feijão", this.filteredCutulre);
 				this.style.backgroundColor = "rgb(119,63,27)";
+			}
+			if (this.filteredCutulre === "Arroz") {
+				this.style.backgroundColor = "rgb(214, 220, 38)";
 			}
 			if (this.filteredCutulre === "Todas") {
 				this.filteredCutulreDif = "";
