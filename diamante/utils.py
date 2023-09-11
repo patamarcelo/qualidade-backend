@@ -41,6 +41,22 @@ pl_soja = pl.filter(variedade__cultura__cultura="Soja")
 
 """
 
+"""sumary_line
+
+Keyword arguments:
+argument -- description
+Return: return_description
+
+for i in pl_done:
+...     estagio_added = op
+...     date_prev = get_prev_app_date(i.data_plantio, 25)
+...     estagio_added['data prevista'] = format_date_json(date_prev)
+...     i.cronograma_programa.append(estagio_added)
+...     i.save()
+
+"""
+
+
 # ------------------------------------------------------------------------------------ SAFRA 2023/2024 - CICLO=2 --------------#
 
 

@@ -388,6 +388,30 @@ class Operacao(Base):
         ]
 
         return produtos
+    
+    @property
+    def operation_done_to_add(self):
+        query = Aplicacao.objects.select_related("operacao").filter(
+            ativo=True, operacao=self.id
+        )
+        produtos = [
+            {
+                "dose": str(dose_produto.dose),
+                "tipo": dose_produto.defensivo.tipo,
+                "produto": dose_produto.defensivo.produto,
+                "quantidade aplicar": "",
+            }
+            for dose_produto in query
+        ]
+        operation = {
+            "dap": self.prazo_dap,
+            "estagio" : self.estagio,
+            "aplicado" : False,
+            "produtos" : produtos,
+            "data prevista": ''
+            
+        }
+        return operation
 
     class Meta:
         ordering = ["programa", "operacao_numero"]
