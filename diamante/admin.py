@@ -537,6 +537,7 @@ class PlantioAdmin(ExtraButtonsMixin, admin.ModelAdmin):
                 "ciclo",
                 "talhao__fazenda",
                 "variedade",
+                "variedade__cultura",
                 "programa",
             )
             .order_by("data_plantio")
@@ -578,6 +579,7 @@ class PlantioAdmin(ExtraButtonsMixin, admin.ModelAdmin):
         "talhao",
         "safra_description",
         "variedade_description",
+        "cultura_description",
         "get_description_finalizado_plantio",
         "area_colheita",
         "get_description_finalizado_colheita",
@@ -811,6 +813,31 @@ class PlantioAdmin(ExtraButtonsMixin, admin.ModelAdmin):
 
     variedade_description.short_description = "Variedade"
 
+    def cultura_description(self, obj):
+        if obj.variedade is not None:
+            cultura = (
+                obj.variedade.cultura.cultura if obj.variedade.cultura.cultura else "-"
+            )
+            cultura_url = None
+            if cultura == "Soja":
+                cultura_url = "soy"
+            if cultura == "Feijão":
+                cultura_url = "beans2"
+            if cultura == "Arroz":
+                cultura_url = "rice"
+            image_url = None
+            if cultura_url is not None:
+                image_url = f"/static/images/icons/{cultura_url}.png"
+            if image_url is not None:
+                return format_html(
+                    f'<img style="width: 20px; height: 20px; text-align: center"  src="{image_url}">'
+                )
+        else:
+            cultura = "Não Planejado"
+        return cultura
+
+    cultura_description.short_description = "Cultura"
+
     def safra_description(self, obj):
         return f"{obj.safra.safra} - {obj.ciclo.ciclo}"
 
@@ -923,6 +950,7 @@ class ColheitaAdmin(admin.ModelAdmin):
                 "plantio__talhao",
                 "plantio__talhao__fazenda",
                 "plantio__variedade",
+                "plantio__variedade__cultura",
                 "plantio__safra",
                 "plantio__ciclo",
             )
@@ -971,6 +999,7 @@ class ColheitaAdmin(admin.ModelAdmin):
         "get_data_colheita",
         "get_placa",
         "get_nome_motorista",
+        "get_plantio_cultura",
         "get_plantio_variedade",
         "get_projeto_origem",
         "get_projeto_parcela",
@@ -1061,6 +1090,32 @@ class ColheitaAdmin(admin.ModelAdmin):
 
     get_projeto_origem.short_description = "Origem"
 
+    def get_plantio_cultura(self, obj):
+        if obj.plantio.variedade is not None:
+            cultura = (
+                obj.plantio.variedade.cultura.cultura if obj.plantio.variedade.cultura.cultura else "-"
+            )
+            cultura_url = None
+            if cultura == "Soja":
+                cultura_url = "soy"
+            if cultura == "Feijão":
+                cultura_url = "beans2"
+            if cultura == "Arroz":
+                cultura_url = "rice"
+            image_url = None
+            if cultura_url is not None:
+                image_url = f"/static/images/icons/{cultura_url}.png"
+            if image_url is not None:
+                return format_html(
+                    f'<img style="width: 20px; height: 20px; text-align: center"  src="{image_url}">'
+                )
+        else:
+            cultura = "Não Planejado"
+        return cultura
+
+    get_plantio_cultura.short_description = "Cultura"
+    
+    
     def get_plantio_variedade(self, obj):
         return obj.plantio.variedade.variedade
 
