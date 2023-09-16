@@ -827,7 +827,7 @@ class Colheita(Base):
     #     return self.peso_liquido / 60
 
     def save(self, *args, **kwargs):
-        if self.umidade:
+        if self.umidade is not None:
             peso_liquido = decimal.Decimal(self.peso_bruto - self.peso_tara)
             if self.umidade > 14:
                 unit_d = decimal.Decimal(14 / 1000)
@@ -835,19 +835,22 @@ class Colheita(Base):
                     ((self.umidade - 14) * 100 * unit_d) * peso_liquido / 100
                 )
                 self.desconto_umidade = desconto_umidade
-                print(desconto_umidade)
+                print('desconto umidade ', desconto_umidade)
+            else:
+                self.desconto_umidade = 0
 
-        if self.impureza:
+        if self.impureza is not None:
             peso_liquido = decimal.Decimal(self.peso_bruto - self.peso_tara)
             desconto_impureza = (peso_liquido * self.impureza) / 100
             self.desconto_impureza = desconto_impureza
-            print(desconto_impureza)
-
-        if self.bandinha:
+            print('Impureza ', desconto_impureza)
+        
+        print(self.bandinha)
+        if self.bandinha is not None:
             peso_liquido = decimal.Decimal(self.peso_bruto - self.peso_tara)
             desconto_bandinha = (peso_liquido * self.bandinha) / 100
             self.desconto_bandinha = desconto_bandinha
-            print(desconto_bandinha)
+            print('Bandinha', desconto_bandinha)
 
         self.peso_liquido = decimal.Decimal(self.peso_bruto - self.peso_tara)
 

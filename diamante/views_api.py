@@ -672,39 +672,40 @@ class PlantioViewSet(viewsets.ModelViewSet):
                             field_to_update = Plantio.objects.filter(
                                 safra=safra, ciclo=ciclo, talhao=talhao_id
                             )[0]
-                            if area:
-                                field_to_update.area_colheita = area
-
-                            if map_centro_id_farm:
-                                field_to_update.map_centro_id = map_centro_id_farm
-
-                            if map_geo_points_farm:
-                                field_to_update.map_geo_points = map_geo_points_farm
-
-                            if state == "active":
-                                if date_plantio:
-                                    field_to_update.data_plantio = date_plantio
-                                    field_to_update.finalizado_plantio = True
+                            if field_to_update.finalizado_colheita == False:
+                                if area:
                                     field_to_update.area_colheita = area
 
-                                if emergence_date:
-                                    field_to_update.data_emergencia = emergence_date
+                                if map_centro_id_farm:
+                                    field_to_update.map_centro_id = map_centro_id_farm
 
-                            if variety_id:
-                                id_variedade_done = [
-                                    x
-                                    for x in variedade_list
-                                    if x.id_farmbox == variety_id
-                                ][0]
-                                field_to_update.variedade = id_variedade_done
-                            else:
-                                field_to_update.variedade = id_variedade
-                            field_to_update.save()
-                            print(
-                                f"{Fore.GREEN}Plantio Alterado com sucesso: {field_to_update} - {safra} - {ciclo} | {Fore.BLUE}{field_to_update.variedade} | {field_to_update.programa}{Style.RESET_ALL}"
-                            )
-                            print("\n")
-                            count_total += 1
+                                if map_geo_points_farm:
+                                    field_to_update.map_geo_points = map_geo_points_farm
+
+                                if state == "active":
+                                    if date_plantio:
+                                        field_to_update.data_plantio = date_plantio
+                                        field_to_update.finalizado_plantio = True
+                                        field_to_update.area_colheita = area
+
+                                    if emergence_date:
+                                        field_to_update.data_emergencia = emergence_date
+
+                                if variety_id:
+                                    id_variedade_done = [
+                                        x
+                                        for x in variedade_list
+                                        if x.id_farmbox == variety_id
+                                    ][0]
+                                    field_to_update.variedade = id_variedade_done
+                                else:
+                                    field_to_update.variedade = id_variedade
+                                field_to_update.save()
+                                print(
+                                    f"{Fore.GREEN}Plantio Alterado com sucesso: {field_to_update} - {safra} - {ciclo} | {Fore.BLUE}{field_to_update.variedade} | {field_to_update.programa}{Style.RESET_ALL}"
+                                )
+                                print("\n")
+                                count_total += 1
                         except Exception as e:
                             print(
                                 f"{Fore.RED}Problema em salvar o plantio: {talhao_id} - {safra} - {ciclo}{Style.RESET_ALL}{e}"
