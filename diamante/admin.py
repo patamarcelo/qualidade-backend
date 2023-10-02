@@ -24,7 +24,7 @@ import csv
 from django.http import HttpResponse
 import codecs
 
-from django.db.models import Q, Sum
+from django.db.models import Q, Sum, F
 
 from django.db.models import Subquery, OuterRef
 from django.utils.formats import localize
@@ -60,8 +60,8 @@ def get_cargas_model(safra_filter, ciclo_filter):
             "plantio__variedade__variedade",
         )
         .annotate(
-            peso_kg=Sum("peso_liquido"),
-            peso_scs=Round((Sum("peso_liquido") / 60), precision=2),
+            peso_kg=Sum(F("peso_liquido")*60),
+            peso_scs=Round((Sum("peso_scs_limpo_e_seco")), precision=2),
         )
         .order_by("plantio__talhao__fazenda__nome")
         .filter(~Q(plantio__variedade__cultura__cultura="Milheto"))
