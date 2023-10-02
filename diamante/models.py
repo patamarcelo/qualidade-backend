@@ -388,7 +388,7 @@ class Operacao(Base):
         ]
 
         return produtos
-    
+
     @property
     def operation_done_to_add(self):
         query = Aplicacao.objects.select_related("operacao").filter(
@@ -405,11 +405,10 @@ class Operacao(Base):
         ]
         operation = {
             "dap": self.prazo_dap,
-            "estagio" : self.estagio,
-            "aplicado" : False,
-            "produtos" : produtos,
-            "data prevista": ''
-            
+            "estagio": self.estagio,
+            "aplicado": False,
+            "produtos": produtos,
+            "data prevista": "",
         }
         return operation
 
@@ -816,6 +815,15 @@ class Colheita(Base):
         null=True,
     )
 
+    peso_scs_limpo_e_seco = models.DecimalField(
+        "Sacos Limpo e Seco",
+        help_text="Peso Limpo e Seco Calculado em Sacos de 60Kg",
+        max_digits=8,
+        decimal_places=2,
+        blank=True,
+        null=True,
+    )
+
     deposito = models.ForeignKey(Deposito, on_delete=models.PROTECT)
 
     # @property
@@ -835,7 +843,7 @@ class Colheita(Base):
                     ((self.umidade - 14) * 100 * unit_d) * peso_liquido / 100
                 )
                 self.desconto_umidade = desconto_umidade
-                print('desconto umidade ', desconto_umidade)
+                print("desconto umidade ", desconto_umidade)
             else:
                 self.desconto_umidade = 0
 
@@ -843,25 +851,35 @@ class Colheita(Base):
             peso_liquido = decimal.Decimal(self.peso_bruto - self.peso_tara)
             desconto_impureza = (peso_liquido * self.impureza) / 100
             self.desconto_impureza = desconto_impureza
-            print('Impureza ', desconto_impureza)
-        
+            print("Impureza ", desconto_impureza)
+
         print(self.bandinha)
         if self.bandinha is not None:
             peso_liquido = decimal.Decimal(self.peso_bruto - self.peso_tara)
             desconto_bandinha = (peso_liquido * self.bandinha) / 100
             self.desconto_bandinha = desconto_bandinha
-            print('Bandinha', desconto_bandinha)
+            print("Bandinha", desconto_bandinha)
+        if self.bandinha == None:
+            self.bandinha = 0
+            self.desconto_bandinha = 0
 
         self.peso_liquido = decimal.Decimal(self.peso_bruto - self.peso_tara)
-
+        self.peso_scs_limpo_e_seco = self.peso_liquido
         if self.desconto_umidade:
             self.peso_liquido = self.peso_liquido - self.desconto_umidade
+            self.peso_scs_limpo_e_seco = (
+                self.peso_scs_limpo_e_seco - self.desconto_umidade
+            )
         if self.desconto_impureza:
             self.peso_liquido = self.peso_liquido - self.desconto_impureza
+            self.peso_scs_limpo_e_seco = (
+                self.peso_scs_limpo_e_seco - self.desconto_impureza
+            )
         if self.desconto_bandinha:
             self.peso_liquido = self.peso_liquido - self.desconto_bandinha
 
         self.peso_scs_liquido = self.peso_liquido / 60
+        self.peso_scs_limpo_e_seco = self.peso_scs_limpo_e_seco / 60
         super(Colheita, self).save(*args, **kwargs)
 
     class Meta:

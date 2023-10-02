@@ -577,9 +577,10 @@ class PlantioAdmin(ExtraButtonsMixin, admin.ModelAdmin):
     )
     list_display = (
         "talhao",
-        "safra_description",
-        "variedade_description",
         "cultura_description",
+        "variedade_description",
+        "safra_description",
+        "programa",
         "get_description_finalizado_plantio",
         "area_colheita",
         "get_description_finalizado_colheita",
@@ -593,7 +594,6 @@ class PlantioAdmin(ExtraButtonsMixin, admin.ModelAdmin):
         "get_data",
         "get_dap_description",
         "get_dias_ciclo",
-        "programa",
         # "detail",
     )
 
@@ -880,6 +880,7 @@ def export_cargas(modeladmin, request, queryset):
             "Desc. Umidade",
             "Impureza",
             "Desc. Impureza",
+            "Limpo e Seco",
             "Bandinha",
             "Desc. Bandinha",
             "Peso Liquido",
@@ -907,6 +908,7 @@ def export_cargas(modeladmin, request, queryset):
         "desconto_umidade",
         "impureza",
         "desconto_impureza",
+        "peso_scs_limpo_e_seco",
         "bandinha",
         "desconto_bandinha",
         "peso_liquido",
@@ -922,11 +924,12 @@ def export_cargas(modeladmin, request, queryset):
         cargas_detail[20] = 0 if carga[20] == None else str(carga[20]).replace(".", ",")
         cargas_detail[21] = 0 if carga[21] == None else str(carga[21]).replace(".", ",")
         cargas_detail[22] = 0 if carga[22] == None else str(carga[22]).replace(".", ",")
+        cargas_detail[23] = 0 if carga[23] == None else str(carga[23]).replace(".", ",")
         peso = cargas_detail[15] - cargas_detail[14]
         cargas_detail.insert(16, peso)
         cargas_detail.insert(
-            24,
-            str(round((float(cargas_detail[23].replace(",", ".")) / 60), 2)).replace(
+            25,
+            str(round((float(cargas_detail[24].replace(",", ".")) / 60), 2)).replace(
                 ".", ","
             ),
         )
@@ -978,6 +981,7 @@ class ColheitaAdmin(admin.ModelAdmin):
                     ("placa", "motorista"),
                     ("ticket", "op"),
                     ("peso_tara", "peso_bruto"),
+                    ("peso_scs_limpo_e_seco"),
                     ("peso_liquido", "peso_scs_liquido"),
                 )
             },
@@ -1013,6 +1017,7 @@ class ColheitaAdmin(admin.ModelAdmin):
         "desconto_umidade",
         "impureza",
         "desconto_impureza",
+        "peso_scs_limpo_e_seco",
         "bandinha",
         "desconto_bandinha",
         "peso_liquido",
@@ -1023,6 +1028,7 @@ class ColheitaAdmin(admin.ModelAdmin):
 
     readonly_fields = (
         "peso_liquido",
+        "peso_scs_limpo_e_seco",
         "peso_scs_liquido",
         "desconto_umidade",
         "desconto_impureza",
@@ -1093,7 +1099,9 @@ class ColheitaAdmin(admin.ModelAdmin):
     def get_plantio_cultura(self, obj):
         if obj.plantio.variedade is not None:
             cultura = (
-                obj.plantio.variedade.cultura.cultura if obj.plantio.variedade.cultura.cultura else "-"
+                obj.plantio.variedade.cultura.cultura
+                if obj.plantio.variedade.cultura.cultura
+                else "-"
             )
             cultura_url = None
             if cultura == "Soja":
@@ -1114,8 +1122,7 @@ class ColheitaAdmin(admin.ModelAdmin):
         return cultura
 
     get_plantio_cultura.short_description = "Cultura"
-    
-    
+
     def get_plantio_variedade(self, obj):
         return obj.plantio.variedade.variedade
 
@@ -1215,8 +1222,8 @@ class OperacaoAdmin(admin.ModelAdmin):
 
     inlines = [AplicacoesProgramaInline]
     list_display = (
-        "programa",
         "estagio",
+        "programa",
         "get_prazo_dap",
         "get_cultura_description",
         "get_obs_description",

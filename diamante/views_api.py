@@ -2,7 +2,12 @@ from django.shortcuts import render
 
 # Create your views here.
 
-from .serializers import TalhaoSerializer, PlantioSerializer, DefensivoSerializer
+from .serializers import (
+    TalhaoSerializer,
+    PlantioSerializer,
+    DefensivoSerializer,
+    AplicacaoSerializer,
+)
 
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -10,6 +15,11 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+from django.contrib.auth.models import User
+from rest_framework.renderers import JSONRenderer
+from rest_framework import generics
+
 
 import json
 from django.http import JsonResponse
@@ -41,6 +51,7 @@ from .models import (
     Aplicacao,
     Operacao,
     Colheita,
+    Programa,
 )
 
 from functools import reduce
@@ -1695,7 +1706,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                             "variedade": i["variedade__nome_fantasia"],
                             "plantio_id": i["id"],
                             "finalizado_plantio": i["finalizado_plantio"],
-                            "finalizado_colheita": i['finalizado_colheita'],
+                            "finalizado_colheita": i["finalizado_colheita"],
                             "plantio_descontinuado": i["plantio_descontinuado"],
                             "fazenda_grupo": i["talhao__fazenda__fazenda__nome"],
                             "talhao_id_unico": i["talhao__id_unico"],
@@ -1959,3 +1970,70 @@ class DefensivoViewSet(viewsets.ModelViewSet):
 
 
 # --------------------- ---------------------- DEFENSIVOS API END  --------------------- ----------------------#
+
+
+# --------------------- ---------------------- PROGRAMS API START  --------------------- ----------------------#
+
+
+class ProgramasDetails(viewsets.ModelViewSet):
+    queryset = Aplicacao.objects.all()
+    serializer_class = AplicacaoSerializer
+    authentication_classes = (TokenAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    @action(detail=False, methods=["GET"])
+    def get_operacoes(self, request):
+        if request.user.is_authenticated:
+            try:
+                safra_filter = None
+                cicle_filter = None
+                try:
+                    safra_filter = request.data["safra"]
+                    cicle_filter = request.data["ciclo"]
+                except Exception as e:
+                    print(e)
+                print(safra_filter)
+                print(cicle_filter)
+                safra_filter = "2023/2024" if safra_filter == None else safra_filter
+                cicle_filter = "1" if cicle_filter == None else cicle_filter
+                qs = (
+                    Aplicacao.objects.values(
+                        "criados",
+                        "modificado",
+                        "dose",
+                        "obs",
+                        "operacao__estagio",
+                        "operacao__prazo_dap",
+                        "operacao__programa__nome",
+                        "operacao__programa__nome_fantasia",
+                        "operacao__programa__cultura__cultura",
+                        "operacao__programa__cultura__variedade__variedade",
+                        "operacao__programa__safra__safra",
+                        "operacao__programa__ciclo__ciclo",
+                        "defensivo__produto",
+                        "defensivo__tipo",
+                    )
+                    .filter(ativo=True)
+                    .filter(operacao__programa__safra__safra=safra_filter)
+                    .filter(operacao__programa__ciclo__ciclo=cicle_filter)
+                )
+                qs_estagios = Operacao.objects.values("estagio", "programa__nome")
+                qs_programas = Programa.objects.values("nome")
+                # serializer = AplicacaoSerializer(qs, many=True)
+                response = {
+                    "msg": f"Consulta realizada com sucesso!!",
+                    "total_return": len(qs),
+                    "dados": qs,
+                    "estagios": qs_estagios,
+                    "programas": qs_programas,
+                }
+                return Response(response, status=status.HTTP_200_OK)
+            except Exception as e:
+                response = {"message": f"Ocorreu um Erro: {e}"}
+                return Response(response, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            response = {"message": "Você precisa estar logado!!!"}
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+
+# --------------------- ---------------------- PROGRAMS API END  --------------------- ----------------------#
