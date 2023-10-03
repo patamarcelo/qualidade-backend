@@ -1999,15 +1999,14 @@ class ProgramasDetails(viewsets.ModelViewSet):
                 qs = (
                     Aplicacao.objects.values(
                         "criados",
-                        "modificado",
+                        # "modificado",
                         "dose",
                         "obs",
                         "operacao__estagio",
                         "operacao__prazo_dap",
                         "operacao__programa__nome",
-                        "operacao__programa__nome_fantasia",
+                        # "operacao__programa__nome_fantasia",
                         "operacao__programa__cultura__cultura",
-                        "operacao__programa__cultura__variedade__variedade",
                         "operacao__programa__safra__safra",
                         "operacao__programa__ciclo__ciclo",
                         "defensivo__produto",
@@ -2018,7 +2017,7 @@ class ProgramasDetails(viewsets.ModelViewSet):
                     .filter(operacao__programa__ciclo__ciclo=cicle_filter)
                 )
                 qs_estagios = Operacao.objects.values("estagio", "programa__nome")
-                qs_programas = Programa.objects.values("nome")
+                qs_programas = Programa.objects.values("nome", "nome_fantasia")
                 # serializer = AplicacaoSerializer(qs, many=True)
                 response = {
                     "msg": f"Consulta realizada com sucesso!!",
