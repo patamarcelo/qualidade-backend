@@ -54,6 +54,12 @@ for i in pl_done:
 ...     i.cronograma_programa.append(estagio_added)
 ...     i.save()
 
+for i in pl_mungo:
+...     index = get_index_dict_estagio(i.cronograma_programa, "12 DIAS")
+...     new_date = format_date_json(get_prev_app_date(i.data_plantio, 12))
+...     i.cronograma_programa[index].update({'data prevista': new_date})
+...     print(i.cronograma_programa[index]['data prevista'])
+
 """
 
 

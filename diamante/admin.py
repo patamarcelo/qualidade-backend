@@ -60,7 +60,7 @@ def get_cargas_model(safra_filter, ciclo_filter):
             "plantio__variedade__variedade",
         )
         .annotate(
-            peso_kg=Sum(F("peso_liquido")*60),
+            peso_kg=Sum(F("peso_liquido") * 60),
             peso_scs=Round((Sum("peso_scs_limpo_e_seco")), precision=2),
         )
         .order_by("plantio__talhao__fazenda__nome")
@@ -1054,6 +1054,7 @@ class ColheitaAdmin(admin.ModelAdmin):
         "plantio__ciclo__ciclo",
         "plantio__talhao__fazenda__nome",
         "plantio__variedade__variedade",
+        "deposito__nome"
     )
 
     ordering = ("-data_colheita",)
@@ -1227,8 +1228,15 @@ class OperacaoAdmin(admin.ModelAdmin):
         "get_prazo_dap",
         "get_cultura_description",
         "get_obs_description",
+        "ativo",
     )
-    list_filter = ["programa", "programa__safra", "programa__ciclo", "modificado"]
+    list_filter = [
+        "programa",
+        "programa__safra",
+        "programa__ciclo",
+        "modificado",
+        "ativo",
+    ]
 
     ordering = (
         "programa",
