@@ -31,6 +31,7 @@ from diamante.utils import *
 pr_mungo = Programa.objects.filter(safra__safra="2023/2024", ciclo__ciclo="2", cultura__cultura="Feijão")[1]
 pr_caupi  = Programa.objects.filter(safra__safra="2023/2024", ciclo__ciclo="2", cultura__cultura="Feijão")[0]
 pr_soja = Programa.objects.filter(safra__safra="2023/2024", ciclo__ciclo="2", cultura__cultura="Soja")[0]
+pr_olimpo = Programa.objects.filter(safra__safra="2023/2024", ciclo__ciclo="2", cultura__cultura="Soja")[1]
 
 
 
@@ -38,6 +39,7 @@ pl = Plantio.objects.filter(safra__safra="2023/2024", ciclo__ciclo="2")
 pl_mungo = pl.filter(variedade__variedade="Feijão Mungo Verde")
 pl_caupi = pl.filter(variedade__variedade="Feijão Caupi")
 pl_soja = pl.filter(variedade__cultura__cultura="Soja")
+pl_olimpo = pl.filter(variedade__variedade="Soja Olimpo IPRO")
 
 """
 
