@@ -1054,7 +1054,7 @@ class ColheitaAdmin(admin.ModelAdmin):
         "plantio__ciclo__ciclo",
         "plantio__talhao__fazenda__nome",
         "plantio__variedade__variedade",
-        "deposito__nome"
+        "deposito__nome",
     )
 
     ordering = ("-data_colheita",)
@@ -1164,16 +1164,14 @@ class ProgramaAdmin(admin.ModelAdmin):
         "safra_description",
         "start_date_description",
         "end_date_description",
+        "ativo",
     )
 
     search_fields = [
         "nome",
     ]
 
-    list_filter = (
-        "safra__safra",
-        "ciclo__ciclo",
-    )
+    list_filter = ("safra__safra", "ciclo__ciclo", "ativo")
 
     ordering = ("safra", "ciclo")
 

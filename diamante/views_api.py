@@ -1996,27 +1996,39 @@ class ProgramasDetails(viewsets.ModelViewSet):
                 print(cicle_filter)
                 safra_filter = "2023/2024" if safra_filter == None else safra_filter
                 cicle_filter = "1" if cicle_filter == None else cicle_filter
-                qs = Aplicacao.objects.values(
-                    "criados",
-                    # "modificado",
-                    "dose",
-                    "obs",
-                    "operacao__estagio",
-                    "operacao__prazo_dap",
-                    "operacao__programa__nome",
-                    # "operacao__programa__nome_fantasia",
-                    "operacao__programa__cultura__cultura",
-                    "operacao__programa__safra__safra",
-                    "operacao__programa__ciclo__ciclo",
-                    "defensivo__produto",
-                    "defensivo__tipo",
-                ).filter(ativo=True)
-                qs_estagios = Operacao.objects.values(
-                    "estagio", "programa__nome", "prazo_dap", "obs"
+                qs = (
+                    Aplicacao.objects.values(
+                        "criados",
+                        # "modificado",
+                        "dose",
+                        "obs",
+                        "operacao__estagio",
+                        "operacao__prazo_dap",
+                        "operacao__programa__nome",
+                        # "operacao__programa__nome_fantasia",
+                        "operacao__programa__cultura__cultura",
+                        "operacao__programa__safra__safra",
+                        "operacao__programa__ciclo__ciclo",
+                        "defensivo__produto",
+                        "defensivo__tipo",
+                    )
+                    .filter(ativo=True)
+                    .filter(operacao__programa__ativo=True)
                 )
-                qs_programas = Programa.objects.values(
-                    "nome", "nome_fantasia", "safra__safra", "ciclo__ciclo"
-                ).order_by("-safra", "-ciclo")
+                qs_estagios = (
+                    Operacao.objects.values(
+                        "estagio", "programa__nome", "prazo_dap", "obs"
+                    )
+                    .filter(ativo=True)
+                    .filter(programa__ativo=True)
+                )
+                qs_programas = (
+                    Programa.objects.values(
+                        "nome", "nome_fantasia", "safra__safra", "ciclo__ciclo"
+                    )
+                    .order_by("-safra", "-ciclo")
+                    .filter(ativo=True)
+                )
                 # serializer = AplicacaoSerializer(qs, many=True)
                 response = {
                     "msg": f"Consulta realizada com sucesso!!",
