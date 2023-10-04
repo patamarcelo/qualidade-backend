@@ -169,6 +169,7 @@ TIPO_CHOICES = (
     ("oleo_mineral_vegetal", "Óleo Mineral/Vegetal"),
     ("protetor", "Protetor"),
     ("regulador", "Regulador"),
+    ("semente", "Semente"),
 )
 
 
