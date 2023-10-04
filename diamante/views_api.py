@@ -2029,6 +2029,7 @@ class ProgramasDetails(viewsets.ModelViewSet):
                     .order_by("-safra", "-ciclo")
                     .filter(ativo=True)
                 )
+                qs_area_total_program = Plantio.objects.values('programa__nome').annotate(total=Sum('area_colheita')).filter(~Q(programa=None)).filter(programa__ativo=True)
                 # serializer = AplicacaoSerializer(qs, many=True)
                 response = {
                     "msg": f"Consulta realizada com sucesso!!",
@@ -2036,6 +2037,7 @@ class ProgramasDetails(viewsets.ModelViewSet):
                     "dados": qs,
                     "estagios": qs_estagios,
                     "programas": qs_programas,
+                    "area_total": qs_area_total_program
                 }
                 return Response(response, status=status.HTTP_200_OK)
             except Exception as e:
