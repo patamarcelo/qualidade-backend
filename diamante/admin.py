@@ -1199,6 +1199,46 @@ class ProgramaAdmin(admin.ModelAdmin):
     end_date_description.short_description = "End Plantio"
 
 
+def export_programa(modeladmin, request, queryset):
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = 'attachment; filename="Programas.csv"'
+    # response.write(codecs.BOM_UTF8)
+    writer = csv.writer(response, delimiter=";")
+    writer.writerow(
+        [
+            "Programa",
+            "Cultura",
+            "Estagio",
+            "Defensivo",
+            "Tipo",
+            "Dose",
+            "Dap",
+            "Safra",
+            "Ciclo",
+        ]
+    )
+    operacoes = queryset.values_list(
+        "operacao__programa__nome",
+        "operacao__programa__cultura__cultura",
+        "operacao__estagio",
+        "defensivo__produto",
+        "defensivo__tipo",
+        "dose",
+        "operacao__prazo_dap",
+        "operacao__programa__safra__safra",
+        "operacao__programa__ciclo__ciclo",
+    ).order_by('operacao__prazo_dap', 'defensivo__tipo','defensivo__produto')
+    for op in operacoes:
+        op_details = list(op)
+        op_details[5] = 0 if op[5] == None else str(op[5]).replace(".", ",")
+        operation = tuple(op_details)
+        writer.writerow(operation)
+    return response
+
+
+export_programa.short_description = "Export to csv"
+
+
 @admin.register(Operacao)
 class OperacaoAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
@@ -1271,6 +1311,8 @@ class DefensivoAdmin(admin.ModelAdmin):
 
 @admin.register(Aplicacao)
 class AplicacaoAdmin(admin.ModelAdmin):
+    actions = [export_programa]
+
     def get_queryset(self, request):
         return (
             super(AplicacaoAdmin, self)
