@@ -62,6 +62,24 @@ for i in pl_mungo:
 ...     i.cronograma_programa[index].update({'data prevista': new_date})
 ...     print(i.cronograma_programa[index]['data prevista'])
 
+
+for i in pl_soja_ok:
+...     days = 12
+...     program = "2º TRIFÓLIO (V2)"
+...     index = get_index_dict_estagio(i.cronograma_programa, program)
+...     new_date = format_date_json(get_prev_app_date(i.data_plantio, days))
+...     i.cronograma_programa[index].update({'data prevista': new_date, 'dap': days})
+...     i.save()
+...
+>>> for i in pl_soja_ok:
+...     days = 17
+...     program = "3º TRIFÓLIO (V3)"
+...     index = get_index_dict_estagio(i.cronograma_programa, program)
+...     new_date = format_date_json(get_prev_app_date(i.data_plantio, days))
+...     i.cronograma_programa[index].update({'data prevista': new_date, 'dap': days})
+...     i.save()
+...
+
 """
 
 
@@ -178,12 +196,21 @@ def alter_programa_and_save(query, operation, current_op_products):
             print("Erro ao Salvar a alteração no programa do  plantio", e)
 
 
-# for i in pl_rr:
-# ...     for j in i.cronograma_programa:
-# ...             if len(j) > 3 and j['aplicado'] == False:
-# ...                     index = get_index_dict_prod(j['produtos'], "MIX BT's")
-# ...                     if index:
-# ...                             print(j['produtos'][index]['dose'])
+def alter_dap_programa_and_save(query, dap, current_op):
+    for i in query:
+        try:
+            days = dap
+            program = current_op
+            index = get_index_dict_estagio(i.cronograma_programa, program)
+            if i.cronograma_programa[index]["aplicado"] == False:
+                new_date = format_date_json(get_prev_app_date(i.data_plantio, days))
+                i.cronograma_programa[index].update(
+                    {"data prevista": new_date, "dap": days}
+                )
+                i.save()
+        except Exception as e:
+            print("Erro ao Salvar a alteração no programa do  plantio", e)
+
 
 v6_1_conv = {
     "dap": 38,
