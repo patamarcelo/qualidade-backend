@@ -24,7 +24,7 @@ from rest_framework import generics
 import json
 from django.http import JsonResponse
 from django.core.serializers import serialize
-from django.db.models import Q, Sum, DecimalField
+from django.db.models import Q, Sum, DecimalField, Count
 import datetime
 from dateutil.relativedelta import relativedelta
 from decimal import *
@@ -938,6 +938,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 qs = (
                     Plantio.objects.values(
                         "safra__safra",
+                        "pk",
                         "ciclo__ciclo",
                         "talhao__id_talhao",
                         "talhao__fazenda__nome",
@@ -971,6 +972,13 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     .order_by("talhao__fazenda__nome")
                     .annotate(area_total=Sum("area_colheita"))
                 )
+                res2 = (
+                    qs_annotate.values(
+                        "talhao__fazenda__nome", "talhao__fazenda__fazenda__nome"
+                    )
+                    .annotate(count=Count("talhao__fazenda__nome"))
+                    .order_by("talhao__fazenda__nome")
+                )
 
                 # ------------- ------------- START SEPARADO POR PROJETO ------------- -------------#
                 resumo = {i["talhao__fazenda__nome"]: {} for i in qs}
@@ -984,6 +992,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 "cultura": i["variedade__cultura__cultura"],
                                 "variedade": i["variedade__nome_fantasia"],
                                 "finalizado_colheita": i["finalizado_colheita"],
+                                "id_plantio": i["pk"],
                             }
                         }
                     )
@@ -1025,6 +1034,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "msg": f"Consulta realizada com sucesso!!",
                     "total_return": len(qs),
                     "resumo_safra": res1,
+                    "resumo_safra_fazenda": res2,
                     "Area Total dos Talhoes Plantados": area_total,
                     "dados": resumo,
                 }
@@ -2013,7 +2023,8 @@ class ProgramasDetails(viewsets.ModelViewSet):
                         "defensivo__tipo",
                     )
                     .filter(ativo=True)
-                    .filter(operacao__programa__ativo=True).filter(operacao__ativo=True)
+                    .filter(operacao__programa__ativo=True)
+                    .filter(operacao__ativo=True)
                 )
                 qs_estagios = (
                     Operacao.objects.values(
