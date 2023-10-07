@@ -554,6 +554,7 @@ class PlantioAdmin(ExtraButtonsMixin, admin.ModelAdmin):
         "talhao__fazenda__nome",
         "talhao__fazenda__fazenda__nome",
         "variedade__variedade",
+        "variedade__cultura__cultura",
         "finalizado_plantio",
         "finalizado_colheita",
         "area_colheita",
@@ -585,8 +586,9 @@ class PlantioAdmin(ExtraButtonsMixin, admin.ModelAdmin):
         "get_data",
         "area_colheita",
         "get_description_finalizado_colheita",
-        "get_area_parcial",
+        # "get_area_parcial",
         "get_total_colheita_cargas_kg",
+        # "talhao",
         "get_total_prod",
         "get_data_primeira_carga",
         "get_data_ultima_carga",
@@ -594,6 +596,7 @@ class PlantioAdmin(ExtraButtonsMixin, admin.ModelAdmin):
         # "area_parcial",
         "get_dap_description",
         "get_dias_ciclo",
+        "get_description_descontinuado_plantio",
         # "detail",
     )
 
@@ -779,6 +782,12 @@ class PlantioAdmin(ExtraButtonsMixin, admin.ModelAdmin):
         return obj.get_dap
 
     get_dap_description.short_description = "DAP "
+
+    def get_description_descontinuado_plantio(self, obj):
+        return obj.plantio_descontinuado
+
+    get_description_descontinuado_plantio.boolean = True
+    get_description_descontinuado_plantio.short_description = "Interrom? "
 
     def get_description_finalizado_plantio(self, obj):
         return obj.finalizado_plantio
@@ -1227,7 +1236,7 @@ def export_programa(modeladmin, request, queryset):
         "operacao__prazo_dap",
         "operacao__programa__safra__safra",
         "operacao__programa__ciclo__ciclo",
-    ).order_by('operacao__prazo_dap', 'defensivo__tipo','defensivo__produto')
+    ).order_by("operacao__prazo_dap", "defensivo__tipo", "defensivo__produto")
     for op in operacoes:
         op_details = list(op)
         op_details[5] = 0 if op[5] == None else str(op[5]).replace(".", ",")
