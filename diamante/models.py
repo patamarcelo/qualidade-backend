@@ -702,6 +702,18 @@ class Plantio(Base):
         ordering = ["data_plantio"]
         verbose_name = "Plantio"
         verbose_name_plural = "Plantios"
+        indexes = [
+            models.Index(
+                fields=[
+                    "safra",
+                    "ciclo",
+                    "talhao",
+                    "programa",
+                    "variedade",
+                    "data_plantio",
+                ]
+            )
+        ]
 
     def __str__(self):
         return f"{self.talhao.id_talhao} | {self.talhao.fazenda.nome} | {str(self.area_colheita)}"

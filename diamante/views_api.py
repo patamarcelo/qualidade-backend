@@ -24,7 +24,7 @@ from rest_framework import generics
 import json
 from django.http import JsonResponse
 from django.core.serializers import serialize
-from django.db.models import Q, Sum, DecimalField, Count
+from django.db.models import Q, Sum, DecimalField, Count, FilteredRelation
 import datetime
 from dateutil.relativedelta import relativedelta
 from decimal import *
@@ -84,6 +84,14 @@ from rest_framework.decorators import api_view, permission_classes
 
 
 # --------------------- --------------------- START TALHAO API --------------------- --------------------- #
+
+
+s_dict = {
+    "2022/2023": 1,
+    "2023/2024": 2,
+}
+
+c_dict = {"1": 3, "2": 4, "3": 5}
 
 
 class TalaoViewSet(viewsets.ModelViewSet):
@@ -1305,7 +1313,17 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 cicle_filter = "1" if cicle_filter == None else cicle_filter
 
                 qs_plantio = (
-                    Plantio.objects.values(
+                    Plantio.objects.select_related(
+                        "safra",
+                        "ciclo",
+                        "talhao",
+                        "fazenda",
+                        "programa",
+                        "variedade",
+                        "variedade__cultura",
+                        "talhao__fazenda__fazenda",
+                    )
+                    .values(
                         "id",
                         "talhao__id_talhao",
                         "talhao__id_unico",
@@ -1327,7 +1345,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         "programa__nome",
                     )
                     .filter(~Q(programa_id=None))
-                    .filter(safra__safra=safra_filter, ciclo__ciclo=cicle_filter)
+                    .filter(safra=s_dict[safra_filter], ciclo=c_dict[cicle_filter])
                     .filter(Q(data_plantio=None))
                     .filter(plantio_descontinuado=False)
                 )
@@ -1335,7 +1353,15 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "estagio", "programa_id", "prazo_dap", "id"
                 )
                 qs_aplicacoes = (
-                    Aplicacao.objects.values(
+                    Aplicacao.objects.select_related(
+                        "defensivo",
+                        "operacao",
+                        "operacao__programa",
+                        "operacao__programa__safra",
+                        "operacao__programa__ciclo",
+                        "operacao__programa__cultura",
+                    )
+                    .values(
                         "defensivo__produto",
                         "defensivo__tipo",
                         "dose",
@@ -1350,8 +1376,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     )
                     .filter(~Q(operacao__programa_id=None))
                     .filter(
-                        operacao__programa__safra__safra=safra_filter,
-                        operacao__programa__ciclo__ciclo=cicle_filter,
+                        operacao__programa__safra=s_dict[safra_filter],
+                        operacao__programa__ciclo=c_dict[cicle_filter],
                         ativo=True,
                     )
                 )
@@ -1576,7 +1602,18 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 cicle_filter = "1" if cicle_filter == None else cicle_filter
 
                 qs_plantio = (
-                    Plantio.objects.values(
+                    Plantio.objects.select_related(
+                        "safra",
+                        "ciclo",
+                        "talhao",
+                        "fazenda",
+                        "programa",
+                        "variedade",
+                        "variedade__cultura",
+                        "talhao__fazenda",
+                        "talhao__fazenda__fazenda",
+                    )
+                    .values(
                         "id",
                         "talhao__id_talhao",
                         "talhao__id_unico",
@@ -1600,7 +1637,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         "cronograma_programa",
                     )
                     .filter(~Q(programa_id=None))
-                    .filter(safra__safra=safra_filter, ciclo__ciclo=cicle_filter)
+                    .filter(safra=s_dict[safra_filter], ciclo=c_dict[cicle_filter])
                     .filter(data_plantio__isnull=False)
                     .filter(plantio_descontinuado=False)
                 )
@@ -1682,28 +1719,42 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 safra_filter = "2023/2024" if safra_filter == None else safra_filter
                 cicle_filter = "1" if cicle_filter == None else cicle_filter
 
-                qs_plantio = Plantio.objects.values(
-                    "id",
-                    "talhao__id_talhao",
-                    "talhao__id_unico",
-                    "talhao_id",
-                    "safra__safra",
-                    "ciclo__ciclo",
-                    "talhao__fazenda__nome",
-                    "talhao__fazenda__map_centro_id",
-                    "talhao__fazenda__map_zoom",
-                    "talhao__fazenda__fazenda__nome",
-                    "variedade__nome_fantasia",
-                    "variedade__cultura__cultura",
-                    "variedade__cultura__map_color",
-                    "variedade__cultura__map_color_line",
-                    "finalizado_plantio",
-                    "finalizado_colheita",
-                    "plantio_descontinuado",
-                    "area_colheita",
-                    "map_centro_id",
-                    "map_geo_points",
-                ).filter(safra__safra=safra_filter, ciclo__ciclo=cicle_filter)
+                qs_plantio = (
+                    Plantio.objects.select_related(
+                        "safra",
+                        "ciclo",
+                        "talhao",
+                        "fazenda",
+                        "programa",
+                        "variedade",
+                        "variedade__cultura",
+                        "talhao__fazenda",
+                        "talhao__fazenda__fazenda",
+                    )
+                    .values(
+                        "id",
+                        "talhao__id_talhao",
+                        "talhao__id_unico",
+                        "talhao_id",
+                        "safra__safra",
+                        "ciclo__ciclo",
+                        "talhao__fazenda__nome",
+                        "talhao__fazenda__map_centro_id",
+                        "talhao__fazenda__map_zoom",
+                        "talhao__fazenda__fazenda__nome",
+                        "variedade__nome_fantasia",
+                        "variedade__cultura__cultura",
+                        "variedade__cultura__map_color",
+                        "variedade__cultura__map_color_line",
+                        "finalizado_plantio",
+                        "finalizado_colheita",
+                        "plantio_descontinuado",
+                        "area_colheita",
+                        "map_centro_id",
+                        "map_geo_points",
+                    )
+                    .filter(safra=s_dict[safra_filter], ciclo=c_dict[cicle_filter])
+                )
 
                 result = [
                     {
@@ -1803,8 +1854,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "map_centro_id",
                     "map_geo_points",
                 ).filter(
-                    safra__safra=safra_filter,
-                    ciclo__ciclo=cicle_filter,
+                    safra=s_dict[safra_filter],
+                    ciclo=c_dict[cicle_filter],
                     plantio_descontinuado=False,
                 )
 
@@ -2006,45 +2057,39 @@ class ProgramasDetails(viewsets.ModelViewSet):
                 print(cicle_filter)
                 safra_filter = "2023/2024" if safra_filter == None else safra_filter
                 cicle_filter = "1" if cicle_filter == None else cicle_filter
-                qs = (
-                    Aplicacao.objects.values(
-                        "criados",
-                        # "modificado",
-                        "dose",
-                        "obs",
-                        "operacao__estagio",
-                        "operacao__prazo_dap",
-                        "operacao__programa__nome",
-                        # "operacao__programa__nome_fantasia",
-                        "operacao__programa__cultura__cultura",
-                        "operacao__programa__safra__safra",
-                        "operacao__programa__ciclo__ciclo",
-                        "defensivo__produto",
-                        "defensivo__tipo",
-                    )
-                    .filter(ativo=True)
-                    .filter(operacao__programa__ativo=True)
-                    .filter(operacao__ativo=True)
+                qs = Aplicacao.objects.values(
+                    "criados",
+                    # "modificado",
+                    "dose",
+                    "obs",
+                    "operacao__estagio",
+                    "operacao__prazo_dap",
+                    "operacao__programa__nome",
+                    # "operacao__programa__nome_fantasia",
+                    "operacao__programa__cultura__cultura",
+                    "operacao__programa__safra__safra",
+                    "operacao__programa__ciclo__ciclo",
+                    "defensivo__produto",
+                    "defensivo__tipo",
+                ).filter(
+                    Q(ativo=True)
+                    & Q(operacao__programa__ativo=True)
+                    & Q(operacao__ativo=True)
                 )
-                qs_estagios = (
-                    Operacao.objects.values(
-                        "estagio", "programa__nome", "prazo_dap", "obs"
-                    )
-                    .filter(ativo=True)
-                    .filter(programa__ativo=True)
-                )
+                qs_estagios = Operacao.objects.values(
+                    "estagio", "programa__nome", "prazo_dap", "obs"
+                ).filter(Q(programa__ativo=True) & Q(ativo=True))
                 qs_programas = (
                     Programa.objects.values(
                         "nome", "nome_fantasia", "safra__safra", "ciclo__ciclo"
                     )
                     .order_by("-safra", "-ciclo")
-                    .filter(ativo=True)
+                    .filter(Q(ativo=True))
                 )
                 qs_area_total_program = (
                     Plantio.objects.values("programa__nome")
                     .annotate(total=Sum("area_colheita"))
-                    .filter(~Q(programa=None))
-                    .filter(programa__ativo=True)
+                    .filter(~Q(programa=None) & Q(programa__ativo=True))
                 )
                 # serializer = AplicacaoSerializer(qs, many=True)
                 response = {

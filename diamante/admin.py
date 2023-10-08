@@ -540,7 +540,6 @@ class PlantioAdmin(ExtraButtonsMixin, admin.ModelAdmin):
                 "variedade__cultura",
                 "programa",
             )
-            .order_by("data_plantio")
         )
 
     formfield_overrides = {
