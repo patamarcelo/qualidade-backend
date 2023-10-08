@@ -213,6 +213,7 @@ class Cultura(Base):
         ordering = ["cultura"]
         verbose_name = "Cultura"
         verbose_name_plural = "Culturas"
+        indexes = [models.Index(fields=["cultura"])]
 
     def __str__(self):
         return self.cultura
@@ -238,6 +239,7 @@ class Variedade(Base):
         ordering = ["variedade"]
         verbose_name = "Variedade"
         verbose_name_plural = "Variedades"
+        indexes = [models.Index(fields=["variedade"])]
 
     def __str__(self):
         return self.variedade
@@ -251,6 +253,7 @@ class Safra(Base):
         # ordering = ["safra"]
         verbose_name = "Safra"
         verbose_name_plural = "Safras"
+        indexes = [models.Index(fields=["safra"])]
 
     def __str__(self):
         return self.safra
@@ -263,6 +266,7 @@ class Ciclo(Base):
         # ordering = ["ciclo"]
         verbose_name = "Ciclo"
         verbose_name_plural = "Ciclos"
+        indexes = [models.Index(fields=["ciclo"])]
 
     def __str__(self):
         return str(self.ciclo)
@@ -316,6 +320,7 @@ class Programa(Base):
         # ordering = ["variedade"]
         verbose_name = "Programa"
         verbose_name_plural = "Programas"
+        indexes = [models.Index(fields=["nome"])]
 
     def __str__(self):
         return f"{self.nome}"
