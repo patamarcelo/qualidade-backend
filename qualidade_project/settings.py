@@ -123,8 +123,18 @@ DATABASES = {
         "PASSWORD": env("DB_EL_PASSWORD"),
         "HOST": env("DB_EL_HOST"),
         "PORT": env("DB_EL_PORT"),
-    }
+    },
+    "dev": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": env("DB_EL_NAME_LOCAL"),
+        "USER": env("DB_EL_USER_LOCAL"),
+        "PASSWORD": env("DB_EL_PASSWORD_LOCAL"),
+        "HOST": env("DB_EL_HOST_LOCAL"),
+        "PORT": env("DB_EL_PORT_LOCAL"),
+    },
 }
+
+# DATABASES["default"] = DATABASES["dev" if DEBUG else "default"]
 
 
 # Password validation

@@ -1,9 +1,4 @@
-{% if "add" in request.get_full_path %}
 <div class="card card-info">
-    {% else %}
-    <div class="card card-info collapsed-card">
-    {% endif %}
-
     <div class="card-header bg-primary">
         <h3 class="card-title">{% if fieldset.name %}{{ fieldset.name }}{% endif %}</h3>
         {% if fieldset.description %}

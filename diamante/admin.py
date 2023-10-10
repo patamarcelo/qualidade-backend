@@ -571,7 +571,7 @@ class PlantioAdmin(ExtraButtonsMixin, admin.ModelAdmin):
         "finalizado_colheita",
         "plantio_descontinuado",
         "programa__nome",
-        "talhao__fazenda__nome",
+        # "talhao__fazenda__nome",
         "variedade",
         "modificado",
     )
