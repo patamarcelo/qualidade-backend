@@ -134,7 +134,7 @@ DATABASES = {
     },
 }
 
-# DATABASES["default"] = DATABASES["dev" if DEBUG else "default"]
+DATABASES["default"] = DATABASES["dev" if DEBUG else "default"]
 
 
 # Password validation
