@@ -922,3 +922,44 @@ class PlantioDetailPlantio(Plantio):
         proxy = True
         verbose_name = "Plantio - Resumo Plantio"
         verbose_name_plural = "Plantios - Resumo Plantio"
+
+
+class AplicacaoPlantio(Base):
+    plantio = models.ForeignKey(
+        Plantio,
+        on_delete=models.PROTECT,
+    )
+    estagio = models.ForeignKey(
+        Operacao,
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+    )
+    defensivo = models.ForeignKey(Defensivo, on_delete=models.PROTECT)
+    dose = models.DecimalField(
+        "Dose KG/LT por ha",
+        help_text="Dose aplicada de Kg ou Lt por ha.",
+        max_digits=8,
+        decimal_places=3,
+    )
+    data_prevista = models.DateField(
+        help_text="dd/mm/aaaa - Data Prevista Aplicação",
+        blank=True,
+        null=True,
+    )
+    aplicado = models.BooleanField(
+        "Aplicação Efetuada",
+        default=False,
+        help_text="Informar se a Aplicação foi realizada",
+    )
+
+    obs = models.TextField("Observação", max_length=500, blank=True)
+
+    class Meta:
+        unique_together = ("plantio", "estagio", "defensivo")
+        # ordering = ["data_colheita"]
+        verbose_name = "Aplicação Plantio"
+        verbose_name_plural = "Aplicações Plantio"
+
+    def __str__(self):
+        return f"{self.estagio} - {self.defensivo} - {self.dose}"
