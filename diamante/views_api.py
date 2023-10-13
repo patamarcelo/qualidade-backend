@@ -2083,7 +2083,7 @@ class ProgramasDetails(viewsets.ModelViewSet):
                     Programa.objects.values(
                         "nome", "nome_fantasia", "safra__safra", "ciclo__ciclo"
                     )
-                    .order_by("-safra", "-ciclo")
+                    .order_by("safra", "ciclo", "nome")
                     .filter(Q(ativo=True))
                 )
                 qs_area_total_program = (

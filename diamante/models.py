@@ -464,6 +464,7 @@ class Plantio(Base):
         related_name="programa_related_plantio",
         blank=True,
         null=True,
+        limit_choices_to={"ativo": True},
     )
     variedade = models.ForeignKey(
         Variedade,

@@ -212,6 +212,26 @@ def alter_dap_programa_and_save(query, dap, current_op):
             print("Erro ao Salvar a alteração no programa do  plantio", e)
 
 
+def admin_form_alter_programa_and_save(
+    query, operation, current_op_products, difDap, newDap
+):
+    for i in query:
+        try:
+            index = get_index_dict_estagio(i.cronograma_programa, operation)
+            if i.cronograma_programa[index]["aplicado"] == False:
+                i.cronograma_programa[index]["produtos"] = current_op_products
+                if difDap == True:
+                    days = newDap
+                    new_date = format_date_json(get_prev_app_date(i.data_plantio, days))
+                    i.cronograma_programa[index].update(
+                        {"data prevista": new_date, "dap": days}
+                    )
+                i.save()
+                print(f"Alteração de programa salva com sucesso: {i}")
+        except Exception as e:
+            print("Erro ao Salvar a alteração no programa do  plantio", e)
+
+
 v6_1_conv = {
     "dap": 38,
     "estagio": "6º TRIFOLIO ( V6.1 )",

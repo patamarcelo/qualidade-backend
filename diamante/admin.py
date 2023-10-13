@@ -1,5 +1,8 @@
+from typing import Any
 from django.contrib import admin
 from django import forms
+from django.db.models.query import QuerySet
+from django.http.request import HttpRequest
 
 from django.utils.formats import date_format
 from django.utils.html import format_html
@@ -49,6 +52,7 @@ from django.http import HttpResponse, JsonResponse
 from django.contrib import admin
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.views.decorators.csrf import csrf_exempt
+from .utils import admin_form_alter_programa_and_save
 
 
 def get_cargas_model(safra_filter, ciclo_filter):
@@ -664,6 +668,11 @@ class PlantioAdmin(ExtraButtonsMixin, admin.ModelAdmin):
         "get_talhao__id_unico",
     )
 
+    def get_readonly_fields(self, request, obj=None):
+        if obj and obj.programa.ativo == True:
+            return self.readonly_fields
+        return self.readonly_fields + ("programa",)
+
     ordering = ("data_plantio",)
 
     def get_area_parcial(self, obj):
@@ -1268,6 +1277,41 @@ class OperacaoAdmin(admin.ModelAdmin):
     ]
 
     inlines = [AplicacoesProgramaInline]
+
+    def save_model(self, request, obj, form, change):
+        pass  # don't actually save the parent instance
+
+    def save_formset(self, request, form, formset, change):
+        formset.save()  # this will save the children
+        form.instance.save()  # form.instance is the parent
+        # print("Prazo antigo DAp: ", form.initial["prazo_dap"])
+        # print("Novo Prazo", form.instance.prazo_dap)
+        changed_dap = form.initial["prazo_dap"] != form.instance.prazo_dap
+        newDap = form.instance.prazo_dap
+        if changed_dap == True:
+            print("funcao pra alterar o prazo dap")
+        if form.instance.ativo == True:
+            query = Aplicacao.objects.select_related("operacao").filter(
+                ativo=True, operacao=form.instance
+            )
+            produtos = [
+                {
+                    "dose": str(dose_produto.dose),
+                    "tipo": dose_produto.defensivo.tipo,
+                    "produto": dose_produto.defensivo.produto,
+                    "quantidade aplicar": "",
+                }
+                for dose_produto in query
+            ]
+            current_op = form.instance.estagio
+            current_program = form.instance.programa
+            current_query = Plantio.objects.filter(
+                programa=current_program, finalizado_plantio=True
+            )
+            admin_form_alter_programa_and_save(
+                current_query, current_op, produtos, changed_dap, newDap
+            )
+
     list_display = (
         "estagio",
         "programa",
@@ -1348,6 +1392,7 @@ class AplicacaoAdmin(admin.ModelAdmin):
     raw_id_fields = ["operacao"]
     list_filter = (
         "operacao__programa",
+        "operacao__programa__ciclo__ciclo",
         "ativo",
         "defensivo",
         "operacao",
@@ -1373,3 +1418,32 @@ class AplicacaoAdmin(admin.ModelAdmin):
         return obj.operacao.programa
 
     programa.short_description = "Programa"
+
+
+@admin.register(AplicacaoPlantio)
+class AplicacaoPlantioAdmin(admin.ModelAdmin):
+    def get_queryset(self, request):
+        return (
+            super(AplicacaoPlantioAdmin, self)
+            .get_queryset(request)
+            .select_related("plantio", "estagio", "defensivo", "estagio__programa")
+        )
+
+    list_display = (
+        "estagio",
+        "plantio",
+        "defensivo",
+        "dose",
+        "data_prevista",
+        "aplicado",
+    )
+
+    search_fields = (
+        "estagio",
+        "plantio",
+        "defensivo",
+        "dose",
+        "data_prevista",
+    )
+
+    raw_id_fields = ["plantio"]
