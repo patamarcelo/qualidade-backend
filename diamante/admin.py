@@ -1279,14 +1279,18 @@ class OperacaoAdmin(admin.ModelAdmin):
     inlines = [AplicacoesProgramaInline]
 
     def save_model(self, request, obj, form, change):
+        print(self)
+        print(self.form)
         pass  # don't actually save the parent instance
 
     def save_formset(self, request, form, formset, change):
-        formset.save()  # this will save the children
         form.instance.save()  # form.instance is the parent
+        formset.save()  # this will save the children
         # print("Prazo antigo DAp: ", form.initial["prazo_dap"])
         # print("Novo Prazo", form.instance.prazo_dap)
-        changed_dap = form.initial["prazo_dap"] != form.instance.prazo_dap
+        changed_dap = None
+        if form.initial:
+            changed_dap = form.initial["prazo_dap"] != form.instance.prazo_dap
         newDap = form.instance.prazo_dap
         if changed_dap == True:
             print("funcao pra alterar o prazo dap")

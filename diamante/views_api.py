@@ -1916,12 +1916,20 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         print(update_field.cronograma_programa[index]["estagio"])
                         print(update_field.cronograma_programa[index]["aplicado"])
                         print("\n")
+                        field_to_update = update_field.cronograma_programa[index][
+                            "aplicado"
+                        ]
 
-                        if update_field.cronograma_programa[index]["aplicado"] == True:
-                            update_field.cronograma_programa[index]["aplicado"] = False
-                        if update_field.cronograma_programa[index]["aplicado"] == False:
-                            update_field.cronograma_programa[index]["aplicado"] = True
+                        new_value = None
+                        if field_to_update == True:
+                            new_value = False
+
+                        if field_to_update == False:
+                            new_value = True
+
+                        update_field.cronograma_programa[index]["aplicado"] = new_value
                         update_field.save()
+
                         updated = {
                             "talhao": update_field.talhao.id_talhao,
                             "estagio": update_field.cronograma_programa[index][
@@ -1931,6 +1939,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 "aplicado"
                             ],
                         }
+                        print("updated at: ", updated)
                         list_updated.append(updated)
                     except Exception as e:
                         print("Erro ao atualizar a Ap no DB", e)

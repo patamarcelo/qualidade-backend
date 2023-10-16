@@ -419,6 +419,7 @@ class Operacao(Base):
         return operation
 
     class Meta:
+        unique_together = ("estagio", "programa")
         ordering = ["programa", "operacao_numero"]
         verbose_name = "Programa - Operação"
         verbose_name_plural = "Programas - Operações"
