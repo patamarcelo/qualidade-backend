@@ -244,22 +244,23 @@ class PlantioDetailPlantioAdmin(admin.ModelAdmin):
         return response
 
 
-class ExportCsvMixin:
-    def export_as_csv(self, request, queryset):
-        meta = self.model._meta
-        field_names = [field.name for field in meta.fields]
+# --------------------------- DELETAR SE NÃO FIZER FALTA - 18/10/2023 ---------------------------#
+# class ExportCsvMixin:
+#     def export_as_csv(self, request, queryset):
+#         meta = self.model._meta
+#         field_names = [field.name for field in meta.fields]
+#         response = HttpResponse(content_type="text/csv")
+#         response["Content-Disposition"] = "attachment; filename={}.csv".format(meta)
+#         writer = csv.writer(response)
 
-        response = HttpResponse(content_type="text/csv")
-        response["Content-Disposition"] = "attachment; filename={}.csv".format(meta)
-        writer = csv.writer(response)
+#         writer.writerow(field_names)
+#         for obj in queryset:
+#             row = writer.writerow([getattr(obj, field) for field in field_names])
 
-        writer.writerow(field_names)
-        for obj in queryset:
-            row = writer.writerow([getattr(obj, field) for field in field_names])
+#         return response
 
-        return response
-
-    export_as_csv.short_description = "Export Selected"
+#     export_as_csv.short_description = "Export Selected"
+# --------------------------- DELETAR SE NÃO FIZER FALTA - 18/10/2023 ---------------------------#
 
 
 class EstagiosProgramaInline(admin.StackedInline):
@@ -369,9 +370,11 @@ admin.site.register(Ciclo)
 def export_plantio(modeladmin, request, queryset):
     response = HttpResponse(content_type="text/csv")
     response["Content-Disposition"] = 'attachment; filename="Plantio.csv"'
+    response.write(codecs.BOM_UTF8)
     writer = csv.writer(response, delimiter=";")
     writer.writerow(
         [
+            "Fazenda",
             "Projeto",
             "Talhao",
             "Safra",
@@ -393,6 +396,7 @@ def export_plantio(modeladmin, request, queryset):
 
     plantios = queryset.values_list(
         "pk",
+        "talhao__fazenda__fazenda__nome",
         "talhao__fazenda__nome",
         "talhao__id_talhao",
         "safra__safra",
@@ -412,13 +416,13 @@ def export_plantio(modeladmin, request, queryset):
     def get_total_prod(total_c_2, plantio):
         total_filt_list = sum([x[1] for x in total_c_2 if plantio[0] == x[0]])
         prod_scs = None
-        if plantio[7]:
+        if plantio[8]:
             try:
                 prod = total_filt_list / plantio[9]
                 prod_scs = prod / 60
             except ZeroDivisionError:
                 value = float("Inf")
-        if plantio[13]:
+        if plantio[14]:
             try:
                 prod = total_filt_list / plantio[13]
                 prod_scs = prod / 60
@@ -432,14 +436,14 @@ def export_plantio(modeladmin, request, queryset):
 
     for plantio in plantios:
         plantio_detail = list(plantio)
-        plantio_detail[9] = localize(plantio_detail[9])
+        plantio_detail[10] = localize(plantio_detail[10])
         cargas_carregadas_filter = [
             x[1] for x in cargas_list if plantio_detail[0] == x[0]
         ]
         cargas_carregadas_kg = localize(sum(cargas_carregadas_filter))
         cargas_carregadas_quantidade = len(cargas_carregadas_filter)
         produtividade = get_total_prod(cargas_list, plantio)
-        plantio_detail.pop(13)
+        plantio_detail.pop(14)
         plantio_detail.append(cargas_carregadas_quantidade)
         plantio_detail.append(cargas_carregadas_kg)
         plantio_detail.append(produtividade)
@@ -872,7 +876,7 @@ class PlantioAdmin(ExtraButtonsMixin, admin.ModelAdmin):
 def export_cargas(modeladmin, request, queryset):
     response = HttpResponse(content_type="text/csv")
     response["Content-Disposition"] = 'attachment; filename="Cargas.csv"'
-    # response.write(codecs.BOM_UTF8)
+    response.write(codecs.BOM_UTF8)
     writer = csv.writer(response, delimiter=";")
     writer.writerow(
         [
