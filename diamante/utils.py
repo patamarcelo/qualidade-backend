@@ -232,6 +232,19 @@ def admin_form_alter_programa_and_save(
             print("Erro ao Salvar a alteração no programa do  plantio", e)
 
 
+def admin_form_remove_index(query, operation):
+    for i in query:
+        try:
+            index = get_index_dict_estagio(i.cronograma_programa, operation)
+            if index:
+                if i.cronograma_programa[index]["aplicado"] == False:
+                    print("removido : ", i.cronograma_programa[index])
+                    i.cronograma_programa.pop(index)
+                    i.save()
+        except Exception as e:
+            print("Erro ao Remover o Estágio do plantio", e)
+
+
 v6_1_conv = {
     "dap": 38,
     "estagio": "6º TRIFOLIO ( V6.1 )",

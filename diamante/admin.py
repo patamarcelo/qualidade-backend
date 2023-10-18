@@ -52,7 +52,7 @@ from django.http import HttpResponse, JsonResponse
 from django.contrib import admin
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.views.decorators.csrf import csrf_exempt
-from .utils import admin_form_alter_programa_and_save
+from .utils import admin_form_alter_programa_and_save, admin_form_remove_index
 
 
 def get_cargas_model(safra_filter, ciclo_filter):
@@ -1223,7 +1223,7 @@ class ProgramaAdmin(admin.ModelAdmin):
 def export_programa(modeladmin, request, queryset):
     response = HttpResponse(content_type="text/csv")
     response["Content-Disposition"] = 'attachment; filename="Programas.csv"'
-    # response.write(codecs.BOM_UTF8)
+    response.write(codecs.BOM_UTF8)
     writer = csv.writer(response, delimiter=";")
     writer.writerow(
         [
@@ -1319,6 +1319,14 @@ class OperacaoAdmin(admin.ModelAdmin):
             admin_form_alter_programa_and_save(
                 current_query, current_op, produtos, changed_dap, newDap
             )
+        if form.instance.ativo == False:
+            print("Estagio desativado: ", form.instance)
+            current_op = form.instance.estagio
+            current_program = form.instance.programa
+            current_query = Plantio.objects.filter(
+                programa=current_program, finalizado_plantio=True
+            )
+            admin_form_remove_index(current_query, current_op)
 
     list_display = (
         "estagio",
