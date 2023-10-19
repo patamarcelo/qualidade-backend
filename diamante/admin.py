@@ -1236,19 +1236,26 @@ def export_programa(modeladmin, request, queryset):
             "Dap",
             "Safra",
             "Ciclo",
+            "Ativo",
         ]
     )
-    operacoes = queryset.values_list(
-        "operacao__programa__nome",
-        "operacao__programa__cultura__cultura",
-        "operacao__estagio",
-        "defensivo__produto",
-        "defensivo__tipo",
-        "dose",
-        "operacao__prazo_dap",
-        "operacao__programa__safra__safra",
-        "operacao__programa__ciclo__ciclo",
-    ).order_by("operacao__prazo_dap", "defensivo__tipo", "defensivo__produto")
+    operacoes = (
+        queryset.values_list(
+            "operacao__programa__nome",
+            "operacao__programa__cultura__cultura",
+            "operacao__estagio",
+            "defensivo__produto",
+            "defensivo__tipo",
+            "dose",
+            "operacao__prazo_dap",
+            "operacao__programa__safra__safra",
+            "operacao__programa__ciclo__ciclo",
+            "ativo",
+        )
+        .order_by("operacao__prazo_dap", "defensivo__tipo", "defensivo__produto")
+        .filter(ativo=True)
+        .filter(operacao__ativo=True)
+    )
     for op in operacoes:
         op_details = list(op)
         op_details[5] = 0 if op[5] == None else str(op[5]).replace(".", ",")
