@@ -673,6 +673,9 @@ class PlantioAdmin(ExtraButtonsMixin, admin.ModelAdmin):
     )
 
     def get_readonly_fields(self, request, obj=None):
+        print(obj.programa)
+        if obj and obj.programa is None:
+            return self.readonly_fields
         if obj and obj.programa.ativo == True:
             return self.readonly_fields
         return self.readonly_fields + ("programa",)
