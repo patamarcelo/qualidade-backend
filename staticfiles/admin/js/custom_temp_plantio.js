@@ -9,12 +9,17 @@ const filterVariedadesDif = plantio.map((data, i) => {
 const filterVar = ["Todas", ...filterVariedades];
 const filterVarDif = ["Todas", ...filterVariedadesDif];
 
-console.log(colheita);
 var app = new Vue({
 	delimiters: ["[[", "]]"],
 	el: "#app",
 	data: {
 		message: "Hello Vue!",
+		ciclos: ["1", "2", "3"],
+		selectedCiclo: url.search.split("=")[1]
+			? url.search.split("=")[1]
+			: "2",
+		selecredSafra: "2023/2024",
+		safras: ["2022/2023", "2023/2024"],
 		plantio: plantio,
 		colheita: colheita,
 		variedades: [...new Set(filterVar)],
@@ -34,6 +39,10 @@ var app = new Vue({
 		imageField: "soy"
 	},
 	methods: {
+		navGo() {
+			console.log("gogogo");
+			window.location = this.customUrl;
+		},
 		viewVaris() {
 			console.log("Working");
 			console.log(this.getFilteredChildren("Cervo"));
@@ -93,6 +102,9 @@ var app = new Vue({
 		}
 	},
 	computed: {
+		customUrl() {
+			return `/admin/diamante/plantiodetailplantio/?ciclo=${this.selectedCiclo}`;
+		},
 		onlyFarm() {
 			const onlyFarmSetS = this.plantio.map((data) => {
 				console.log(data);

@@ -168,8 +168,30 @@ class PlantioDetailPlantioAdmin(admin.ModelAdmin):
     #         "plantio__talhao__id_talhao", "plantio__id", "peso_liquido", "data_colheita"
     #     )
     # ]
+    cicle_filter = None
 
     def get_queryset(self, request):
+        global cicle_filter
+        request.GET = request.GET.copy()
+        ciclo = request.GET.pop("ciclo", None)
+        if ciclo:
+            cicle_filter = ciclo[0]
+            return (
+                super(PlantioDetailPlantioAdmin, self)
+                .get_queryset(request)
+                .select_related(
+                    "talhao",
+                    "safra",
+                    "ciclo",
+                    "talhao__fazenda",
+                    "variedade",
+                    "programa",
+                )
+                .filter(ciclo__ciclo=cicle_filter)
+                .order_by("data_plantio")
+            )
+        else:
+            cicle_filter = "2"
         return (
             super(PlantioDetailPlantioAdmin, self)
             .get_queryset(request)
@@ -181,6 +203,7 @@ class PlantioDetailPlantioAdmin(admin.ModelAdmin):
                 "variedade",
                 "programa",
             )
+            .filter(ciclo__ciclo=cicle_filter)
             .order_by("data_plantio")
         )
 
@@ -190,7 +213,9 @@ class PlantioDetailPlantioAdmin(admin.ModelAdmin):
             extra_context=extra_context,
         )
         safra_filter = "2023/2024"
-        ciclo_filter = "2"
+        # ciclo_filter = "2"
+        # ciclo_filter = request.GET["ciclo"]
+        # print(ciclo_filter)
         try:
             qs = response.context_data["cl"].queryset
         except (AttributeError, KeyError):
@@ -214,11 +239,9 @@ class PlantioDetailPlantioAdmin(admin.ModelAdmin):
                 #     output_field=DecimalField(),
             ),
         }
-
         query_data = (
             qs.filter(
                 safra__safra=safra_filter,
-                ciclo__ciclo=ciclo_filter,
                 plantio_descontinuado=False,
             )
             .filter(~Q(variedade__cultura__cultura="Milheto"))
@@ -238,7 +261,7 @@ class PlantioDetailPlantioAdmin(admin.ModelAdmin):
         )
 
         response.context_data["colheita_2"] = json.dumps(
-            get_cargas_model(safra_filter, ciclo_filter), cls=DjangoJSONEncoder
+            get_cargas_model(safra_filter, cicle_filter), cls=DjangoJSONEncoder
         )
 
         return response
@@ -673,7 +696,8 @@ class PlantioAdmin(ExtraButtonsMixin, admin.ModelAdmin):
     )
 
     def get_readonly_fields(self, request, obj=None):
-        print(obj.programa)
+        if obj == None:
+            return self.readonly_fields
         if obj and obj.programa is None:
             return self.readonly_fields
         if obj and obj.programa.ativo == True:
