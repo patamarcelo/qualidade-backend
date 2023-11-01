@@ -218,16 +218,33 @@ def admin_form_alter_programa_and_save(
     for i in query:
         try:
             index = get_index_dict_estagio(i.cronograma_programa, operation)
-            if i.cronograma_programa[index]["aplicado"] == False:
-                i.cronograma_programa[index]["produtos"] = current_op_products
-                if difDap == True:
-                    days = newDap
-                    new_date = format_date_json(get_prev_app_date(i.data_plantio, days))
-                    i.cronograma_programa[index].update(
-                        {"data prevista": new_date, "dap": days}
-                    )
+            print("Index: ", index)
+            if index:
+                if i.cronograma_programa[index]["aplicado"] == False:
+                    i.cronograma_programa[index]["produtos"] = current_op_products
+                    if difDap == True:
+                        days = newDap
+                        new_date = format_date_json(
+                            get_prev_app_date(i.data_plantio, days)
+                        )
+                        i.cronograma_programa[index].update(
+                            {"data prevista": new_date, "dap": days}
+                        )
+                    i.save()
+                    print(f"Alteração de programa salva com sucesso: {i}")
+            else:
+                operation_to_add = {
+                    "dap": newDap,
+                    "estagio": operation,
+                    "aplicado": False,
+                    "produtos": current_op_products,
+                    "data prevista": format_date_json(
+                        get_prev_app_date(i.data_plantio, newDap)
+                    ),
+                }
+                i.cronograma_programa.append(operation_to_add)
                 i.save()
-                print(f"Alteração de programa salva com sucesso: {i}")
+                print(f"Estágio incluído com sucesso: {i}")
         except Exception as e:
             print("Erro ao Salvar a alteração no programa do  plantio", e)
 

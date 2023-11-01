@@ -69,7 +69,7 @@ def get_cargas_model(safra_filter, ciclo_filter):
         )
         .order_by("plantio__talhao__fazenda__nome")
         .filter(~Q(plantio__variedade__cultura__cultura="Milheto"))
-        .filter(plantio__safra__safra=safra_filter, plantio__ciclo__ciclo=ciclo_filter)
+        .filter(plantio__safra__safra=safra_filter, plantio__ciclo=ciclo_filter)
     ]
     return cargas_model
 
@@ -107,7 +107,9 @@ class PlantioDetailAdmin(admin.ModelAdmin):
             extra_context=extra_context,
         )
         safra_filter = "2023/2024"
-        ciclo_filter = "1"
+
+        # ciclo_filter = "1"
+        cicle_filter = Ciclo.objects.all()[0]
         try:
             qs = response.context_data["cl"].queryset
         except (AttributeError, KeyError):
@@ -131,7 +133,7 @@ class PlantioDetailAdmin(admin.ModelAdmin):
         query_data = (
             qs.filter(
                 safra__safra=safra_filter,
-                ciclo__ciclo=ciclo_filter,
+                ciclo=cicle_filter,
                 finalizado_plantio=True,
                 plantio_descontinuado=False,
             )
@@ -151,7 +153,7 @@ class PlantioDetailAdmin(admin.ModelAdmin):
         )
 
         response.context_data["colheita_2"] = json.dumps(
-            get_cargas_model(safra_filter, ciclo_filter), cls=DjangoJSONEncoder
+            get_cargas_model(safra_filter, cicle_filter), cls=DjangoJSONEncoder
         )
 
         return response
@@ -175,7 +177,8 @@ class PlantioDetailPlantioAdmin(admin.ModelAdmin):
         request.GET = request.GET.copy()
         ciclo = request.GET.pop("ciclo", None)
         if ciclo:
-            cicle_filter = ciclo[0]
+            ciclo_index = int(ciclo[0]) - 1
+            cicle_filter = Ciclo.objects.all()[ciclo_index]
             return (
                 super(PlantioDetailPlantioAdmin, self)
                 .get_queryset(request)
@@ -187,11 +190,11 @@ class PlantioDetailPlantioAdmin(admin.ModelAdmin):
                     "variedade",
                     "programa",
                 )
-                .filter(ciclo__ciclo=cicle_filter)
+                .filter(ciclo=cicle_filter)
                 .order_by("data_plantio")
             )
         else:
-            cicle_filter = "2"
+            cicle_filter = Ciclo.objects.all()[1]
         return (
             super(PlantioDetailPlantioAdmin, self)
             .get_queryset(request)
@@ -203,7 +206,7 @@ class PlantioDetailPlantioAdmin(admin.ModelAdmin):
                 "variedade",
                 "programa",
             )
-            .filter(ciclo__ciclo=cicle_filter)
+            .filter(ciclo=cicle_filter)
             .order_by("data_plantio")
         )
 
