@@ -444,18 +444,18 @@ def export_plantio(modeladmin, request, queryset):
         prod_scs = None
         if plantio[8]:
             try:
-                prod = total_filt_list / plantio[9]
+                prod = total_filt_list / plantio[10]
                 prod_scs = prod / 60
             except ZeroDivisionError:
                 value = float("Inf")
         if plantio[14]:
             try:
-                prod = total_filt_list / plantio[13]
-                prod_scs = prod / 60
+                if plantio[13].isdecimal():
+                    prod = total_filt_list / plantio[13]
+                    prod_scs = prod / 60
             except ZeroDivisionError:
                 value = float("Inf")
         if prod_scs:
-            print(type(round(prod_scs, 2)))
             return localize(round(prod_scs, 2))
         else:
             return " - "
