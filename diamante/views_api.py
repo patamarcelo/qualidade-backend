@@ -1969,6 +1969,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         finalizado_plantio=True,
                         plantio_descontinuado=False,
                     )
+                    .filter(~Q(variedade__cultura__cultura="Milheto"))
                     .values(
                         "talhao__fazenda__nome",
                         "variedade__cultura__cultura",
