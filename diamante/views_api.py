@@ -1981,7 +1981,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         year=ExtractYear("data_plantio"),
                         area_total=Sum("area_colheita"),
                     )
-                    .order_by("ciclo__ciclo", "month", "talhao__fazenda__nome")
+                    .order_by("year", "ciclo__ciclo", "month", "talhao__fazenda__nome")
                 )
                 response = {
                     "msg": "Consulta realizada com sucesso!!",
