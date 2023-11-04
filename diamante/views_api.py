@@ -75,6 +75,7 @@ from django.db.models.functions import Round
 
 
 from rest_framework.decorators import api_view, permission_classes
+from django.db.models.functions.datetime import ExtractMonth, ExtractYear
 
 
 # --------------------- --------------------- START DEFENSIVOS MONGO API --------------------- --------------------- #
@@ -1948,6 +1949,42 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "msg": "Atualização realizada com sucesso!",
                     "data": params,
                     "result": list_updated,
+                }
+                return Response(response, status=status.HTTP_200_OK)
+            except Exception as e:
+                response = {"message": f"Ocorreu um Erro: {e}"}
+                return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+        else:
+            response = {"message": "Você precisa estar logado!!!"}
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=["GET", "POST"])
+    def get_plantio_calendar_done(self, request, pk=None):
+        if request.user.is_authenticated:
+            try:
+                qs = (
+                    Plantio.objects.filter(
+                        safra__safra="2023/2024",
+                        finalizado_plantio=True,
+                        plantio_descontinuado=False,
+                    )
+                    .values(
+                        "talhao__fazenda__nome",
+                        "variedade__cultura__cultura",
+                        "variedade__variedade",
+                        "ciclo__ciclo",
+                    )
+                    .annotate(
+                        month=ExtractMonth("data_plantio"),
+                        year=ExtractYear("data_plantio"),
+                        area_total=Sum("area_colheita"),
+                    )
+                    .order_by("ciclo__ciclo", "month", "talhao__fazenda__nome")
+                )
+                response = {
+                    "msg": "Consulta realizada com sucesso!!",
+                    "data": qs,
                 }
                 return Response(response, status=status.HTTP_200_OK)
             except Exception as e:
