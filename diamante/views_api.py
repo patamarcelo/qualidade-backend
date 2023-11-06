@@ -2128,7 +2128,11 @@ class ProgramasDetails(viewsets.ModelViewSet):
                 ).filter(Q(programa__ativo=True) & Q(ativo=True))
                 qs_programas = (
                     Programa.objects.values(
-                        "nome", "nome_fantasia", "safra__safra", "ciclo__ciclo"
+                        "nome",
+                        "nome_fantasia",
+                        "safra__safra",
+                        "ciclo__ciclo",
+                        "versao",
                     )
                     .order_by("safra", "ciclo", "nome")
                     .filter(Q(ativo=True))
