@@ -316,6 +316,8 @@ class Programa(Base):
         null=True,
     )
 
+    versao = models.IntegerField("Versão Atual", blank=True, null=True)
+
     class Meta:
         # ordering = ["variedade"]
         verbose_name = "Programa"

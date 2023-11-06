@@ -1213,6 +1213,7 @@ class ProgramaAdmin(admin.ModelAdmin):
     list_display = (
         "nome",
         "safra_description",
+        "versao",
         "start_date_description",
         "end_date_description",
         "ativo",
