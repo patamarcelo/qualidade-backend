@@ -38,6 +38,7 @@ from django.db.models.functions import Coalesce, Round
 
 from django.core import serializers
 from django.contrib.admin import SimpleListFilter
+from datetime import datetime
 
 
 from admin_extra_buttons.api import (
@@ -52,7 +53,11 @@ from django.http import HttpResponse, JsonResponse
 from django.contrib import admin
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.views.decorators.csrf import csrf_exempt
-from .utils import admin_form_alter_programa_and_save, admin_form_remove_index
+from .utils import (
+    admin_form_alter_programa_and_save,
+    admin_form_remove_index,
+    close_plantation_and_productivity,
+)
 
 
 def get_cargas_model(safra_filter, ciclo_filter):
@@ -703,6 +708,62 @@ class PlantioAdmin(ExtraButtonsMixin, admin.ModelAdmin):
         "get_talhao__id_unico",
         "id_farmbox",
     )
+
+    def save_model(self, request, obj, form, change):
+        print(obj)
+        print(self)
+        print("form Plantio")
+        print("Valor Atual: ")
+        if (
+            form.initial["finalizado_colheita"] == False
+            and form.instance.finalizado_colheita == True
+        ):
+            print("Colheita Finalizada")
+
+            # GET CLOSED DATE
+            filtered_list = [x[2] for x in self.total_c_2 if obj.id == x[0]]
+            sorted_list = sorted(filtered_list)
+            closed_date = None
+            if len(sorted_list) > 0:
+                closed_date = sorted_list[0]
+            else:
+                today = str(datetime.now()).split(" ")[0].strip()
+                closed_date = today
+
+            # GET PROD NUMBER
+            total_filt_list = sum([x[1] for x in self.total_c_2 if obj.id == x[0]])
+            prod_scs = None
+            value = None
+            if obj.finalizado_colheita:
+                try:
+                    prod = total_filt_list / obj.area_colheita
+                    prod_scs = prod / 60
+                    value = round(prod_scs, 2)
+                    print(value)
+                except ZeroDivisionError:
+                    value = None
+
+            print("Produtividade ", value)
+            print("Data Colheita", closed_date)
+            print("id_farmBox", obj.id_farmbox)
+            response = close_plantation_and_productivity(
+                obj.id_farmbox, str(closed_date), str(value)
+            )
+            print(response)
+            print(response.text)
+            print(response.content)
+        form.save()
+        # pass  # don't actually save the parent instance
+
+    # def save_formset(self, request, form, formset, change):
+    #     form.instance.save()  # form.instance is the parent
+    #     formset.save()  # this will save the children
+
+    #     if form.initial:
+    #         print("Valor Atual: ")
+    #         print(form.initial["finalizado_colheita"])
+    #         print("Valor depois de alterado: ")
+    #         print(form.instance.finalizado_colheita)
 
     def get_readonly_fields(self, request, obj=None):
         if obj == None:

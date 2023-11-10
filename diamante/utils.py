@@ -4,6 +4,11 @@ import datetime
 
 today = datetime.date.today()
 
+import requests
+import json
+
+from qualidade_project.settings import FARMBOX_ID
+
 
 # pr_mungo = Programa.objects.all()[2]
 # pr_caupi = Programa.objects.all()[1]
@@ -260,6 +265,21 @@ def admin_form_remove_index(query, operation):
                     i.save()
         except Exception as e:
             print("Erro ao Remover o Estágio do plantio", e)
+
+
+def close_plantation_and_productivity(id_plantation_farm, close_date, product):
+    # id_plantation = 193351
+    # close_date = "2023-11-10"
+    # producti = 40.20
+    id_plantation = id_plantation_farm
+    url = f"https://farmbox.cc/api/v1/plantations/{id_plantation}"
+    payload = {"id": id_plantation, "closed_date": close_date, "productivity": product}
+    headers = {
+        "content-type": "application/json",
+        "Authorization": FARMBOX_ID,
+    }
+    response = requests.put(url, data=json.dumps(payload), headers=headers)
+    return response
 
 
 v6_1_conv = {

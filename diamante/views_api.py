@@ -636,6 +636,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     farm_name = i["farm_name"]
                     variedade_name = i["variety_name"]
                     area = i["area"]
+                    id_plantio_farmbox = i["id"]
 
                     variedade_planejada = i["planned_variety_name"]
                     cultura_planejada = i["planned_culture_name"]
@@ -692,6 +693,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                             field_to_update = Plantio.objects.filter(
                                 safra=safra, ciclo=ciclo, talhao=talhao_id
                             )[0]
+                            field_to_update.id_farmbox = id_plantio_farmbox
                             if field_to_update.finalizado_colheita == False:
                                 if area:
                                     field_to_update.area_colheita = area
@@ -743,6 +745,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 field_to_update.map_geo_points = map_geo_points_farm
                             field_to_update.variedade = None
                             field_to_update.programa = None
+                            field_to_update.id_farmbox = id_plantio_farmbox
+
                             field_to_update.save()
                             print(
                                 f"{Fore.YELLOW}Plantio Alterado com sucesso para SEM VARIEDADE: {field_to_update}- {safra} - {ciclo}{Style.RESET_ALL}"
