@@ -527,6 +527,13 @@ class Plantio(Base):
     cronograma_programa = models.JSONField(null=True, blank=True)
     map_centro_id = models.JSONField(null=True, blank=True)
     map_geo_points = models.JSONField(null=True, blank=True)
+    id_farmbox = models.PositiveIntegerField(
+        "ID Plantio Farmbox",
+        help_text="Id de cada plantio do farmbox",
+        blank=True,
+        null=True,
+        unique=True,
+    )
 
     @property
     def get_dap(self):

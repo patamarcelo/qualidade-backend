@@ -652,7 +652,12 @@ class PlantioAdmin(ExtraButtonsMixin, admin.ModelAdmin):
             "Dados",
             {
                 "fields": (
-                    ("get_data_plantio", "get_dap_description", "get_talhao__id_unico"),
+                    (
+                        "get_data_plantio",
+                        "get_dap_description",
+                        "get_talhao__id_unico",
+                        "id_farmbox",
+                    ),
                     (
                         "talhao",
                         "ativo",
@@ -696,6 +701,7 @@ class PlantioAdmin(ExtraButtonsMixin, admin.ModelAdmin):
         "get_dap_description",
         "get_data_plantio",
         "get_talhao__id_unico",
+        "id_farmbox",
     )
 
     def get_readonly_fields(self, request, obj=None):
