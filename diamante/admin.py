@@ -40,6 +40,8 @@ from django.core import serializers
 from django.contrib.admin import SimpleListFilter
 from datetime import datetime
 
+from django.contrib import messages
+
 
 from admin_extra_buttons.api import (
     ExtraButtonsMixin,
@@ -746,24 +748,20 @@ class PlantioAdmin(ExtraButtonsMixin, admin.ModelAdmin):
             print("Produtividade ", value)
             print("Data Colheita", closed_date)
             print("id_farmBox", obj.id_farmbox)
-            response = close_plantation_and_productivity(
-                obj.id_farmbox, str(closed_date), str(value)
-            )
-            print(response)
-            print(response.text)
-            print(response.content)
+            try:
+                response = close_plantation_and_productivity(
+                    obj.id_farmbox, str(closed_date), str(value)
+                )
+                print(response)
+                resp_obj = json.loads(response.text)
+                str_resp = f'Alterado no FARMBOX - {resp_obj["farm_name"]} - {resp_obj["name"]} - {resp_obj["harvest_name"]}-{resp_obj["cycle"]} - Produtividade: {resp_obj["productivity"]} - Variedade: {resp_obj["variety_name"]} - Area: {resp_obj["area"]}'
+                messages.add_message(request, messages.INFO, str_resp)
+            except Exception as e:
+                print("Erro ao alterar os dados no FarmBox")
+                messages.add_message(
+                    request, messages.ERROR, f"Erro ao salvar os dados no Farmbox: {e}"
+                )
         form.save()
-        # pass  # don't actually save the parent instance
-
-    # def save_formset(self, request, form, formset, change):
-    #     form.instance.save()  # form.instance is the parent
-    #     formset.save()  # this will save the children
-
-    #     if form.initial:
-    #         print("Valor Atual: ")
-    #         print(form.initial["finalizado_colheita"])
-    #         print("Valor depois de alterado: ")
-    #         print(form.instance.finalizado_colheita)
 
     def get_readonly_fields(self, request, obj=None):
         if obj == None:
