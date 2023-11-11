@@ -716,51 +716,54 @@ class PlantioAdmin(ExtraButtonsMixin, admin.ModelAdmin):
         print(self)
         print("form Plantio")
         print("Valor Atual: ")
-        if (
-            form.initial["finalizado_colheita"] == False
-            and form.instance.finalizado_colheita == True
-        ):
-            print("Colheita Finalizada")
+        if form.initial:
+            if (
+                form.initial["finalizado_colheita"] == False
+                and form.instance.finalizado_colheita == True
+            ):
+                print("Colheita Finalizada")
 
-            # GET CLOSED DATE
-            filtered_list = [x[2] for x in self.total_c_2 if obj.id == x[0]]
-            sorted_list = sorted(filtered_list)
-            closed_date = None
-            if len(sorted_list) > 0:
-                closed_date = sorted_list[0]
-            else:
-                today = str(datetime.now()).split(" ")[0].strip()
-                closed_date = today
+                # GET CLOSED DATE
+                filtered_list = [x[2] for x in self.total_c_2 if obj.id == x[0]]
+                sorted_list = sorted(filtered_list)
+                closed_date = None
+                if len(sorted_list) > 0:
+                    closed_date = sorted_list[0]
+                else:
+                    today = str(datetime.now()).split(" ")[0].strip()
+                    closed_date = today
 
-            # GET PROD NUMBER
-            total_filt_list = sum([x[1] for x in self.total_c_2 if obj.id == x[0]])
-            prod_scs = None
-            value = None
-            if obj.finalizado_colheita:
+                # GET PROD NUMBER
+                total_filt_list = sum([x[1] for x in self.total_c_2 if obj.id == x[0]])
+                prod_scs = None
+                value = None
+                if obj.finalizado_colheita:
+                    try:
+                        prod = total_filt_list / obj.area_colheita
+                        prod_scs = prod / 60
+                        value = round(prod_scs, 2)
+                        print(value)
+                    except ZeroDivisionError:
+                        value = None
+
+                print("Produtividade ", value)
+                print("Data Colheita", closed_date)
+                print("id_farmBox", obj.id_farmbox)
                 try:
-                    prod = total_filt_list / obj.area_colheita
-                    prod_scs = prod / 60
-                    value = round(prod_scs, 2)
-                    print(value)
-                except ZeroDivisionError:
-                    value = None
-
-            print("Produtividade ", value)
-            print("Data Colheita", closed_date)
-            print("id_farmBox", obj.id_farmbox)
-            try:
-                response = close_plantation_and_productivity(
-                    obj.id_farmbox, str(closed_date), str(value)
-                )
-                print(response)
-                resp_obj = json.loads(response.text)
-                str_resp = f'Alterado no FARMBOX - {resp_obj["farm_name"]} - {resp_obj["name"]} - {resp_obj["harvest_name"]}-{resp_obj["cycle"]} - Produtividade: {resp_obj["productivity"]} - Variedade: {resp_obj["variety_name"]} - Area: {resp_obj["area"]}'
-                messages.add_message(request, messages.INFO, str_resp)
-            except Exception as e:
-                print("Erro ao alterar os dados no FarmBox")
-                messages.add_message(
-                    request, messages.ERROR, f"Erro ao salvar os dados no Farmbox: {e}"
-                )
+                    response = close_plantation_and_productivity(
+                        obj.id_farmbox, str(closed_date), str(value)
+                    )
+                    print(response)
+                    resp_obj = json.loads(response.text)
+                    str_resp = f'Alterado no FARMBOX - {resp_obj["farm_name"]} - {resp_obj["name"]} - {resp_obj["harvest_name"]}-{resp_obj["cycle"]} - Produtividade: {resp_obj["productivity"]} - Variedade: {resp_obj["variety_name"]} - Area: {resp_obj["area"]}'
+                    messages.add_message(request, messages.INFO, str_resp)
+                except Exception as e:
+                    print("Erro ao alterar os dados no FarmBox")
+                    messages.add_message(
+                        request,
+                        messages.ERROR,
+                        f"Erro ao salvar os dados no Farmbox: {e}",
+                    )
         form.save()
 
     def get_readonly_fields(self, request, obj=None):
