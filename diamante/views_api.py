@@ -946,7 +946,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     print(e)
 
                 safra_filter = "2023/2024" if safra_filter == None else safra_filter
-                cicle_filter = "1" if cicle_filter == None else cicle_filter
+                cicle_filter = "2" if cicle_filter == None else cicle_filter
 
                 qs = (
                     Plantio.objects.values(

@@ -92,8 +92,31 @@ class PlantioDetailAdmin(admin.ModelAdmin):
     #         "plantio__talhao__id_talhao", "plantio__id", "peso_liquido", "data_colheita"
     #     )
     # ]
+    cicle_filter = None
 
     def get_queryset(self, request):
+        global cicle_filter
+        request.GET = request.GET.copy()
+        ciclo = request.GET.pop("ciclo", None)
+        if ciclo:
+            ciclo_index = int(ciclo[0]) - 1
+            cicle_filter = Ciclo.objects.all()[ciclo_index]
+            return (
+                super(PlantioDetailAdmin, self)
+                .get_queryset(request)
+                .select_related(
+                    "talhao",
+                    "safra",
+                    "ciclo",
+                    "talhao__fazenda",
+                    "variedade",
+                    "programa",
+                )
+                .filter(ciclo=cicle_filter)
+                .order_by("data_plantio")
+            )
+        else:
+            cicle_filter = Ciclo.objects.all()[1]
         return (
             super(PlantioDetailAdmin, self)
             .get_queryset(request)
@@ -105,6 +128,7 @@ class PlantioDetailAdmin(admin.ModelAdmin):
                 "variedade",
                 "programa",
             )
+            .filter(ciclo=cicle_filter)
             .order_by("data_plantio")
         )
 
@@ -116,7 +140,7 @@ class PlantioDetailAdmin(admin.ModelAdmin):
         safra_filter = "2023/2024"
 
         # ciclo_filter = "1"
-        cicle_filter = Ciclo.objects.all()[0]
+        # cicle_filter = Ciclo.objects.all()[0]
         try:
             qs = response.context_data["cl"].queryset
         except (AttributeError, KeyError):

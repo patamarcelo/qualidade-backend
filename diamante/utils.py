@@ -105,6 +105,34 @@ pl_arroz = pl.filter(variedade__cultura__cultura="Arroz")
 # ------------------------------------------------------------------------------------ SAFRA 2023/2024 - CICLO=3 --------------#
 
 
+# ------------------------------------------------------------------------------------ START DUPLICANDO PROGRAMAS --------------#
+"""        _START DUPLICANDO PROGRAMAS_
+
+    
+from diamante.models import Programa, Operacao , Aplicacao
+p_a = Programa.objects.filter(cultura__cultura="Arroz")
+p_a_424 = p_a[1]
+p_a_pam = p_a[2]
+apl = Aplicacao.objects.filter(operacao__programa=p_a_424)
+op_pam = Operacao.objects.filter(programa=p_a_pam)
+for i in op_pam:
+    for j in apl:
+            if i.estagio == j.operacao.estagio:
+                    new_op = j
+                    new_op.id = None
+                    new_op.pk = None
+                    new_op._state.adding = True
+                    new_op.operacao = i
+                    new_op.save()
+
+
+Returns:
+        _type_: _description_
+    """
+
+# ------------------------------------------------------------------------------------ END DUPLICANDO PROGRAMAS --------------#
+
+
 def get_dap(data_plantio):
     if data_plantio:
         dap = 0

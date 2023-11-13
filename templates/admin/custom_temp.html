@@ -6,7 +6,24 @@
 
 {% block content_title %}
 
-
+<div class="container-fluid pl-0" style="display: grid; grid-template-columns: 100px 80px 40px auto; align-items: start">
+    <div class="container-fluid mb-4 d-flex flex-column mr-2" >
+        <span>Safra</span>
+        <select class="form-select form-select-lg" aria-label=".form-select-lg example" v-model="selecredSafra" style="width: 100px">
+            <option v-for="safra in safras" :value="safra">[[safra]]</option>
+        </select>
+    </div>
+    <div class="container-fluid mb-4 d-flex flex-column ml-2" >
+        <span>Ciclo</span>
+        <select class="form-select form-select-lg" aria-label=".form-select-lg example" v-model="selectedCiclo">
+            <option v-for="ciclo in ciclos" :value="ciclo">[[ciclo]]</option>
+        </select>
+    </div>
+    <div style="align-self: center; margin-left: 10px">
+        <button @click="navGo" type="button" class="btn btn-primary btn-sm">Filtrar
+        </button>
+    </div>
+</div>
 <div class="container-fluid mb-4">
     <select class="form-select form-select-lg" aria-label=".form-select-lg example" v-model="filteredCutulre">
         <option v-for="cultura in variedades" :value="cultura">[[cultura]]</option>
@@ -227,6 +244,7 @@
     <script type='text/javascript'>
         var plantio = {{ summary_2|safe }}
         var colheita = {{ colheita_2|safe }}
+        let url = new URL(window.location.href);
     </script>
     <script src="{% static 'admin/js/custom_temp.js' %}" type="text/javascript"></script>
     

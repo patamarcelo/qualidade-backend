@@ -15,6 +15,12 @@ var app = new Vue({
 	el: "#app",
 	data: {
 		message: "Hello Vue!",
+		ciclos: ["1", "2", "3"],
+		selectedCiclo: url.search.split("=")[1]
+			? url.search.split("=")[1]
+			: "2",
+		selecredSafra: "2023/2024",
+		safras: ["2022/2023", "2023/2024"],
 		plantio: plantio,
 		colheita: colheita,
 		variedades: [...new Set(filterVar)],
@@ -35,6 +41,10 @@ var app = new Vue({
 		imageField: "soy"
 	},
 	methods: {
+		navGo() {
+			console.log("gogogo");
+			window.location = this.customUrl;
+		},
 		resetPlantio() {
 			this.plantio = plantio;
 		},
@@ -108,6 +118,9 @@ var app = new Vue({
 		}
 	},
 	computed: {
+		customUrl() {
+			return `/admin/diamante/plantiodetailplantio/?ciclo=${this.selectedCiclo}`;
+		},
 		onlyFarmWhitoutVariedade() {
 			const onlyFarmSetSOut = this.plantio.map((data) => {
 				const name = data.talhao__fazenda__nome;
