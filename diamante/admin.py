@@ -563,6 +563,7 @@ class ColheitaFilterNoProgram(SimpleListFilter):
 class PlantioAdmin(ExtraButtonsMixin, admin.ModelAdmin):
     actions = [export_plantio]
     show_full_result_count = False
+    autocomplete_fields = ["talhao"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -1086,6 +1087,8 @@ export_cargas.short_description = "Export to csv"
 
 @admin.register(Colheita)
 class ColheitaAdmin(admin.ModelAdmin):
+    autocomplete_fields = ["plantio"]
+
     def get_queryset(self, request):
         return (
             super(ColheitaAdmin, self)
@@ -1167,7 +1170,7 @@ class ColheitaAdmin(admin.ModelAdmin):
         "peso_scs_liquido",
     )
 
-    raw_id_fields = ["plantio"]
+    # raw_id_fields = ["plantio"]
 
     readonly_fields = (
         "peso_liquido",

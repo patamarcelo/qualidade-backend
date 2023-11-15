@@ -732,7 +732,7 @@ class Plantio(Base):
         ]
 
     def __str__(self):
-        return f"{self.talhao.id_talhao} | {self.talhao.fazenda.nome} | {str(self.area_colheita)}"
+        return f"{self.talhao.id_talhao} | {self.talhao.fazenda.nome} | {self.safra}-{self.ciclo} | {self.variedade.variedade}| {str(self.area_colheita)}"
 
 
 class Colheita(Base):
