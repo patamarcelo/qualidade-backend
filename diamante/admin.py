@@ -608,6 +608,19 @@ class PlantioAdmin(ExtraButtonsMixin, admin.ModelAdmin):
             )
         )
 
+    def get_search_results(self, request, queryset, search_term):
+        ciclo_filter = CicloAtual.objects.filter(nome="Colheita")[0]
+        queryset, use_distinct = super().get_search_results(
+            request, queryset, search_term
+        )
+
+        # Exclude only for autocomplete
+        print("resquest_Path", request.path)
+        if request.path == "/admin/autocomplete/":
+            queryset = queryset.filter(ciclo=ciclo_filter.ciclo)
+
+        return queryset, use_distinct
+
     formfield_overrides = {
         models.JSONField: {
             "widget": JSONEditorWidget(width="200%", height="100vh", mode="tree")
@@ -1596,3 +1609,8 @@ class AplicacaoPlantioAdmin(admin.ModelAdmin):
     )
 
     raw_id_fields = ["plantio"]
+
+
+@admin.register(CicloAtual)
+class SafraCicloAtual(admin.ModelAdmin):
+    list_display = ("nome", "safra", "ciclo")

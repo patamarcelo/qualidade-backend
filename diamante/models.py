@@ -974,3 +974,18 @@ class AplicacaoPlantio(Base):
 
     def __str__(self):
         return f"{self.estagio} - {self.defensivo} - {self.dose}"
+
+
+class CicloAtual(Base):
+    nome = models.CharField(
+        "Safra / Ciclo Atual", max_length=150, null=True, blank=True
+    )
+    safra = models.ForeignKey(Safra, on_delete=models.PROTECT)
+    ciclo = models.ForeignKey(Ciclo, on_delete=models.PROTECT)
+
+    class Meta:
+        verbose_name = "Safra - Ciclo Atual"
+        verbose_name_plural = "Safra - Ciclo Atuais"
+
+    def __str__(self):
+        return f"{self.safra} - {self.ciclo}"
