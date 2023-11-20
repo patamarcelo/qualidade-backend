@@ -989,3 +989,35 @@ class CicloAtual(Base):
 
     def __str__(self):
         return f"{self.safra} - {self.ciclo}"
+
+
+class PlannerPlantio(Base):
+    projeto = models.ForeignKey(Projeto, on_delete=models.PROTECT)
+    cultura = models.ForeignKey(Cultura, on_delete=models.PROTECT)
+    variedade = models.ForeignKey(
+        Variedade, on_delete=models.PROTECT, blank=True, null=True
+    )
+    ciclo = models.ForeignKey(Ciclo, on_delete=models.PROTECT)
+    safra = models.ForeignKey(Safra, on_delete=models.PROTECT)
+    start_date = models.DateField(
+        help_text="Data Prevista Início Programa / Plantio",
+        blank=True,
+        null=True,
+    )
+    area = models.DecimalField(
+        "Area Prevista",
+        help_text="Informar Area Prevista",
+        blank=True,
+        null=True,
+        max_digits=10,
+        decimal_places=2,
+    )
+
+    class Meta:
+        verbose_name = "Planejamento Plantio"
+        verbose_name_plural = "Planejamento Plantios"
+        unique_together = ("projeto", "cultura", "ciclo", "safra", "start_date")
+        ordering = ["start_date"]
+
+    def __str__(self):
+        return f"{self.projeto} - {self.safra}-{self.ciclo} - {self.start_date} - {self.cultura}"

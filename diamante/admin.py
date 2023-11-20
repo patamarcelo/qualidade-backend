@@ -617,7 +617,9 @@ class PlantioAdmin(ExtraButtonsMixin, admin.ModelAdmin):
         # Exclude only for autocomplete
         print("resquest_Path", request.path)
         if request.path == "/admin/autocomplete/":
-            queryset = queryset.filter(ciclo=ciclo_filter.ciclo)
+            queryset = queryset.filter(
+                ciclo=ciclo_filter.ciclo, finalizado_colheita=False
+            )
 
         return queryset, use_distinct
 
@@ -1614,3 +1616,27 @@ class AplicacaoPlantioAdmin(admin.ModelAdmin):
 @admin.register(CicloAtual)
 class SafraCicloAtual(admin.ModelAdmin):
     list_display = ("nome", "safra", "ciclo")
+
+
+@admin.register(PlannerPlantio)
+class PlannerPlantioAdmin(admin.ModelAdmin):
+    def get_queryset(self, request):
+        return (
+            super(PlannerPlantioAdmin, self)
+            .get_queryset(request)
+            .select_related("projeto", "cultura", "ciclo", "cultura")
+        )
+
+    list_display = (
+        "projeto",
+        "start_date",
+        "cultura",
+        "variedade",
+        "safra_description",
+        "area",
+    )
+
+    def safra_description(self, obj):
+        return f"{obj.safra.safra} - {obj.ciclo.ciclo}"
+
+    safra_description.short_description = "Safra"
