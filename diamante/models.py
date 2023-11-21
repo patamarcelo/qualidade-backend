@@ -997,8 +997,8 @@ class PlannerPlantio(Base):
     variedade = models.ForeignKey(
         Variedade, on_delete=models.PROTECT, blank=True, null=True
     )
-    ciclo = models.ForeignKey(Ciclo, on_delete=models.PROTECT)
     safra = models.ForeignKey(Safra, on_delete=models.PROTECT)
+    ciclo = models.ForeignKey(Ciclo, on_delete=models.PROTECT)
     start_date = models.DateField(
         help_text="Data Prevista Início Programa / Plantio",
         blank=True,

@@ -448,6 +448,8 @@ def export_plantio(modeladmin, request, queryset):
             "Cargas Carregadas",
             "Carregado Kg",
             "Produtividade",
+            "lat",
+            "long",
         ]
     )
 
@@ -467,6 +469,7 @@ def export_plantio(modeladmin, request, queryset):
         "variedade__dias_ciclo",
         "programa__nome",
         "area_parcial",
+        "map_centro_id",
     )
     cargas_list = modeladmin.total_c_2
 
@@ -493,6 +496,9 @@ def export_plantio(modeladmin, request, queryset):
 
     for plantio in plantios:
         plantio_detail = list(plantio)
+        lat = str(plantio_detail[15]["lat"]).replace(".", ",")
+        lng = str(plantio_detail[15]["lng"]).replace(".", ",")
+        plantio_detail.pop(15)
         plantio_detail[10] = localize(plantio_detail[10])
         cargas_carregadas_filter = [
             x[1] for x in cargas_list if plantio_detail[0] == x[0]
@@ -504,8 +510,11 @@ def export_plantio(modeladmin, request, queryset):
         plantio_detail.append(cargas_carregadas_quantidade)
         plantio_detail.append(cargas_carregadas_kg)
         plantio_detail.append(produtividade)
-
+        plantio_detail.append(lat)
+        plantio_detail.append(lng)
         plantio_detail.pop(0)
+        print(plantio_detail)
+        print(lat, lng)
         plantio = tuple(plantio_detail)
         writer.writerow(plantio)
     return response
@@ -1213,9 +1222,9 @@ class ColheitaAdmin(admin.ModelAdmin):
     list_filter = (
         "plantio__safra__safra",
         "plantio__ciclo__ciclo",
+        "deposito__nome",
         "plantio__talhao__fazenda__nome",
         "plantio__variedade__variedade",
-        "deposito__nome",
     )
 
     ordering = ("-data_colheita",)
@@ -1624,12 +1633,19 @@ class PlannerPlantioAdmin(admin.ModelAdmin):
         return (
             super(PlannerPlantioAdmin, self)
             .get_queryset(request)
-            .select_related("projeto", "cultura", "ciclo", "cultura")
+            .select_related(
+                "projeto",
+                "cultura",
+                "ciclo",
+                "cultura",
+                "projeto__fazenda",
+                "safra",
+            )
         )
 
     list_display = (
         "projeto",
-        "start_date",
+        "start_date_description",
         "cultura",
         "variedade",
         "safra_description",
@@ -1640,3 +1656,13 @@ class PlannerPlantioAdmin(admin.ModelAdmin):
         return f"{obj.safra.safra} - {obj.ciclo.ciclo}"
 
     safra_description.short_description = "Safra"
+
+    def start_date_description(self, obj):
+        if obj.start_date:
+            return date_format(
+                obj.start_date, format="SHORT_DATE_FORMAT", use_l10n=True
+            )
+        else:
+            return " - "
+
+    start_date_description.short_description = "Start Plantio"

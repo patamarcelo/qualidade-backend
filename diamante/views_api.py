@@ -52,6 +52,7 @@ from .models import (
     Operacao,
     Colheita,
     Programa,
+    PlannerPlantio,
 )
 
 from functools import reduce
@@ -1316,7 +1317,28 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 print(cicle_filter)
                 safra_filter = "2023/2024" if safra_filter == None else safra_filter
                 cicle_filter = "1" if cicle_filter == None else cicle_filter
-
+                qs_planejamento = (
+                    PlannerPlantio.objects.select_related(
+                        "projeto",
+                        "cultura",
+                        "ciclo",
+                        "cultura",
+                        "projeto__fazenda",
+                        "safra",
+                    )
+                    .values(
+                        "projeto",
+                        "projeto__id",
+                        "projeto__nome",
+                        "cultura",
+                        "variedade",
+                        "safra__safra",
+                        "ciclo__ciclo",
+                        "start_date",
+                        "area",
+                    )
+                    .filter(safra__safra=safra_filter, ciclo__ciclo=cicle_filter)
+                )
                 qs_plantio = (
                     Plantio.objects.select_related(
                         "safra",
@@ -1336,6 +1358,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         "safra__safra",
                         "ciclo__ciclo",
                         "talhao__fazenda__nome",
+                        "talhao__fazenda__id",
                         "talhao__fazenda__fazenda__nome",
                         "talhao__fazenda__fazenda__capacidade_plantio_ha_dia",
                         "variedade__nome_fantasia",
@@ -1401,6 +1424,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                     "fazenda_grupo": i[
                                         "talhao__fazenda__fazenda__nome"
                                     ],
+                                    "projeto_id": i["talhao__fazenda__id"],
                                     "talhao_id_unico": i["talhao__id_unico"],
                                     "plantio_finalizado": i["finalizado_plantio"],
                                     "area_colheita": i["area_colheita"],
@@ -1461,7 +1485,20 @@ class PlantioViewSet(viewsets.ModelViewSet):
                             }
                         }
                     )
+                    print("inside loop : ", k)
+                    filtered_planner = qs_planejamento.filter(projeto__nome=k)
+                    planner_date = False
+                    if filtered_planner:
+                        print("aqui temos planejamneto: , ", filtered_planner)
+                        current_planner = filtered_planner[0]
+                        inital_date_planner = current_planner["start_date"]
+                        planner_date = True
+
                     for kk, vv in v.items():
+                        # print("VVV :", vv)
+                        # print("\n")
+                        projeto_id = vv["projeto_id"]
+
                         data_plantio = vv["data_plantio"]
                         area_colheita = vv["area_colheita"]
                         start_date = vv["programa_start_date"]
@@ -1473,10 +1510,16 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         prev_date[k]["dias_necessários"] = round(
                             prev_date[k]["area"] / capacidade_dia
                         )
-                        prev_date[k]["data_inicial"] = get_base_date(start_date)
+                        if planner_date:
+                            prev_date[k]["data_inicial"] = get_base_date(
+                                inital_date_planner
+                            )
+                        else:
+                            prev_date[k]["data_inicial"] = get_base_date(start_date)
                         prev_date[k]["data_final"] = prev_date[k][
                             "data_inicial"
                         ] + datetime.timedelta(days=prev_date[k]["dias_necessários"])
+                        # ------------HERE is the challenge-------------------#
                         if data_plantio is None:
                             final_result[k][kk].update(
                                 {
@@ -1499,6 +1542,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 }
                             )
                             index += 1
+                print(qs_planejamento)
 
                 # RESUMO POR DIA COM TOTAIS DE APLICACOES
                 final_by_day = []
