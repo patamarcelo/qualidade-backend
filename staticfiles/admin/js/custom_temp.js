@@ -119,7 +119,7 @@ var app = new Vue({
 	},
 	computed: {
 		customUrl() {
-			return `/admin/diamante/plantiodetailplantio/?ciclo=${this.selectedCiclo}`;
+			return `/admin/diamante/plantiodetail/?ciclo=${this.selectedCiclo}`;
 		},
 		onlyFarmWhitoutVariedade() {
 			const onlyFarmSetSOut = this.plantio.map((data) => {
