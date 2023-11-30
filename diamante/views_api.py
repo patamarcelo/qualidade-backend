@@ -725,7 +725,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                     field_to_update.variedade = id_variedade
                                 field_to_update.save()
                                 print(
-                                    f"{Fore.GREEN}Plantio Alterado com sucesso: {field_to_update} - {safra} - {ciclo} | {Fore.BLUE}{field_to_update.variedade} | {field_to_update.programa}{Style.RESET_ALL}"
+                                    f"{Fore.GREEN}Plantio Alterado com sucesso: {field_to_update} - {safra} - {ciclo} | {Fore.CYAN}{field_to_update.variedade} | {field_to_update.programa}{Style.RESET_ALL}"
                                 )
                                 print("\n")
                                 count_total += 1
@@ -1379,7 +1379,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 )
                 qs_programas = Operacao.objects.values(
                     "estagio", "programa_id", "prazo_dap", "id"
-                )
+                ).filter(ativo=True)
                 qs_aplicacoes = (
                     Aplicacao.objects.select_related(
                         "defensivo",
@@ -1485,11 +1485,11 @@ class PlantioViewSet(viewsets.ModelViewSet):
                             }
                         }
                     )
-                    print("inside loop : ", k)
+                    # print("inside loop : ", k)
                     filtered_planner = qs_planejamento.filter(projeto__nome=k)
                     planner_date = False
                     if filtered_planner:
-                        print("aqui temos planejamneto: , ", filtered_planner)
+                        # print("aqui temos planejamneto: , ", filtered_planner)
                         current_planner = filtered_planner[0]
                         inital_date_planner = current_planner["start_date"]
                         planner_date = True

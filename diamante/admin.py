@@ -38,7 +38,7 @@ from django.db.models.functions import Coalesce, Round
 
 from django.core import serializers
 from django.contrib.admin import SimpleListFilter
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from django.contrib import messages
 
@@ -330,6 +330,7 @@ class AplicacoesProgramaInline(admin.StackedInline):
     model = Aplicacao
     extra = 0
     fields = ["defensivo", "dose", "ativo"]
+    autocomplete_fields = ["defensivo"]
 
 
 @admin.register(Deposito)
@@ -418,6 +419,7 @@ class VariedadeAdmin(admin.ModelAdmin):
     list_filter = [
         "cultura",
     ]
+    search_fields = ["variedade"]
 
 
 admin.site.register(Safra)
@@ -442,6 +444,7 @@ def export_plantio(modeladmin, request, queryset):
             "Colheita Finalizada",
             "Area",
             "Data Plantio",
+            "Data Prev Colheita",
             # "Dap",
             "Ciclo Variedade",
             "Programa",
@@ -494,11 +497,21 @@ def export_plantio(modeladmin, request, queryset):
         else:
             return " - "
 
+    def get_prev_colheita(data_plantio, timeDelta):
+        if data_plantio:
+            prev_date_delta = timedelta(timeDelta)
+            prev_date_final = data_plantio + prev_date_delta
+            return prev_date_final
+        else:
+            return " - "
+
     for plantio in plantios:
         plantio_detail = list(plantio)
         lat = str(plantio_detail[15]["lat"]).replace(".", ",")
         lng = str(plantio_detail[15]["lng"]).replace(".", ",")
         plantio_detail.pop(15)
+        data_plantio = plantio_detail[11]
+        time_delta_plantio = plantio_detail[12]
         plantio_detail[10] = localize(plantio_detail[10])
         cargas_carregadas_filter = [
             x[1] for x in cargas_list if plantio_detail[0] == x[0]
@@ -513,6 +526,7 @@ def export_plantio(modeladmin, request, queryset):
         plantio_detail.append(lat)
         plantio_detail.append(lng)
         plantio_detail.pop(0)
+        plantio_detail.insert(11, get_prev_colheita(data_plantio, time_delta_plantio))
         print(plantio_detail)
         print(lat, lng)
         plantio = tuple(plantio_detail)
@@ -572,7 +586,7 @@ class ColheitaFilterNoProgram(SimpleListFilter):
 class PlantioAdmin(ExtraButtonsMixin, admin.ModelAdmin):
     actions = [export_plantio]
     show_full_result_count = False
-    autocomplete_fields = ["talhao"]
+    autocomplete_fields = ["talhao", "programa", "variedade"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -625,9 +639,12 @@ class PlantioAdmin(ExtraButtonsMixin, admin.ModelAdmin):
 
         # Exclude only for autocomplete
         print("resquest_Path", request.path)
+
         if request.path == "/admin/autocomplete/":
             queryset = queryset.filter(
-                ciclo=ciclo_filter.ciclo, finalizado_colheita=False
+                ciclo=ciclo_filter.ciclo,
+                finalizado_colheita=False,
+                plantio_descontinuado=False,
             )
 
         return queryset, use_distinct
@@ -673,6 +690,7 @@ class PlantioAdmin(ExtraButtonsMixin, admin.ModelAdmin):
         "programa",
         "get_description_finalizado_plantio",
         "get_data",
+        "get_data_prev_col",
         "area_colheita",
         "get_description_finalizado_colheita",
         # "get_area_parcial",
@@ -969,6 +987,18 @@ class PlantioAdmin(ExtraButtonsMixin, admin.ModelAdmin):
             return " - "
 
     get_data.short_description = "Data Plantio"
+
+    def get_data_prev_col(self, obj):
+        if obj.data_plantio:
+            prev_date_delta = timedelta(obj.variedade.dias_ciclo)
+            prev_date_final = obj.data_plantio + prev_date_delta
+            return date_format(
+                prev_date_final, format="SHORT_DATE_FORMAT", use_l10n=True
+            )
+        else:
+            return " - "
+
+    get_data_prev_col.short_description = "Data Prev. Col."
 
     def variedade_description(self, obj):
         if obj.variedade:
@@ -1566,6 +1596,7 @@ class AplicacaoAdmin(admin.ModelAdmin):
     list_filter = (
         "operacao__programa",
         "operacao__programa__ciclo__ciclo",
+        "operacao__programa__safra__safra",
         "ativo",
         "defensivo",
         "operacao",
