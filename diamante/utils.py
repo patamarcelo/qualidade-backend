@@ -169,6 +169,7 @@ def get_quantidade_aplicar(dose, area_colehita):
 
 
 def get_base_date(data_inicial, today=today):
+    today = datetime.date.today()
     if data_inicial > today:
         return data_inicial
     else:
