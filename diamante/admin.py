@@ -477,7 +477,7 @@ def export_plantio(modeladmin, request, queryset):
     cargas_list = modeladmin.total_c_2
 
     def get_total_prod(total_c_2, plantio):
-        total_filt_list = sum([x[1] for x in total_c_2 if plantio[0] == x[0]])
+        total_filt_list = sum([(x[1] * 60) for x in total_c_2 if plantio[0] == x[0]])
         prod_scs = None
         if plantio[8]:
             try:
@@ -514,7 +514,7 @@ def export_plantio(modeladmin, request, queryset):
         time_delta_plantio = plantio_detail[12]
         plantio_detail[10] = localize(plantio_detail[10])
         cargas_carregadas_filter = [
-            x[1] for x in cargas_list if plantio_detail[0] == x[0]
+            (x[1] * 60) for x in cargas_list if plantio_detail[0] == x[0]
         ]
         cargas_carregadas_kg = localize(sum(cargas_carregadas_filter))
         cargas_carregadas_quantidade = len(cargas_carregadas_filter)
@@ -593,7 +593,7 @@ class PlantioAdmin(ExtraButtonsMixin, admin.ModelAdmin):
         self.total_c_2 = [
             x
             for x in Colheita.objects.values_list(
-                "plantio__id", "peso_liquido", "data_colheita"
+                "plantio__id", "peso_scs_limpo_e_seco", "data_colheita"
             )
         ]
 
@@ -608,7 +608,7 @@ class PlantioAdmin(ExtraButtonsMixin, admin.ModelAdmin):
         self.total_c_2 = [
             x
             for x in Colheita.objects.values_list(
-                "plantio__id", "peso_liquido", "data_colheita"
+                "plantio__id", "peso_scs_limpo_e_seco", "data_colheita"
             )
         ]
         return HttpResponseRedirectToReferrer(request)
@@ -784,6 +784,8 @@ class PlantioAdmin(ExtraButtonsMixin, admin.ModelAdmin):
         print("form Plantio")
         print("Valor Atual: ")
         if form.initial:
+            if form.initial["data_plantio"] != obj.data_plantio:
+                obj.cronograma_programa = None
             if (
                 form.initial["finalizado_colheita"] == False
                 and form.instance.finalizado_colheita == True
@@ -801,7 +803,9 @@ class PlantioAdmin(ExtraButtonsMixin, admin.ModelAdmin):
                     closed_date = today
 
                 # GET PROD NUMBER
-                total_filt_list = sum([x[1] for x in self.total_c_2 if obj.id == x[0]])
+                total_filt_list = sum(
+                    [(x[1] * 60) for x in self.total_c_2 if obj.id == x[0]]
+                )
                 prod_scs = None
                 value = None
                 if obj.finalizado_colheita:
@@ -887,14 +891,14 @@ class PlantioAdmin(ExtraButtonsMixin, admin.ModelAdmin):
 
     # TOTAL DE CARGAS CARREGADAS PARA O PLANTIO E KG
     def get_total_colheita_cargas_kg(self, obj):
-        filtered_list = [x[1] for x in self.total_c_2 if obj.id == x[0]]
+        filtered_list = [(x[1] * 60) for x in self.total_c_2 if obj.id == x[0]]
         return sum(filtered_list)
 
     get_total_colheita_cargas_kg.short_description = "Peso Carr."
 
     # PRODUTIVIDADE TOTAL DO PLANTIO
     def get_total_prod(self, obj):
-        total_filt_list = sum([x[1] for x in self.total_c_2 if obj.id == x[0]])
+        total_filt_list = sum([(x[1] * 60) for x in self.total_c_2 if obj.id == x[0]])
         prod_scs = None
         if obj.finalizado_colheita:
             try:
@@ -1067,8 +1071,8 @@ def export_cargas(modeladmin, request, queryset):
             "Parcela",
             "Safra",
             "Ciclo",
-            "Cultura",
             "Variedade",
+            "Cultura",
             "Placa",
             "Motorista",
             "Peso Tara",

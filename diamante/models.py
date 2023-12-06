@@ -64,7 +64,7 @@ class Fazenda(Base):
     class Meta:
         ordering = ["nome"]
         verbose_name = "Fazenda"
-        verbose_name_plural = "Fazenda"
+        verbose_name_plural = "Fazendas"
 
     def __str__(self):
         return self.nome
@@ -119,7 +119,7 @@ class Projeto(Base):
     class Meta:
         ordering = ["nome"]
         verbose_name = "Projeto"
-        verbose_name_plural = "Projeto"
+        verbose_name_plural = "Projetos"
 
     def __str__(self):
         return f"{self.nome} / {self.fazenda}"
@@ -757,9 +757,7 @@ class Colheita(Base):
         "Nome Motorista", max_length=40, help_text="Nome do Motorista"
     )
 
-    ticket = models.CharField(
-        "Ticket", max_length=20, blank=True, null=True, unique=True
-    )
+    ticket = models.CharField("Ticket", max_length=20, blank=True, null=True)
     op = models.CharField("OP", max_length=20, blank=True, null=True, unique=True)
 
     peso_tara = models.PositiveIntegerField(
