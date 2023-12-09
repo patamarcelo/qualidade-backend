@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from rest_framework.authtoken.models import Token
-from .models import Talhao, Plantio, Projeto, Defensivo, Aplicacao
+from .models import Talhao, Plantio, Projeto, Defensivo, Aplicacao, Colheita
 from rest_framework.fields import CurrentUserDefault
 
 from usuario.models import CustomUsuario as User
@@ -50,3 +50,23 @@ class AplicacaoSerializer(serializers.ModelSerializer):
 #             "id",
 #             "fazenda_nome",
 #         ]
+
+
+class ColheitaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Colheita
+        fields = "__all__"
+        # fields = [
+        #     "peso_tara",
+        #     "peso_bruto",
+        #     "umidade",
+        #     "desconto_umidade",
+        #     "impureza",
+        #     "desconto_impureza",
+        #     "bandinha",
+        #     "desconto_bandinha",
+        #     "peso_liquido",
+        #     "peso_scs_liquido",
+        #     "peso_scs_limpo_e_seco",
+        #     "deposito",
+        # ]

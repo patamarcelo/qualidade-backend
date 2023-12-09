@@ -7,6 +7,7 @@ from .serializers import (
     PlantioSerializer,
     DefensivoSerializer,
     AplicacaoSerializer,
+    ColheitaSerializer,
 )
 
 from rest_framework import viewsets, status
@@ -53,6 +54,7 @@ from .models import (
     Colheita,
     Programa,
     PlannerPlantio,
+    Deposito,
 )
 
 from functools import reduce
@@ -77,6 +79,8 @@ from django.db.models.functions import Round
 
 from rest_framework.decorators import api_view, permission_classes
 from django.db.models.functions.datetime import ExtractMonth, ExtractYear
+
+import requests
 
 
 # --------------------- --------------------- START DEFENSIVOS MONGO API --------------------- --------------------- #
@@ -2209,3 +2213,193 @@ class ProgramasDetails(viewsets.ModelViewSet):
 
 
 # --------------------- ---------------------- PROGRAMS API END  --------------------- ----------------------#
+
+
+def remove_leading_zeros(num):
+    return num.lstrip("0")
+
+
+def adjust_parcelas(parcelas):
+    list_parcelas = parcelas.replace("'", "").split(";")
+    if len(list_parcelas) == 2:
+        return list_parcelas[:-1]
+    return parcelas.replace("'", "").split(";")[0:-1]
+
+
+class ColheitaApiSave(viewsets.ModelViewSet):
+    queryset = Colheita.objects.all()
+    serializer_class = ColheitaSerializer
+    authentication_classes = (TokenAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    @action(detail=False, methods=["GET", "POST"])
+    def save_from_protheus(self, request):
+        if request.user.is_authenticated:
+            date_file = request.data["plantio"]
+            data_json = json.load(date_file)
+            plantio_query = Plantio.objects.all()
+            deposito_query = Deposito.objects.all()
+            for i in data_json:
+                data = i["Data de Pesagem"]
+                romaneio = i["Num Romaneio"]
+                filial = i["Filial"]
+                ticket = remove_leading_zeros(i["Ticket"])
+                placa = i["Placa do veiculo"]
+                motorista = i["Motorista"]
+                origem = i["Projeto"]
+                origem_id = remove_leading_zeros(i["Cod Projeto"])
+                parcelas = adjust_parcelas(i["Parcela"])
+                peso_bruto = i["Peso Bruto"]
+                peso_tara = i["Peso Tara"]
+                peso_liquido = i["Peso Liquido"]
+                umidade = i["Umidade Entrada %"]
+                impureza = i["Impureza Entrada %"]
+                safra = i["Safra"]
+                ciclo = i["Ciclo"]
+                destino = i["Destino"]
+                final_ticket = f"{filial}{ticket}"
+                print(i)
+                if len(parcelas) > 1:
+                    for index, parcela in enumerate(parcelas):
+                        peso_bruto_considerado = int(peso_bruto / len(parcelas))
+                        peso_tara_considerado = int(peso_tara / len(parcelas))
+                        if index + 1 == len(parcelas):
+                            if peso_bruto % len(parcelas) != 0:
+                                peso_bruto_ajuste = peso_bruto % len(parcelas)
+                                peso_bruto_considerado += peso_bruto_ajuste
+                            if peso_tara % len(parcelas) != 0:
+                                peso_tara_ajuste = peso_tara % len(parcelas)
+                                peso_tara_considerado += peso_tara_ajuste
+                        peso_liquido_considerado = int(
+                            peso_bruto_considerado - peso_tara_considerado
+                        )
+                        carga = {
+                            "data": data,
+                            "romaneio": romaneio,
+                            "ticket": final_ticket,
+                            "placa": placa,
+                            "motorista": motorista,
+                            "origem": origem,
+                            "origem_id": origem_id,
+                            "parcela": parcela,
+                            "peso_bruto": peso_bruto_considerado,
+                            "peso_tara": peso_tara_considerado,
+                            "peso_liquido": peso_liquido_considerado,
+                            "umidade": umidade,
+                            "impureza": impureza,
+                            "safra": safra,
+                            "ciclo": ciclo,
+                            "destino": destino,
+                        }
+                        try:
+                            plantio_id = plantio_query.get(
+                                safra__safra=safra,
+                                ciclo__ciclo=ciclo,
+                                talhao__fazenda__id_d=origem_id,
+                                talhao__id_talhao=parcela,
+                            )
+                            deposito_id = deposito_query.get(pk=destino)
+
+                            if plantio_id and deposito_id:
+                                try:
+                                    new_carga = Colheita(
+                                        plantio=plantio_id,
+                                        deposito=deposito_id,
+                                        data_colheita=data,
+                                        romaneio=romaneio,
+                                        placa=placa,
+                                        motorista=motorista,
+                                        ticket=final_ticket,
+                                        peso_tara=peso_tara_considerado,
+                                        peso_bruto=peso_bruto_considerado,
+                                        umidade=Decimal(umidade),
+                                        impureza=Decimal(impureza),
+                                    )
+                                    new_carga.save()
+                                    print(
+                                        f"{Fore.GREEN}Nova Carga incluida com sucesso: {new_carga}{Style.RESET_ALL}"
+                                    )
+                                except Exception as e:
+                                    print(
+                                        f"Proglema em salvar a carga: {Fore.LIGHTRED_EX}{e}{Style.RESET_ALL}"
+                                    )
+                            print(f"{Fore.BLUE}{deposito_id}{Style.RESET_ALL}")
+                            print(f"{Fore.BLUE}{plantio_id}{Style.RESET_ALL}")
+                        except Exception as e:
+                            print(
+                                f"plantio não encontrado - {Fore.LIGHTRED_EX}Origem: {origem} | Parcela: {parcela}{Style.RESET_ALL}"
+                            )
+                        print(carga)
+                else:
+                    carga = {
+                        "data": data,
+                        "romaneio": romaneio,
+                        "ticket": final_ticket,
+                        "placa": placa,
+                        "motorista": motorista,
+                        "origem": origem,
+                        "origem_id": origem_id,
+                        "parcela": parcelas[0],
+                        "peso_bruto": peso_bruto,
+                        "peso_tara": peso_tara,
+                        "peso_liquido": peso_liquido,
+                        "umidade": umidade,
+                        "impureza": impureza,
+                        "safra": safra,
+                        "ciclo": ciclo,
+                        "destino": destino,
+                    }
+                    try:
+                        plantio_id = plantio_query.get(
+                            safra__safra=safra,
+                            ciclo__ciclo=ciclo,
+                            talhao__fazenda__id_d=origem_id,
+                            talhao__id_talhao=parcelas[0],
+                        )
+                        deposito_id = deposito_query.get(pk=destino)
+                        if plantio_id and deposito_id:
+                            try:
+                                new_carga = Colheita(
+                                    plantio=plantio_id,
+                                    deposito=deposito_id,
+                                    data_colheita=data,
+                                    romaneio=romaneio,
+                                    placa=placa,
+                                    motorista=motorista,
+                                    ticket=final_ticket,
+                                    peso_tara=peso_tara,
+                                    peso_bruto=peso_bruto,
+                                    umidade=Decimal(umidade),
+                                    impureza=Decimal(impureza),
+                                )
+                                new_carga.save()
+                                print(
+                                    f"{Fore.GREEN}Nova Carga incluida com sucesso: {new_carga}{Style.RESET_ALL}"
+                                )
+                            except Exception as e:
+                                print(
+                                    f"Proglema em salvar a carga: {Fore.LIGHTRED_EX}{e}{Style.RESET_ALL}"
+                                )
+                        print(f"{Fore.BLUE}{deposito_id}{Style.RESET_ALL}")
+                        print(f"{Fore.BLUE}{plantio_id}{Style.RESET_ALL}")
+                    except Exception as e:
+                        print(
+                            f"plantio não encontrado - {Fore.LIGHTRED_EX}Origem: {origem} | Parcela: {parcelas[0]}{Style.RESET_ALL}"
+                        )
+                    print(carga)
+                print("\n")
+            qs = Colheita.objects.all()
+            serializer = ColheitaSerializer(qs, many=True)
+            try:
+                response = {
+                    "msg": f"Cadastro das Cargas efetuado com sucesso!!!",
+                    "quantidade": len(serializer.data),
+                    "data": serializer.data,
+                }
+                return Response(response, status=status.HTTP_200_OK)
+            except Exception as e:
+                response = {"message": f"Ocorreu um Erro: {e}"}
+                return Response(response, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            response = {"message": "Você precisa estar logado!!!"}
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)

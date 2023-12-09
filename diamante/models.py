@@ -851,7 +851,9 @@ class Colheita(Base):
         null=True,
     )
 
-    deposito = models.ForeignKey(Deposito, on_delete=models.PROTECT)
+    deposito = models.ForeignKey(
+        Deposito, on_delete=models.PROTECT, related_name="deposito_colheita"
+    )
 
     # @property
     # def peso_saco_umido(self):
