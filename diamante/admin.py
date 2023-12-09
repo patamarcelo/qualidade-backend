@@ -64,6 +64,20 @@ from .utils import (
 import requests
 
 from admin_confirm.admin import AdminConfirmMixin, confirm_action
+from django.urls import path
+from django.http import HttpResponseRedirect
+
+from usuario.models import CustomUsuario as User
+from rest_framework.authtoken.models import Token
+
+
+from qualidade_project.settings import DEBUG
+
+main_path = (
+    "http://127.0.0.1:8000"
+    if DEBUG == True
+    else "https://diamante-quality.up.railway.app"
+)
 
 
 def get_cargas_model(safra_filter, ciclo_filter):
@@ -608,51 +622,50 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
     def finalize_plantio(self, request, queryset):
         queryset.update(finalizado_colheita=True)
         for obj in queryset:
-            if obj.finalizado_colheita == True:
-                print("colheita finalizada")
-                # GET CLOSED DATE
-                filtered_list = [x[2] for x in self.total_c_2 if obj.id == x[0]]
-                sorted_list = sorted(filtered_list)
-                closed_date = None
-                if len(sorted_list) > 0:
-                    closed_date = sorted_list[0]
-                else:
-                    today = str(datetime.now()).split(" ")[0].strip()
-                    closed_date = today
+            print("colheita finalizada")
+            # GET CLOSED DATE
+            filtered_list = [x[2] for x in self.total_c_2 if obj.id == x[0]]
+            sorted_list = sorted(filtered_list)
+            closed_date = None
+            if len(sorted_list) > 0:
+                closed_date = sorted_list[0]
+            else:
+                today = str(datetime.now()).split(" ")[0].strip()
+                closed_date = today
 
-                # GET PROD NUMBER
-                total_filt_list = sum(
-                    [(x[1] * 60) for x in self.total_c_2 if obj.id == x[0]]
-                )
-                prod_scs = None
-                value = None
-                if obj.finalizado_colheita:
-                    try:
-                        prod = total_filt_list / obj.area_colheita
-                        prod_scs = prod / 60
-                        value = round(prod_scs, 2)
-                        print(value)
-                    except ZeroDivisionError:
-                        value = None
-
-                print("Produtividade ", value)
-                print("Data Colheita", closed_date)
-                print("id_farmBox", obj.id_farmbox)
+            # GET PROD NUMBER
+            total_filt_list = sum(
+                [(x[1] * 60) for x in self.total_c_2 if obj.id == x[0]]
+            )
+            prod_scs = None
+            value = None
+            if obj.finalizado_colheita:
                 try:
-                    response = close_plantation_and_productivity(
-                        obj.id_farmbox, str(closed_date), str(value)
-                    )
-                    print(response)
-                    resp_obj = json.loads(response.text)
-                    str_resp = f'Alterado no FARMBOX - {resp_obj["farm_name"]} - {resp_obj["name"]} - {resp_obj["harvest_name"]}-{resp_obj["cycle"]} - Produtividade: {resp_obj["productivity"]} - Variedade: {resp_obj["variety_name"]} - Area: {resp_obj["area"]}'
-                    messages.add_message(request, messages.INFO, str_resp)
-                except Exception as e:
-                    print("Erro ao alterar os dados no FarmBox")
-                    messages.add_message(
-                        request,
-                        messages.ERROR,
-                        f"Erro ao salvar os dados no Farmbox: {e}",
-                    )
+                    prod = total_filt_list / obj.area_colheita
+                    prod_scs = prod / 60
+                    value = round(prod_scs, 2)
+                    print(value)
+                except ZeroDivisionError:
+                    value = None
+
+            print("Produtividade ", value)
+            print("Data Colheita", closed_date)
+            print("id_farmBox", obj.id_farmbox)
+            try:
+                response = close_plantation_and_productivity(
+                    obj.id_farmbox, str(closed_date), str(value)
+                )
+                print(response)
+                resp_obj = json.loads(response.text)
+                str_resp = f'Alterado no FARMBOX - {resp_obj["farm_name"]} - {resp_obj["name"]} - {resp_obj["harvest_name"]}-{resp_obj["cycle"]} - Produtividade: {resp_obj["productivity"]} - Variedade: {resp_obj["variety_name"]} - Area: {resp_obj["area"]}'
+                messages.add_message(request, messages.INFO, str_resp)
+            except Exception as e:
+                print("Erro ao alterar os dados no FarmBox")
+                messages.add_message(
+                    request,
+                    messages.ERROR,
+                    f"Erro ao salvar os dados no Farmbox: {e}",
+                )
 
     @button(
         change_form=True,
@@ -1202,9 +1215,22 @@ def export_cargas(modeladmin, request, queryset):
 export_cargas.short_description = "Export to csv"
 
 
+class SomeModelForm(forms.Form):
+    csv_file = forms.FileField(required=False, label="please select a file")
+
+
 @admin.register(Colheita)
 class ColheitaAdmin(admin.ModelAdmin):
     autocomplete_fields = ["plantio"]
+    change_list_template = "admin/change_list_colheita.html"
+
+    def get_urls(self):
+        urls = super().get_urls()
+        my_urls = [path(r"^upload_csv/$", self.upload_csv, name="upload_csv")]
+
+        return my_urls + urls
+
+    urls = property(get_urls)
 
     def get_queryset(self, request):
         return (
@@ -1272,7 +1298,6 @@ class ColheitaAdmin(admin.ModelAdmin):
         "get_projeto_parcela",
         "get_nome_fantasia",
         "ticket",
-        "op",
         "peso_bruto",
         "peso_tara",
         "get_peso_liquido",
@@ -1321,6 +1346,40 @@ class ColheitaAdmin(admin.ModelAdmin):
     )
 
     ordering = ("-data_colheita",)
+
+    def upload_csv(self, request):
+        if request.method == "POST":
+            user_id = Token.objects.get(user=request.user)
+            form = SomeModelForm(request.POST, request.FILES)
+            if form.is_valid():
+                data_file = request.FILES["csv_file"]
+                data_json = json.load(data_file)
+
+                headers = {
+                    "Content-Type": "application/json",
+                    "Authorization": f"Token {user_id}",
+                }
+                response = requests.post(
+                    f"{main_path}/diamante/colheita/save_from_protheus/",
+                    headers=headers,
+                    json=data_json,
+                )
+                resp = json.loads(response.text)
+                includes = resp["data"]["includes"]
+                not_includes = resp["data"]["notincludes"]
+                if includes > 0:
+                    msg = f"{includes} Cargas incuídas com Sucesso"
+                    messages.add_message(request, messages.SUCCESS, msg)
+                if not_includes > 0:
+                    msg = f"{not_includes} Cargas não incluídas"
+                    messages.add_message(request, messages.WARNING, msg)
+        return HttpResponseRedirectToReferrer(request)
+
+    # def changelist_view(self, *args, **kwargs):
+    #     view = super().changelist_view(*args, **kwargs)
+    #     print(self)
+    #     # view.context_data["submit_csv_form"] = SomeModelForm
+    #     return view
 
     def get_peso_liquido(self, obj):
         return obj.peso_bruto - obj.peso_tara

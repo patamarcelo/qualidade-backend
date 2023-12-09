@@ -2235,13 +2235,16 @@ class ColheitaApiSave(viewsets.ModelViewSet):
     @action(detail=False, methods=["GET", "POST"])
     def save_from_protheus(self, request):
         if request.user.is_authenticated:
-            date_file = request.data["plantio"]
-            data_json = json.load(date_file)
+            data_json = request.data
+            # date_file = request.data["plantio"]
+            # data_json = json.load(date_file)
             plantio_query = Plantio.objects.all()
             deposito_query = Deposito.objects.all()
+            succes = 0
+            failed = 0
             for i in data_json:
                 data = i["Data de Pesagem"]
-                romaneio = i["Num Romaneio"]
+                romaneio = remove_leading_zeros(str(i["Num Romaneio"]))
                 filial = i["Filial"]
                 ticket = remove_leading_zeros(i["Ticket"])
                 placa = i["Placa do veiculo"]
@@ -2316,6 +2319,7 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                                         impureza=Decimal(impureza),
                                     )
                                     new_carga.save()
+                                    succes += 1
                                     print(
                                         f"{Fore.GREEN}Nova Carga incluida com sucesso: {new_carga}{Style.RESET_ALL}"
                                     )
@@ -2323,6 +2327,7 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                                     print(
                                         f"Proglema em salvar a carga: {Fore.LIGHTRED_EX}{e}{Style.RESET_ALL}"
                                     )
+                                    failed += 1
                             print(f"{Fore.BLUE}{deposito_id}{Style.RESET_ALL}")
                             print(f"{Fore.BLUE}{plantio_id}{Style.RESET_ALL}")
                         except Exception as e:
@@ -2373,6 +2378,7 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                                     impureza=Decimal(impureza),
                                 )
                                 new_carga.save()
+                                succes += 1
                                 print(
                                     f"{Fore.GREEN}Nova Carga incluida com sucesso: {new_carga}{Style.RESET_ALL}"
                                 )
@@ -2380,6 +2386,7 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                                 print(
                                     f"Proglema em salvar a carga: {Fore.LIGHTRED_EX}{e}{Style.RESET_ALL}"
                                 )
+                                failed += 1
                         print(f"{Fore.BLUE}{deposito_id}{Style.RESET_ALL}")
                         print(f"{Fore.BLUE}{plantio_id}{Style.RESET_ALL}")
                     except Exception as e:
@@ -2394,7 +2401,8 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                 response = {
                     "msg": f"Cadastro das Cargas efetuado com sucesso!!!",
                     "quantidade": len(serializer.data),
-                    "data": serializer.data,
+                    "data": {"includes": succes, "notincludes": failed}
+                    # "data": serializer.data,
                 }
                 return Response(response, status=status.HTTP_200_OK)
             except Exception as e:

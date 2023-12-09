@@ -71,6 +71,8 @@ INSTALLED_APPS = [
     "usuario",
     "diamante",
     "admin_extra_buttons",
+    "crispy_forms",
+    "crispy_bootstrap4",
 ]
 
 MIDDLEWARE = [
@@ -214,3 +216,5 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedStaticFilesStorage"
 INTERNAL_IPS = [
     "127.0.0.1",
 ]
+
+CRISPY_TEMPLATE_PACK = "bootstrap4"
