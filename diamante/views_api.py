@@ -1115,10 +1115,24 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     .filter(plantio_descontinuado=False)
                 )
 
+                qs_by_day = (
+                    Plantio.objects.values(
+                        "data_plantio",
+                        "talhao__fazenda__nome",
+                        "talhao__fazenda__fazenda__nome",
+                        "variedade__cultura__cultura",
+                    )
+                    .annotate(area_total=Sum("area_colheita"))
+                    .filter(finalizado_plantio=True, plantio_descontinuado=False)
+                    .filter(safra__safra=safra_filter, ciclo__ciclo=cicle_filter)
+                    .order_by("data_plantio")
+                )
+
                 response = {
                     "msg": f"Consulta realizada com sucesso GetPlantioDone API!! - Safra: {safra_filter} - Ciclo: {cicle_filter}",
                     "total_return": len(qs),
                     "data": qs,
+                    "plantio_by_day": qs_by_day
                     # "resume_by_farm": qsFarm,
                 }
                 return Response(response, status=status.HTTP_200_OK)
@@ -1877,8 +1891,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "plantio__finalizado_colheita",
                     "plantio__area_parcial",
                 ).annotate(
-                    peso_kg=Sum("peso_liquido"),
-                    peso_scs=Round((Sum("peso_liquido") / 60), precision=2),
+                    peso_kg=Round((Sum("peso_scs_limpo_e_seco") * 60), precision=2),
+                    peso_scs=Round(Sum("peso_scs_limpo_e_seco"), precision=2),
                     # produtividade=Round(
                     #     ("peso_scs" / "plantio__area_colheita"),
                     #     precision=2,
@@ -2238,19 +2252,24 @@ class ColheitaApiSave(viewsets.ModelViewSet):
             data_json = request.data
             # date_file = request.data["plantio"]
             # data_json = json.load(date_file)
-            plantio_query = Plantio.objects.all()
+            plantio_query = Plantio.objects.all().filter(
+                finalizado_plantio=True,
+                finalizado_colheita=False,
+                plantio_descontinuado=False,
+            )
             deposito_query = Deposito.objects.all()
             succes = 0
             failed = 0
+            problem = []
             for i in data_json:
                 data = i["Data de Pesagem"]
                 romaneio = remove_leading_zeros(str(i["Num Romaneio"]))
                 filial = i["Filial"]
-                ticket = remove_leading_zeros(i["Ticket"])
+                ticket = remove_leading_zeros(str(i["Ticket"]))
                 placa = i["Placa do veiculo"]
                 motorista = i["Motorista"]
                 origem = i["Projeto"]
-                origem_id = remove_leading_zeros(i["Cod Projeto"])
+                origem_id = remove_leading_zeros(str(i["Cod Projeto"]))
                 parcelas = adjust_parcelas(i["Parcela"])
                 peso_bruto = i["Peso Bruto"]
                 peso_tara = i["Peso Tara"]
@@ -2328,6 +2347,13 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                                         f"Proglema em salvar a carga: {Fore.LIGHTRED_EX}{e}{Style.RESET_ALL}"
                                     )
                                     failed += 1
+                                    problem_load = {
+                                        "parcela": parcela,
+                                        "projeto": origem,
+                                        "romaneio": romaneio,
+                                        "error": str(e),
+                                    }
+                                    problem.append(problem_load)
                             print(f"{Fore.BLUE}{deposito_id}{Style.RESET_ALL}")
                             print(f"{Fore.BLUE}{plantio_id}{Style.RESET_ALL}")
                         except Exception as e:
@@ -2387,6 +2413,13 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                                     f"Proglema em salvar a carga: {Fore.LIGHTRED_EX}{e}{Style.RESET_ALL}"
                                 )
                                 failed += 1
+                                problem_load = {
+                                    "parcela": parcela,
+                                    "projeto": origem,
+                                    "romaneio": romaneio,
+                                    "error": str(e),
+                                }
+                                problem.append(problem_load)
                         print(f"{Fore.BLUE}{deposito_id}{Style.RESET_ALL}")
                         print(f"{Fore.BLUE}{plantio_id}{Style.RESET_ALL}")
                     except Exception as e:
@@ -2401,7 +2434,8 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                 response = {
                     "msg": f"Cadastro das Cargas efetuado com sucesso!!!",
                     "quantidade": len(serializer.data),
-                    "data": {"includes": succes, "notincludes": failed}
+                    "data": {"includes": succes, "notincludes": failed},
+                    "failed_load": problem
                     # "data": serializer.data,
                 }
                 return Response(response, status=status.HTTP_200_OK)

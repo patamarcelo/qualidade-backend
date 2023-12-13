@@ -444,7 +444,6 @@ admin.site.register(Safra)
 admin.site.register(Ciclo)
 
 
-@confirm_action
 @admin.action(description="Exportar Plantio para Excel")
 def export_plantio(modeladmin, request, queryset):
     response = HttpResponse(content_type="text/csv")
@@ -604,7 +603,7 @@ class ColheitaFilterNoProgram(SimpleListFilter):
 
 @admin.register(Plantio)
 class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
-    actions = [export_plantio, "finalize_plantio"]
+    actions = [export_plantio]
     show_full_result_count = False
     autocomplete_fields = ["talhao", "programa", "variedade"]
 
@@ -617,7 +616,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
             )
         ]
 
-    @confirm_action
+    # @confirm_action
     @admin.action(description="Colher o Plantio")
     def finalize_plantio(self, request, queryset):
         queryset.update(finalizado_colheita=True)
@@ -738,6 +737,8 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         "area_colheita",
         "area_parcial",
         "data_plantio",
+        "programa__nome",
+        "id_farmbox",
     ]
     raw_id_fields = ["talhao"]
     list_filter = (
@@ -1367,12 +1368,22 @@ class ColheitaAdmin(admin.ModelAdmin):
                 resp = json.loads(response.text)
                 includes = resp["data"]["includes"]
                 not_includes = resp["data"]["notincludes"]
+                failed_loads = resp["failed_load"]
                 if includes > 0:
                     msg = f"{includes} Cargas incuídas com Sucesso"
                     messages.add_message(request, messages.SUCCESS, msg)
                 if not_includes > 0:
                     msg = f"{not_includes} Cargas não incluídas"
+                    failed_format = list(
+                        map(
+                            lambda x: f"Romaneio: {x['romaneio']} - {x['projeto']}: {x['parcela']} <br/> {x['error']}",
+                            failed_loads,
+                        )
+                    )
                     messages.add_message(request, messages.WARNING, msg)
+                    for failed in failed_format:
+                        messages.add_message(request, messages.ERROR, mark_safe(failed))
+
         return HttpResponseRedirectToReferrer(request)
 
     # def changelist_view(self, *args, **kwargs):
