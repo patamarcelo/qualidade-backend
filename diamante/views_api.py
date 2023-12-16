@@ -2358,8 +2358,15 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                             print(f"{Fore.BLUE}{plantio_id}{Style.RESET_ALL}")
                         except Exception as e:
                             print(
-                                f"plantio não encontrado - {Fore.LIGHTRED_EX}Origem: {origem} | Parcela: {parcela}{Style.RESET_ALL}"
+                                f"plantio não encontrado - {Fore.LIGHTRED_EX}Origem: {origem} | Parcela: {parcela} | Erro: {e}{Style.RESET_ALL}"
                             )
+                            failed += 1
+                            problem_load = {
+                                "parcela": parcela,
+                                "projeto": origem,
+                                "romaneio": romaneio,
+                                "error": str(e),
+                            }
                         print(carga)
                 else:
                     carga = {
@@ -2424,8 +2431,15 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                         print(f"{Fore.BLUE}{plantio_id}{Style.RESET_ALL}")
                     except Exception as e:
                         print(
-                            f"plantio não encontrado - {Fore.LIGHTRED_EX}Origem: {origem} | Parcela: {parcelas[0]}{Style.RESET_ALL}"
+                            f"plantio não encontrado - {Fore.LIGHTRED_EX}Origem: {origem} | Parcela: {parcelas[0]} | Erro: {e}{Style.RESET_ALL}"
                         )
+                        failed += 1
+                        problem_load = {
+                            "parcela": parcela,
+                            "projeto": origem,
+                            "romaneio": romaneio,
+                            "error": str(e),
+                        }
                     print(carga)
                 print("\n")
             qs = Colheita.objects.all()

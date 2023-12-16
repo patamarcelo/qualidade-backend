@@ -1292,7 +1292,7 @@ class ColheitaAdmin(admin.ModelAdmin):
         "romaneio",
         "get_data_colheita",
         "get_placa",
-        "get_nome_motorista",
+        # "get_nome_motorista",
         "get_plantio_cultura",
         "get_plantio_variedade",
         "get_projeto_origem",
