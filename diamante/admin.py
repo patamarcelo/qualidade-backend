@@ -846,6 +846,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
                         "finalizado_colheita",
                     ),
                     ("plantio_descontinuado",),
+                    ("observacao",),
                 )
             },
         ),

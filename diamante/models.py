@@ -482,6 +482,7 @@ class Plantio(Base):
     finalizado_colheita = models.BooleanField(
         "Finalizado Colheita", default=False, help_text="Finalizada a Colheita"
     )
+
     area_aproveito = models.BooleanField(
         "Area Aprov.", default=False, help_text="Apontar caso seja Area de Aproveito"
     )
@@ -523,6 +524,18 @@ class Plantio(Base):
 
     plantio_descontinuado = models.BooleanField(
         "Plantio Descontinuado", default=False, help_text="Plantio interrompido ?"
+    )
+
+    replantio = models.BooleanField(
+        "Replantio",
+        default=False,
+        help_text="Apontar caso tenha ocorrido replantio nesta Parcela / Safra / Ciclo",
+    )
+
+    talhao_desativado = models.BooleanField(
+        "Parcela Desativada",
+        default=False,
+        help_text="Apontar caso a Parcela tenha sido desativada nesta Safra / Ciclo",
     )
 
     cronograma_programa = models.JSONField(null=True, blank=True)
