@@ -445,6 +445,7 @@ class Aplicacao(Base):
     obs = models.TextField("Observação", max_length=500, blank=True)
 
     class Meta:
+        unique_together = ("operacao", "defensivo", "ativo", "dose")
         ordering = ["operacao", "defensivo"]
         verbose_name = "Programa - Operações/Aplicações"
         verbose_name_plural = "Programas - Operações/Aplicações"
@@ -746,7 +747,9 @@ class Plantio(Base):
         ]
 
     def __str__(self):
-        return f"{self.talhao.id_talhao} | {self.talhao.fazenda.nome} | {self.safra}-{self.ciclo} | {self.variedade.variedade}| {str(self.area_colheita)}"
+        if self.variedade is not None:
+            return f"{self.talhao.id_talhao} | {self.talhao.fazenda.nome} | {self.safra}-{self.ciclo} | {self.variedade.variedade}| {str(self.area_colheita)}"
+        return f"{self.talhao.id_talhao} | {self.talhao.fazenda.nome} | {self.safra}-{self.ciclo} | {str(self.area_colheita)}"
 
 
 class Colheita(Base):
