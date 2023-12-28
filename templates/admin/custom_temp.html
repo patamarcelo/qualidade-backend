@@ -30,7 +30,7 @@
             <option v-for="cultura in variedades" :value="cultura">[[cultura]]</option>
         </select>
         
-        <select class="form-select form-select-lg form-control-sm" aria-label=".form-select-lg example" v-model="filteredCutulreDif">
+        <select class="form-select form-select-lg form-control-sm ml-1" aria-label=".form-select-lg example" v-model="filteredCutulreDif">
             <option v-for="variedade in filterVariedadesDif" :value="variedade">[[variedade]]</option>
         </select>
         <span @click="viewVaris" style="cursor: pointer">
@@ -40,10 +40,10 @@
         </span>
     </div>
     <br/>
-    <div style="margin-top: 5px; width: 250px">
+    <div style="margin-top: 5px; width: 234px">
         <span>
             <select name="opcoes" multiple v-model="excludeFarm" class="form-control">
-                <option v-for="farm in onlyFarmWhitoutVariedade" :value="farm">[[ farm ]]</option>
+                <option v-for="farm in onlyFarmWhitoutVariedade" :value="farm">[[ farm.replace('Projeto', '') ]]</option>
             </select>    
         </span>
         <span @click="resetPlantio" style="cursor: pointer">

@@ -31,7 +31,7 @@
         <option v-for="cultura in variedades" :value="cultura">[[cultura]]</option>
     </select>
     
-    <select class="form-select form-control-sm form-select-lg" aria-label=".form-select-lg example" v-model="filteredCutulreDif">
+    <select class="form-select form-control-sm form-select-lg ml-1" aria-label=".form-select-lg example" v-model="filteredCutulreDif">
         <option v-for="variedade in filterVariedadesDif" :value="variedade">[[variedade]]</option>
     </select>
     <span @click="viewVaris" style="cursor: pointer">

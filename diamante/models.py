@@ -22,6 +22,7 @@ class Base(models.Model):
     criados = models.DateTimeField("Criação", auto_now_add=True)
     modificado = models.DateTimeField("Atualização", auto_now=True)
     ativo = models.BooleanField("Ativo", default=True)
+    observacao = models.TextField("Observação", blank=True, null=True)
 
     class Meta:
         abstract = True

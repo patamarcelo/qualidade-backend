@@ -506,9 +506,10 @@ def export_plantio(modeladmin, request, queryset):
                 value = float("Inf")
         if plantio[14]:
             try:
-                if plantio[13].isdecimal():
-                    prod = total_filt_list / plantio[13]
-                    prod_scs = prod / 60
+                if plantio[13] is not None:
+                    if plantio[13].isdecimal():
+                        prod = total_filt_list / plantio[13]
+                        prod_scs = prod / 60
             except ZeroDivisionError:
                 value = float("Inf")
         if prod_scs:
@@ -526,8 +527,19 @@ def export_plantio(modeladmin, request, queryset):
 
     for plantio in plantios:
         plantio_detail = list(plantio)
-        lat = str(plantio_detail[15]["lat"]).replace(".", ",")
-        lng = str(plantio_detail[15]["lng"]).replace(".", ",")
+        lat = ""
+        lng = ""
+        if isinstance(plantio_detail[15], dict):
+            lat = (
+                str(plantio_detail[15]["lat"]).replace(".", ",")
+                if plantio_detail[15]["lat"] != None
+                else ""
+            )
+            lng = (
+                str(plantio_detail[15]["lng"]).replace(".", ",")
+                if plantio_detail[15]["lng"] != None
+                else ""
+            )
         plantio_detail.pop(15)
         data_plantio = plantio_detail[11]
         time_delta_plantio = plantio_detail[12]
