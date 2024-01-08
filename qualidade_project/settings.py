@@ -198,10 +198,10 @@ STATIC_URL = "/static/"
 DEFAULT_FILE_STORAGE = "storages.backends.dropbox.DropBoxStorage"
 DROPBOX_ROOT_PATH = "/"
 
-if DEBUG == True:
-    DROPBOX_OAUTH2_REFRESH_TOKEN = env("DROPBOX_OAUTH2_REFRESH_TOKEN", default="")
-    DROPBOX_APP_SECRET = env("DROPBOX_APP_SECRET", default="")
-    DROPBOX_APP_KEY = env("DROPBOX_APP_KEY", default="")
+
+DROPBOX_OAUTH2_REFRESH_TOKEN = env("DROPBOX_OAUTH2_REFRESH_TOKEN", default="")
+DROPBOX_APP_SECRET = env("DROPBOX_APP_SECRET", default="")
+DROPBOX_APP_KEY = env("DROPBOX_APP_KEY", default="")
 
 
 MEDIA_URL = "/media/"
