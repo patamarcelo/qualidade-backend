@@ -15,6 +15,9 @@ from django.core.validators import RegexValidator, MinLengthValidator
 
 from django.db.models import Count
 
+import uuid
+from os.path import join
+
 # Create your models here.
 
 
@@ -1038,3 +1041,57 @@ class PlannerPlantio(Base):
 
     def __str__(self):
         return f"{self.projeto} - {self.safra}-{self.ciclo} - {self.start_date} - {self.cultura}"
+
+
+class Visitas(Base):
+    fazenda = models.ForeignKey(Fazenda, on_delete=models.PROTECT)
+    projeto = models.ManyToManyField(Projeto, blank=True, null=True)
+    data = models.DateField(
+        "Data Visita", help_text="dd/mm/aaaa - Data efetiva da Visita"
+    )
+    resp_visita = models.CharField(
+        "Responsável pela Visita",
+        help_text="Pessoa que foi visitar a fazenda",
+        max_length=100,
+        blank=True,
+        null=True,
+    )
+    resp_fazenda = models.CharField(
+        "Responsável Recebedor da Fazenda",
+        help_text="Pessoa que foi receber a visita na fazenda",
+        max_length=100,
+        blank=True,
+        null=True,
+    )
+    observacoes_gerais = models.TextField("Observações Gerais", blank=True, null=True)
+
+    class Meta:
+        ordering = ["-data"]
+        verbose_name = "Visita"
+        verbose_name_plural = "Visitas"
+
+    def __str__(self):
+        return f"{self.data} - {self.fazenda.nome}"
+
+
+def get_file_path(instance, filename):
+    ext = str(uuid.uuid4())[:8]
+    file_path = join("visitas", ext)
+    return file_path.replace("..", ".")
+
+
+class RegistroVisitas(Base):
+    visita = models.ForeignKey(Visitas, on_delete=models.PROTECT)
+    image = models.ImageField("Imagem", upload_to="visitas/")
+    image_title = models.CharField(
+        "Título da Imagem", blank=True, null=True, max_length=100
+    )
+    obs = models.TextField("Obs", blank=True, null=True)
+
+    class Meta:
+        ordering = ["criados"]
+        verbose_name = "Registro da Visita"
+        verbose_name_plural = "Registros da Visita"
+
+    def __str__(self):
+        return self.image_title

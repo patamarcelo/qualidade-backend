@@ -73,6 +73,7 @@ INSTALLED_APPS = [
     "admin_extra_buttons",
     "crispy_forms",
     "crispy_bootstrap4",
+    "storages",
 ]
 
 MIDDLEWARE = [
@@ -194,9 +195,17 @@ AUTH_USER_MODEL = "usuario.CustomUsuario"
 STATIC_URL = "/static/"
 # STATIC_ROOT = os.path.join(BASE_DIR, "static")
 
+DEFAULT_FILE_STORAGE = "storages.backends.dropbox.DropBoxStorage"
+DROPBOX_ROOT_PATH = "/"
+
+if DEBUG == True:
+    DROPBOX_OAUTH2_REFRESH_TOKEN = env("DROPBOX_OAUTH2_REFRESH_TOKEN", default="")
+    DROPBOX_APP_SECRET = env("DROPBOX_APP_SECRET", default="")
+    DROPBOX_APP_KEY = env("DROPBOX_APP_KEY", default="")
+
 
 MEDIA_URL = "/media/"
-MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+MEDIA_ROOT = os.path.join(BASE_DIR, "media/")
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.0/ref/settings/#default-auto-field
 

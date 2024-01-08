@@ -42,6 +42,8 @@ from datetime import datetime, timedelta, date
 
 from django.contrib import messages
 
+from django.utils.html import escape
+
 
 from admin_extra_buttons.api import (
     ExtraButtonsMixin,
@@ -72,6 +74,7 @@ from rest_framework.authtoken.models import Token
 
 
 from qualidade_project.settings import DEBUG
+
 
 main_path = (
     "http://127.0.0.1:8000"
@@ -1853,3 +1856,68 @@ class PlannerPlantioAdmin(admin.ModelAdmin):
             return " - "
 
     start_date_description.short_description = "Start Plantio"
+
+
+@admin.register(Visitas)
+class VisitasAdmin(admin.ModelAdmin):
+    def get_queryset(self, request):
+        return (
+            super(VisitasAdmin, self)
+            .get_queryset(request)
+            .select_related(
+                "fazenda",
+            )
+        )
+
+    list_display = (
+        "get_fazenda_name",
+        "data",
+        "resp_visita",
+        "resp_fazenda",
+        "observacoes_gerais",
+    )
+    filter_horizontal = ("projeto",)
+
+    def get_fazenda_name(self, obj):
+        return obj.fazenda.nome
+
+    get_fazenda_name.short_description = "Fazenda"
+
+    # ordering = ["produto"]
+    # search_fields = ["produto", "tipo"]
+    # list_filter = ("tipo",)
+    # show_full_result_count = False
+
+
+@admin.register(RegistroVisitas)
+class RegistroVisitasAdmin(admin.ModelAdmin):
+    def get_queryset(self, request):
+        return (
+            super(RegistroVisitasAdmin, self)
+            .get_queryset(request)
+            .select_related(
+                "visita",
+            )
+        )
+
+    list_display = ("get_fazenda_name", "image_title", "image_tag")
+    # ordering = ["produto"]
+    # search_fields = ["produto", "tipo"]
+    # list_filter = ("tipo",)
+    # show_full_result_count = False
+    readonly_fields = ("image_tag",)
+
+    def get_fazenda_name(self, obj):
+        return obj.visita.fazenda.nome
+
+    get_fazenda_name.short_description = "Fazenda"
+
+    def image_tag(self, obj):
+        return format_html(
+            '<img src="{}" style="max-width:50px; max-height:50px"/>'.format(
+                obj.image.url
+            )
+        )
+
+    image_tag.short_description = "Foto"
+    image_tag.allow_tags = True
