@@ -2367,6 +2367,7 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                                 "romaneio": romaneio,
                                 "error": str(e),
                             }
+                            problem.append(problem_load)
                         print(carga)
                 else:
                     carga = {
@@ -2435,11 +2436,12 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                         )
                         failed += 1
                         problem_load = {
-                            "parcela": parcela,
+                            "parcela": parcelas[0],
                             "projeto": origem,
                             "romaneio": romaneio,
                             "error": str(e),
                         }
+                        problem.append(problem_load)
                     print(carga)
                 print("\n")
             qs = Colheita.objects.all()

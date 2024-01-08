@@ -38,7 +38,7 @@ from django.db.models.functions import Coalesce, Round
 
 from django.core import serializers
 from django.contrib.admin import SimpleListFilter
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 
 from django.contrib import messages
 
@@ -472,6 +472,7 @@ def export_plantio(modeladmin, request, queryset):
             "Produtividade",
             "lat",
             "long",
+            "dap",
         ]
     )
 
@@ -525,6 +526,14 @@ def export_plantio(modeladmin, request, queryset):
         else:
             return " - "
 
+    def get_dap(data_plantio):
+        dap = 0
+        today = date.today()
+        if data_plantio:
+            dap = today - data_plantio
+            dap = dap.days + 1
+        return dap
+
     for plantio in plantios:
         plantio_detail = list(plantio)
         lat = ""
@@ -558,6 +567,7 @@ def export_plantio(modeladmin, request, queryset):
         plantio_detail.append(lng)
         plantio_detail.pop(0)
         plantio_detail.insert(11, get_prev_colheita(data_plantio, time_delta_plantio))
+        plantio_detail.append(get_dap(data_plantio))
         print(plantio_detail)
         print(lat, lng)
         plantio = tuple(plantio_detail)
