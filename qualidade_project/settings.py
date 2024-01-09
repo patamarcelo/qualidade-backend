@@ -195,7 +195,15 @@ AUTH_USER_MODEL = "usuario.CustomUsuario"
 STATIC_URL = "/static/"
 # STATIC_ROOT = os.path.join(BASE_DIR, "static")
 
-DEFAULT_FILE_STORAGE = "storages.backends.dropbox.DropBoxStorage"
+# DEFAULT_FILE_STORAGE = "storages.backends.dropbox.DropBoxStorage"
+STORAGES = {
+    "default": {
+        "BACKEND": "storages.backends.dropbox.DropboxStorage",
+        "OPTIONS": {},
+    },
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedStaticFilesStorage"},
+}
+
 DROPBOX_ROOT_PATH = "/"
 
 
@@ -218,8 +226,7 @@ REST_AUTH_SERIALIZERS = {
 
 STATICFILES_DIRS = [os.path.join(BASE_DIR, "static")]
 STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
-
-STATICFILES_STORAGE = "whitenoise.storage.CompressedStaticFilesStorage"
+# STATICFILES_STORAGE = "whitenoise.storage.CompressedStaticFilesStorage"
 
 
 INTERNAL_IPS = [

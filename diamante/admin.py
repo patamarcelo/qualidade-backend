@@ -1900,12 +1900,17 @@ class RegistroVisitasAdmin(admin.ModelAdmin):
             )
         )
 
-    list_display = ("get_fazenda_name", "image_title", "image_tag")
+    list_display = ("get_fazenda_name", "get_date_of", "image_title", "image_tag")
     # ordering = ["produto"]
     # search_fields = ["produto", "tipo"]
     # list_filter = ("tipo",)
     # show_full_result_count = False
     readonly_fields = ("image_tag",)
+
+    def get_date_of(self, obj):
+        return obj.visita.data
+
+    get_date_of.short_description = "Data"
 
     def get_fazenda_name(self, obj):
         return obj.visita.fazenda.nome

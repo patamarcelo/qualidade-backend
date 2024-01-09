@@ -17,6 +17,7 @@ from django.db.models import Count
 
 import uuid
 from os.path import join
+import os
 
 # Create your models here.
 
@@ -1069,20 +1070,21 @@ class Visitas(Base):
         ordering = ["-data"]
         verbose_name = "Visita"
         verbose_name_plural = "Visitas"
+        unique_together = ("fazenda", "data")
 
     def __str__(self):
         return f"{self.data} - {self.fazenda.nome}"
 
 
-def get_file_path(instance, filename):
-    ext = str(uuid.uuid4())[:8]
-    file_path = join("visitas", ext)
-    return file_path.replace("..", ".")
+def get_img_upload_path(instance, filename):
+    base_path = "visitas"
+    file_name = f"{instance.visita.data}_{instance.visita.fazenda.nome}/"
+    return os.path.join(base_path, file_name, filename)
 
 
 class RegistroVisitas(Base):
     visita = models.ForeignKey(Visitas, on_delete=models.PROTECT)
-    image = models.ImageField("Imagem", upload_to="visitas/")
+    image = models.ImageField("Imagem", upload_to=get_img_upload_path)
     image_title = models.CharField(
         "Título da Imagem", blank=True, null=True, max_length=100
     )
@@ -1090,8 +1092,10 @@ class RegistroVisitas(Base):
 
     class Meta:
         ordering = ["criados"]
-        verbose_name = "Registro da Visita"
-        verbose_name_plural = "Registros da Visita"
+        verbose_name = "Visita - Registro"
+        verbose_name_plural = "Visitas - Registros"
 
     def __str__(self):
-        return self.image_title
+        if self.image_title:
+            return self.image_title
+        return "Imagem sem Titulo"

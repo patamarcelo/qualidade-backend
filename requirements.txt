@@ -25,6 +25,7 @@ django-jsonform==2.17.0
 django-jsonsuit==0.5.0
 django-modeltree==0.4
 django-prettyjson==0.4.1
+django-storages==1.14.2
 django_debug_toolbar==3.8.1
 djangorestframework==3.14.0
 dnspython==2.3.0
@@ -78,6 +79,3 @@ urllib3==2.0.7
 whitenoise==6.4.0
 xlrd==2.0.1
 xlwt==1.3.0
-
-
--e git+https://github.com/patamarcelo/django-storages.git#egg=django-storages
