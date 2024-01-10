@@ -1,4 +1,7 @@
 from django.shortcuts import render
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
+
 
 # Create your views here.
 
@@ -8,6 +11,8 @@ from .serializers import (
     DefensivoSerializer,
     AplicacaoSerializer,
     ColheitaSerializer,
+    VisitasSerializer,
+    RegistroVisitasSerializer,
 )
 
 from rest_framework import viewsets, status
@@ -55,6 +60,8 @@ from .models import (
     Programa,
     PlannerPlantio,
     Deposito,
+    Visitas,
+    RegistroVisitas,
 )
 
 from functools import reduce
@@ -2461,3 +2468,69 @@ class ColheitaApiSave(viewsets.ModelViewSet):
         else:
             response = {"message": "Você precisa estar logado!!!"}
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+
+class VisitasConsultasApi(viewsets.ModelViewSet):
+    queryset = Visitas.objects.all()
+    serializer_class = VisitasSerializer
+    authentication_classes = (TokenAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    # @method_decorator(cache_page(86400))
+    @action(detail=False, methods=["GET"])
+    def get_visitas(self, request):
+        qs_registros = (
+            RegistroVisitas.objects.all()
+            .order_by("-visita__id")
+            .distinct("visita")
+            .select_related("visita", "visita__fazenda")
+        )
+        serializer_registros = RegistroVisitasSerializer(qs_registros, many=True)
+
+        qs_visitas = (
+            Visitas.objects.all()
+            .order_by("-id")
+            .select_related("fazenda")
+            .prefetch_related("projeto")
+        )
+        serializer_visitas = VisitasSerializer(qs_visitas, many=True)
+
+        response = {
+            "msg": "Consulta das Visitas realizada com sucesso!!",
+            "data_registros": serializer_registros.data,
+            "data_visitas": serializer_visitas.data,
+        }
+        return Response(response, status=status.HTTP_200_OK)
+
+
+class RegistroVisitasApi(viewsets.ModelViewSet):
+    queryset = RegistroVisitas.objects.all()
+    serializer_class = RegistroVisitasSerializer
+    authentication_classes = (TokenAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    @action(detail=False, methods=["GET"])
+    def get_registro_visita(self, request, pk=None):
+        if request.method == "GET":
+            id_filtered = None
+            if request.data:
+                # id_filtered = request.data["idfilter"]
+                print(id_filtered)
+                qs = RegistroVisitas.objects.filter(
+                    visita_id=id_filtered
+                ).select_related("visita", "visita__fazenda")
+                # qs = RegistroVisitas.objects.filter(
+                #     visita_id=id_filtered
+                # ).select_related("visita", "visita__fazenda")
+                serialize = RegistroVisitasSerializer(qs, many=True)
+                response = {
+                    "msg": "Consulta da Visita e as informações Realizada com sucesso!!",
+                    "data": serialize.data,
+                }
+                return Response(response, status.HTTP_200_OK)
+            else:
+                response = {
+                    "msg": "Não foi informado nenhuma visita para Filtro",
+                    "data": [],
+                }
+            return Response(response, status.HTTP_400_BAD_REQUEST)

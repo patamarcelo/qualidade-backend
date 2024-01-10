@@ -1,6 +1,15 @@
 from rest_framework import serializers
 from rest_framework.authtoken.models import Token
-from .models import Talhao, Plantio, Projeto, Defensivo, Aplicacao, Colheita
+from .models import (
+    Talhao,
+    Plantio,
+    Projeto,
+    Defensivo,
+    Aplicacao,
+    Colheita,
+    Visitas,
+    RegistroVisitas,
+)
 from rest_framework.fields import CurrentUserDefault
 
 from usuario.models import CustomUsuario as User
@@ -45,6 +54,7 @@ class AplicacaoSerializer(serializers.ModelSerializer):
 
 #     class Meta:
 #         model = Projeto
+fields = "__all__"
 #         fields = [
 #             "nome",
 #             "id",
@@ -70,3 +80,38 @@ class ColheitaSerializer(serializers.ModelSerializer):
         #     "peso_scs_limpo_e_seco",
         #     "deposito",
         # ]
+
+
+class ProjetosSerializer(serializers.ModelSerializer):
+    def to_representation(self, value):
+        return value.nome
+
+    class Meta:
+        model = Projeto
+        fields = "__all__"
+
+
+class VisitasSerializer(serializers.ModelSerializer):
+    fazenda_title = serializers.CharField(source="fazenda.nome", read_only=True)
+    projetos = ProjetosSerializer(source="projeto", read_only=True, many=True)
+
+    class Meta:
+        model = Visitas
+        fields = "__all__"
+
+
+class RegistroVisitasSerializer(serializers.ModelSerializer):
+    visita_title = serializers.CharField(source="visita.fazenda.nome", read_only=True)
+    visita_data = serializers.CharField(source="visita.data", read_only=True)
+
+    class Meta:
+        model = RegistroVisitas
+        fields = [
+            "visita",
+            # "image",
+            "image_url",
+            "image_title",
+            "obs",
+            "visita_title",
+            "visita_data",
+        ]

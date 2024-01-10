@@ -365,6 +365,7 @@ class FazendaAdmin(admin.ModelAdmin):
     list_display = ("nome", "id_d", "get_plantio_dia")
     ordering = ("nome",)
     show_full_result_count = False
+    search_fields = ["fazenda"]
 
     def get_plantio_dia(self, obj):
         return f"{obj.capacidade_plantio_ha_dia} ha/dia"
@@ -1858,16 +1859,63 @@ class PlannerPlantioAdmin(admin.ModelAdmin):
     start_date_description.short_description = "Start Plantio"
 
 
+class RegistroVisitasAdminInline(admin.StackedInline):
+    model = RegistroVisitas
+    extra = 0
+    fields = ["ativo", "image", "image_title", "obs"]
+
+    def get_queryset(self, request):
+        print("getttt")
+        return (
+            super(RegistroVisitasAdminInline, self)
+            .get_queryset(request)
+            .select_related("visita__fazenda", "visita")
+            .prefetch_related("visita__projeto", "visita__projeto__fazenda")
+        )
+
+
 @admin.register(Visitas)
 class VisitasAdmin(admin.ModelAdmin):
+    show_full_result_count = False
+    autocomplete_fields = ["fazenda", "projeto"]
+    inlines = [RegistroVisitasAdminInline]
+
     def get_queryset(self, request):
+        print(self, request, "tryng overide here")
         return (
             super(VisitasAdmin, self)
             .get_queryset(request)
-            .select_related(
-                "fazenda",
-            )
+            .select_related("fazenda")
+            .prefetch_related("projeto")
         )
+
+    fieldsets = (
+        (
+            "Dados",
+            {
+                "fields": (
+                    ("ativo",),
+                    ("criados", "modificado"),
+                )
+            },
+        ),
+        (
+            "Visita",
+            {
+                "fields": (
+                    ("data",),
+                    ("fazenda",),
+                    ("projeto",),
+                    ("resp_visita",),
+                    ("resp_fazenda"),
+                )
+            },
+        ),
+    )
+    readonly_fields = (
+        "criados",
+        "modificado",
+    )
 
     list_display = (
         "get_fazenda_name",
@@ -1891,13 +1939,14 @@ class VisitasAdmin(admin.ModelAdmin):
 
 @admin.register(RegistroVisitas)
 class RegistroVisitasAdmin(admin.ModelAdmin):
+    show_full_result_count = False
+
     def get_queryset(self, request):
+        print(self, request, "tryng overide")
         return (
             super(RegistroVisitasAdmin, self)
             .get_queryset(request)
-            .select_related(
-                "visita",
-            )
+            .select_related("visita", "visita__fazenda")
         )
 
     list_display = ("get_fazenda_name", "get_date_of", "image_title", "image_tag")

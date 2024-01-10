@@ -1090,6 +1090,12 @@ class RegistroVisitas(Base):
     )
     obs = models.TextField("Obs", blank=True, null=True)
 
+    @property
+    def image_url(self):
+        if self.image:
+            return self.image.url
+        return ""  # or some default
+
     class Meta:
         ordering = ["criados"]
         verbose_name = "Visita - Registro"

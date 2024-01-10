@@ -9,6 +9,8 @@ from .views_api import (
     DefensivoViewSet,
     ProgramasDetails,
     ColheitaApiSave,
+    VisitasConsultasApi,
+    RegistroVisitasApi,
 )
 
 router = routers.DefaultRouter()
@@ -17,6 +19,8 @@ router.register("plantio", PlantioViewSet)
 router.register("defensivo", DefensivoViewSet)
 router.register("programas", ProgramasDetails)
 router.register("colheita", ColheitaApiSave)
+router.register("visitas", VisitasConsultasApi)
+router.register("registrosvisita", RegistroVisitasApi)
 
 
 urlpatterns = [
