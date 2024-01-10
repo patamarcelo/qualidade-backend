@@ -2476,7 +2476,7 @@ class VisitasConsultasApi(viewsets.ModelViewSet):
     authentication_classes = (TokenAuthentication,)
     permission_classes = (IsAuthenticated,)
 
-    # @method_decorator(cache_page(86400))
+    @method_decorator(cache_page(300))
     @action(detail=False, methods=["GET"])
     def get_visitas(self, request):
         qs_registros = (
