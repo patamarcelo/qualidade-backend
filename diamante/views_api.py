@@ -1099,6 +1099,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         "talhao__fazenda__nome",
                         "talhao__fazenda__map_centro_id",
                         "talhao__fazenda__fazenda__nome",
+                        "talhao__fazenda__fazenda__capacidade_plantio_ha_dia",
+                        "programa__start_date",
                         "variedade__cultura__cultura",
                         "variedade__dias_ciclo",
                         "variedade__cultura__map_color",
@@ -1120,7 +1122,99 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     .filter(safra__safra=safra_filter, ciclo__ciclo=cicle_filter)
                     # .filter(finalizado_plantio=True)
                     .filter(plantio_descontinuado=False)
+                    .filter(~Q(programa_id=None))
                 )
+
+                qs_planejamento = (
+                    PlannerPlantio.objects.select_related(
+                        "projeto",
+                        "cultura",
+                        "ciclo",
+                        "cultura",
+                        "projeto__fazenda",
+                        "safra",
+                    )
+                    .values(
+                        "projeto",
+                        "projeto__id",
+                        "projeto__nome",
+                        "cultura",
+                        "variedade",
+                        "safra__safra",
+                        "ciclo__ciclo",
+                        "start_date",
+                        "area",
+                    )
+                    .filter(safra__safra=safra_filter, ciclo__ciclo=cicle_filter)
+                )
+
+                prev_date = {}
+
+                for po, i in enumerate(qs):
+                    if i["data_plantio"] == None:
+                        capacidade_dia = i[
+                            "talhao__fazenda__fazenda__capacidade_plantio_ha_dia"
+                        ]
+                        try:
+                            # filtered_planner = qs_planejamento.filter(
+                            #     projeto__nome=i["talhao__fazenda__nome"]
+                            # )
+                            # planner_date = False
+                            # if filtered_planner:
+                            #     # print("aqui temos planejamneto: , ", filtered_planner)
+                            #     current_planner = filtered_planner[0]
+                            #     inital_date_planner = current_planner["start_date"]
+                            #     planner_date = True
+
+                            # if planner_date:
+                            #     start_date = get_base_date(inital_date_planner)
+                            # else:
+                            start_date = get_base_date(i["programa__start_date"])
+                        except Exception as e:
+                            print("error :", e)
+                        if prev_date.get(i["talhao__fazenda__nome"]):
+                            area_atual = prev_date.get(i["talhao__fazenda__nome"])[
+                                "area"
+                            ]
+                            dias_necessarios = round(area_atual / capacidade_dia)
+                            qs[po].update(
+                                {
+                                    "data_plantio": prev_date.get(
+                                        i["talhao__fazenda__nome"]
+                                    )["data_inicial"]
+                                    + datetime.timedelta(days=dias_necessarios)
+                                }
+                            )
+                            prev_date.update(
+                                {
+                                    i["talhao__fazenda__nome"]: {
+                                        "area": area_atual + i["area_colheita"],
+                                        "dias_necessários": 0,
+                                        "data_inicial": start_date,
+                                        "data_final": None,
+                                    }
+                                }
+                            )
+                        else:
+                            prev_date.update(
+                                {
+                                    i["talhao__fazenda__nome"]: {
+                                        "area": i["area_colheita"],
+                                        "dias_necessários": 0,
+                                        "data_inicial": start_date,
+                                        "data_final": None,
+                                    }
+                                }
+                            )
+                            qs[po].update({"data_plantio": start_date})
+                print(prev_date)
+
+                # ln = [
+                #     {**x, "data_plantio": "2024-01-01"}
+                #     if x["data_plantio"] == None
+                #     else x
+                #     for x in qs
+                # ]
 
                 qs_by_day = (
                     Plantio.objects.values(
@@ -2509,12 +2603,47 @@ class RegistroVisitasApi(viewsets.ModelViewSet):
     authentication_classes = (TokenAuthentication,)
     permission_classes = (IsAuthenticated,)
 
-    @action(detail=False, methods=["GET"])
+    @action(detail=False, methods=["GET", "POST"])
     def get_registro_visita(self, request, pk=None):
-        if request.method == "GET":
+        if request.method == "POST":
             id_filtered = None
             if request.data:
-                # id_filtered = request.data["idfilter"]
+                print(request.data)
+                id_filtered = request.data["idfilter"]
+                print(id_filtered)
+                qs = (
+                    RegistroVisitas.objects.filter(visita_id=id_filtered).values(
+                        "visita",
+                        "image_title",
+                        "obs",
+                        "visita__fazenda__nome",
+                        "visita__data",
+                    )
+                    # .select_related("visita", "visita__fazenda")
+                )
+                # qs = RegistroVisitas.objects.filter(
+                #     visita_id=id_filtered
+                # ).select_related("visita", "visita__fazenda")
+                serialize = RegistroVisitasSerializer(qs, many=True)
+                response = {
+                    "msg": "Consulta da Visita e as informações Realizada com sucesso!!",
+                    "data": qs,
+                }
+                return Response(response, status.HTTP_200_OK)
+            else:
+                response = {
+                    "msg": "Não foi informado nenhuma visita para Filtro",
+                    "data": [],
+                }
+            return Response(response, status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=["GET", "POST"])
+    def get_registro_visita_url(self, request, pk=None):
+        if request.method == "POST":
+            id_filtered = None
+            if request.data:
+                print(request.data)
+                id_filtered = request.data["idfilter"]
                 print(id_filtered)
                 qs = RegistroVisitas.objects.filter(
                     visita_id=id_filtered
