@@ -1085,6 +1085,9 @@ def get_img_upload_path(instance, filename):
 class RegistroVisitas(Base):
     visita = models.ForeignKey(Visitas, on_delete=models.PROTECT)
     image = models.ImageField("Imagem", upload_to=get_img_upload_path)
+    image_link_url = models.CharField(
+        "Link da Imagem", blank=True, null=True, max_length=250
+    )
     image_title = models.CharField(
         "Título da Imagem", blank=True, null=True, max_length=100
     )

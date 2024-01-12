@@ -9,6 +9,10 @@ import json
 
 from qualidade_project.settings import FARMBOX_ID
 
+import dropbox
+from dropbox.sharing import RequestedVisibility
+from django.conf import settings
+
 
 # pr_mungo = Programa.objects.all()[2]
 # pr_caupi = Programa.objects.all()[1]
@@ -487,3 +491,25 @@ v6_2_rr = {
     ],
     "data prevista": "",
 }
+
+
+def get_long_lived_link(file_path):
+    # Dropbox access token
+    access_token = (
+        settings.DROPBOX_OAUTH2_REFRESH_TOKEN
+    )  # Replace with your actual access token
+
+    # Initialize Dropbox SDK
+    dbx = dropbox.Dropbox(access_token)
+
+    # Convert the temporary link to a long-lived one
+    # long_lived_link = dbx.sharing_create_shared_link(result.link).url
+    long_lived_link = dbx.sharing_create_shared_link_with_settings(file_path).url
+
+    return long_lived_link
+
+
+# Example usage:
+# file_path = "/path/to/your/file.txt"
+# long_lived_link = get_long_lived_link(file_path)
+# print("Long-lived link:", long_lived_link)

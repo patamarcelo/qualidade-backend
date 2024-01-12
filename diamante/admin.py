@@ -1908,6 +1908,7 @@ class VisitasAdmin(admin.ModelAdmin):
                     ("projeto",),
                     ("resp_visita",),
                     ("resp_fazenda"),
+                    ("observacoes_gerais"),
                 )
             },
         ),
