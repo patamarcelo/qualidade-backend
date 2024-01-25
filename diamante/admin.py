@@ -74,6 +74,12 @@ from rest_framework.authtoken.models import Token
 
 
 from qualidade_project.settings import DEBUG
+from django.conf import settings
+import dropbox
+
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
+from django.core.files.storage import FileSystemStorage
 
 
 main_path = (
@@ -1093,7 +1099,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
     get_data.short_description = "Data Plantio"
 
     def get_data_prev_col(self, obj):
-        if obj.data_plantio:
+        if obj.data_plantio and obj.variedade:
             prev_date_delta = timedelta(obj.variedade.dias_ciclo)
             prev_date_final = obj.data_plantio + prev_date_delta
             return date_format(
@@ -1373,7 +1379,7 @@ class ColheitaAdmin(admin.ModelAdmin):
         "plantio__variedade__variedade",
     )
 
-    ordering = ("-data_colheita",)
+    ordering = ("-data_colheita", "-romaneio")
 
     def upload_csv(self, request):
         if request.method == "POST":
@@ -1396,9 +1402,20 @@ class ColheitaAdmin(admin.ModelAdmin):
                 includes = resp["data"]["includes"]
                 not_includes = resp["data"]["notincludes"]
                 failed_loads = resp["failed_load"]
+                success_loads = resp["success_load"]
                 if includes > 0:
                     msg = f"{includes} Cargas incuídas com Sucesso"
                     messages.add_message(request, messages.SUCCESS, msg)
+                    success_format = list(
+                        map(
+                            lambda x: f"Romaneio: {x['romaneio']} - {x['projeto']}: {x['parcela']}",
+                            success_loads,
+                        )
+                    )
+                    for success in success_format:
+                        messages.add_message(
+                            request, messages.SUCCESS, mark_safe(success)
+                        )
                 if not_includes > 0:
                     msg = f"{not_includes} Cargas não incluídas"
                     failed_format = list(
@@ -1936,6 +1953,27 @@ class VisitasAdmin(admin.ModelAdmin):
     # search_fields = ["produto", "tipo"]
     # list_filter = ("tipo",)
     # show_full_result_count = False
+    # def save_model(self, request, obj, form, change):
+    #     print(self)
+    #     print(self.form)
+    #     pass  # don't actually save the parent instance
+
+    # def save_formset(self, request, form, formset, change):
+    #     print("arquivos")
+    #     print(self)
+    #     dbx = dropbox.Dropbox(
+    #         app_key=settings.DROPBOX_APP_KEY,
+    #         app_secret=settings.DROPBOX_APP_SECRET,
+    #         oauth2_refresh_token=settings.DROPBOX_OAUTH2_REFRESH_TOKEN,
+    #         timeout=100,
+    #     )
+    #     images = request.FILES
+    #     for i in images.items():
+    #         file_name = FileSystemStorage(location="/tmp").save(i[1].name, i[1])
+    #         file_url = os.path.join("/", file_name)
+    #         file_link_metadata = dbx.sharing_create_shared_link_with_settings(file_url)
+    #         downloadable_url = file_link_metadata.url.replace("dl=0", "dl=1")
+    #         print(downloadable_url)
 
 
 @admin.register(RegistroVisitas)

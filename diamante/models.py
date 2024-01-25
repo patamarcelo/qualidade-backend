@@ -19,6 +19,9 @@ import uuid
 from os.path import join
 import os
 
+import dropbox
+from django.conf import settings
+
 # Create your models here.
 
 
@@ -898,8 +901,16 @@ class Colheita(Base):
                 self.desconto_umidade = 0
 
         if self.impureza is not None:
+            # REGRA FAZENDAO
+            descontar_imp_num = self.impureza
+            if self.deposito.id_d == 4:
+                good_imp = 1
+                if self.impureza >= good_imp:
+                    descontar_imp_num = self.impureza - good_imp
+                else:
+                    descontar_imp_num = 0
             peso_liquido = decimal.Decimal(self.peso_bruto - self.peso_tara)
-            desconto_impureza = (peso_liquido * self.impureza) / 100
+            desconto_impureza = (peso_liquido * descontar_imp_num) / 100
             self.desconto_impureza = desconto_impureza
             print("Impureza ", desconto_impureza)
 
@@ -1070,7 +1081,7 @@ class Visitas(Base):
         ordering = ["-data"]
         verbose_name = "Visita"
         verbose_name_plural = "Visitas"
-        unique_together = ("fazenda", "data")
+        # unique_together = ("fazenda", "data", "projeto")
 
     def __str__(self):
         return f"{self.data} - {self.fazenda.nome}"
@@ -1085,7 +1096,7 @@ def get_img_upload_path(instance, filename):
 class RegistroVisitas(Base):
     visita = models.ForeignKey(Visitas, on_delete=models.PROTECT)
     image = models.ImageField("Imagem", upload_to=get_img_upload_path)
-    image_link_url = models.CharField(
+    image_link_url = models.URLField(
         "Link da Imagem", blank=True, null=True, max_length=250
     )
     image_title = models.CharField(
@@ -1108,3 +1119,26 @@ class RegistroVisitas(Base):
         if self.image_title:
             return self.image_title
         return "Imagem sem Titulo"
+
+    # def save(self, *args, **kwargs):
+    #     super().save(*args, **kwargs)
+    #     # Dropbox API
+    #     dropbox_access_token = settings.DROPBOX_OAUTH2_REFRESH_TOKEN
+    #     dbx = dropbox.Dropbox(dropbox_access_token)
+
+    #     file_name = os.path.basename(self.image.path)
+
+    #     # Upload the file to Dropbox
+    #     # with open(self.image.path, "rb") as f:
+    #     #     response = dbx.files_upload(f.read(), "/" + file_name)
+    #     # Generate shared link
+    #     # shared_link_metadata = dbx.sharing_create_shared_link(response.path_display)
+    #     file_link_metadata = dbx.sharing_create_shared_link_with_settings(
+    #         self.image.name
+    #     )
+    #     downloadable_url = file_link_metadata.url.replace("dl=0", "dl=1")
+    #     # Save the shared link to the model
+    #     print(downloadable_url)
+
+    #     self.image_link_url = downloadable_url
+    #     super().save(*args, **kwargs)

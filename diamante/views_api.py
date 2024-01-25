@@ -2362,6 +2362,7 @@ class ColheitaApiSave(viewsets.ModelViewSet):
             succes = 0
             failed = 0
             problem = []
+            success_list = []
             for i in data_json:
                 data = i["Data de Pesagem"]
                 romaneio = remove_leading_zeros(str(i["Num Romaneio"]))
@@ -2443,6 +2444,12 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                                     print(
                                         f"{Fore.GREEN}Nova Carga incluida com sucesso: {new_carga}{Style.RESET_ALL}"
                                     )
+                                    success_load = {
+                                        "parcela": parcela,
+                                        "projeto": origem,
+                                        "romaneio": romaneio,
+                                    }
+                                    success_list.append(success_load)
                                 except Exception as e:
                                     print(
                                         f"Proglema em salvar a carga: {Fore.LIGHTRED_EX}{e}{Style.RESET_ALL}"
@@ -2454,6 +2461,7 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                                         "romaneio": romaneio,
                                         "error": str(e),
                                     }
+
                                     problem.append(problem_load)
                             print(f"{Fore.BLUE}{deposito_id}{Style.RESET_ALL}")
                             print(f"{Fore.BLUE}{plantio_id}{Style.RESET_ALL}")
@@ -2517,6 +2525,12 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                                 print(
                                     f"{Fore.GREEN}Nova Carga incluida com sucesso: {new_carga}{Style.RESET_ALL}"
                                 )
+                                success_load = {
+                                    "parcela": parcelas[0],
+                                    "projeto": origem,
+                                    "romaneio": romaneio,
+                                }
+                                success_list.append(success_load)
                             except Exception as e:
                                 print(
                                     f"Proglema em salvar a carga: {Fore.LIGHTRED_EX}{e}{Style.RESET_ALL}"
@@ -2552,7 +2566,8 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                     "msg": f"Cadastro das Cargas efetuado com sucesso!!!",
                     "quantidade": len(serializer.data),
                     "data": {"includes": succes, "notincludes": failed},
-                    "failed_load": problem
+                    "failed_load": problem,
+                    "success_load": success_list
                     # "data": serializer.data,
                 }
                 return Response(response, status=status.HTTP_200_OK)
@@ -2575,7 +2590,7 @@ class VisitasConsultasApi(viewsets.ModelViewSet):
     def get_visitas(self, request):
         qs_registros = (
             RegistroVisitas.objects.all()
-            .order_by("-visita__id")
+            .order_by("visita__id")
             .distinct("visita")
             .select_related("visita", "visita__fazenda")
         )
