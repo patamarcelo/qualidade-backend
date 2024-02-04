@@ -62,6 +62,7 @@ from .models import (
     Deposito,
     Visitas,
     RegistroVisitas,
+    PlantioDetail,
 )
 
 from functools import reduce
@@ -88,6 +89,9 @@ from rest_framework.decorators import api_view, permission_classes
 from django.db.models.functions.datetime import ExtractMonth, ExtractYear
 
 import requests
+
+from django.db.models import Case, When, DecimalField, Value
+from django.db.models.functions import Coalesce, Round
 
 
 # --------------------- --------------------- START DEFENSIVOS MONGO API --------------------- --------------------- #
@@ -2677,4 +2681,62 @@ class RegistroVisitasApi(viewsets.ModelViewSet):
                     "msg": "Não foi informado nenhuma visita para Filtro",
                     "data": [],
                 }
+            return Response(response, status.HTTP_400_BAD_REQUEST)
+
+
+class PlantioDetailResumoApi(viewsets.ModelViewSet):
+    queryset = PlantioDetail.objects.all()
+    authentication_classes = (TokenAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    @action(detail=False, methods=["GET"])
+    def get_colheita_resumo(self, request):
+        try:
+            safra_filter = None
+            cicle_filter = None
+            try:
+                safra_filter = request.data["safra"]
+                cicle_filter = request.data["ciclo"]
+                print(safra_filter, cicle_filter)
+            except Exception as e:
+                print(e)
+            metrics = {
+                "area_total": Sum("area_colheita"),
+                "area_finalizada": Case(
+                    When(
+                        finalizado_colheita=True, then=Coalesce(Sum("area_colheita"), 0)
+                    ),
+                    When(
+                        finalizado_colheita=False, then=Coalesce(Sum("area_parcial"), 0)
+                    ),
+                    default=Value(0),
+                    output_field=DecimalField(),
+                    # ),
+                    # "area_parcial": Case(
+                    #     When(finalizado_colheita=False, then=Coalesce(Sum("area_parcial"), 0)),
+                    #     default=Value(0),
+                    #     output_field=DecimalField(),
+                ),
+            }
+            query_data = (
+                PlantioDetail.objects.filter(
+                    safra__safra=safra_filter,
+                    ciclo__ciclo=cicle_filter,
+                    finalizado_plantio=True,
+                    plantio_descontinuado=False,
+                )
+                .filter(~Q(variedade__cultura__cultura="Milheto"))
+                .values(
+                    "talhao__fazenda__nome",
+                    "variedade__cultura__cultura",
+                    "variedade__variedade",
+                )
+                .annotate(**metrics)
+                .order_by("talhao__fazenda__nome")
+            )
+
+            response = {"msg": "Consulta realizada com sucesso!!", "data": query_data}
+            return Response(response, status=status.HTTP_200_OK)
+        except Exception as e:
+            response = {"msg": f"Ocorreu um Erro: {e}"}
             return Response(response, status.HTTP_400_BAD_REQUEST)

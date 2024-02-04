@@ -11,6 +11,7 @@ from .views_api import (
     ColheitaApiSave,
     VisitasConsultasApi,
     RegistroVisitasApi,
+    PlantioDetailResumoApi,
 )
 
 router = routers.DefaultRouter()
@@ -21,6 +22,7 @@ router.register("programas", ProgramasDetails)
 router.register("colheita", ColheitaApiSave)
 router.register("visitas", VisitasConsultasApi)
 router.register("registrosvisita", RegistroVisitasApi)
+router.register("resumocolheita", PlantioDetailResumoApi)
 
 
 urlpatterns = [
