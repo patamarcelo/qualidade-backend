@@ -2735,7 +2735,40 @@ class PlantioDetailResumoApi(viewsets.ModelViewSet):
                 .order_by("talhao__fazenda__nome")
             )
 
-            response = {"msg": "Consulta realizada com sucesso!!", "data": query_data}
+            new_dict = []
+            for i in query_data:
+                filtered_dict = filter(
+                    lambda obj: obj[1]["talhao__fazenda__nome"]
+                    == i["talhao__fazenda__nome"]
+                    and obj[1]["variedade__cultura__cultura"]
+                    == i["variedade__cultura__cultura"]
+                    and obj[1]["variedade__variedade"] == i["variedade__variedade"],
+                    enumerate(new_dict),
+                )
+                if len(list(filtered_dict)) > 0:
+                    filtered_dict = list(
+                        filter(
+                            lambda obj: obj[1]["talhao__fazenda__nome"]
+                            == i["talhao__fazenda__nome"]
+                            and obj[1]["variedade__cultura__cultura"]
+                            == i["variedade__cultura__cultura"]
+                            and obj[1]["variedade__variedade"]
+                            == i["variedade__variedade"],
+                            enumerate(new_dict),
+                        )
+                    )
+                    index_find = filtered_dict[0][0]
+                    area_total = new_dict[index_find]["area_total"] + i["area_total"]
+                    area_finalizada = (
+                        new_dict[index_find]["area_finalizada"] + i["area_finalizada"]
+                    )
+                    new_dict[index_find].update(
+                        {"area_total": area_total, "area_finalizada": area_finalizada}
+                    )
+                else:
+                    new_dict.append(i)
+
+            response = {"msg": "Consulta realizada com sucesso!!", "data": new_dict}
             return Response(response, status=status.HTTP_200_OK)
         except Exception as e:
             response = {"msg": f"Ocorreu um Erro: {e}"}
