@@ -63,6 +63,7 @@ from .models import (
     Visitas,
     RegistroVisitas,
     PlantioDetail,
+    CicloAtual,
 )
 
 from functools import reduce
@@ -2700,6 +2701,11 @@ class PlantioDetailResumoApi(viewsets.ModelViewSet):
                 print(safra_filter, cicle_filter)
             except Exception as e:
                 print(e)
+            if safra_filter == None or cicle_filter == None:
+                print("Sem Safra e/ou ciclo informados")
+                safracicle_filter = CicloAtual.objects.filter(nome="Colheita")[0]
+                safra_filter = safracicle_filter.safra.safra
+                cicle_filter = safracicle_filter.ciclo.ciclo
             metrics = {
                 "area_total": Sum("area_colheita"),
                 "area_finalizada": Case(
