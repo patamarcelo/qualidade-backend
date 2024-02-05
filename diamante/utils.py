@@ -14,6 +14,10 @@ from dropbox.sharing import RequestedVisibility
 from django.conf import settings
 
 
+from django.db.models import Q, Sum, F
+from django.db.models.functions import Coalesce, Round
+
+
 # pr_mungo = Programa.objects.all()[2]
 # pr_caupi = Programa.objects.all()[1]
 # pr_rr = Programa.objects.all()[4]
@@ -313,6 +317,61 @@ def close_plantation_and_productivity(id_plantation_farm, close_date, product):
     }
     response = requests.put(url, data=json.dumps(payload), headers=headers)
     return response
+
+
+def duplicate_existing_operations_program(old_program, new_program):
+    old_operations = Operacao.objects.filter(programa=old_program, ativo=True)
+    try:
+        for op in old_operations:
+            new_op = op
+            new_op.id = None
+            new_op.pk = None
+            new_op._state.adding = True
+            new_op.programa = new_program
+            new_op.save()
+    except Exception as e:
+        print("Erro ao Duplicar as Operações do Programa")
+
+
+def duplicate_existing_operations_program_and_applications(old_program, new_program):
+    old_operations = Operacao.objects.filter(programa=old_program, ativo=True)
+    old_aplications = Aplicacao.objects.filter(
+        operacao__programa=old_program, ativo=True
+    )
+
+    try:
+        for op in old_operations:
+            for ap in old_aplications:
+                if op.estagio == ap.operacao.estagio:
+                    new_op = ap
+                    new_op.id = None
+                    new_op.pk = None
+                    new_op._state.adding = True
+                    new_op.operacao = op
+                    new_op.operacao.programa = new_program
+                    new_op.save()
+    except Exception as e:
+        print("Erro ao Duplicar as Operações do Programa com as Aplicações")
+
+
+def get_cargas_model(safra_filter, ciclo_filter, colheita):
+    print(safra_filter, ciclo_filter, colheita)
+    cargas_model = [
+        x
+        for x in colheita.objects.values(
+            "plantio__talhao__fazenda__nome",
+            "plantio__variedade__cultura__cultura",
+            "plantio__variedade__variedade",
+        )
+        .annotate(
+            peso_kg=Sum(F("peso_liquido") * 60),
+            peso_scs=Round((Sum("peso_scs_limpo_e_seco")), precision=2),
+        )
+        .order_by("plantio__talhao__fazenda__nome")
+        .filter(~Q(plantio__variedade__cultura__cultura="Milheto"))
+        .filter(plantio__safra__safra=safra_filter, plantio__ciclo__ciclo=ciclo_filter)
+    ]
+    return cargas_model
 
 
 v6_1_conv = {

@@ -41,6 +41,7 @@ from .utils import (
     get_quantidade_aplicar,
     get_base_date,
     get_index_dict_estagio,
+    get_cargas_model,
 )
 
 import qualidade_project.mongo_api as mongo_api
@@ -2740,7 +2741,7 @@ class PlantioDetailResumoApi(viewsets.ModelViewSet):
                 .annotate(**metrics)
                 .order_by("talhao__fazenda__nome")
             )
-
+            cargas = get_cargas_model(safra_filter, cicle_filter, Colheita)
             new_dict = []
             for i in query_data:
                 filtered_dict = filter(
@@ -2773,6 +2774,22 @@ class PlantioDetailResumoApi(viewsets.ModelViewSet):
                     )
                 else:
                     new_dict.append(i)
+
+            for carga in cargas:
+                filtered_dict = list(
+                    filter(
+                        lambda obj: obj[1]["talhao__fazenda__nome"]
+                        == carga["plantio__talhao__fazenda__nome"]
+                        and obj[1]["variedade__cultura__cultura"]
+                        == carga["plantio__variedade__cultura__cultura"]
+                        and obj[1]["variedade__variedade"]
+                        == carga["plantio__variedade__variedade"],
+                        enumerate(new_dict),
+                    )
+                )
+                index_find = filtered_dict[0][0]
+                peso_total = carga["peso_scs"]
+                new_dict[index_find].update({"peso_kg": peso_total})
 
             response = {"msg": "Consulta realizada com sucesso!!", "data": new_dict}
             return Response(response, status=status.HTTP_200_OK)
