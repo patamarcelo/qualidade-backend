@@ -319,8 +319,8 @@ def close_plantation_and_productivity(id_plantation_farm, close_date, product):
     return response
 
 
-def duplicate_existing_operations_program(old_program, new_program):
-    old_operations = Operacao.objects.filter(programa=old_program, ativo=True)
+def duplicate_existing_operations_program(old_program, new_program, operacao_model):
+    old_operations = operacao_model.objects.filter(programa=old_program, ativo=True)
     try:
         for op in old_operations:
             new_op = op
@@ -330,17 +330,26 @@ def duplicate_existing_operations_program(old_program, new_program):
             new_op.programa = new_program
             new_op.save()
     except Exception as e:
-        print("Erro ao Duplicar as Operações do Programa")
+        print(f"Erro ao Duplicar as Operações do Programa: {e}")
 
 
-def duplicate_existing_operations_program_and_applications(old_program, new_program):
-    old_operations = Operacao.objects.filter(programa=old_program, ativo=True)
-    old_aplications = Aplicacao.objects.filter(
+def duplicate_existing_operations_program_and_applications(
+    old_program, new_program, operacao_model, aplicacao_model
+):
+    new_operations = operacao_model.objects.filter(programa=new_program, ativo=True)
+    old_aplications = aplicacao_model.objects.filter(
         operacao__programa=old_program, ativo=True
     )
 
+    # THIS TRY BLOCK NOT TESTED YET
     try:
-        for op in old_operations:
+        duplicate_existing_operations_program(old_program, new_program, operacao_model)
+        print("Todas os estágios duplicados com sucesso...")
+    except Exception as e:
+        print(f"Error ao gerar as aplicacoes dentro da funcao: {e}")
+
+    try:
+        for op in new_operations:
             for ap in old_aplications:
                 if op.estagio == ap.operacao.estagio:
                     new_op = ap
@@ -351,7 +360,7 @@ def duplicate_existing_operations_program_and_applications(old_program, new_prog
                     new_op.operacao.programa = new_program
                     new_op.save()
     except Exception as e:
-        print("Erro ao Duplicar as Operações do Programa com as Aplicações")
+        print(f"Erro ao Duplicar as Operações do Programa com as Aplicações: {e}")
 
 
 def get_cargas_model(safra_filter, ciclo_filter, colheita):

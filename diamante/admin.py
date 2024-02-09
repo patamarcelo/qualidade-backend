@@ -633,6 +633,34 @@ class ColheitaFilterNoProgram(SimpleListFilter):
             return queryset.filter(Q(programa_id=None))
 
 
+class ProgramaFilter(SimpleListFilter):
+    title = "Programas"  # or use _('country') for translated title
+    parameter_name = "programas"
+
+    def lookups(self, request, model_admin):
+        programas = Programa.objects.filter(ativo=True)
+        return [(x.id, x.nome) for x in programas]
+
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(Q(programa_id=self.value()))
+        return queryset
+
+
+class ProgramaAplicacaoFilter(SimpleListFilter):
+    title = "Programas"  # or use _('country') for translated title
+    parameter_name = "programas"
+
+    def lookups(self, request, model_admin):
+        programas = Programa.objects.filter(ativo=True)
+        return [(x.id, x.nome) for x in programas]
+
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(Q(operacao__programa_id=self.value()))
+        return queryset
+
+
 @admin.register(Plantio)
 class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
     actions = [export_plantio]
@@ -1319,6 +1347,7 @@ class ColheitaAdmin(admin.ModelAdmin):
                 )
             },
         ),
+        ("Observações", {"fields": (("observacao",))}),
     )
 
     list_display = (
@@ -1630,6 +1659,7 @@ class OperacaoAdmin(admin.ModelAdmin):
         return (
             super(OperacaoAdmin, self)
             .get_queryset(request)
+            .filter(programa__ativo=True)
             .select_related("programa", "programa__cultura")
         )
 
@@ -1701,7 +1731,7 @@ class OperacaoAdmin(admin.ModelAdmin):
         "ativo",
     )
     list_filter = [
-        "programa",
+        ProgramaFilter,
         "programa__safra",
         "programa__ciclo",
         "modificado",
@@ -1749,6 +1779,7 @@ class AplicacaoAdmin(admin.ModelAdmin):
         return (
             super(AplicacaoAdmin, self)
             .get_queryset(request)
+            .filter(operacao__programa__ativo=True, operacao__ativo=True)
             .select_related("operacao", "defensivo", "operacao__programa")
         )
 
@@ -1771,7 +1802,7 @@ class AplicacaoAdmin(admin.ModelAdmin):
     ]
     raw_id_fields = ["operacao"]
     list_filter = (
-        "operacao__programa",
+        ProgramaAplicacaoFilter,
         "operacao__programa__ciclo__ciclo",
         "operacao__programa__safra__safra",
         "ativo",

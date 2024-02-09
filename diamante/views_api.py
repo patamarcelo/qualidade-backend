@@ -551,7 +551,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 variedade=id_variedade,
                                 area_colheita=area,
                                 map_centro_id=map_centro_id_farm,
-                                map_geo_points=map_geo_points_farm
+                                map_geo_points=map_geo_points_farm,
                                 # data_plantio=data_plantio,
                             )
 
@@ -1239,7 +1239,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "msg": f"Consulta realizada com sucesso GetPlantioDone API!! - Safra: {safra_filter} - Ciclo: {cicle_filter}",
                     "total_return": len(qs),
                     "data": qs,
-                    "plantio_by_day": qs_by_day
+                    "plantio_by_day": qs_by_day,
                     # "resume_by_farm": qsFarm,
                 }
                 return Response(response, status=status.HTTP_200_OK)
@@ -2262,7 +2262,7 @@ class ProgramasDetails(viewsets.ModelViewSet):
     authentication_classes = (TokenAuthentication,)
     permission_classes = (IsAuthenticated,)
 
-    @action(detail=False, methods=["GET"])
+    @action(detail=False, methods=["GET", "POST"])
     def get_operacoes(self, request):
         if request.user.is_authenticated:
             try:
@@ -2573,7 +2573,7 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                     "quantidade": len(serializer.data),
                     "data": {"includes": succes, "notincludes": failed},
                     "failed_load": problem,
-                    "success_load": success_list
+                    "success_load": success_list,
                     # "data": serializer.data,
                 }
                 return Response(response, status=status.HTTP_200_OK)
