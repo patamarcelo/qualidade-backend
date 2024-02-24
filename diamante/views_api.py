@@ -65,6 +65,7 @@ from .models import (
     RegistroVisitas,
     PlantioDetail,
     CicloAtual,
+    Fazenda,
 )
 
 from functools import reduce
@@ -922,7 +923,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
         if request.user.is_authenticated:
             try:
                 qs_plantio_date = Plantio.objects.filter(
-                    safra__safra="2023/2024", ciclo="3"
+                    safra__safra="2023/2024", ciclo="3", finalizado_plantio=True
                 )
                 data_plantada = {}
                 area_total = 0
@@ -1060,11 +1061,37 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 # ------------- ------------- END SEPARADO POR FAZENDA > PROJETO ------------- -------------#
 
                 area_total = qs_annotate.aggregate(Sum("area_colheita"))
+                projetos = Projeto.objects.values("nome", "fazenda__nome")
+                resumo_by_farm = []
+                for projeto in projetos:
+                    filter_array = list(
+                        filter(
+                            lambda x: x["fazenda"] == projeto["fazenda__nome"],
+                            resumo_by_farm,
+                        )
+                    )
+                    # print(filter_array)
+                    if len(filter_array) > 0:
+                        index_to_update = [
+                            i
+                            for i, _ in enumerate(resumo_by_farm)
+                            if _["fazenda"] == projeto["fazenda__nome"]
+                        ][0]
+                        resumo_by_farm[index_to_update]["projetos"].append(
+                            projeto["nome"]
+                        )
+                    else:
+                        dict_to_insert = {
+                            "fazenda": projeto["fazenda__nome"],
+                            "projetos": [projeto["nome"]],
+                        }
+                        resumo_by_farm.append(dict_to_insert)
 
                 response = {
                     "msg": f"Consulta realizada com sucesso!!",
                     "total_return": len(qs),
                     "resumo_safra": res1,
+                    "fazenda_grupo_projetos": resumo_by_farm,
                     "resumo_safra_fazenda": res2,
                     "Area Total dos Talhoes Plantados": area_total,
                     "dados": resumo,

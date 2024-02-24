@@ -503,6 +503,7 @@ def export_plantio(modeladmin, request, queryset):
         "programa__nome",
         "area_parcial",
         "map_centro_id",
+        "variedade__dias_germinacao",
     )
     cargas_list = modeladmin.total_c_2
 
@@ -546,6 +547,8 @@ def export_plantio(modeladmin, request, queryset):
 
     for plantio in plantios:
         plantio_detail = list(plantio)
+        time_delta_variedade_germinacao = plantio_detail[-1]
+        plantio_detail.pop()
         lat = ""
         lng = ""
         if isinstance(plantio_detail[15], dict):
@@ -576,7 +579,8 @@ def export_plantio(modeladmin, request, queryset):
         plantio_detail.append(lat)
         plantio_detail.append(lng)
         plantio_detail.pop(0)
-        plantio_detail.insert(11, get_prev_colheita(data_plantio, time_delta_plantio))
+        time_delta_calc = time_delta_plantio + time_delta_variedade_germinacao
+        plantio_detail.insert(11, get_prev_colheita(data_plantio, time_delta_calc))
         plantio_detail.append(get_dap(data_plantio))
         print(plantio_detail)
         print(lat, lng)
@@ -814,6 +818,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         # "talhao__fazenda__nome",
         "variedade",
         "modificado",
+        "area_aferida",
     )
     list_display = (
         "talhao",
@@ -837,6 +842,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         "get_dap_description",
         "get_dias_ciclo",
         "get_description_descontinuado_plantio",
+        "area_aferida"
         # "detail",
     )
 
@@ -893,6 +899,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
                         "area_parcial",
                         "finalizado_colheita",
                     ),
+                    ("area_aferida",),
                     ("plantio_descontinuado",),
                     ("observacao",),
                 )
@@ -1128,7 +1135,9 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
 
     def get_data_prev_col(self, obj):
         if obj.data_plantio and obj.variedade:
-            prev_date_delta = timedelta(obj.variedade.dias_ciclo)
+            prev_date_delta = timedelta(
+                obj.variedade.dias_ciclo + obj.variedade.dias_germinacao
+            )
             prev_date_final = obj.data_plantio + prev_date_delta
             return date_format(
                 prev_date_final, format="SHORT_DATE_FORMAT", use_l10n=True
@@ -1754,7 +1763,7 @@ class OperacaoAdmin(admin.ModelAdmin):
     get_prazo_dap.short_description = "DAP"
 
     def get_obs_description(self, obj):
-        if obj.obs:
+        if obj.observacao or obj.obs:
             return f"{obj.obs[:20] }..."
         else:
             return " - "

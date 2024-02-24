@@ -530,6 +530,12 @@ class Plantio(Base):
 
     veiculos_carregados = models.IntegerField("Veículos Carregados / Talhao", default=0)
 
+    area_aferida = models.BooleanField(
+        "Área Aferida",
+        default=False,
+        help_text="Informa se houve a medição da área após o plantio",
+    )
+
     plantio_descontinuado = models.BooleanField(
         "Plantio Descontinuado", default=False, help_text="Plantio interrompido ?"
     )
