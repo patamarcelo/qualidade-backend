@@ -93,7 +93,7 @@ from django.db.models.functions.datetime import ExtractMonth, ExtractYear
 
 import requests
 
-from django.db.models import Case, When, DecimalField, Value
+from django.db.models import Case, When, DecimalField, Value, F
 from django.db.models.functions import Coalesce, Round
 
 
@@ -2217,8 +2217,93 @@ class PlantioViewSet(viewsets.ModelViewSet):
     #         response = {"message": "Você precisa estar logado!!!"}
     #         return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
+    # --------------------- ---------------------- DEFENSIVOS API START --------------------- ----------------------#
 
-# --------------------- ---------------------- DEFENSIVOS API START --------------------- ----------------------#
+    @action(detail=False, methods=["GET", "POST"])
+    def get_colheita_plantio_info(self, request, pk=None):
+        if request.user.is_authenticated:
+            safra_filter = None
+            cicle_filter = None
+            try:
+                safra_filter = request.data["safra"]
+                cicle_filter = request.data["ciclo"]
+            except Exception as e:
+                print(e)
+            safra_filter = "2023/2024" if safra_filter == None else safra_filter
+            cicle_filter = "1" if cicle_filter == None else cicle_filter
+            try:
+                cargas_query = (
+                    Colheita.objects.values(
+                        "plantio__talhao__id_talhao",
+                        "plantio__id",
+                        "plantio__talhao__fazenda__nome",
+                    )
+                    .annotate(
+                        total_peso_liquido=Sum("peso_liquido"),
+                        total_romaneio=Count("romaneio"),
+                    )
+                    .annotate(
+                        totaldays=(
+                            datetime.datetime.now().date() - F("plantio__data_plantio")
+                        )
+                    )
+                    .filter(
+                        plantio__safra=s_dict[safra_filter],
+                        plantio__ciclo=c_dict[cicle_filter],
+                        plantio__finalizado_plantio=True,
+                        plantio__finalizado_colheita=False,
+                        plantio__plantio_descontinuado=False,
+                        totaldays__gte=datetime.timedelta(days=118),
+                    )
+                )
+                qs = (
+                    Plantio.objects.values(
+                        "id",
+                        "talhao__id_talhao",
+                        "talhao__id_unico",
+                        "data_plantio",
+                        "safra__safra",
+                        "ciclo__ciclo",
+                        "talhao__fazenda__nome",
+                        "talhao__fazenda__map_centro_id",
+                        "talhao__fazenda__map_zoom",
+                        "talhao__fazenda__fazenda__nome",
+                        "variedade__nome_fantasia",
+                        "variedade__cultura__cultura",
+                        "variedade__cultura__map_color",
+                        "variedade__cultura__map_color_line",
+                        "finalizado_plantio",
+                        "finalizado_colheita",
+                        "area_colheita",
+                        "area_parcial",
+                    )
+                    .annotate(
+                        totaldays=(datetime.datetime.now().date() - F("data_plantio"))
+                    )
+                    .filter(
+                        safra=s_dict[safra_filter],
+                        ciclo=c_dict[cicle_filter],
+                        finalizado_plantio=True,
+                        finalizado_colheita=False,
+                        plantio_descontinuado=False,
+                        totaldays__gte=datetime.timedelta(days=118),
+                    )
+                    .order_by("talhao__id_unico")
+                )
+
+                response = {
+                    "msg": "Consulta realizada com sucesso!!",
+                    "data": qs,
+                    "cargas": cargas_query,
+                }
+                return Response(response, status=status.HTTP_200_OK)
+            except Exception as e:
+                response = {"message": f"Ocorreu um Erro: {e}"}
+                return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+        else:
+            response = {"message": "Você precisa estar logado!!!"}
+            return Response(response, status=status.HTTP_401_UNAUTHORIZED)
 
 
 class DefensivoViewSet(viewsets.ModelViewSet):

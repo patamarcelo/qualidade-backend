@@ -143,7 +143,8 @@ class PlantioDetailAdmin(admin.ModelAdmin):
                 .order_by("data_plantio")
             )
         else:
-            cicle_filter = Ciclo.objects.all()[1]
+            cicle_filter = CicloAtual.objects.filter(nome="Colheita")[0]
+            cicle_filter = cicle_filter.ciclo
         return (
             super(PlantioDetailAdmin, self)
             .get_queryset(request)
@@ -252,7 +253,8 @@ class PlantioDetailPlantioAdmin(admin.ModelAdmin):
                 .order_by("data_plantio")
             )
         else:
-            cicle_filter = Ciclo.objects.all()[1]
+            cicle_filter = CicloAtual.objects.filter(nome="Colheita")[0]
+            cicle_filter = cicle_filter.ciclo
         return (
             super(PlantioDetailPlantioAdmin, self)
             .get_queryset(request)
@@ -665,9 +667,41 @@ class ProgramaAplicacaoFilter(SimpleListFilter):
         return queryset
 
 
+@admin.action(description="Aferição das Áreas")
+def area_aferida(modeladdmin, request, queryset):
+    count_true = 0
+    ha_positivo = 0
+
+    count_false = 0
+    ha_negativo = 0
+    for i in queryset:
+        aferido = i.area_aferida
+        if aferido == True:
+            i.area_aferida = False
+            count_false += 1
+            ha_negativo += i.area_colheita
+        else:
+            i.area_aferida = True
+            count_true += 1
+            ha_positivo += i.area_colheita
+        i.save()
+    if count_true > 0:
+        messages.add_message(
+            request,
+            messages.SUCCESS,
+            f"{count_true} Áreas informadas como aferidas: {ha_positivo} hectares",
+        )
+    if count_false > 0:
+        messages.add_message(
+            request,
+            messages.INFO,
+            f"{count_false} Áreas informadas como NÃO aferidas: {ha_negativo} hectares",
+        )
+
+
 @admin.register(Plantio)
 class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
-    actions = [export_plantio]
+    actions = [export_plantio, area_aferida]
     show_full_result_count = False
     autocomplete_fields = ["talhao", "programa", "variedade"]
 
@@ -842,7 +876,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         "get_dap_description",
         "get_dias_ciclo",
         "get_description_descontinuado_plantio",
-        "area_aferida"
+        "area_aferida",
         # "detail",
     )
 

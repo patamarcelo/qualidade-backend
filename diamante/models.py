@@ -894,12 +894,33 @@ class Colheita(Base):
     #     return self.peso_liquido / 60
 
     def save(self, *args, **kwargs):
+        umidade_dict = {
+            "Arroz": 12,
+            "Soja": 14,
+            "Feijão": 14,
+        }
+        impureza_dict = {
+            "Arroz": 2,
+            "Soja": 0,
+            "Feijão": 0,
+        }
         if self.umidade is not None:
             peso_liquido = decimal.Decimal(self.peso_bruto - self.peso_tara)
-            if self.umidade > 14:
-                unit_d = decimal.Decimal(14 / 1000)
+            if self.umidade > umidade_dict[self.plantio.variedade.cultura.cultura]:
+                unit_d = decimal.Decimal(
+                    umidade_dict[self.plantio.variedade.cultura.cultura] / 1000
+                )
                 desconto_umidade = (
-                    ((self.umidade - 14) * 100 * unit_d) * peso_liquido / 100
+                    (
+                        (
+                            self.umidade
+                            - umidade_dict[self.plantio.variedade.cultura.cultura]
+                        )
+                        * 100
+                        * unit_d
+                    )
+                    * peso_liquido
+                    / 100
                 )
                 self.desconto_umidade = desconto_umidade
                 print("desconto umidade ", desconto_umidade)
@@ -908,7 +929,12 @@ class Colheita(Base):
 
         if self.impureza is not None:
             # REGRA FAZENDAO
-            descontar_imp_num = self.impureza
+            descontar_imp_num = 0
+            if self.impureza > impureza_dict[self.plantio.variedade.cultura.cultura]:
+                descontar_imp_num = (
+                    self.impureza
+                    - impureza_dict[self.plantio.variedade.cultura.cultura]
+                )
             if self.deposito.id_d == 4:
                 good_imp = 1
                 if self.impureza >= good_imp:
