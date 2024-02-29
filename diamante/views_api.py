@@ -2483,6 +2483,10 @@ class ColheitaApiSave(viewsets.ModelViewSet):
             success_list = []
             for i in data_json:
                 data = i["Data de Pesagem"]
+                if "/" in data:
+                    data = datetime.datetime.strptime(data, "%d/%m/%Y").strftime(
+                        "%Y-%m-%d"
+                    )
                 romaneio = remove_leading_zeros(str(i["Num Romaneio"]))
                 filial = i["Filial"]
                 ticket = remove_leading_zeros(str(i["Ticket"]))
