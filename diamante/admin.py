@@ -853,6 +853,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         "variedade",
         "modificado",
         "area_aferida",
+        # "area_parcial",
     )
     list_display = (
         "talhao",
@@ -872,11 +873,11 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         "get_data_primeira_carga",
         "get_data_ultima_carga",
         "get_total_colheita_cargas",
-        # "area_parcial",
         "get_dap_description",
         "get_dias_ciclo",
         "get_description_descontinuado_plantio",
         "area_aferida",
+        "area_parcial",
         # "detail",
     )
 
@@ -928,11 +929,11 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
                         "data_plantio",
                         "data_emergencia",
                     ),
-                    ("data_prevista_colheita",),
                     (
                         "area_parcial",
                         "finalizado_colheita",
                     ),
+                    ("data_prevista_colheita",),
                     ("area_aferida",),
                     ("plantio_descontinuado",),
                     ("observacao",),
@@ -1090,6 +1091,8 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
                 value = float("Inf")
         if prod_scs:
             return f"{localize(round(prod_scs,2))} Scs/ha"
+        if obj.area_parcial != None and obj.area_parcial > 0 and total_filt_list == 0:
+            return 0
         else:
             return " - "
 
