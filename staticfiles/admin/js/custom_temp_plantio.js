@@ -27,7 +27,7 @@ var app = new Vue({
 		filteredCutulre: "Todas",
 		filteredCutulreDif: "",
 		selected: "",
-		viewAllVareidades: true,
+		viewAllVareidades: false,
 		style: {
 			color: "whitesmoke",
 			backgroundColor: "blue"

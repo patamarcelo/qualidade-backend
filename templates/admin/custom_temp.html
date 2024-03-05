@@ -95,7 +95,17 @@
             </thead>
             <tbody v-if="filteredArray">
                 <tr v-for="(col,i) in filteredArray">
-                    <td>[[ i.split("|")[0] ]]</td>
+                    <td style="padding-bottom: 0.25rem !important; padding-top: 0.25rem!important">
+                        
+                            [[ i.split("|")[0] ]]
+                        
+                        <div class="progress" style="background-color: white; border-radius: 8px">
+                            <div :class="getClass(((col?.areaColheita/col?.areaTotal)*100).toFixed(0))" role="progressbar" :style="getwidth(((col?.areaColheita/col?.areaTotal)*100).toFixed(2))" :aria-valuenow="((col?.areaColheita/col?.areaTotal)*100).toFixed(0)" aria-valuemin="0" aria-valuemax="100">
+                                [[((col?.areaColheita/col?.areaTotal)*100).toFixed(0) ]] % 
+                            </div>
+                        </div>
+                        
+                    </td>
                     <td style="text-align: center"><img style="width: 26px; height: 26px; cursor: pointer"
                             :src="customIcon(i.split('|')[1])" /> </td>
                     <td style="text-align: center">[[ col?.areaTotal?.toLocaleString("pt-br", {
@@ -121,7 +131,14 @@
                 </tr>
             </tbody>
             <tfoot>
-                <th scope="row">Totais</th>
+                <th scope="row" style="padding-bottom: 0.25rem !important; padding-top: 0.25rem!important">
+                    Totais
+                    <div class="progress" style="background-color: white; border-radius: 8px">
+                        <div :class="getClass(((newTotals?.areaColhida/newTotals?.areaTotal)*100).toFixed(0))" role="progressbar" :style="getwidth(((newTotals?.areaColhida/newTotals?.areaTotal)*100).toFixed(0))" :aria-valuenow="((newTotals?.areaColhida/newTotals?.areaTotal)*100).toFixed(0)" aria-valuemin="0" aria-valuemax="100">
+                            [[((newTotals?.areaColhida/newTotals?.areaTotal)*100).toFixed(2) ]] % 
+                        </div>
+                    </div>
+                </th>
                 <td style="text-align: center"></td>
                 <td style="text-align: center; font-weight: bold">[[newTotals?.areaTotal?.toLocaleString("pt-br", {
                     minimumFractionDigits: 2,

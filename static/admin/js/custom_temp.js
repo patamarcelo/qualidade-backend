@@ -28,7 +28,7 @@ var app = new Vue({
 		filteredCutulre: "Todas",
 		filteredCutulreDif: "",
 		selected: "",
-		viewAllVareidades: true,
+		viewAllVareidades: false,
 		excludeFarm: [],
 		style: {
 			color: "whitesmoke",
@@ -72,6 +72,18 @@ var app = new Vue({
 			console.log(filter);
 			console.log(this.filteredArrayByVariedade);
 			return "teste 1 ";
+		},
+		getwidth(size) {
+			return `width: ${size}% ; background-color: yellow`;
+		},
+		getClass(size) {
+			if (size < 25) {
+				return "progress-bar bg-warning";
+			}
+			if (size < 80) {
+				return "progress-bar bg-info";
+			}
+			return "progress-bar bg-success";
 		}
 	},
 	watch: {
