@@ -109,6 +109,7 @@ from django.db.models.functions import Coalesce, Round
 s_dict = {
     "2022/2023": 1,
     "2023/2024": 2,
+    "2024/2025": 3,
 }
 
 c_dict = {"1": 3, "2": 4, "3": 5}
@@ -464,7 +465,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             try:
                 # file = request.FILES["plantio_arroz"]
                 # file_ = open(os.path.join(settings.BASE_DIR, 'filename'))
-                date_file = "2023-08-11 17:31"
+                date_file = "2024-03-14 17:39"
                 with open(f"static/files/dataset-{date_file}.json") as user_file:
                     file_contents = user_file.read()
                     parsed_json = json.loads(file_contents)
@@ -472,7 +473,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 # DB CONSULT
                 talhao_list = Talhao.objects.all()
                 variedade_list = Variedade.objects.all()
-                safra = Safra.objects.all()[1]
+                safra = Safra.objects.all()[2]
                 ciclo_list = Ciclo.objects.all()
                 projetos = Projeto.objects.all()
 
