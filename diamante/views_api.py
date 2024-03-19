@@ -465,7 +465,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             try:
                 # file = request.FILES["plantio_arroz"]
                 # file_ = open(os.path.join(settings.BASE_DIR, 'filename'))
-                date_file = "2024-03-14 17:39"
+                date_file = "2024-03-16 11:21"
                 with open(f"static/files/dataset-{date_file}.json") as user_file:
                     file_contents = user_file.read()
                     parsed_json = json.loads(file_contents)
@@ -2504,6 +2504,14 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                 safra = i["Safra"]
                 ciclo = i["Ciclo"]
                 destino = i["Destino"]
+                
+                if 'UBS' in str(destino):
+                    destino = 2
+                elif "BADU" in str(destino):
+                    destino = 10
+                elif "FAZENDAO" in str(destino):
+                    destino = 4
+                
                 final_ticket = f"{filial}{ticket}"
                 print(i)
                 if len(parcelas) > 1:

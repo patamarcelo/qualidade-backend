@@ -120,14 +120,19 @@ class PlantioDetailAdmin(admin.ModelAdmin):
     #     )
     # ]
     cicle_filter = None
+    safra_filter = None
 
     def get_queryset(self, request):
-        global cicle_filter
+        global cicle_filter, safra_filter
         request.GET = request.GET.copy()
         ciclo = request.GET.pop("ciclo", None)
+        safra = request.GET.pop("safra", None)
         if ciclo:
             ciclo_index = int(ciclo[0]) - 1
+            print('ciclo Url: ', ciclo_index)
+            safra_filter = safra[0].replace('_', '/').strip()
             cicle_filter = Ciclo.objects.all()[ciclo_index]
+            safra_filter = Safra.objects.filter(safra=safra_filter)[0]
             return (
                 super(PlantioDetailAdmin, self)
                 .get_queryset(request)
@@ -139,12 +144,14 @@ class PlantioDetailAdmin(admin.ModelAdmin):
                     "variedade",
                     "programa",
                 )
-                .filter(ciclo=cicle_filter)
+                .filter(ciclo=cicle_filter, safra=safra_filter)
                 .order_by("data_plantio")
             )
         else:
             cicle_filter = CicloAtual.objects.filter(nome="Colheita")[0]
             cicle_filter = cicle_filter.ciclo
+            safra_filter = CicloAtual.objects.filter(nome="Colheita")[0]
+            safra_filter = safra_filter.safra
         return (
             super(PlantioDetailAdmin, self)
             .get_queryset(request)
@@ -156,7 +163,7 @@ class PlantioDetailAdmin(admin.ModelAdmin):
                 "variedade",
                 "programa",
             )
-            .filter(ciclo=cicle_filter)
+            .filter(ciclo=cicle_filter, safra=safra_filter)
             .order_by("data_plantio")
         )
 
@@ -165,7 +172,8 @@ class PlantioDetailAdmin(admin.ModelAdmin):
             request,
             extra_context=extra_context,
         )
-        safra_filter = "2023/2024"
+        safra_filter = CicloAtual.objects.filter(nome="Colheita")[0]
+        safra_filter = safra_filter.safra
 
         # ciclo_filter = "1"
         # cicle_filter = Ciclo.objects.all()[0]
@@ -230,14 +238,20 @@ class PlantioDetailPlantioAdmin(admin.ModelAdmin):
     #     )
     # ]
     cicle_filter = None
-
+    safra_filter = None
+    
     def get_queryset(self, request):
-        global cicle_filter
+        global cicle_filter, safra_filter
         request.GET = request.GET.copy()
         ciclo = request.GET.pop("ciclo", None)
+        safra = request.GET.pop("safra", None)
         if ciclo:
             ciclo_index = int(ciclo[0]) - 1
             cicle_filter = Ciclo.objects.all()[ciclo_index]
+            
+            if safra:
+                safra_filter = safra[0].replace('_', '/').strip()
+                safra_filter = Safra.objects.filter(safra=safra_filter)[0]
             return (
                 super(PlantioDetailPlantioAdmin, self)
                 .get_queryset(request)
@@ -253,8 +267,10 @@ class PlantioDetailPlantioAdmin(admin.ModelAdmin):
                 .order_by("data_plantio")
             )
         else:
-            cicle_filter = CicloAtual.objects.filter(nome="Colheita")[0]
+            cicle_filter = CicloAtual.objects.filter(nome="Plantio")[0]
             cicle_filter = cicle_filter.ciclo
+            safra_filter = CicloAtual.objects.filter(nome="Plantio")[0]
+            safra_filter = safra_filter.safra
         return (
             super(PlantioDetailPlantioAdmin, self)
             .get_queryset(request)
@@ -266,16 +282,19 @@ class PlantioDetailPlantioAdmin(admin.ModelAdmin):
                 "variedade",
                 "programa",
             )
-            .filter(ciclo=cicle_filter)
+            .filter(ciclo=cicle_filter, safra=safra_filter)
             .order_by("data_plantio")
         )
 
     def changelist_view(self, request, extra_context=None):
+        # global safra_filter
         response = super().changelist_view(
             request,
             extra_context=extra_context,
         )
-        safra_filter = "2023/2024"
+        # safra_filter = "2023/2024"
+        # safra_filter = CicloAtual.objects.filter(nome="Plantio")[0]
+        # safra_filter = safra_filter.safra
         # ciclo_filter = "2"
         # ciclo_filter = request.GET["ciclo"]
         # print(ciclo_filter)

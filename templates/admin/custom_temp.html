@@ -134,14 +134,13 @@
                 </tr>
             </tbody>
             <tfoot style="background-color: rgb(149, 146, 146); color: whitesmoke">
-                <th scope="row" style="padding-bottom: 0.25rem !important; padding-top: 0.25rem!important">
-                    Totais
-                    <div class="progress" style="background-color: white; border-radius: 8px">
-                        <div :class="getClass(((newTotals?.areaColhida/newTotals?.areaTotal)*100).toFixed(0))" role="progressbar" :style="getwidth(((newTotals?.areaColhida/newTotals?.areaTotal)*100).toFixed(0))" :aria-valuenow="((newTotals?.areaColhida/newTotals?.areaTotal)*100).toFixed(0)" aria-valuemin="0" aria-valuemax="100">
-                            [[((newTotals?.areaColhida/newTotals?.areaTotal)*100).toFixed(2) ]] % 
+                    <td>
+                        <div class="progress" style="background-color: white; border-radius: 8px; margin-top: 4px">
+                            <div :class="getClass(((newTotals?.areaColhida/newTotals?.areaTotal)*100).toFixed(0))" role="progressbar" :style="getwidth(((newTotals?.areaColhida/newTotals?.areaTotal)*100).toFixed(0))" :aria-valuenow="((newTotals?.areaColhida/newTotals?.areaTotal)*100).toFixed(0)" aria-valuemin="0" aria-valuemax="100">
+                                [[((newTotals?.areaColhida/newTotals?.areaTotal)*100).toFixed(2) ]] % 
+                            </div>
                         </div>
-                    </div>
-                </th>
+                    </td>
                 <td style="text-align: center"></td>
                 <td style="text-align: center; font-weight: bold">[[newTotals?.areaTotal?.toLocaleString("pt-br", {
                     minimumFractionDigits: 2,
