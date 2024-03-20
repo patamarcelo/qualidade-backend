@@ -1,5 +1,5 @@
 from django.db import models
-from diamante.models import Projeto, Cultura, TIPO_CHOICES, Defensivo, Safra, Ciclo
+from diamante.models import Projeto, Cultura, TIPO_CHOICES, Defensivo, Safra, Ciclo, Plantio
 
 import os
 from django.db.models import F
@@ -256,7 +256,23 @@ class TempoAplicacao(Base):
         return self.os.numero
 
 class ParametrosAplicacao(Base):
-    pass
+    os = models.ForeignKey(OrdemDeServico, on_delete=models.PROTECT)
+    temperatura_max = models.PositiveIntegerField()
+    umidade_relativa_min = models.PositiveIntegerField()
+    umidade_relativa_ax = models.PositiveIntegerField()
+    # equipamento = models.ForeignKey(???)
+    altura_do_voo = models.PositiveIntegerField()
+    largura_da_faixa = models.PositiveIntegerField()
+    parcelas = models.ManyToManyField(Plantio)
+    receituario_agronomo_n = models.PositiveIntegerField()
+    data_emissao = models.DateField("Emitido em", help_text="dd/mm/aaaa")
+    
+    class Meta:
+        verbose_name = "Parâmetros Básicos de Apicação"
+        verbose_name_plural = "Parâmetros Básicos de Apicações"
+        
+    def __str__(self):
+        return self.os.numero
 
 class AplicacaoAviao(Base):
     os = models.ForeignKey(OrdemDeServico, on_delete=models.PROTECT, related_name="os_related_aplicacao")
