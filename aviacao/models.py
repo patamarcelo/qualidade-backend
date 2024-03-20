@@ -108,8 +108,12 @@ def get_img_upload_path(instance, filename):
     file_name = f"{instance.numero}_{instance.criados}/"
     return os.path.join(base_path, file_name, filename)
 
-
+TIPO_AVIAO_CHOICES = (
+    ("turbo", "Turbo"),
+    ("ipanema", "Ipanema")
+)
 class TabelaPilotos(Base):
+    tipo = models.CharField("Tipo Avião", max_length=100, choices=TIPO_AVIAO_CHOICES)
     safra = models.ForeignKey(Safra, on_delete=models.PROTECT)
     ciclo = models.ForeignKey(Ciclo, on_delete=models.PROTECT)
     vazao = models.PositiveIntegerField()
@@ -120,6 +124,7 @@ class TabelaPilotos(Base):
         decimal_places=2,)
     
     class Meta: 
+        unique_together = ("tipo", "safra", "ciclo", 'vazao', 'preco')
         verbose_name = "Preço do Piloto"
         verbose_name_plural = "Preços dos Pilotos"
     
@@ -128,7 +133,7 @@ class TabelaPilotos(Base):
 
 class OrdemDeServico(Base):
     numero = models.PositiveIntegerField(unique=True)
-    data = models.DateField("Data", help_text="dd/mm/aaaa")
+    data = models.DateField("Data")
     ajudante = models.ManyToManyField(Ajudante)
     area = models.DecimalField(
         "Area",
@@ -156,8 +161,8 @@ class OrdemDeServico(Base):
     )
     cultura = models.ForeignKey(Cultura, on_delete=models.PROTECT)
     os_file = models.ImageField("Ordem de Serviço", upload_to=get_img_upload_path)
-    data_inicial = models.DateField("Data Inicial Aplicação", help_text="dd/mm/aaaa")
-    data_final = models.DateField("Data Final Aplicação", help_text="dd/mm/aaaa")
+    data_inicial = models.DateField("Data Inicial Aplicação")
+    data_final = models.DateField("Data Final Aplicação")
     horimetro_inicial = models.DecimalField(
         "Horímetro Inicial",
         blank=True,
@@ -210,6 +215,7 @@ class OrdemDeServico(Base):
         decimal_places=2,
     )
     projeto = models.ForeignKey(Projeto, on_delete=models.PROTECT)
+    parcelas = models.ManyToManyField(Plantio)
     aeronave = models.ForeignKey(Aeronave, on_delete=models.PROTECT)
     engenheiro_agronomo = models.ForeignKey(EngenheiroAgronomo, on_delete=models.PROTECT, blank=True, null=True)
     piloto = models.ForeignKey(Piloto, on_delete=models.PROTECT)
@@ -255,17 +261,22 @@ class TempoAplicacao(Base):
     def __str__(self):
         return self.os.numero
 
+
+TIPO_EQUIPAMENTO = (
+    ("bico", "Bico"),
+    ("atomizador", "Atomizador"),
+    ("swathmaster", "Swathmaster")
+)
 class ParametrosAplicacao(Base):
     os = models.ForeignKey(OrdemDeServico, on_delete=models.PROTECT)
     temperatura_max = models.PositiveIntegerField()
     umidade_relativa_min = models.PositiveIntegerField()
     umidade_relativa_ax = models.PositiveIntegerField()
-    # equipamento = models.ForeignKey(???)
+    equipamento = models.CharField("Equipamento utilizado",max_length=100, choices=TIPO_EQUIPAMENTO)
     altura_do_voo = models.PositiveIntegerField()
     largura_da_faixa = models.PositiveIntegerField()
-    parcelas = models.ManyToManyField(Plantio)
     receituario_agronomo_n = models.PositiveIntegerField()
-    data_emissao = models.DateField("Emitido em", help_text="dd/mm/aaaa")
+    data_emissao = models.DateField("Emitido em")
     
     class Meta:
         verbose_name = "Parâmetros Básicos de Apicação"
@@ -288,8 +299,8 @@ class AplicacaoAviao(Base):
     class Meta:
         unique_together = ("os", "defensivo", "ativo", "dose")
         ordering = ["os", "defensivo"]
-        verbose_name = "Aplicação Avião"
-        verbose_name_plural = "Aplicações Avião"
+        verbose_name = "Aplicação - Produto Aplicado"
+        verbose_name_plural = "Aplicações - Produtos Aplicados"
 
     def __str__(self):
         return f"{self.defensivo} - {self.dose} - {self.ativo} - {self.os.numero}"

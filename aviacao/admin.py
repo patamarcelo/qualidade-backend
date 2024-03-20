@@ -9,18 +9,71 @@ from django_json_widget.widgets import JSONEditorWidget
 class AplicacaoAviaoInline(admin.StackedInline):
     model = AplicacaoAviao
     extra = 0
-    fields = ["defensivo", "dose", "ativo"]
     autocomplete_fields = ["defensivo"]
+    fieldsets = [
+        (
+            "Produto / Dose",
+            {
+                "fields": (
+                    (
+                        "defensivo",
+                        "dose",
+                    ),
+                )
+            },
+        )
+    ]
 
 
 class CondicoesMeteorologicasInline(admin.StackedInline):
     model = CondicoesMeteorologicas
     extra = 0
-    fields = [
-        "temperatura_inicial",
-        "temperatura_final",
-        "umidade_relativa_incial",
-        "umidade_relativa_final",
+    fieldsets = [
+        (
+            "Dados",
+            {
+                "fields": (
+                    (
+                        "temperatura_inicial",
+                        "temperatura_final",
+                    ),
+                    (
+                        "umidade_relativa_incial",
+                        "umidade_relativa_final",
+                    ),
+                    (
+                        "velocidade_vento_inicial",
+                        "velocidade_vento_final",
+                    ),
+                )
+            },
+        )
+    ]
+
+
+class ParametrosAplicacaoInline(admin.StackedInline):
+    model = ParametrosAplicacao
+    extra = 0
+    fieldsets = [
+        (
+            "Parâmetros",
+            {
+                "fields": (
+                    ("temperatura_max",),
+                    (
+                        "umidade_relativa_min",
+                        "umidade_relativa_ax",
+                    ),
+                    ("equipamento"),
+                    (
+                        "altura_do_voo",
+                        "largura_da_faixa",
+                    ),
+                    ("receituario_agronomo_n",),
+                    ("data_emissao",),
+                )
+            },
+        )
     ]
 
 
@@ -57,13 +110,44 @@ class GerenteAdmin(admin.ModelAdmin):
     search_fields = ["nome"]
 
 
+@admin.register(ParametrosAplicacao)
+class ParametrosAplicacaoAdmin(admin.ModelAdmin):
+    list_display = ["os"]
+    fieldsets = [
+        (
+            "Dados",
+            {
+                "fields": (
+                    ("os",),
+                    ("temperatura_max",),
+                    (
+                        "umidade_relativa_min",
+                        "umidade_relativa_ax",
+                    ),
+                    (
+                        "altura_do_voo",
+                        "largura_da_faixa",
+                    ),
+                    ("parcelas",),
+                    ("receituario_agronomo_n",),
+                    ("data_emissao",),
+                )
+            },
+        )
+    ]
+
+
 @admin.register(OrdemDeServico)
 class OrdemDeServicoAdmin(admin.ModelAdmin):
     list_display = ("numero", "data")
     filter_horizontal = ("ajudante",)
     readonly_fields = ["criados"]
-    autocomplete_fields = ["encarregado_autoriza"]
-    inlines = [AplicacaoAviaoInline, CondicoesMeteorologicasInline]
+    autocomplete_fields = ["encarregado_autoriza", "projeto", "parcelas"]
+    inlines = [
+        AplicacaoAviaoInline,
+        CondicoesMeteorologicasInline,
+        ParametrosAplicacaoInline,
+    ]
     fieldsets = [
         (
             "Dados",
@@ -71,6 +155,7 @@ class OrdemDeServicoAdmin(admin.ModelAdmin):
                 "fields": (
                     ("ativo", "criados"),
                     ("numero", "data"),
+                    ("projeto", "parcelas"),
                     ("os_file"),
                     (
                         "data_inicial",
@@ -87,7 +172,7 @@ class OrdemDeServicoAdmin(admin.ModelAdmin):
         ),
         (
             "Aeronave",
-            {"fields": (("aeronave"), ("piloto"), ("uso_gps",))},
+            {"fields": (("aeronave", "piloto"), ("uso_gps",))},
         ),
         (
             "Responsável",
@@ -122,3 +207,17 @@ class AplicacaoAviaoAdmin(admin.ModelAdmin):
 @admin.register(TabelaPilotos)
 class TabelaPilotosAdmin(admin.ModelAdmin):
     list_display = ("safra", "ciclo", "vazao", "preco", "ativo")
+    fieldsets = [
+        (
+            "Dados",
+            {
+                "fields": (
+                    ("ativo"),
+                    ("tipo"),
+                    ("safra", "ciclo"),
+                    ("vazao", "preco"),
+                    ("observacao"),
+                )
+            },
+        )
+    ]
