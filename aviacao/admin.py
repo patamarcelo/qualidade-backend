@@ -4,6 +4,9 @@ from django.contrib import admin
 from .models import *
 
 from django_json_widget.widgets import JSONEditorWidget
+import locale
+
+locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
 
 
 class AplicacaoAviaoInline(admin.StackedInline):
@@ -90,6 +93,7 @@ class AeronaveAdmin(admin.ModelAdmin):
 @admin.register(Pista)
 class PistaAdmin(admin.ModelAdmin):
     list_display = ("projeto", "nome", "coordenadas")
+    search_fields = ["projeto"]
 
     formfield_overrides = {
         models.JSONField: {
@@ -137,12 +141,16 @@ class ParametrosAplicacaoAdmin(admin.ModelAdmin):
     ]
 
 
+@admin.register(Ajudante)
+class AjudanteAdmin(admin.ModelAdmin):
+    list_display = ["nome"]
+
 @admin.register(OrdemDeServico)
 class OrdemDeServicoAdmin(admin.ModelAdmin):
     list_display = ("numero", "data")
     filter_horizontal = ("ajudante",)
-    readonly_fields = ["criados"]
-    autocomplete_fields = ["encarregado_autoriza", "projeto", "parcelas"]
+    readonly_fields = ["criados", "get_tempo_aplicacao"]
+    autocomplete_fields = ["encarregado_autoriza", "projeto", "parcelas", "tarifa_piloto", 'pista']
     inlines = [
         AplicacaoAviaoInline,
         CondicoesMeteorologicasInline,
@@ -164,6 +172,7 @@ class OrdemDeServicoAdmin(admin.ModelAdmin):
                     ("cultura", "tipo_servico"),
                     ("area", "volume"),
                     ("horimetro_inicial", "horimetro_final"),
+                    ("get_tempo_aplicacao"),
                     ("combustivel", "oleo_lubrificante"),
                     ("ajudante"),
                     ("encarregado_autoriza"),
@@ -172,7 +181,7 @@ class OrdemDeServicoAdmin(admin.ModelAdmin):
         ),
         (
             "Aeronave",
-            {"fields": (("aeronave", "piloto"), ("uso_gps",))},
+            {"fields": (("aeronave", "piloto"),("pista", "tarifa_piloto"), ("uso_gps",))},
         ),
         (
             "Responsável",
@@ -206,7 +215,9 @@ class AplicacaoAviaoAdmin(admin.ModelAdmin):
 
 @admin.register(TabelaPilotos)
 class TabelaPilotosAdmin(admin.ModelAdmin):
-    list_display = ("safra", "ciclo", "vazao", "preco", "ativo")
+    list_display = ("tipo", "safra_description", "vazao", "get_price_descriptio", "ativo")
+    list_filter = ["tipo"]
+    search_fields = ["tipo"]
     fieldsets = [
         (
             "Dados",
@@ -221,3 +232,14 @@ class TabelaPilotosAdmin(admin.ModelAdmin):
             },
         )
     ]
+    
+    
+    def safra_description(self, obj):
+        return f"{obj.safra.safra} - {obj.ciclo.ciclo}"
+    safra_description.short_description = "Safra/Ciclo"
+    
+    def get_price_descriptio(self, obj):
+        return f'R$ {locale.currency(obj.preco, grouping=True, symbol=False)}'
+    get_price_descriptio.short_description = "Preço"
+    
+    

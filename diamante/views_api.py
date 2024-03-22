@@ -465,7 +465,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             try:
                 # file = request.FILES["plantio_arroz"]
                 # file_ = open(os.path.join(settings.BASE_DIR, 'filename'))
-                date_file = "2024-03-16 11:21"
+                date_file = "2024-03-22 07:36"
                 with open(f"static/files/dataset-{date_file}.json") as user_file:
                     file_contents = user_file.read()
                     parsed_json = json.loads(file_contents)
@@ -494,6 +494,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     farm_name = i["farm_name"]
                     variedade_name = i["variety_name"]
                     area = i["area"]
+                    id_plantio_farmbox = i["id"]
 
                     variedade_planejada = i["planned_variety_name"]
                     cultura_planejada = i["planned_culture_name"]
@@ -554,6 +555,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 area_colheita=area,
                                 map_centro_id=map_centro_id_farm,
                                 map_geo_points=map_geo_points_farm,
+                                id_farmbox = id_plantio_farmbox
                                 # data_plantio=data_plantio,
                             )
 
@@ -590,6 +592,28 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 ciclo_3.update({cultura_planejada: round(area_total)})
                             else:
                                 ciclo_3.update({cultura_planejada: round(area)})
+                    else:
+                        try:
+                            novo_plantio = Plantio(
+                                safra=safra,
+                                ciclo=ciclo,
+                                talhao=talhao_id,
+                                variedade=None,
+                                area_colheita=area,
+                                programa=None,
+                                map_centro_id=map_centro_id_farm,
+                                map_geo_points=map_geo_points_farm,
+                                id_farmbox = id_plantio_farmbox
+                                # data_plantio=data_plantio,
+                            )
+                            novo_plantio.save()
+                            print(
+                                f"{Fore.GREEN}Novo Plantio salvo com sucesso: {novo_plantio}{Style.RESET_ALL}"
+                            )
+                        except Exception as e:
+                            print(
+                                f"{Fore.RED}Problema em salvar o plantio Não Planejado: {talhao_id} - {safra} - {ciclo}{Style.RESET_ALL}{e}"
+                            )
 
                 print(f"Area Total da Soja Ciclo 1: {area_total_1}")
                 print(f"Area Total da Soja Ciclo 2: {area_total_2}")
@@ -2254,7 +2278,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         plantio__finalizado_plantio=True,
                         plantio__finalizado_colheita=False,
                         plantio__plantio_descontinuado=False,
-                        totaldays__gte=datetime.timedelta(days=118),
+                        totaldays__gte=datetime.timedelta(days=117),
                     )
                 )
                 qs = (
@@ -2287,7 +2311,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         finalizado_plantio=True,
                         finalizado_colheita=False,
                         plantio_descontinuado=False,
-                        totaldays__gte=datetime.timedelta(days=118),
+                        totaldays__gte=datetime.timedelta(days=117),
                     )
                     .order_by("talhao__id_unico")
                 )

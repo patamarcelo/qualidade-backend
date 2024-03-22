@@ -124,12 +124,13 @@ class TabelaPilotos(Base):
         decimal_places=2,)
     
     class Meta: 
-        unique_together = ("tipo", "safra", "ciclo", 'vazao', 'preco')
+        unique_together = ("ativo","tipo", "safra", "ciclo", 'vazao')
+        ordering = ["tipo", "safra", 'ciclo', 'vazao']
         verbose_name = "Preço do Piloto"
         verbose_name_plural = "Preços dos Pilotos"
     
     def __str__(self):
-        return f'{self.safra.safra}-{self.ciclo.ciclo} / R$ {self.preco} -{self.vazao}kg/hs '
+        return f'{self.tipo} - {self.vazao} - R$ {self.preco}'
 
 class OrdemDeServico(Base):
     numero = models.PositiveIntegerField(unique=True)
@@ -178,18 +179,22 @@ class OrdemDeServico(Base):
         max_digits=10,
         decimal_places=2,
     )
-
-    tempo_aplicacao = models.GeneratedField(
-        expression=F("horimetro_final") - F("horimetro_inicial"),
-        output_field=models.DecimalField(
-            "Tempo Aplicacao",
-            blank=True,
-            null=True,
-            max_digits=10,
-            decimal_places=2,
-        ),
-        db_persist=True,
-    )
+    # area_total = models.GeneratedField(
+    #     expression=F("area") * F("area"),
+    #     output_field=models.BigIntegerField(),
+    #     db_persist=True,
+    # )
+    # tempo_aplicacao = models.GeneratedField(
+    #     expression=F("horimetro_final") - F("horimetro_inicial"),
+    #     output_field=models.DecimalField(
+    #         "Tempo Aplicacao",
+    #         blank=True,
+    #         null=True,
+    #         max_digits=10,
+    #         decimal_places=2,
+    #     ),
+    #     db_persist=True,
+    # )
 
     oleo_lubrificante = models.DecimalField(
         "Óelo Lubrificante",
@@ -219,10 +224,17 @@ class OrdemDeServico(Base):
     aeronave = models.ForeignKey(Aeronave, on_delete=models.PROTECT)
     engenheiro_agronomo = models.ForeignKey(EngenheiroAgronomo, on_delete=models.PROTECT, blank=True, null=True)
     piloto = models.ForeignKey(Piloto, on_delete=models.PROTECT)
+    tarifa_piloto = models.ForeignKey(TabelaPilotos, on_delete=models.PROTECT)
     pista = models.ForeignKey(Pista, on_delete=models.PROTECT)
     tecnico_agricola_executor = models.ForeignKey(TecnicoAgricola, on_delete=models.PROTECT, blank=True, null=True)
     
-    
+    # @property
+    def get_tempo_aplicacao(self):
+        if self.horimetro_inicial and self.horimetro_final:
+            return f'{self.horimetro_final - self.horimetro_inicial} Horas'
+        return " - "
+    get_tempo_aplicacao.short_description = "Tempo Aplicação"
+        
     class Meta:
         verbose_name = "Ordem de Serviço"
         verbose_name_plural = "Ordens de Serviço"
