@@ -4,10 +4,6 @@ from django.contrib import admin
 from .models import *
 
 from django_json_widget.widgets import JSONEditorWidget
-import locale
-
-locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
-
 
 class AplicacaoAviaoInline(admin.StackedInline):
     model = AplicacaoAviao
@@ -239,7 +235,7 @@ class TabelaPilotosAdmin(admin.ModelAdmin):
     safra_description.short_description = "Safra/Ciclo"
     
     def get_price_descriptio(self, obj):
-        return f'R$ {locale.currency(obj.preco, grouping=True, symbol=False)}'
+        return f"R$ {str(obj.preco).replace('.', ',')}"
     get_price_descriptio.short_description = "Preço"
     
     

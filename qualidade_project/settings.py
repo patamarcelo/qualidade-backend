@@ -174,6 +174,8 @@ THOUSAND_SEPARATOR = (".",)
 
 USE_THOUSAND_SEPARATOR = True
 
+FORMAT_MODULE_PATH = 'qualidade_project.format'
+
 LANGUAGE_CODE = "pt-br"
 
 TIME_ZONE = "America/Sao_Paulo"
