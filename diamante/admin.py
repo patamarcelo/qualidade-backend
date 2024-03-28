@@ -129,8 +129,8 @@ class PlantioDetailAdmin(admin.ModelAdmin):
         safra = request.GET.pop("safra", None)
         if ciclo:
             ciclo_index = int(ciclo[0]) - 1
-            print('ciclo Url: ', ciclo_index)
-            safra_filter = safra[0].replace('_', '/').strip()
+            print("ciclo Url: ", ciclo_index)
+            safra_filter = safra[0].replace("_", "/").strip()
             cicle_filter = Ciclo.objects.all()[ciclo_index]
             safra_filter = Safra.objects.filter(safra=safra_filter)[0]
             return (
@@ -239,7 +239,7 @@ class PlantioDetailPlantioAdmin(admin.ModelAdmin):
     # ]
     cicle_filter = None
     safra_filter = None
-    
+
     def get_queryset(self, request):
         global cicle_filter, safra_filter
         request.GET = request.GET.copy()
@@ -248,9 +248,9 @@ class PlantioDetailPlantioAdmin(admin.ModelAdmin):
         if ciclo:
             ciclo_index = int(ciclo[0]) - 1
             cicle_filter = Ciclo.objects.all()[ciclo_index]
-            
+
             if safra:
-                safra_filter = safra[0].replace('_', '/').strip()
+                safra_filter = safra[0].replace("_", "/").strip()
                 safra_filter = Safra.objects.filter(safra=safra_filter)[0]
             return (
                 super(PlantioDetailPlantioAdmin, self)
@@ -1628,6 +1628,7 @@ class ProgramaAdmin(admin.ModelAdmin):
         )
 
     show_full_result_count = False
+    readonly_fields = ["modificado"]
 
     inlines = [EstagiosProgramaInline]
     list_display = (
@@ -1646,6 +1647,23 @@ class ProgramaAdmin(admin.ModelAdmin):
     list_filter = ("safra__safra", "ciclo__ciclo", "ativo")
 
     ordering = ("safra", "ciclo")
+
+    fieldsets = [
+        (
+            "Dados",
+            {
+                "fields": (
+                    ("ativo", "modificado"),
+                    ("nome", "nome_fantasia"),
+                    ("safra", "ciclo"),
+                    ("cultura"),
+                    ("programa_por_data", "programa_por_estagio"),
+                    ("start_date", "end_date"),
+                    ("versao"),
+                )
+            },
+        )
+    ]
 
     def safra_description(self, obj):
         return f"{obj.safra.safra} - {obj.ciclo.ciclo}"

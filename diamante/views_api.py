@@ -28,7 +28,7 @@ from rest_framework import generics
 
 
 import json
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.core.serializers import serialize
 from django.db.models import Q, Sum, DecimalField, Count, FilteredRelation
 import datetime
@@ -95,6 +95,11 @@ import requests
 
 from django.db.models import Case, When, DecimalField, Value, F
 from django.db.models.functions import Coalesce, Round
+
+
+import time
+from .map_generate_pol import draw_cartoon_map
+import base64
 
 
 # --------------------- --------------------- START DEFENSIVOS MONGO API --------------------- --------------------- #
@@ -555,7 +560,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 area_colheita=area,
                                 map_centro_id=map_centro_id_farm,
                                 map_geo_points=map_geo_points_farm,
-                                id_farmbox = id_plantio_farmbox
+                                id_farmbox=id_plantio_farmbox,
                                 # data_plantio=data_plantio,
                             )
 
@@ -603,7 +608,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 programa=None,
                                 map_centro_id=map_centro_id_farm,
                                 map_geo_points=map_geo_points_farm,
-                                id_farmbox = id_plantio_farmbox
+                                id_farmbox=id_plantio_farmbox,
                                 # data_plantio=data_plantio,
                             )
                             novo_plantio.save()
@@ -2330,6 +2335,91 @@ class PlantioViewSet(viewsets.ModelViewSet):
             response = {"message": "Você precisa estar logado!!!"}
             return Response(response, status=status.HTTP_401_UNAUTHORIZED)
 
+    @action(detail=False, methods=["GET", "POST"])
+    def get_matplot_draw(self, request, pk=None):
+        # get id_farmbox
+        projeto_filter = request.data["projeto"]
+        parcelas_filter = request.data["parcelas"]
+        print(parcelas_filter)
+        for i in parcelas_filter:
+            print(i)
+
+        start_time = time.time()
+        print(start_time)
+        try:
+            plantio_map = Plantio.objects.values(
+                "map_geo_points", "map_centro_id", "talhao__id_talhao", "id_farmbox"
+            ).filter(
+                safra__safra="2023/2024",
+                ciclo__ciclo="3",
+                finalizado_plantio=True,
+                talhao__fazenda__id_farmbox=projeto_filter,
+            )
+
+            print("depois de fazer a query")
+            print(time.time() - start_time)
+            center_id = []
+            polygons = []
+            labels = []
+            farm_ids = []
+            print("entrando no loop")
+            print(time.time() - start_time)
+            for i in plantio_map:
+                center = [
+                    float(i["map_centro_id"]["lat"]),
+                    (float(i["map_centro_id"]["lng"]) * -1),
+                ]
+                center_id.append(center)
+
+                np = [
+                    [float(x["latitude"]), (float(x["longitude"]) * -1)]
+                    for x in i["map_geo_points"]
+                ]
+                polygons.append(np)
+
+                labels.append(i["talhao__id_talhao"])
+                farm_ids.append(i["id_farmbox"])
+
+            print("saindo do loop")
+            print(time.time() - start_time)
+
+            img_buffer = draw_cartoon_map(
+                polygons=polygons,
+                labels=labels,
+                centerid=center_id,
+                ids_farmbox=farm_ids,
+                filled_polygon_index=parcelas_filter,
+                filled_color=(0, 0.96, 0, 0.7),
+                fontsize=3,
+            )
+
+            data_img = base64.b64encode(img_buffer.getvalue()).decode()
+            data_uri = f"data:image/png;base64,{data_img}"
+
+            response = {
+                "msg": "Mapa gerado com sucesso!!",
+                "data": {
+                    "center_ids": center_id,
+                    "labels": labels,
+                    "polygons": polygons,
+                },
+            }
+            return HttpResponse(
+                data_uri,
+                content_type="image/png",
+                status=status.HTTP_200_OK,
+            )
+
+            # POSTMAN
+            # return HttpResponse(
+            #     img_buffer.getvalue(),
+            #     content_type="image/png",
+            #     status=status.HTTP_200_OK,
+            # )
+        except Exception as e:
+            response = {"message": f"Ocorreu um Erro: {e}"}
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
 
 class DefensivoViewSet(viewsets.ModelViewSet):
     queryset = Defensivo.objects.all().order_by("produto")
@@ -2528,14 +2618,14 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                 safra = i["Safra"]
                 ciclo = i["Ciclo"]
                 destino = i["Destino"]
-                
-                if 'UBS' in str(destino):
+
+                if "UBS" in str(destino):
                     destino = 2
                 elif "BADU" in str(destino):
                     destino = 10
                 elif "FAZENDAO" in str(destino):
                     destino = 4
-                
+
                 final_ticket = f"{filial}{ticket}"
                 print(i)
                 if len(parcelas) > 1:
