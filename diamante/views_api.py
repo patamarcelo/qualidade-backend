@@ -470,7 +470,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             try:
                 # file = request.FILES["plantio_arroz"]
                 # file_ = open(os.path.join(settings.BASE_DIR, 'filename'))
-                date_file = "2024-03-22 07:36"
+                date_file = "2024-04-03 15:14"
                 with open(f"static/files/dataset-{date_file}.json") as user_file:
                     file_contents = user_file.read()
                     parsed_json = json.loads(file_contents)
@@ -2573,6 +2573,17 @@ def adjust_parcelas(parcelas):
         return list_parcelas[:-1]
     return parcelas.replace("'", "").split(";")[0:-1]
 
+def adjust_percent_parcelas(percent):
+    if len(percent) > 0:
+        list_percent = percent.split(';')
+        if len(list_percent) > 2:
+            new_list = [int(x) / 100 for x in list_percent[0:-1] ]
+            return new_list
+        else :
+            return list_percent[0]
+    else:
+        return ""
+
 
 class ColheitaApiSave(viewsets.ModelViewSet):
     queryset = Colheita.objects.all()
@@ -2597,7 +2608,7 @@ class ColheitaApiSave(viewsets.ModelViewSet):
             problem = []
             success_list = []
             for i in data_json:
-                data = i["Data de Pesagem"]
+                data = i["Data de Pesagem Tara"]
                 if "/" in data:
                     data = datetime.datetime.strptime(data, "%d/%m/%Y").strftime(
                         "%Y-%m-%d"
@@ -2618,6 +2629,9 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                 safra = i["Safra"]
                 ciclo = i["Ciclo"]
                 destino = i["Destino"]
+                percent_parcelas = adjust_percent_parcelas(i["Percentual_Parcela"])
+                id_farmtruck= i["ID_Integracao"]
+                
 
                 if "UBS" in str(destino):
                     destino = 2
@@ -2625,20 +2639,27 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                     destino = 10
                 elif "FAZENDAO" in str(destino):
                     destino = 4
+                elif "DIAMANTE" in str(destino):
+                    destino = 1
 
                 final_ticket = f"{filial}{ticket}"
                 print(i)
                 if len(parcelas) > 1:
                     for index, parcela in enumerate(parcelas):
-                        peso_bruto_considerado = int(peso_bruto / len(parcelas))
-                        peso_tara_considerado = int(peso_tara / len(parcelas))
-                        if index + 1 == len(parcelas):
-                            if peso_bruto % len(parcelas) != 0:
-                                peso_bruto_ajuste = peso_bruto % len(parcelas)
-                                peso_bruto_considerado += peso_bruto_ajuste
-                            if peso_tara % len(parcelas) != 0:
-                                peso_tara_ajuste = peso_tara % len(parcelas)
-                                peso_tara_considerado += peso_tara_ajuste
+                        if len(percent_parcelas) > 0:
+                            peso_bruto_considerado = int(peso_bruto * percent_parcelas[index])
+                            peso_tara_considerado = int(peso_tara * percent_parcelas[index])
+                        
+                        else :
+                            if index + 1 == len(parcelas):
+                                peso_bruto_considerado = int(peso_bruto / len(parcelas))
+                                peso_tara_considerado = int(peso_tara / len(parcelas))
+                                if peso_bruto % len(parcelas) != 0:
+                                    peso_bruto_ajuste = peso_bruto % len(parcelas)
+                                    peso_bruto_considerado += peso_bruto_ajuste
+                                if peso_tara % len(parcelas) != 0:
+                                    peso_tara_ajuste = peso_tara % len(parcelas)
+                                    peso_tara_considerado += peso_tara_ajuste
                         peso_liquido_considerado = int(
                             peso_bruto_considerado - peso_tara_considerado
                         )
@@ -2659,7 +2680,9 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                             "safra": safra,
                             "ciclo": ciclo,
                             "destino": destino,
+                            "id_farmtruck": id_farmtruck
                         }
+                        print("Nova Carga: ", f'{Fore.CYAN}{carga}{Style.RESET_ALL}')
                         try:
                             plantio_id = plantio_query.get(
                                 safra__safra=safra,
@@ -2683,6 +2706,7 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                                         peso_bruto=peso_bruto_considerado,
                                         umidade=Decimal(umidade),
                                         impureza=Decimal(impureza),
+                                        id_farmtruck=id_farmtruck,
                                     )
                                     new_carga.save()
                                     succes += 1
@@ -2722,7 +2746,6 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                                 "error": str(e),
                             }
                             problem.append(problem_load)
-                        print(carga)
                 else:
                     carga = {
                         "data": data,
@@ -2741,7 +2764,9 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                         "safra": safra,
                         "ciclo": ciclo,
                         "destino": destino,
+                        "id_farmtruck": id_farmtruck
                     }
+                    print("Nova Carga 1 parcela :", f'{Fore.LIGHTCYAN_EX}{carga}{Style.RESET_ALL}')
                     try:
                         plantio_id = plantio_query.get(
                             safra__safra=safra,
@@ -2764,6 +2789,7 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                                     peso_bruto=peso_bruto,
                                     umidade=Decimal(umidade),
                                     impureza=Decimal(impureza),
+                                    id_farmtruck=id_farmtruck,
                                 )
                                 new_carga.save()
                                 succes += 1
@@ -2802,7 +2828,6 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                             "error": str(e),
                         }
                         problem.append(problem_load)
-                    print(carga)
                 print("\n")
             qs = Colheita.objects.all()
             serializer = ColheitaSerializer(qs, many=True)

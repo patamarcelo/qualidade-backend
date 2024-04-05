@@ -884,6 +884,14 @@ class Colheita(Base):
     deposito = models.ForeignKey(
         Deposito, on_delete=models.PROTECT, related_name="deposito_colheita"
     )
+    
+    id_farmtruck = models.CharField(
+        "ID Plantio Farmtruck APP",
+        help_text="Id de cada plantio do App FarmTruck",
+        max_length=100,
+        blank=True,
+        null=True,
+    )
 
     # @property
     # def peso_saco_umido(self):
