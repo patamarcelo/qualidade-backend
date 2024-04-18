@@ -937,22 +937,18 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
             "Plantio",
             {
                 "fields": (
-                    ("area_colheita",),
+                    (
+                        "area_colheita",
+                        "area_parcial",
+                    ),
                     ("safra", "ciclo"),
                     ("variedade", "programa"),
-                    (
-                        "finalizado_plantio",
-                        "data_prevista_plantio",
-                    ),
+                    ("finalizado_plantio", "finalizado_colheita"),
                     (
                         "data_plantio",
                         "data_emergencia",
                     ),
-                    (
-                        "area_parcial",
-                        "finalizado_colheita",
-                    ),
-                    ("data_prevista_colheita",),
+                    ("data_prevista_colheita", "data_prevista_plantio"),
                     ("area_aferida",),
                     ("plantio_descontinuado",),
                     ("observacao",),
@@ -1383,7 +1379,7 @@ class ColheitaAdmin(admin.ModelAdmin):
             "Dados",
             {
                 "fields": (
-                    ("ativo",),
+                    ("ativo", "id_farmtruck"),
                     ("criados", "modificado"),
                 )
             },
@@ -1397,8 +1393,8 @@ class ColheitaAdmin(admin.ModelAdmin):
                     ("placa", "motorista"),
                     ("ticket", "op"),
                     ("peso_tara", "peso_bruto"),
-                    ("peso_scs_limpo_e_seco"),
-                    ("peso_liquido", "peso_scs_liquido"),
+                    ("get_peso_liquido", 'peso_scs_liquido'),
+                    ("peso_liquido", "peso_scs_limpo_e_seco"),
                 )
             },
         ),
@@ -1451,11 +1447,14 @@ class ColheitaAdmin(admin.ModelAdmin):
         "desconto_bandinha",
         "criados",
         "modificado",
+        "id_farmtruck",
+        "get_peso_liquido"
     )
 
     search_fields = [
         "romaneio",
         "placa",
+        "ticket",
         "motorista",
         "deposito__nome_fantasia",
         "plantio__talhao__id_unico",
@@ -1502,7 +1501,7 @@ class ColheitaAdmin(admin.ModelAdmin):
                     messages.add_message(request, messages.SUCCESS, msg)
                     success_format = list(
                         map(
-                            lambda x: f"Romaneio: {x['romaneio']} - {x['projeto']}: {x['parcela']}",
+                            lambda x: f"{x['romaneio']} - Ticket: {x['ticket']} - {x['projeto']}: {x['parcela']}",
                             success_loads,
                         )
                     )
@@ -1531,7 +1530,10 @@ class ColheitaAdmin(admin.ModelAdmin):
     #     return view
 
     def get_peso_liquido(self, obj):
-        return obj.peso_bruto - obj.peso_tara
+        if obj.peso_bruto is not None and obj.peso_tara is not None:
+            return obj.peso_bruto - obj.peso_tara
+        else:
+            return " - "
 
     get_peso_liquido.short_description = "Peso"
 

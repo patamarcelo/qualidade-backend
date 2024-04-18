@@ -887,7 +887,6 @@ class Colheita(Base):
     
     id_farmtruck = models.CharField(
         "ID Plantio Farmtruck APP",
-        help_text="Id de cada plantio do App FarmTruck",
         max_length=100,
         blank=True,
         null=True,
@@ -984,7 +983,7 @@ class Colheita(Base):
         super(Colheita, self).save(*args, **kwargs)
 
     class Meta:
-        unique_together = (("plantio", "romaneio", "ticket"), ("romaneio", "plantio"))
+        unique_together = (("plantio", "romaneio", "ticket"), ("romaneio", "plantio"), ('ticket', 'plantio'))
         ordering = ["data_colheita"]
         verbose_name = "Colheita"
         verbose_name_plural = "Colheitas"
