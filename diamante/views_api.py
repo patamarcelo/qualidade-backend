@@ -2394,7 +2394,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             print("saindo do loop")
             print(time.time() - start_time)
             
-            parcelas_filter = [x["talhao__id_talhao"] for x in plantio_ids if x["id_farmbox"] in parcelas_filter]
+            parcelas_filter = [x["talhao__id_talhao"] for x in plantio_map if x["id_farmbox"] in parcelas_filter]
 
             img_buffer = draw_cartoon_map(
                 polygons=polygons,
@@ -2402,8 +2402,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 centerid=center_id,
                 ids_farmbox=farm_ids,
                 filled_polygon_index=parcelas_filter,
-                # filled_color=(0, 0.96, 0, 0.7),
-                filled_color="#4191C4",
+                filled_color=(0, 0.96, 0, 0.7),
+                # filled_color="#4191C4",
                 fontsize=3,
             )
 
@@ -2707,62 +2707,148 @@ class ColheitaApiSave(viewsets.ModelViewSet):
             problem = []
             success_list = []
             for i in data_json:
-                if len(i["Placa do veiculo"]) > 0:
-                    data = i["Data de Pesagem Tara"]
-                    if "/" in data:
-                        data = datetime.datetime.strptime(data, "%d/%m/%Y").strftime(
-                            "%Y-%m-%d"
-                        )
-                    romaneio = remove_leading_zeros(str(i["Num Romaneio"]))
-                    filial = i["Filial"]
-                    ticket = remove_leading_zeros(str(i["Ticket"]))
-                    placa = i["Placa do veiculo"]
-                    motorista = i["Motorista"]
-                    origem = i["Projeto"]
-                    origem_id = remove_leading_zeros(str(i["Cod Projeto"]))
-                    parcelas = adjust_parcelas(i["Parcela"])
-                    peso_bruto = i["Peso Bruto"]
-                    peso_tara = i["Peso Tara"]
-                    peso_liquido = i["Peso Liquido"]
-                    umidade = i["Umidade Entrada %"]
-                    impureza = i["Impureza Entrada %"]
-                    safra = i["Safra"]
-                    ciclo = i["Ciclo"]
-                    destino = i["Destino"]
-                    percent_parcelas = adjust_percent_parcelas(i["Percentual_Parcela"])
-                    id_farmtruck= i["ID_Integracao"]
-                    
-
-                    if "UBS" in str(destino):
-                        destino = 2
-                    elif "BADU" in str(destino):
-                        destino = 10
-                    elif "FAZENDAO" in str(destino):
-                        destino = 4
-                    elif "DIAMANTE" in str(destino):
-                        destino = 1
-
-                    final_ticket = f"{filial}{ticket}"
-                    print(i)
-                    if len(parcelas) > 1:
-                        for index, parcela in enumerate(parcelas):
-                            if len(percent_parcelas) > 0:
-                                peso_bruto_considerado = int(peso_bruto * percent_parcelas[index])
-                                peso_tara_considerado = int(peso_tara * percent_parcelas[index])
-                            
-                            else :
-                                if index + 1 == len(parcelas):
-                                    peso_bruto_considerado = int(peso_bruto / len(parcelas))
-                                    peso_tara_considerado = int(peso_tara / len(parcelas))
-                                    if peso_bruto % len(parcelas) != 0:
-                                        peso_bruto_ajuste = peso_bruto % len(parcelas)
-                                        peso_bruto_considerado += peso_bruto_ajuste
-                                    if peso_tara % len(parcelas) != 0:
-                                        peso_tara_ajuste = peso_tara % len(parcelas)
-                                        peso_tara_considerado += peso_tara_ajuste
-                            peso_liquido_considerado = int(
-                                peso_bruto_considerado - peso_tara_considerado
+                try:
+                    if len(i["Placa do veiculo"]) > 0:
+                        data = i["Data de Pesagem Tara"]
+                        if "/" in data:
+                            data = datetime.datetime.strptime(data, "%d/%m/%Y").strftime(
+                                "%Y-%m-%d"
                             )
+                        romaneio = remove_leading_zeros(str(i["Num Romaneio"]))
+                        filial = i["Filial"]
+                        ticket = remove_leading_zeros(str(i["Ticket"]))
+                        placa = i["Placa do veiculo"]
+                        motorista = i["Motorista"]
+                        origem = i["Projeto"]
+                        origem_id = remove_leading_zeros(str(i["Cod Projeto"]))
+                        parcelas = adjust_parcelas(i["Parcela"])
+                        peso_bruto = i["Peso Bruto"]
+                        peso_tara = i["Peso Tara"]
+                        peso_liquido = i["Peso Liquido"]
+                        umidade = i["Umidade Entrada %"]
+                        impureza = i["Impureza Entrada %"]
+                        safra = i["Safra"]
+                        ciclo = i["Ciclo"]
+                        destino = i["Destino"]
+                        percent_parcelas = adjust_percent_parcelas(i["Percentual_Parcela"])
+                        id_farmtruck= i["ID_Integracao"]
+                        
+
+                        if "UBS" in str(destino):
+                            destino = 2
+                        elif "BADU" in str(destino):
+                            destino = 10
+                        elif "FAZENDAO" in str(destino):
+                            destino = 4
+                        elif "DIAMANTE" in str(destino):
+                            destino = 1
+
+                        final_ticket = f"{filial}{ticket}"
+                        print(i)
+                        if len(parcelas) > 1:
+                            for index, parcela in enumerate(parcelas):
+                                if len(percent_parcelas) > 0:
+                                    peso_bruto_considerado = int(peso_bruto * percent_parcelas[index])
+                                    peso_tara_considerado = int(peso_tara * percent_parcelas[index])
+                                
+                                else :
+                                    if index + 1 == len(parcelas):
+                                        peso_bruto_considerado = int(peso_bruto / len(parcelas))
+                                        peso_tara_considerado = int(peso_tara / len(parcelas))
+                                        if peso_bruto % len(parcelas) != 0:
+                                            peso_bruto_ajuste = peso_bruto % len(parcelas)
+                                            peso_bruto_considerado += peso_bruto_ajuste
+                                        if peso_tara % len(parcelas) != 0:
+                                            peso_tara_ajuste = peso_tara % len(parcelas)
+                                            peso_tara_considerado += peso_tara_ajuste
+                                peso_liquido_considerado = int(
+                                    peso_bruto_considerado - peso_tara_considerado
+                                )
+                                carga = {
+                                    "data": data,
+                                    "romaneio": romaneio,
+                                    "ticket": final_ticket,
+                                    "placa": placa,
+                                    "motorista": motorista,
+                                    "origem": origem,
+                                    "origem_id": origem_id,
+                                    "parcela": parcela,
+                                    "peso_bruto": peso_bruto_considerado,
+                                    "peso_tara": peso_tara_considerado,
+                                    "peso_liquido": peso_liquido_considerado,
+                                    "umidade": umidade,
+                                    "impureza": impureza,
+                                    "safra": safra,
+                                    "ciclo": ciclo,
+                                    "destino": destino,
+                                    "id_farmtruck": id_farmtruck
+                                }
+                                print("Nova Carga: ", f'{Fore.CYAN}{carga}{Style.RESET_ALL}')
+                                try:
+                                    plantio_id = plantio_query.get(
+                                        safra__safra=safra,
+                                        ciclo__ciclo=ciclo,
+                                        talhao__fazenda__id_d=origem_id,
+                                        talhao__id_talhao=parcela,
+                                    )
+                                    deposito_id = deposito_query.get(pk=destino)
+
+                                    if plantio_id and deposito_id:
+                                        try:
+                                            new_carga = Colheita(
+                                                plantio=plantio_id,
+                                                deposito=deposito_id,
+                                                data_colheita=data,
+                                                romaneio=romaneio,
+                                                placa=placa,
+                                                motorista=motorista,
+                                                ticket=final_ticket,
+                                                peso_tara=peso_tara_considerado,
+                                                peso_bruto=peso_bruto_considerado,
+                                                umidade=Decimal(umidade),
+                                                impureza=Decimal(impureza),
+                                                id_farmtruck=id_farmtruck,
+                                            )
+                                            new_carga.save()
+                                            succes += 1
+                                            print(
+                                                f"{Fore.GREEN}Nova Carga incluida com sucesso: {new_carga}{Style.RESET_ALL}"
+                                            )
+                                            success_load = {
+                                                "parcela": parcela,
+                                                "projeto": origem,
+                                                "romaneio": romaneio,
+                                                "ticket": ticket
+                                            }
+                                            success_list.append(success_load)
+                                        except Exception as e:
+                                            print(
+                                                f"Proglema em salvar a carga: {Fore.LIGHTRED_EX}{e}{Style.RESET_ALL}"
+                                            )
+                                            failed += 1
+                                            problem_load = {
+                                                "parcela": parcela,
+                                                "projeto": origem,
+                                                "romaneio": romaneio,
+                                                "error": str(e),
+                                            }
+
+                                            problem.append(problem_load)
+                                    print(f"{Fore.BLUE}{deposito_id}{Style.RESET_ALL}")
+                                    print(f"{Fore.BLUE}{plantio_id}{Style.RESET_ALL}")
+                                except Exception as e:
+                                    print(
+                                        f"plantio não encontrado - {Fore.LIGHTRED_EX}Origem: {origem} | Parcela: {parcela} | Erro: {e}{Style.RESET_ALL}"
+                                    )
+                                    failed += 1
+                                    problem_load = {
+                                        "parcela": parcela,
+                                        "projeto": origem,
+                                        "romaneio": romaneio,
+                                        "error": str(e),
+                                    }
+                                    problem.append(problem_load)
+                        else:
                             carga = {
                                 "data": data,
                                 "romaneio": romaneio,
@@ -2771,10 +2857,10 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                                 "motorista": motorista,
                                 "origem": origem,
                                 "origem_id": origem_id,
-                                "parcela": parcela,
-                                "peso_bruto": peso_bruto_considerado,
-                                "peso_tara": peso_tara_considerado,
-                                "peso_liquido": peso_liquido_considerado,
+                                "parcela": parcelas[0],
+                                "peso_bruto": peso_bruto,
+                                "peso_tara": peso_tara,
+                                "peso_liquido": peso_liquido,
                                 "umidade": umidade,
                                 "impureza": impureza,
                                 "safra": safra,
@@ -2782,16 +2868,15 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                                 "destino": destino,
                                 "id_farmtruck": id_farmtruck
                             }
-                            print("Nova Carga: ", f'{Fore.CYAN}{carga}{Style.RESET_ALL}')
+                            print("Nova Carga 1 parcela :", f'{Fore.LIGHTCYAN_EX}{carga}{Style.RESET_ALL}')
                             try:
                                 plantio_id = plantio_query.get(
                                     safra__safra=safra,
                                     ciclo__ciclo=ciclo,
                                     talhao__fazenda__id_d=origem_id,
-                                    talhao__id_talhao=parcela,
+                                    talhao__id_talhao=parcelas[0],
                                 )
                                 deposito_id = deposito_query.get(pk=destino)
-
                                 if plantio_id and deposito_id:
                                     try:
                                         new_carga = Colheita(
@@ -2802,8 +2887,8 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                                             placa=placa,
                                             motorista=motorista,
                                             ticket=final_ticket,
-                                            peso_tara=peso_tara_considerado,
-                                            peso_bruto=peso_bruto_considerado,
+                                            peso_tara=peso_tara,
+                                            peso_bruto=peso_bruto,
                                             umidade=Decimal(umidade),
                                             impureza=Decimal(impureza),
                                             id_farmtruck=id_farmtruck,
@@ -2814,7 +2899,7 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                                             f"{Fore.GREEN}Nova Carga incluida com sucesso: {new_carga}{Style.RESET_ALL}"
                                         )
                                         success_load = {
-                                            "parcela": parcela,
+                                            "parcela": parcelas[0],
                                             "projeto": origem,
                                             "romaneio": romaneio,
                                             "ticket": ticket
@@ -2826,120 +2911,38 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                                         )
                                         failed += 1
                                         problem_load = {
-                                            "parcela": parcela,
+                                            "parcela": parcelas[0],
                                             "projeto": origem,
                                             "romaneio": romaneio,
                                             "error": str(e),
                                         }
-
                                         problem.append(problem_load)
                                 print(f"{Fore.BLUE}{deposito_id}{Style.RESET_ALL}")
                                 print(f"{Fore.BLUE}{plantio_id}{Style.RESET_ALL}")
                             except Exception as e:
                                 print(
-                                    f"plantio não encontrado - {Fore.LIGHTRED_EX}Origem: {origem} | Parcela: {parcela} | Erro: {e}{Style.RESET_ALL}"
+                                    f"plantio não encontrado - {Fore.LIGHTRED_EX}Origem: {origem} | Parcela: {parcelas[0]} | Erro: {e}{Style.RESET_ALL}"
                                 )
                                 failed += 1
                                 problem_load = {
-                                    "parcela": parcela,
+                                    "parcela": parcelas[0],
                                     "projeto": origem,
                                     "romaneio": romaneio,
                                     "error": str(e),
                                 }
                                 problem.append(problem_load)
+                        print("\n")
                     else:
-                        carga = {
-                            "data": data,
-                            "romaneio": romaneio,
-                            "ticket": final_ticket,
-                            "placa": placa,
-                            "motorista": motorista,
-                            "origem": origem,
-                            "origem_id": origem_id,
-                            "parcela": parcelas[0],
-                            "peso_bruto": peso_bruto,
-                            "peso_tara": peso_tara,
-                            "peso_liquido": peso_liquido,
-                            "umidade": umidade,
-                            "impureza": impureza,
-                            "safra": safra,
-                            "ciclo": ciclo,
-                            "destino": destino,
-                            "id_farmtruck": id_farmtruck
-                        }
-                        print("Nova Carga 1 parcela :", f'{Fore.LIGHTCYAN_EX}{carga}{Style.RESET_ALL}')
-                        try:
-                            plantio_id = plantio_query.get(
-                                safra__safra=safra,
-                                ciclo__ciclo=ciclo,
-                                talhao__fazenda__id_d=origem_id,
-                                talhao__id_talhao=parcelas[0],
-                            )
-                            deposito_id = deposito_query.get(pk=destino)
-                            if plantio_id and deposito_id:
-                                try:
-                                    new_carga = Colheita(
-                                        plantio=plantio_id,
-                                        deposito=deposito_id,
-                                        data_colheita=data,
-                                        romaneio=romaneio,
-                                        placa=placa,
-                                        motorista=motorista,
-                                        ticket=final_ticket,
-                                        peso_tara=peso_tara,
-                                        peso_bruto=peso_bruto,
-                                        umidade=Decimal(umidade),
-                                        impureza=Decimal(impureza),
-                                        id_farmtruck=id_farmtruck,
-                                    )
-                                    new_carga.save()
-                                    succes += 1
-                                    print(
-                                        f"{Fore.GREEN}Nova Carga incluida com sucesso: {new_carga}{Style.RESET_ALL}"
-                                    )
-                                    success_load = {
-                                        "parcela": parcelas[0],
-                                        "projeto": origem,
-                                        "romaneio": romaneio,
-                                        "ticket": ticket
-                                    }
-                                    success_list.append(success_load)
-                                except Exception as e:
-                                    print(
-                                        f"Proglema em salvar a carga: {Fore.LIGHTRED_EX}{e}{Style.RESET_ALL}"
-                                    )
-                                    failed += 1
-                                    problem_load = {
-                                        "parcela": parcelas[0],
-                                        "projeto": origem,
-                                        "romaneio": romaneio,
-                                        "error": str(e),
-                                    }
-                                    problem.append(problem_load)
-                            print(f"{Fore.BLUE}{deposito_id}{Style.RESET_ALL}")
-                            print(f"{Fore.BLUE}{plantio_id}{Style.RESET_ALL}")
-                        except Exception as e:
-                            print(
-                                f"plantio não encontrado - {Fore.LIGHTRED_EX}Origem: {origem} | Parcela: {parcelas[0]} | Erro: {e}{Style.RESET_ALL}"
-                            )
-                            failed += 1
-                            problem_load = {
-                                "parcela": parcelas[0],
-                                "projeto": origem,
-                                "romaneio": romaneio,
-                                "error": str(e),
-                            }
-                            problem.append(problem_load)
-                    print("\n")
-                else:
-                    print('Carga sem Placa e para ser computada')
-                    problem_load = {
-                                "parcela": "SEM PLACA",
-                                "projeto": "SEM PLACA",
-                                "romaneio": remove_leading_zeros(str(i["Ticket"])),
-                                "error": "SEM PLACA",
-                            }
-                    problem.append(problem_load)
+                        print('Carga sem Placa e para ser computada')
+                        problem_load = {
+                                    "parcela": "SEM PLACA",
+                                    "projeto": "SEM PLACA",
+                                    "romaneio": remove_leading_zeros(str(i["Ticket"])),
+                                    "error": "SEM PLACA",
+                                }
+                        problem.append(problem_load)
+                except Exception as e:
+                    print(f'{Fore.LIGHTRED_EX}Erro ao salvar a carga, verificar os campos fornecidos: {e}{Style.RESET_ALL}' )
             qs = Colheita.objects.all()
             serializer = ColheitaSerializer(qs, many=True)
             try:
