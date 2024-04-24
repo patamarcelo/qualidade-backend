@@ -101,6 +101,15 @@ import time
 from .map_generate_pol import draw_cartoon_map
 import base64
 
+from rest_framework.authtoken.models import Token
+
+from qualidade_project.settings import DEBUG
+
+main_path_upload_ids = (
+    "http://localhost:5050"
+    if DEBUG == True
+    else "https://ubs-nodeserver.up.railway.app"
+)
 
 # --------------------- --------------------- START DEFENSIVOS MONGO API --------------------- --------------------- #
 
@@ -470,7 +479,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             try:
                 # file = request.FILES["plantio_arroz"]
                 # file_ = open(os.path.join(settings.BASE_DIR, 'filename'))
-                date_file = "2024-04-16 12:03"
+                date_file = "2024-04-22 08:16"
                 with open(f"static/files/dataset-{date_file}.json") as user_file:
                     file_contents = user_file.read()
                     parsed_json = json.loads(file_contents)
@@ -1091,7 +1100,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 # ------------- ------------- END SEPARADO POR FAZENDA > PROJETO ------------- -------------#
 
                 area_total = qs_annotate.aggregate(Sum("area_colheita"))
-                projetos = Projeto.objects.values("nome", "fazenda__nome", 'id_d')
+                projetos = Projeto.objects.values("nome", "fazenda__nome", "id_d")
                 resumo_by_farm = []
                 for projeto in projetos:
                     filter_array = list(
@@ -1965,6 +1974,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     )
                     .values(
                         "id",
+                        "modificado",
                         "talhao__id_talhao",
                         "talhao__id_unico",
                         "talhao_id",
@@ -1999,6 +2009,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                             "variedade": i["variedade__nome_fantasia"],
                             "plantio_id": i["id"],
                             "finalizado_plantio": i["finalizado_plantio"],
+                            # "finalizado_colheita": True if i["modificado"] < datetime.datetime.strptime("2023-12-30", '%Y-%m-%d') else False,
                             "finalizado_colheita": i["finalizado_colheita"],
                             "plantio_descontinuado": i["plantio_descontinuado"],
                             "fazenda_grupo": i["talhao__fazenda__fazenda__nome"],
@@ -2066,6 +2077,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 )
                 qs_plantio = Plantio.objects.values(
                     "id",
+                    "modificado",
                     "talhao__id_talhao",
                     "talhao__id_unico",
                     "talhao_id",
@@ -2094,6 +2106,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 result = [x for x in qs_plantio]
                 for i in qs_colheita:
                     for j in result:
+                        # dateFilt = "2023-12-30"
+                        # j["finalizado_colheita"] = True if j["modificado"] < datetime.datetime.strptime(dateFilt, '%Y-%m-%d') else False
                         if i["plantio__id"] == j["id"]:
                             j["peso_kg"] = i["peso_kg"]
                             j["peso_scs"] = i["peso_scs"]
@@ -2357,8 +2371,10 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 # programa__isnull=False,
                 talhao__fazenda__id_farmbox=projeto_filter,
             )
-            
-            plantio_ids = Plantio.objects.values("id_farmbox", "talhao__id_talhao").filter(
+
+            plantio_ids = Plantio.objects.values(
+                "id_farmbox", "talhao__id_talhao"
+            ).filter(
                 safra__safra="2024/2025",
                 ciclo__ciclo="1",
                 # finalizado_plantio=True,
@@ -2393,8 +2409,12 @@ class PlantioViewSet(viewsets.ModelViewSet):
 
             print("saindo do loop")
             print(time.time() - start_time)
-            
-            parcelas_filter = [x["talhao__id_talhao"] for x in plantio_map if x["id_farmbox"] in parcelas_filter]
+
+            parcelas_filter = [
+                x["talhao__id_talhao"]
+                for x in plantio_map
+                if x["id_farmbox"] in parcelas_filter
+            ]
 
             img_buffer = draw_cartoon_map(
                 polygons=polygons,
@@ -2433,7 +2453,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
         except Exception as e:
             response = {"message": f"Ocorreu um Erro: {e}"}
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
-    
+
     @action(detail=False, methods=["GET", "POST"])
     def get_matplot_draw_application(self, request, pk=None):
         # get id_farmbox
@@ -2447,7 +2467,11 @@ class PlantioViewSet(viewsets.ModelViewSet):
         print(start_time)
         try:
             plantio_map = Plantio.objects.values(
-                "map_geo_points", "map_centro_id", "talhao__id_talhao", "id_farmbox", "id"
+                "map_geo_points",
+                "map_centro_id",
+                "talhao__id_talhao",
+                "id_farmbox",
+                "id",
             ).filter(
                 safra__safra="2023/2024",
                 ciclo__ciclo="3",
@@ -2672,13 +2696,14 @@ def adjust_parcelas(parcelas):
         return list_parcelas[:-1]
     return parcelas.replace("'", "").split(";")[0:-1]
 
+
 def adjust_percent_parcelas(percent):
     if len(percent) > 0:
-        list_percent = percent.split(';')
+        list_percent = percent.split(";")
         if len(list_percent) > 2:
-            new_list = [float(x) / 100 for x in list_percent[0:-1] ]
+            new_list = [float(x) / 100 for x in list_percent[0:-1]]
             return new_list
-        else :
+        else:
             return list_percent[0]
     else:
         return ""
@@ -2692,6 +2717,7 @@ class ColheitaApiSave(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["GET", "POST"])
     def save_from_protheus(self, request):
+        user_id = Token.objects.get(user=request.user)
         if request.user.is_authenticated:
             data_json = request.data
             # date_file = request.data["plantio"]
@@ -2711,9 +2737,9 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                     if len(i["Placa do veiculo"]) > 0:
                         data = i["Data de Pesagem Tara"]
                         if "/" in data:
-                            data = datetime.datetime.strptime(data, "%d/%m/%Y").strftime(
-                                "%Y-%m-%d"
-                            )
+                            data = datetime.datetime.strptime(
+                                data, "%d/%m/%Y"
+                            ).strftime("%Y-%m-%d")
                         romaneio = remove_leading_zeros(str(i["Num Romaneio"]))
                         filial = i["Filial"]
                         ticket = remove_leading_zeros(str(i["Ticket"]))
@@ -2730,9 +2756,10 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                         safra = i["Safra"]
                         ciclo = i["Ciclo"]
                         destino = i["Destino"]
-                        percent_parcelas = adjust_percent_parcelas(i["Percentual_Parcela"])
-                        id_farmtruck= i["ID_Integracao"]
-                        
+                        percent_parcelas = adjust_percent_parcelas(
+                            i["Percentual_Parcela"]
+                        )
+                        id_farmtruck = i["ID_Integracao"]
 
                         if "UBS" in str(destino):
                             destino = 2
@@ -2748,15 +2775,25 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                         if len(parcelas) > 1:
                             for index, parcela in enumerate(parcelas):
                                 if len(percent_parcelas) > 0:
-                                    peso_bruto_considerado = int(peso_bruto * percent_parcelas[index])
-                                    peso_tara_considerado = int(peso_tara * percent_parcelas[index])
-                                
-                                else :
+                                    peso_bruto_considerado = int(
+                                        peso_bruto * percent_parcelas[index]
+                                    )
+                                    peso_tara_considerado = int(
+                                        peso_tara * percent_parcelas[index]
+                                    )
+
+                                else:
                                     if index + 1 == len(parcelas):
-                                        peso_bruto_considerado = int(peso_bruto / len(parcelas))
-                                        peso_tara_considerado = int(peso_tara / len(parcelas))
+                                        peso_bruto_considerado = int(
+                                            peso_bruto / len(parcelas)
+                                        )
+                                        peso_tara_considerado = int(
+                                            peso_tara / len(parcelas)
+                                        )
                                         if peso_bruto % len(parcelas) != 0:
-                                            peso_bruto_ajuste = peso_bruto % len(parcelas)
+                                            peso_bruto_ajuste = peso_bruto % len(
+                                                parcelas
+                                            )
                                             peso_bruto_considerado += peso_bruto_ajuste
                                         if peso_tara % len(parcelas) != 0:
                                             peso_tara_ajuste = peso_tara % len(parcelas)
@@ -2781,9 +2818,12 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                                     "safra": safra,
                                     "ciclo": ciclo,
                                     "destino": destino,
-                                    "id_farmtruck": id_farmtruck
+                                    "id_farmtruck": id_farmtruck,
                                 }
-                                print("Nova Carga: ", f'{Fore.CYAN}{carga}{Style.RESET_ALL}')
+                                print(
+                                    "Nova Carga: ",
+                                    f"{Fore.CYAN}{carga}{Style.RESET_ALL}",
+                                )
                                 try:
                                     plantio_id = plantio_query.get(
                                         safra__safra=safra,
@@ -2818,7 +2858,8 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                                                 "parcela": parcela,
                                                 "projeto": origem,
                                                 "romaneio": romaneio,
-                                                "ticket": ticket
+                                                "ticket": ticket,
+                                                "id_farmtruck": id_farmtruck,
                                             }
                                             success_list.append(success_load)
                                         except Exception as e:
@@ -2866,9 +2907,12 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                                 "safra": safra,
                                 "ciclo": ciclo,
                                 "destino": destino,
-                                "id_farmtruck": id_farmtruck
+                                "id_farmtruck": id_farmtruck,
                             }
-                            print("Nova Carga 1 parcela :", f'{Fore.LIGHTCYAN_EX}{carga}{Style.RESET_ALL}')
+                            print(
+                                "Nova Carga 1 parcela :",
+                                f"{Fore.LIGHTCYAN_EX}{carga}{Style.RESET_ALL}",
+                            )
                             try:
                                 plantio_id = plantio_query.get(
                                     safra__safra=safra,
@@ -2902,7 +2946,8 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                                             "parcela": parcelas[0],
                                             "projeto": origem,
                                             "romaneio": romaneio,
-                                            "ticket": ticket
+                                            "ticket": ticket,
+                                            "id_farmtruck": id_farmtruck,
                                         }
                                         success_list.append(success_load)
                                     except Exception as e:
@@ -2933,18 +2978,40 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                                 problem.append(problem_load)
                         print("\n")
                     else:
-                        print('Carga sem Placa e para ser computada')
+                        print("Carga sem Placa e para ser computada")
                         problem_load = {
-                                    "parcela": "SEM PLACA",
-                                    "projeto": "SEM PLACA",
-                                    "romaneio": remove_leading_zeros(str(i["Ticket"])),
-                                    "error": "SEM PLACA",
-                                }
+                            "parcela": "SEM PLACA",
+                            "projeto": "SEM PLACA",
+                            "romaneio": remove_leading_zeros(str(i["Ticket"])),
+                            "error": "SEM PLACA",
+                        }
                         problem.append(problem_load)
                 except Exception as e:
-                    print(f'{Fore.LIGHTRED_EX}Erro ao salvar a carga, verificar os campos fornecidos: {e}{Style.RESET_ALL}' )
+                    print(
+                        f"{Fore.LIGHTRED_EX}Erro ao salvar a carga, verificar os campos fornecidos: {e}{Style.RESET_ALL}"
+                    )
             qs = Colheita.objects.all()
             serializer = ColheitaSerializer(qs, many=True)
+            # TODO
+            id_farmtruck_list = list(set([x["id_farmtruck"] for x in success_list if len(x["id_farmtruck"]) > 5]))
+            print(
+                "IDs Farmtruck incluido com sucesso: \n",
+            )
+
+            print(id_farmtruck_list)
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Token {user_id}",
+            }
+            try:
+                response = requests.post(
+                    f"{main_path_upload_ids}/romaneios/update-status-protheus-uploaded/",
+                    headers=headers,
+                    data=json.dumps(id_farmtruck_list),
+                )
+                print("response from send Ids:", response)
+            except Exception as e:
+                print(f"erro ao enviar os Ids para o servidor: {e}")
             try:
                 response = {
                     "msg": f"Cadastro das Cargas efetuado com sucesso!!!",
