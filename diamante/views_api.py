@@ -479,7 +479,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             try:
                 # file = request.FILES["plantio_arroz"]
                 # file_ = open(os.path.join(settings.BASE_DIR, 'filename'))
-                date_file = "2024-04-22 08:16"
+                date_file = "2024-04-26 11:42"
                 with open(f"static/files/dataset-{date_file}.json") as user_file:
                     file_contents = user_file.read()
                     parsed_json = json.loads(file_contents)
@@ -2872,6 +2872,7 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                                                 "projeto": origem,
                                                 "romaneio": romaneio,
                                                 "error": str(e),
+                                                "id_farmtruck": id_farmtruck,
                                             }
 
                                             problem.append(problem_load)
@@ -2887,6 +2888,7 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                                         "projeto": origem,
                                         "romaneio": romaneio,
                                         "error": str(e),
+                                        "id_farmtruck": id_farmtruck,
                                     }
                                     problem.append(problem_load)
                         else:
@@ -2960,6 +2962,7 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                                             "projeto": origem,
                                             "romaneio": romaneio,
                                             "error": str(e),
+                                            "id_farmtruck": id_farmtruck,
                                         }
                                         problem.append(problem_load)
                                 print(f"{Fore.BLUE}{deposito_id}{Style.RESET_ALL}")
@@ -2974,6 +2977,7 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                                     "projeto": origem,
                                     "romaneio": romaneio,
                                     "error": str(e),
+                                    "id_farmtruck": id_farmtruck,
                                 }
                                 problem.append(problem_load)
                         print("\n")
@@ -2984,6 +2988,7 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                             "projeto": "SEM PLACA",
                             "romaneio": remove_leading_zeros(str(i["Ticket"])),
                             "error": "SEM PLACA",
+                            "id_farmtruck": id_farmtruck,
                         }
                         problem.append(problem_load)
                 except Exception as e:
@@ -2993,7 +2998,8 @@ class ColheitaApiSave(viewsets.ModelViewSet):
             qs = Colheita.objects.all()
             serializer = ColheitaSerializer(qs, many=True)
             # TODO
-            id_farmtruck_list = list(set([x["id_farmtruck"] for x in success_list if len(x["id_farmtruck"]) > 5]))
+            id_farmtruck_problem_list = list(set([x["id_farmtruck"] for x in problem if len(x["id_farmtruck"]) > 5]))
+            id_farmtruck_list = list(set([x["id_farmtruck"] for x in success_list if len(x["id_farmtruck"]) > 5 and x["id_farmtruck"] not in id_farmtruck_problem_list]))
             print(
                 "IDs Farmtruck incluido com sucesso: \n",
             )

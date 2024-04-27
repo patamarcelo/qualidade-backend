@@ -59,15 +59,15 @@
     {% endblock %}
     {% block result_list %}
 
-    <div style="display: flex; justify-content: flex-start; margin-bottom: 45px">
-        <h1><span class="badge badge-pill badge-success" :style="styleTitle">Plantio </span></h1>
+    <div style="display: flex; justify-content: flex-start; margin-bottom: 5px; margin-top: 50px">
+        <h1><span class="badge badge-success" :style="styleTitle">Plantio </span></h1>
     </div>
     <div v-if="titleAcomp.length > 3" style="display: flex; justify-content: center; margin-bottom: 45px">
         <h1><span class="badge badge-pill badge-success" :style="style">[[titleAcomp]]</span></h1>
     </div>
     <div class="container-fluid" v-if="!viewAllVareidades">
         <table class="table table-striped table-hover">
-            <thead>
+            <thead style="background-color: rgb(12,94,145); ; color: whitesmoke">
                 <tr>
                     <th>Projeto</th>
                     <th style="text-align: center">Cultura</th>
@@ -78,17 +78,17 @@
             </thead>
             <tbody v-if="filteredArray">
                 <tr v-for="(col,i) in filteredArray">
-                    <td>[[ i.split("|")[0] ]]</td>
+                    <td><b>[[ i.split("|")[0] ]]</b></td>
                     <td style="text-align: center"><img style="width: 26px; height: 26px; cursor: pointer"
                             :src="customIcon(i.split('|')[1])" /> </td>
                     <td style="text-align: center">[[ col?.areaTotal?.toLocaleString("pt-br", {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2
                         }) ]] ha</td>
-                    <td style="text-align: center">[[ col?.areaPlantada?.toLocaleString("pt-br", {
+                    <td style="text-align: center">[[ col?.areaPlantada === 0 ? "-" : col?.areaPlantada?.toLocaleString("pt-br", {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2
-                        }) ]] ha</td>
+                        }) + " ha"]] </td>
                     <td style="text-align: center">[[ col?.saldoPlantio?.toLocaleString("pt-br", {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2
@@ -96,17 +96,17 @@
 
                 </tr>
             </tbody>
-            <tfoot>
+            <tfoot style="background-color: rgb(12,94,145); color: whitesmoke">
                 <th scope="row">Totais</th>
                 <td style="text-align: center"></td>
                 <td style="text-align: center; font-weight: bold">[[newTotals?.areaTotal?.toLocaleString("pt-br", {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2
                     })]] ha</td>
-                <td style="text-align: center; font-weight: bold">[[newTotals?.areaPlantada?.toLocaleString("pt-br", {
+                <td style="text-align: center; font-weight: bold">[[newTotals?.areaPlantada === 0 ? "-" : newTotals?.areaPlantada?.toLocaleString("pt-br", {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2
-                    })]] ha</td>
+                    }) + " ha"]]</td>
                 <td style="text-align: center; font-weight: bold">[[newTotals?.saldoPlantio?.toLocaleString("pt-br", {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2
@@ -129,7 +129,7 @@
 
     <div class="container-fluid" v-if="viewAllVareidades">
         <table class="table table-striped table-hover">
-            <thead>
+            <thead style="background-color: rgb(12,94,145); color: whitesmoke">
                 <tr>
                     <th>Projeto</th>
                     <th style="text-align: center">Cultura</th>
@@ -152,10 +152,10 @@
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2
                             }) ]] ha</td>
-                        <td style="text-align: center">[[ col?.areaPlantada?.toLocaleString("pt-br", {
+                        <td style="text-align: center">[[ col?.areaPlantada === 0 ? "-" : col?.areaPlantada?.toLocaleString("pt-br", {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2
-                            }) ]] ha</td>
+                            }) + " ha"]] </td>
                         <td style="text-align: center">[[ col?.saldoPlantio?.toLocaleString("pt-br", {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2
@@ -170,10 +170,10 @@
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2
                             }) ]] ha</td>
-                        <td style="text-align: center">[[ colIn?.areaPlantada?.toLocaleString("pt-br", {
+                        <td style="text-align: center">[[ colIn?.areaPlantada === 0 ? "-" : colIn?.areaPlantada?.toLocaleString("pt-br", {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2
-                            }) ]] ha</td>
+                            }) + " ha"]] </td>
                         <td style="text-align: center">[[ colIn?.saldoPlantio?.toLocaleString("pt-br", {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2
@@ -182,17 +182,17 @@
                 </template>
             </tbody>
 
-            <tfoot>
+            <tfoot style="background-color: rgb(12,94,145); color: whitesmoke">
                 <th scope="row">Totais</th>
                 <td style="text-align: center"></td>
                 <td style="text-align: center; font-weight: bold">[[newTotals?.areaTotal?.toLocaleString("pt-br", {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2
                     })]] ha</td>
-                <td style="text-align: center; font-weight: bold">[[newTotals?.areaPlantada?.toLocaleString("pt-br", {
+                <td style="text-align: center; font-weight: bold">[[newTotals?.areaPlantada === 0 ? '-' : newTotals?.areaPlantada?.toLocaleString("pt-br", {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2
-                    })]] ha</td>
+                    }) + " ha"]] </td>
                 <td style="text-align: center; font-weight: bold">[[newTotals?.saldoPlantio?.toLocaleString("pt-br", {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2

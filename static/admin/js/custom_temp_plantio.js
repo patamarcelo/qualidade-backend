@@ -34,7 +34,8 @@ var app = new Vue({
 		},
 		styleTitle: {
 			color: "whitesmoke",
-			backgroundColor: "blue"
+			backgroundColor: "blue",
+			borderRadius: '12px'
 		},
 		imageField: "soy"
 	},
@@ -60,6 +61,9 @@ var app = new Vue({
 			}
 			if (cultura === "Arroz") {
 				return "/static/images/icons/rice.png";
+			}
+			if (cultura === "Algodão") {
+				return "/static/images/icons/cotton.png";
 			}
 		},
 		getFilteredChildren(filter) {
