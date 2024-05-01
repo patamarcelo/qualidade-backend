@@ -2355,6 +2355,9 @@ class PlantioViewSet(viewsets.ModelViewSet):
         # get id_farmbox
         projeto_filter = request.data["projeto"]
         parcelas_filter = request.data["parcelas"]
+        safra_filter = request.data["safra"]
+        
+        
         print(parcelas_filter)
         for i in parcelas_filter:
             print(i)
@@ -2375,8 +2378,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             plantio_ids = Plantio.objects.values(
                 "id_farmbox", "talhao__id_talhao"
             ).filter(
-                safra__safra="2024/2025",
-                ciclo__ciclo="1",
+                safra__safra=safra_filter['safra'],
                 # finalizado_plantio=True,
                 programa__isnull=False,
                 talhao__fazenda__id_farmbox=projeto_filter,
@@ -2412,7 +2414,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
 
             parcelas_filter = [
                 x["talhao__id_talhao"]
-                for x in plantio_map
+                for x in plantio_ids
                 if x["id_farmbox"] in parcelas_filter
             ]
 

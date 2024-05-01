@@ -501,6 +501,8 @@ def export_plantio(modeladmin, request, queryset):
             "Cargas Carregadas",
             "Carregado Kg",
             "Produtividade",
+            "Area Parcial",
+            "Area a Considerar",
             "lat",
             "long",
             "dap",
@@ -572,6 +574,9 @@ def export_plantio(modeladmin, request, queryset):
         plantio_detail.pop()
         lat = ""
         lng = ""
+        area_parcial = str(plantio_detail[14]).replace(".",",")
+        area_plantada = str(plantio_detail[10]).replace(".",",")
+        area_considerar = area_plantada if plantio_detail[9] == True else area_parcial
         if isinstance(plantio_detail[15], dict):
             lat = (
                 str(plantio_detail[15]["lat"]).replace(".", ",")
@@ -597,6 +602,8 @@ def export_plantio(modeladmin, request, queryset):
         plantio_detail.append(cargas_carregadas_quantidade)
         plantio_detail.append(cargas_carregadas_kg)
         plantio_detail.append(produtividade)
+        plantio_detail.append(str(area_parcial).replace(".", ','))
+        plantio_detail.append(area_considerar)
         plantio_detail.append(lat)
         plantio_detail.append(lng)
         plantio_detail.pop(0)
