@@ -607,7 +607,7 @@ def export_plantio(modeladmin, request, queryset):
         plantio_detail.append(lat)
         plantio_detail.append(lng)
         plantio_detail.pop(0)
-        time_delta_calc = time_delta_plantio + time_delta_variedade_germinacao
+        time_delta_calc = time_delta_plantio + time_delta_variedade_germinacao if time_delta_plantio is not None and time_delta_variedade_germinacao is not None else " - "
         plantio_detail.insert(11, get_prev_colheita(data_plantio, time_delta_calc))
         plantio_detail.append(get_dap(data_plantio))
         print(plantio_detail)
