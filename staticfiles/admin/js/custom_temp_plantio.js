@@ -17,9 +17,9 @@ var app = new Vue({
 		ciclos: ["1", "2", "3"],
 		selectedCiclo: url.search.split("=")[1]
 			? url.search.split("=")[1]
-			: "2",
-		selecredSafra: "2023/2024",
-		safras: ["2022/2023", "2023/2024"],
+			: "1",
+		selecredSafra: "2024/2025",
+		safras: ["2022/2023", "2023/2024", "2024/2025"],
 		plantio: plantio,
 		colheita: colheita,
 		variedades: [...new Set(filterVar)],
@@ -35,7 +35,7 @@ var app = new Vue({
 		styleTitle: {
 			color: "whitesmoke",
 			backgroundColor: "blue",
-			borderRadius: '8px !important'
+			borderRadius: '12px'
 		},
 		imageField: "soy"
 	},
@@ -107,7 +107,7 @@ var app = new Vue({
 	},
 	computed: {
 		customUrl() {
-			return `/admin/diamante/plantiodetailplantio/?ciclo=${this.selectedCiclo}`;
+			return `/admin/diamante/plantiodetailplantio/?ciclo=${this.selectedCiclo}&safra=${this.selecredSafra.replace('/','_')}`;
 		},
 		onlyFarm() {
 			const onlyFarmSetS = this.plantio.map((data) => {

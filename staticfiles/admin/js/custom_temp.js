@@ -20,7 +20,7 @@ var app = new Vue({
 			? url.search.split("=")[1]
 			: "2",
 		selecredSafra: "2023/2024",
-		safras: ["2022/2023", "2023/2024"],
+		safras: ["2022/2023", "2023/2024","2024/2025"],
 		plantio: plantio,
 		colheita: colheita,
 		variedades: [...new Set(filterVar)],
@@ -134,7 +134,7 @@ var app = new Vue({
 	},
 	computed: {
 		customUrl() {
-			return `/admin/diamante/plantiodetail/?ciclo=${this.selectedCiclo}`;
+			return `/admin/diamante/plantiodetail/?ciclo=${this.selectedCiclo}&safra=${this.selecredSafra.replace('/','_')}`;
 		},
 		onlyFarmWhitoutVariedade() {
 			const onlyFarmSetSOut = this.plantio.map((data) => {
