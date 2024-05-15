@@ -255,13 +255,15 @@ def alter_dap_programa_and_save(query, dap, current_op):
 
 
 def admin_form_alter_programa_and_save(
-    query, operation, current_op_products, difDap, newDap
+    query, operation, current_op_products, difDap, newDap, nome_estagio_alterado, estagio_alterado
 ):
     for i in query:
         try:
             index = get_index_dict_estagio(i.cronograma_programa, operation)
             print("Index: ", index)
             if index:
+                if nome_estagio_alterado == True:
+                    i.cronograma_programa[index]['estagio'] = estagio_alterado
                 if i.cronograma_programa[index]["aplicado"] == False:
                     i.cronograma_programa[index]["produtos"] = current_op_products
                     if difDap == True:
@@ -316,6 +318,7 @@ def close_plantation_and_productivity(id_plantation_farm, close_date, product):
         "Authorization": FARMBOX_ID,
     }
     response = requests.put(url, data=json.dumps(payload), headers=headers)
+    print('response:', response.status_code, response.text)
     return response
 
 

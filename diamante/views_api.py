@@ -2627,7 +2627,7 @@ class ProgramasDetails(viewsets.ModelViewSet):
                     print(e)
                 print(safra_filter)
                 print(cicle_filter)
-                safra_filter = "2023/2024" if safra_filter == None else safra_filter
+                safra_filter = "2024/2025" if safra_filter == None else safra_filter
                 cicle_filter = "1" if cicle_filter == None else cicle_filter
                 qs = Aplicacao.objects.values(
                     "criados",

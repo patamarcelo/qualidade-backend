@@ -780,8 +780,15 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
                 )
                 print(response)
                 resp_obj = json.loads(response.text)
-                str_resp = f'Alterado no FARMBOX - {resp_obj["farm_name"]} - {resp_obj["name"]} - {resp_obj["harvest_name"]}-{resp_obj["cycle"]} - Produtividade: {resp_obj["productivity"]} - Variedade: {resp_obj["variety_name"]} - Area: {resp_obj["area"]}'
-                messages.add_message(request, messages.INFO, str_resp)
+                resp_code = response.status_code
+                if int(resp_code) < 300:
+                    print('resp obj: , ', resp_obj)
+                    str_resp = f'Alterado no FARMBOX - {resp_obj["farm_name"]} - {resp_obj["name"]} - {resp_obj["harvest_name"]}-{resp_obj["cycle"]} - Produtividade: {resp_obj["productivity"]} - Variedade: {resp_obj["variety_name"]} - Area: {resp_obj["area"]}'
+                    messages.add_message(request, messages.INFO, str_resp)
+                if int(resp_code) > 400 and int(resp_code) < 500:
+                    print('resp obj: , ', resp_obj)
+                    str_resp = f'Erro ao Alterar no FarmBox - {response.status_code} - {response.text}'
+                    messages.add_message(request, messages.ERROR, str_resp)
             except Exception as e:
                 print("Erro ao alterar os dados no FarmBox")
                 messages.add_message(
@@ -1024,8 +1031,15 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
                     )
                     print(response)
                     resp_obj = json.loads(response.text)
-                    str_resp = f'Alterado no FARMBOX - {resp_obj["farm_name"]} - {resp_obj["name"]} - {resp_obj["harvest_name"]}-{resp_obj["cycle"]} - Produtividade: {resp_obj["productivity"]} - Variedade: {resp_obj["variety_name"]} - Area: {resp_obj["area"]}'
-                    messages.add_message(request, messages.INFO, str_resp)
+                    resp_code = response.status_code
+                    if int(resp_code) < 300:
+                        print('resp obj: , ', resp_obj)
+                        str_resp = f'Alterado no FARMBOX - {resp_obj["farm_name"]} - {resp_obj["name"]} - {resp_obj["harvest_name"]}-{resp_obj["cycle"]} - Produtividade: {resp_obj["productivity"]} - Variedade: {resp_obj["variety_name"]} - Area: {resp_obj["area"]}'
+                        messages.add_message(request, messages.INFO, str_resp)
+                    if int(resp_code) > 400 and int(resp_code) < 500:
+                        print('resp obj: , ', resp_obj)
+                        str_resp = f'Erro ao Alterar no FarmBox - {response.status_code} - {response.text}'
+                        messages.add_message(request, messages.ERROR, str_resp)
                 except Exception as e:
                     print("Erro ao alterar os dados no FarmBox")
                     messages.add_message(
@@ -1779,6 +1793,19 @@ class OperacaoAdmin(admin.ModelAdmin):
         # print("Prazo antigo DAp: ", form.initial["prazo_dap"])
         # print("Novo Prazo", form.instance.prazo_dap)
         changed_dap = None
+        
+        # Alterando o nome do estagio do programa
+        nome_estagio_alterado = False
+        estagio_alterado = 'Novo Nome'
+        if form.initial:
+            estagio_original = form.instance.estagio.strip()
+            estagio_alterado = form.initial['estagio'].strip()
+            print('nome alterado:', estagio_original)
+            print('nome original: ', estagio_alterado)
+            print('estagios sao diferentes: ', estagio_original != estagio_alterado) 
+            if estagio_original != estagio_alterado:
+                nome_estagio_alterado = True
+                
         if form.initial:
             changed_dap = form.initial["prazo_dap"] != form.instance.prazo_dap
         newDap = form.instance.prazo_dap
@@ -1797,13 +1824,17 @@ class OperacaoAdmin(admin.ModelAdmin):
                 }
                 for dose_produto in query
             ]
-            current_op = form.instance.estagio
+            if nome_estagio_alterado == True:
+                current_op = form.initial['estagio']
+                estagio_alterado = form.instance.estagio
+            else:
+                current_op = form.instance.estagio
             current_program = form.instance.programa
             current_query = Plantio.objects.filter(
                 programa=current_program, finalizado_plantio=True
             )
             admin_form_alter_programa_and_save(
-                current_query, current_op, produtos, changed_dap, newDap
+                current_query, current_op, produtos, changed_dap, newDap, nome_estagio_alterado, estagio_alterado
             )
         if form.instance.ativo == False:
             print("Estagio desativado: ", form.instance)
