@@ -1835,12 +1835,18 @@ class PlantioViewSet(viewsets.ModelViewSet):
             try:
                 safra_filter = request.data["safra"]
                 cicle_filter = request.data["ciclo"]
-
-                print(safra_filter)
-                print(cicle_filter)
-
-                safra_filter = "2023/2024" if safra_filter == None else safra_filter
-                cicle_filter = "1" if cicle_filter == None else cicle_filter
+                device = None
+                if request.data.get("device") is not None:
+                    device = request.data['device']
+                print('device:', device)
+                print('safra filter: ', safra_filter)
+                print('cicle filter: ',cicle_filter)
+                if device is None:
+                    safra_filter = '2024/2025'    
+                    cicle_filter = '1'
+                else:
+                    safra_filter = "2024/2025" if safra_filter == None else safra_filter
+                    cicle_filter = "1" if cicle_filter == None else cicle_filter
 
                 qs_plantio = (
                     Plantio.objects.select_related(
