@@ -1820,6 +1820,8 @@ class OperacaoAdmin(admin.ModelAdmin):
                     "dose": str(dose_produto.dose),
                     "tipo": dose_produto.defensivo.tipo,
                     "produto": dose_produto.defensivo.produto,
+                    "id_farmbox": dose_produto.defensivo.id_farmbox,
+                    "formulacao": dose_produto.defensivo.unidade_medida,
                     "quantidade aplicar": "",
                 }
                 for dose_produto in query
@@ -1887,9 +1889,9 @@ class OperacaoAdmin(admin.ModelAdmin):
 
 @admin.register(Defensivo)
 class DefensivoAdmin(admin.ModelAdmin):
-    list_display = ("produto", "tipo")
+    list_display = ("produto", "tipo", 'id_farmbox')
     ordering = ["produto"]
-    search_fields = ["produto", "tipo"]
+    search_fields = ["produto", "tipo", 'id_farmbox']
     list_filter = ("tipo",)
     show_full_result_count = False
 

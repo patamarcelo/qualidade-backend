@@ -163,7 +163,7 @@ class Talhao(Base):
 # -------------  ------------- PRODUTO -------------  -------------#
 
 UNIDADE_CHOICES = (("l_ha", "LT"), ("kg_ha", "KG"), ("un_ha", "Hectare"))
-FORMULACAO_CHOICES = (("liquido", "Líquido"), ("solido", "Sólido"))
+FORMULACAO_CHOICES = (("liquido", "Líquido"), ("solido", "Sólido"), ('unidade','Unidade'))
 
 TIPO_CHOICES = (
     ("acaricida", "Acaricida"),
@@ -193,6 +193,8 @@ class Defensivo(Base):
         "Formulação", max_length=40, choices=FORMULACAO_CHOICES
     )
     tipo = models.CharField("Tipo", max_length=40, choices=TIPO_CHOICES)
+    
+    id_farmbox = models.IntegerField("ID FarmBox", unique=True, blank=True, null=True)
 
     class Meta:
         ordering = ["produto"]
@@ -401,6 +403,8 @@ class Operacao(Base):
                 "dose": str(dose_produto.dose),
                 "tipo": dose_produto.defensivo.tipo,
                 "produto": dose_produto.defensivo.produto,
+                "id_farmbox": dose_produto.defensivo.id_farmbox,
+                "formulacao": dose_produto.defensivo.unidade_medida,
                 "quantidade aplicar": "",
             }
             for dose_produto in query
@@ -418,6 +422,8 @@ class Operacao(Base):
                 "dose": str(dose_produto.dose),
                 "tipo": dose_produto.defensivo.tipo,
                 "produto": dose_produto.defensivo.produto,
+                "id_farmbox": dose_produto.defensivo.id_farmbox,
+                "formulacao": dose_produto.defensivo.unidade_medida,
                 "quantidade aplicar": "",
             }
             for dose_produto in query
@@ -426,6 +432,7 @@ class Operacao(Base):
             "dap": self.prazo_dap,
             "estagio": self.estagio,
             "aplicado": False,
+            "enviado_farmbox": False,
             "produtos": produtos,
             "data prevista": "",
         }

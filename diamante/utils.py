@@ -281,6 +281,7 @@ def admin_form_alter_programa_and_save(
                     "dap": newDap,
                     "estagio": operation,
                     "aplicado": False,
+                    "enviado_farmbox": False,
                     "produtos": current_op_products,
                     "data prevista": format_date_json(
                         get_prev_app_date(i.data_plantio, newDap)
