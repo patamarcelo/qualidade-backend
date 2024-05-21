@@ -389,8 +389,8 @@ class DepositoAdmin(admin.ModelAdmin):
 
 @admin.register(Fazenda)
 class FazendaAdmin(admin.ModelAdmin):
-    list_display = ("nome", "id_d", "get_plantio_dia")
-    ordering = ("nome",)
+    list_display = ("nome", "id_d", "get_plantio_dia", "id_responsavel_farmbox","id_encarregado_farmbox")
+    ordering = ("nome",) 
     show_full_result_count = False
     search_fields = ["fazenda"]
 

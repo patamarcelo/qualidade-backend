@@ -1568,6 +1568,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     .filter(safra=s_dict[safra_filter], ciclo=c_dict[cicle_filter])
                     .filter(Q(data_plantio=None))
                     .filter(plantio_descontinuado=False)
+                    .filter(finalizado_colheita=False)
                 )
                 qs_programas = Operacao.objects.values(
                     "estagio", "programa_id", "prazo_dap", "id"
@@ -1887,6 +1888,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     .filter(safra=s_dict[safra_filter], ciclo=c_dict[cicle_filter])
                     .filter(data_plantio__isnull=False)
                     .filter(plantio_descontinuado=False)
+                    .filter(finalizado_colheita=False)
                 )
                 try:
                     result = [

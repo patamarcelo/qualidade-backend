@@ -62,6 +62,8 @@ class Deposito(Base):
 class Fazenda(Base):
     nome = models.CharField("Nome", max_length=100, help_text="Fazenda", unique=True)
     id_d = models.PositiveIntegerField("ID_D", unique=True)
+    id_responsavel_farmbox = models.IntegerField("ID Responsavel FarmBox", unique=True, blank=True, null=True)
+    id_encarregado_farmbox = models.IntegerField("ID Encarregado FarmBox", unique=True, blank=True, null=True)
 
     capacidade_plantio_ha_dia = models.PositiveIntegerField(
         "Quantidade ha Plantio / dia",
@@ -160,7 +162,7 @@ class Talhao(Base):
 
 # -------------  ------------- PRODUTO -------------  -------------#
 
-UNIDADE_CHOICES = (("l_ha", "LT"), ("kg_ha", "KG"))
+UNIDADE_CHOICES = (("l_ha", "LT"), ("kg_ha", "KG"), ("un_ha", "Hectare"))
 FORMULACAO_CHOICES = (("liquido", "Líquido"), ("solido", "Sólido"))
 
 TIPO_CHOICES = (
@@ -175,6 +177,7 @@ TIPO_CHOICES = (
     ("lubrificante", "Lubrificante"),
     ("nutricao", "Nutrição"),
     ("oleo_mineral_vegetal", "Óleo Mineral/Vegetal"),
+    ("operacao", 'Operação'),
     ("protetor", "Protetor"),
     ("regulador", "Regulador"),
     ("semente", "Semente"),
@@ -256,7 +259,7 @@ class Variedade(Base):
 #  ------------- ------------- PRODUCAO -------------  -------------#
 class Safra(Base):
     safra = models.CharField("Safra", max_length=100, help_text="Safra", unique=True)
-
+    id_farmbox = models.IntegerField("ID FarmBox", unique=True, blank=True, null=True)
     class Meta:
         # ordering = ["safra"]
         verbose_name = "Safra"
