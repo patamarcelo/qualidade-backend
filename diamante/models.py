@@ -62,8 +62,8 @@ class Deposito(Base):
 class Fazenda(Base):
     nome = models.CharField("Nome", max_length=100, help_text="Fazenda", unique=True)
     id_d = models.PositiveIntegerField("ID_D", unique=True)
-    id_responsavel_farmbox = models.IntegerField("ID Responsavel FarmBox", unique=True, blank=True, null=True)
-    id_encarregado_farmbox = models.IntegerField("ID Encarregado FarmBox", unique=True, blank=True, null=True)
+    id_responsavel_farmbox = models.IntegerField("ID Responsavel FarmBox",  blank=True, null=True)
+    id_encarregado_farmbox = models.IntegerField("ID Encarregado FarmBox",  blank=True, null=True)
 
     capacidade_plantio_ha_dia = models.PositiveIntegerField(
         "Quantidade ha Plantio / dia",
@@ -194,7 +194,7 @@ class Defensivo(Base):
     )
     tipo = models.CharField("Tipo", max_length=40, choices=TIPO_CHOICES)
     
-    id_farmbox = models.IntegerField("ID FarmBox", unique=True, blank=True, null=True)
+    id_farmbox = models.IntegerField("ID FarmBox", blank=True, null=True)
 
     class Meta:
         ordering = ["produto"]
@@ -694,6 +694,8 @@ class Plantio(Base):
                             {
                                 "produto": dose_produto.defensivo.produto,
                                 "tipo": dose_produto.defensivo.tipo,
+                                "id_farmbox": dose_produto.defensivo.id_farmbox,
+                                "formulacao": dose_produto.defensivo.unidade_medida,
                                 "dose": str(dose_produto.dose),
                                 "quantidade aplicar": str(
                                     round(
@@ -714,6 +716,7 @@ class Plantio(Base):
                         "estagio": i.estagio,
                         "aplicado": True if i.prazo_dap <= 0 else False,
                         "dap": i.prazo_dap,
+                        "enviado_farmbox": False,
                         "data prevista": format_date_json(
                             str(data_plantio), datetime.timedelta(days=time_delta_prazo)
                         ),

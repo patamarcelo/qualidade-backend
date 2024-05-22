@@ -1889,7 +1889,7 @@ class OperacaoAdmin(admin.ModelAdmin):
 
 @admin.register(Defensivo)
 class DefensivoAdmin(admin.ModelAdmin):
-    list_display = ("produto", "tipo", 'id_farmbox')
+    list_display = ("produto", "tipo", 'id_farmbox', 'unidade_medida')
     ordering = ["produto"]
     search_fields = ["produto", "tipo", 'id_farmbox']
     list_filter = ("tipo",)

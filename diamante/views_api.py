@@ -104,6 +104,7 @@ import base64
 from rest_framework.authtoken.models import Token
 
 from qualidade_project.settings import DEBUG
+from qualidade_project.settings import FARMBOX_ID
 
 main_path_upload_ids = (
     "http://localhost:5050"
@@ -1866,9 +1867,14 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         "talhao__id_talhao",
                         "talhao__id_unico",
                         "talhao_id",
+                        "id_farmbox",
                         "safra__safra",
+                        "safra__id_farmbox",
                         "ciclo__ciclo",
                         "talhao__fazenda__nome",
+                        "talhao__fazenda__id_farmbox",
+                        "talhao__fazenda__fazenda__id_responsavel_farmbox",
+                        "talhao__fazenda__fazenda__id_encarregado_farmbox",
                         "talhao__fazenda__fazenda__nome",
                         "talhao__fazenda__fazenda__capacidade_plantio_ha_dia",
                         "variedade__nome_fantasia",
@@ -1895,12 +1901,17 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         {
                             "fazenda": i["talhao__fazenda__nome"],
                             "parcela": i["talhao__id_talhao"],
+                            "plantio_id_farmbox": i["id_farmbox"],
                             "dados": {
                                 "safra": i["safra__safra"],
+                                "safra_id_farmbox": i["safra__id_farmbox"],
                                 "ciclo": i["ciclo__ciclo"],
                                 "cultura": i["variedade__cultura__cultura"],
                                 "variedade": i["variedade__nome_fantasia"],
                                 "plantio_id": i["id"],
+                                "projeto_id_farmbox": i["talhao__fazenda__id_farmbox"],
+                                "responsavel_id_farmbox": i["talhao__fazenda__fazenda__id_responsavel_farmbox"],
+                                "encarregado_id_farmbox": i["talhao__fazenda__fazenda__id_encarregado_farmbox"],
                                 "fazenda_grupo": i["talhao__fazenda__fazenda__nome"],
                                 "talhao_id_unico": i["talhao__id_unico"],
                                 "plantio_finalizado": i["finalizado_plantio"],
@@ -2208,6 +2219,45 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 response = {"message": f"Ocorreu um Erro: {e}"}
                 return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
+        else:
+            response = {"message": "Você precisa estar logado!!!"}
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=["GET", "POST", "PUT"])
+    def open_app_farmbox(sef, request, pk=None):
+        if request.user.is_authenticated:
+            try:
+                params = request.data["data"]
+                print('Abrindo Aplicação')
+                print('Params from Farmbox: ', params)
+                url = "https://farmbox.cc/api/v1/applications"
+                payload = params
+                headers = {
+                    "content-type": "application/json",
+                    "Authorization": FARMBOX_ID,
+                }
+                response_farm = requests.post(url, data=json.dumps(payload), headers=headers)
+                print('response:', response_farm.status_code, response_farm.text)
+                
+                if response_farm.status_code == 201:
+                    response = {
+                        "msg": "APP Aberta com sucesso!!",
+                        "data": params,
+                        "status": response_farm.status_code,
+                        "result": response_farm.text,
+                    }
+                    return Response(response, status=status.HTTP_201_CREATED)
+                else:
+                    response = {
+                        "msg": "Problema em abrir a Aplicação!!",
+                        "data": params,
+                        "status": response_farm.status_code,
+                        "result": response_farm.text,
+                    }
+                    return Response(response, status=status.HTTP_400_BAD_REQUEST)
+            except Exception as e:
+                response = {"message": f"Ocorreu um Erro: {e}"}
+                return Response(response, status=status.HTTP_400_BAD_REQUEST)
         else:
             response = {"message": "Você precisa estar logado!!!"}
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
