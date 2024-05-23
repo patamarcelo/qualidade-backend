@@ -1725,6 +1725,8 @@ def export_programa(modeladmin, request, queryset):
             "Defensivo",
             "Tipo",
             "Dose",
+            "Unidade Medida",
+            "id Farmbox",
             "Dap",
             "Safra",
             "Ciclo",
@@ -1739,6 +1741,8 @@ def export_programa(modeladmin, request, queryset):
             "defensivo__produto",
             "defensivo__tipo",
             "dose",
+            "defensivo__unidade_medida",
+            "defensivo__id_farmbox",
             "operacao__prazo_dap",
             "operacao__programa__safra__safra",
             "operacao__programa__ciclo__ciclo",
@@ -1915,6 +1919,8 @@ class AplicacaoAdmin(admin.ModelAdmin):
         "programa",
         "defensivo",
         "defensivo__formulacao",
+        "defensivo__unidade_medida",
+        "defensivo__id_farmbox",
         "dose",
         "get_operacao_prazo_dap",
         "ativo",
@@ -1941,6 +1947,17 @@ class AplicacaoAdmin(admin.ModelAdmin):
         "modificado",
     )
 
+    
+    def defensivo__id_farmbox(self, obj):
+        return obj.defensivo.id_farmbox
+
+    defensivo__id_farmbox.short_description = "id Farm"
+    
+    def defensivo__unidade_medida(self, obj):
+        return obj.defensivo.get_unidade_medida_display()
+
+    defensivo__unidade_medida.short_description = "Unidade"
+    
     def defensivo__formulacao(self, obj):
         return obj.defensivo.get_tipo_display()
 

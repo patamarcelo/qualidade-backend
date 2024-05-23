@@ -2705,7 +2705,7 @@ class ProgramasDetails(viewsets.ModelViewSet):
                     Q(ativo=True)
                     & Q(operacao__programa__ativo=True)
                     & Q(operacao__ativo=True)
-                )
+                ).filter(~Q(defensivo__tipo="operacao"))
                 qs_estagios = Operacao.objects.values(
                     "estagio", "programa__nome", "prazo_dap", "obs"
                 ).filter(Q(programa__ativo=True) & Q(ativo=True))
