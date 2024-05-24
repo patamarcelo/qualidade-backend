@@ -2602,6 +2602,72 @@ class PlantioViewSet(viewsets.ModelViewSet):
         except Exception as e:
             response = {"message": f"Ocorreu um Erro: {e}"}
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
+    
+    
+    @action(detail=False, methods=["GET", "POST"])
+    def get_bio_prods_open_and_planted(self, request, pk=None):
+        if request.user.is_authenticated:
+            try:
+                qs = (
+                    Plantio.objects.filter(
+                        safra__safra="2024/2025",
+                        ciclo__ciclo="1",
+                        finalizado_plantio=True,
+                        plantio_descontinuado=False,
+                        programa__isnull=False,
+                        finalizado_colheita=False
+                    )
+                    .filter(~Q(variedade__cultura__cultura="Milheto"))
+                    .values(
+                        "cronograma_programa",
+                        "area_colheita",
+                        "talhao__id_talhao",
+                        "talhao__fazenda__nome"
+                    )
+                )
+                bio_prods = []
+                today = datetime.datetime.today()
+                check_date = today + datetime.timedelta(days=15)
+                
+                print('check_date: ', check_date)
+                for i in qs:
+                    cronograma = i['cronograma_programa']
+                    area = i["area_colheita"]
+                    parcela = i['talhao__id_talhao']
+                    projeto = i['talhao__fazenda__nome']
+                    # print(i)
+                    # print('\n')
+                    for program in cronograma[1:]:
+                        if program['aplicado'] == False:
+                            datetime_object = datetime.datetime.strptime(program['data prevista'], '%Y-%m-%d')
+                            if datetime_object <=check_date:
+                                check_prods = program['produtos']
+                                for prods in check_prods:
+                                    if prods['tipo'] == 'biologico':
+                                        estagio = program['estagio']
+                                        print('estagio: ', estagio)
+                                        print('data Prevista: ',program["data prevista"])
+                                        print(prods)
+                                        prods_formated = prods
+                                        prods_formated["quantidade aplicar"] = float(area) * float(prods["dose"])
+                                        prods_formated["parcela"] = parcela
+                                        prods_formated["projeto"] = projeto
+                                        prods_formated["area"] = area
+                                        prods_formated["estagio"] = estagio
+                                        bio_prods.append(prods_formated)
+                response = {
+                    "msg": "Consulta realizada com sucesso dos produtos previstos de Biológicos!!",
+                    "data": bio_prods,
+                }
+                return Response(response, status=status.HTTP_200_OK)
+            except Exception as e:
+                response = {"message": f"Ocorreu um Erro: {e}"}
+                return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+        else:
+            response = {"message": "Você precisa estar logado!!!"}
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
 
 
 class DefensivoViewSet(viewsets.ModelViewSet):
