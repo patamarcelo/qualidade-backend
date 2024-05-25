@@ -106,6 +106,8 @@ from rest_framework.authtoken.models import Token
 from qualidade_project.settings import DEBUG
 from qualidade_project.settings import FARMBOX_ID
 
+from collections import defaultdict
+
 main_path_upload_ids = (
     "http://localhost:5050"
     if DEBUG == True
@@ -2604,6 +2606,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
     
     
+    
     @action(detail=False, methods=["GET", "POST"])
     def get_bio_prods_open_and_planted(self, request, pk=None):
         if request.user.is_authenticated:
@@ -2647,6 +2650,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                         estagio = program['estagio']
                                         print('estagio: ', estagio)
                                         print('data Prevista: ',program["data prevista"])
+                                        print('check_date: ', check_date)
+                                        print('\n')
                                         print(prods)
                                         prods_formated = prods
                                         prods_formated["quantidade aplicar"] = float(area) * float(prods["dose"])
@@ -2655,6 +2660,17 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                         prods_formated["area"] = area
                                         prods_formated["estagio"] = estagio
                                         bio_prods.append(prods_formated)
+                summed_quantities = defaultdict(int)
+                
+                for obj in bio_prods:
+                    summed_quantities[obj['id_farmbox']] += obj['quantidade aplicar']
+                total_prods = [{'id': key, 'quantity': value} for key, value in summed_quantities.items()]
+                cout_total = 0
+                for i in total_prods:
+                    print(i)
+                    cout_total += i['quantity']
+                print('total: ', cout_total)
+                print(len(bio_prods))
                 response = {
                     "msg": "Consulta realizada com sucesso dos produtos previstos de Biológicos!!",
                     "data": bio_prods,

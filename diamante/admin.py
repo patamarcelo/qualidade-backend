@@ -1425,7 +1425,7 @@ class ColheitaAdmin(admin.ModelAdmin):
                 "fields": (
                     ("umidade", "desconto_umidade"),
                     ("impureza", "desconto_impureza"),
-                    ("bandinha", "desconto_bandinha"),
+                    # ("bandinha", "desconto_bandinha"),
                 )
             },
         ),
@@ -1450,9 +1450,9 @@ class ColheitaAdmin(admin.ModelAdmin):
         "desconto_umidade",
         "impureza",
         "desconto_impureza",
-        "peso_scs_limpo_e_seco",
-        "bandinha",
-        "desconto_bandinha",
+        # "peso_scs_limpo_e_seco",
+        # "bandinha",
+        # "desconto_bandinha",
         "peso_liquido",
         "peso_scs_liquido",
     )
