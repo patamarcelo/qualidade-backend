@@ -532,7 +532,7 @@ def export_plantio(modeladmin, request, queryset):
 
     def get_total_prod(total_c_2, plantio):
         total_filt_list = sum([(x[1] * 60) for x in total_c_2 if plantio[0] == x[0]])
-        prod_scs = None
+        prod_scs = 0
         if plantio[8]:
             try:
                 prod = total_filt_list / plantio[10]
@@ -541,10 +541,9 @@ def export_plantio(modeladmin, request, queryset):
                 value = float("Inf")
         if plantio[14]:
             try:
-                if plantio[13] is not None:
-                    if plantio[13].isdecimal():
-                        prod = total_filt_list / plantio[13]
-                        prod_scs = prod / 60
+                if plantio[14] is not None:
+                    prod = total_filt_list / plantio[14]
+                    prod_scs = prod / 60
             except ZeroDivisionError:
                 value = float("Inf")
         if prod_scs:
