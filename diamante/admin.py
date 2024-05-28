@@ -1928,6 +1928,7 @@ class AplicacaoAdmin(admin.ModelAdmin):
         "operacao__programa__nome",
         "operacao__estagio",
         "defensivo__produto",
+        "defensivo__tipo",
         "dose",
     ]
     raw_id_fields = ["operacao"]

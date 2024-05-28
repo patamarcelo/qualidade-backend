@@ -2635,6 +2635,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     )
                 )
                 bio_prods = []
+                bio_prods_geral = []
                 today = datetime.datetime.today()
                 check_date = today + datetime.timedelta(days=15)
                 
@@ -2666,20 +2667,46 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                         prods_formated["area"] = area
                                         prods_formated["estagio"] = estagio
                                         bio_prods.append(prods_formated)
-                summed_quantities = defaultdict(int)
+                            check_prods_geral = program['produtos']
+                            for prods in check_prods_geral:
+                                if prods['tipo'] == 'biologico':
+                                    estagio = program['estagio']
+                                    print('estagio: ', estagio)
+                                    print('data Prevista: ',program["data prevista"])
+                                    print('check_date: ', check_date)
+                                    print('\n')
+                                    print(prods)
+                                    prods_formated_geral = prods
+                                    prods_formated_geral["quantidade aplicar"] = float(area) * float(prods["dose"])
+                                    prods_formated_geral["parcela"] = parcela
+                                    prods_formated_geral["projeto"] = projeto
+                                    prods_formated_geral["area"] = area
+                                    prods_formated_geral["estagio"] = estagio
+                                    bio_prods_geral.append(prods_formated_geral)
                 
-                for obj in bio_prods:
-                    summed_quantities[obj['id_farmbox']] += obj['quantidade aplicar']
-                total_prods = [{'id': key, 'quantity': value} for key, value in summed_quantities.items()]
-                cout_total = 0
-                for i in total_prods:
-                    print(i)
-                    cout_total += i['quantity']
-                print('total: ', cout_total)
-                print(len(bio_prods))
+                # summed_quantities = defaultdict(int)                
+                # for obj in bio_prods:
+                #     summed_quantities[obj['id_farmbox']] += obj['quantidade aplicar']
+                # total_prods = [{'id': key, 'quantity': value} for key, value in summed_quantities.items()]
+                # cout_total = 0
+                # for i in total_prods:
+                #     cout_total += i['quantity']
+                # print('total: ', cout_total)
+                # print(len(bio_prods))
+                
+                # summed_quantities_geral = defaultdict(int)                
+                # for obj in bio_prods_geral:
+                #     summed_quantities_geral[obj['id_farmbox']] += obj['quantidade aplicar']
+                # total_prods_geral = [{'id': key, 'quantity': value} for key, value in summed_quantities_geral.items()]
+                # cout_total_geral = 0
+                # for i in total_prods_geral:
+                #     cout_total_geral += i['quantity']
+                # print('total Geral: ', cout_total_geral)
+                # print(len(bio_prods))
                 response = {
                     "msg": "Consulta realizada com sucesso dos produtos previstos de Biológicos!!",
                     "data": bio_prods,
+                    "data_geral": bio_prods_geral,
                 }
                 return Response(response, status=status.HTTP_200_OK)
             except Exception as e:
