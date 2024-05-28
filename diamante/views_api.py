@@ -1588,6 +1588,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     .values(
                         "defensivo__produto",
                         "defensivo__tipo",
+                        "defensivo__id_farmbox",
                         "dose",
                         "operacao",
                         "operacao__estagio",
@@ -1645,6 +1646,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                                     "produto": y["defensivo__produto"],
                                                     "tipo": y["defensivo__tipo"],
                                                     "dose": y["dose"],
+                                                    "id_farmbox": y["defensivo__id_farmbox"],
                                                     "quantidade aplicar": get_quantidade_aplicar(
                                                         y["dose"], i["area_colheita"]
                                                     ),
@@ -1786,6 +1788,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                             {
                                                 "produto": i["produto"],
                                                 "tipo": i["tipo"],
+                                                "id_farmbox": i["id_farmbox"],
                                                 "quantidade": i["quantidade aplicar"]
                                                 + value_of_upda,
                                             }
@@ -1795,6 +1798,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                             {
                                                 "produto": i["produto"],
                                                 "tipo": i["tipo"],
+                                                "id_farmbox": i["id_farmbox"],
                                                 "quantidade": i["quantidade aplicar"],
                                             }
                                         )
@@ -1806,6 +1810,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                             {
                                                 "produto": x["produto"],
                                                 "quantidade": x["quantidade aplicar"],
+                                                "tipo": x["tipo"],
+                                                "id_farmbox": x["id_farmbox"],
                                             }
                                             for x in produtos_cronograma
                                         ],
@@ -2911,6 +2917,8 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                             destino = 4
                         elif "DIAMANTE" in str(destino):
                             destino = 1
+                        elif "BIGUA" in str(destino):
+                            destino = 3
 
                         final_ticket = f"{filial}{ticket}"
                         print(i)
