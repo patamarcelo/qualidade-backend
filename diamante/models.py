@@ -1196,9 +1196,12 @@ class RegistroVisitas(Base):
     #     super().save(*args, **kwargs)
 
 
-    class AppFarmboxIntegration(Base):
-        app = models.JSONField(null=True, blank=True)
-        
-        class Meta:
-            verbose_name = 'Aps Integração'
-            verbose_name_plural = 'Aps Integrações'
+
+class AppFarmboxIntegration(Base):
+    app_nuumero = models.CharField('AP Número', max_length=200, null=True, blank=True)
+    app_fazenda = models.CharField('Fazenda AP', max_length=200, null=True, blank=True)
+    app         = models.JSONField(null=True, blank=True)
+    
+    class Meta:
+        verbose_name = 'Aps Integração'
+        verbose_name_plural = 'Aps Integrações'

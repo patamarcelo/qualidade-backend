@@ -255,7 +255,13 @@ def alter_dap_programa_and_save(query, dap, current_op):
 
 
 def admin_form_alter_programa_and_save(
-    query, operation, current_op_products, difDap, newDap, nome_estagio_alterado, estagio_alterado
+    query,
+    operation,
+    current_op_products,
+    difDap,
+    newDap,
+    nome_estagio_alterado,
+    estagio_alterado,
 ):
     for i in query:
         try:
@@ -263,7 +269,7 @@ def admin_form_alter_programa_and_save(
             print("Index: ", index)
             if index:
                 if nome_estagio_alterado == True:
-                    i.cronograma_programa[index]['estagio'] = estagio_alterado
+                    i.cronograma_programa[index]["estagio"] = estagio_alterado
                 if i.cronograma_programa[index]["aplicado"] == False:
                     i.cronograma_programa[index]["produtos"] = current_op_products
                     if difDap == True:
@@ -319,7 +325,7 @@ def close_plantation_and_productivity(id_plantation_farm, close_date, product):
         "Authorization": FARMBOX_ID,
     }
     response = requests.put(url, data=json.dumps(payload), headers=headers)
-    print('response:', response.status_code, response.text)
+    print("response:", response.status_code, response.text)
     return response
 
 
@@ -590,3 +596,36 @@ def get_long_lived_link(file_path):
 # file_path = "/path/to/your/file.txt"
 # long_lived_link = get_long_lived_link(file_path)
 # print("Long-lived link:", long_lived_link)
+
+
+dictFarm = [
+    {"id": 11936, "name": "Fazenda Safira", "fazenda": "Campo Guapo", "protId": "0208"},
+    {"id": 11937, "name": "Fazenda Tucano", "fazenda": "Diamante", "protId": "0202"},
+    {"id": 11938, "name": "Fazenda Jacaré", "fazenda": "Diamante", "protId": "0202"},
+    {"id": 11939, "name": "Fazenda Capivara", "fazenda": "Diamante", "protId": "0202"},
+    {"id": 11940, "name": "Fazenda Tuiuiu", "fazenda": "Diamante", "protId": "0202"},
+    {"id": 11941, "name": "Fazenda Cervo", "fazenda": "Diamante", "protId": "0202"},
+    {"id": 11942, "name": "Fazenda Lago Verde", "fazenda": "Lago Verde", "protId": ""},
+    {"id": 11943, "name": "Fazenda Praia Alta", "fazenda": "Diamante", "protId": "0202"},
+    {
+        "id": 11944,
+        "name": "Fazenda Campo Guapo",
+        "fazenda": "Campo Guapo",
+        "protId": "0208",
+    },
+    {"id": 11945, "name": "Fazenda Cacique", "fazenda": "Campo Guapo", "protId": "0208"},
+    {
+        "id": 11946,
+        "name": "Fazenda Benção de Deus",
+        "fazenda": "Bencao de Deus",
+        "protId": "0206",
+    },
+    {"id": 11947, "name": "Fazenda Santa Maria", "fazenda": "", "protId": ""},
+    {"id": 11948, "name": "Fazenda Eldorado", "fazenda": "", "protId": ""},
+    {"id": 11949, "name": "Fazenda Fazendinha", "fazenda": "", "protId": "0207"},
+    {"id": 11950, "name": "Fazenda Novo Acordo", "fazenda": "", "protId": ""},
+    {"id": 11951, "name": "Fazenda Ouro Verde", "fazenda": "", "protId": "0204"},
+    {"id": 12103, "name": "Fazenda 5 Estrelas ", "fazenda": "", "protId": ""},
+    {"id": 12104, "name": "Fazenda Pau Brasil", "fazenda": "", "protId": ""},
+    {"id": 12105, "name": "Fazenda Biguá", "fazenda": "", "protId": ""},
+]

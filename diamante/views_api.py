@@ -42,6 +42,7 @@ from .utils import (
     get_base_date,
     get_index_dict_estagio,
     get_cargas_model,
+    dictFarm
 )
 
 import qualidade_project.mongo_api as mongo_api
@@ -66,6 +67,7 @@ from .models import (
     PlantioDetail,
     CicloAtual,
     Fazenda,
+    AppFarmboxIntegration
 )
 
 from functools import reduce
@@ -2231,6 +2233,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             response = {"message": "Você precisa estar logado!!!"}
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
+#TODO
     @action(detail=False, methods=["GET", "POST", "PUT"])
     def open_app_farmbox(sef, request, pk=None):
         if request.user.is_authenticated:
@@ -2248,6 +2251,19 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 print('response:', response_farm.status_code, response_farm.text)
                 
                 if response_farm.status_code == 201:
+                    parsed_json = json.loads(response_farm.text)
+                    try:
+                        app_id_farm = parsed_json["plantations"][0]['plantation']['farm_name']
+                        # app_fazenda = [ x['name'] for x in dictFarm if x['id'] == app_id_farm][0]
+                        nova_app = AppFarmboxIntegration(
+                            app_nuumero=parsed_json['code'],
+                            app_fazenda=app_id_farm,
+                            app=parsed_json
+                        )
+                        nova_app.save()
+                    except Exception as e:
+                        print('Problema em salvar a nova Aplicaçào: ', e)
+
                     response = {
                         "msg": "APP Aberta com sucesso!!",
                         "data": params,

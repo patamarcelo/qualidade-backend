@@ -2187,3 +2187,16 @@ class RegistroVisitasAdmin(admin.ModelAdmin):
 
     image_tag.short_description = "Foto"
     image_tag.allow_tags = True
+
+
+
+@admin.register(AppFarmboxIntegration)
+class AppFarmBoxIntegrationAdmin(admin.ModelAdmin):
+    
+    list_display = ("criados", "app_nuumero", "app_fazenda")
+    
+    formfield_overrides = {
+        models.JSONField: {
+            "widget": JSONEditorWidget(width="200%", height="50vh", mode="tree")
+        },
+    }
