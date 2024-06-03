@@ -1194,3 +1194,11 @@ class RegistroVisitas(Base):
 
     #     self.image_link_url = downloadable_url
     #     super().save(*args, **kwargs)
+
+
+    class AppFarmboxIntegration(Base):
+        app = models.JSONField(null=True, blank=True)
+        
+        class Meta:
+            verbose_name = 'Aps Integração'
+            verbose_name_plural = 'Aps Integrações'
