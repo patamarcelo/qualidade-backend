@@ -498,6 +498,8 @@ def export_plantio(modeladmin, request, queryset):
             # "Dap",
             "Ciclo Variedade",
             "Programa",
+            "ID FarmBox",
+            "Data Prevista Plantio",
             "Cargas Carregadas",
             "Carregado Kg",
             "Produtividade",
@@ -526,6 +528,8 @@ def export_plantio(modeladmin, request, queryset):
         "programa__nome",
         "area_parcial",
         "map_centro_id",
+        "id_farmbox",
+        "data_prevista_plantio",
         "variedade__dias_germinacao",
     )
     cargas_list = modeladmin.total_c_2

@@ -478,13 +478,15 @@ class PlantioViewSet(viewsets.ModelViewSet):
 
     # --------------------- ---------------------- UPDATE PLANTIO API --------------------- ----------------------#
 
+    # SAVE PLANTIO ON NEW SAFRA CICLO
     @action(detail=True, methods=["POST"])
     def save_plantio_from_farmBox_json(self, request, pk=None):
         if request.user.is_authenticated:
             try:
                 # file = request.FILES["plantio_arroz"]
                 # file_ = open(os.path.join(settings.BASE_DIR, 'filename'))
-                date_file = "2024-04-26 11:42"
+                # date_file = "2024-06-13 08:07"
+                date_file = request.data["filename"]
                 with open(f"static/files/dataset-{date_file}.json") as user_file:
                     file_contents = user_file.read()
                     parsed_json = json.loads(file_contents)
@@ -492,7 +494,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 # DB CONSULT
                 talhao_list = Talhao.objects.all()
                 variedade_list = Variedade.objects.all()
-                safra = Safra.objects.all()[2]
+                safra_list = Safra.objects.all()
+                # safra = Safra.objects.all()[0]
                 ciclo_list = Ciclo.objects.all()
                 projetos = Projeto.objects.all()
 
@@ -514,7 +517,11 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     variedade_name = i["variety_name"]
                     area = i["area"]
                     id_plantio_farmbox = i["id"]
-
+                    
+                    planned_date = None
+                    if i["planned_date"]:
+                        planned_date = i["planned_date"].split('T')[0]
+                    
                     variedade_planejada = i["planned_variety_name"]
                     cultura_planejada = i["planned_culture_name"]
 
@@ -528,6 +535,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     map_geo_points_farm = i["geo_points"]
 
                     safra_farm = i["harvest_name"]
+                    safra = [x for x in safra_list if x.safra == safra_farm][0]
                     ciclo_json = i["cycle"]
 
                     ciclo = ciclo_list[ciclo_json - 1]
@@ -575,6 +583,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 map_centro_id=map_centro_id_farm,
                                 map_geo_points=map_geo_points_farm,
                                 id_farmbox=id_plantio_farmbox,
+                                data_prevista_plantio=planned_date
                                 # data_plantio=data_plantio,
                             )
 
@@ -700,6 +709,10 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     variedade_name = i["variety_name"]
                     area = i["area"]
                     id_plantio_farmbox = i["id"]
+                    
+                    planned_date = None
+                    if i["planned_date"]:
+                        planned_date = i["planned_date"].split('T')[0]
 
                     variedade_planejada = i["planned_variety_name"]
                     cultura_planejada = i["planned_culture_name"]
@@ -758,6 +771,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                             )[0]
                             field_to_update.id_farmbox = id_plantio_farmbox
                             if field_to_update.finalizado_colheita == False:
+                                if planned_date:
+                                    field_to_update.data_prevista_plantio = planned_date
                                 if area:
                                     field_to_update.area_colheita = area
 
@@ -2248,6 +2263,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "Authorization": FARMBOX_ID,
                 }
                 response_farm = requests.post(url, data=json.dumps(payload), headers=headers)
+                print('responseAll from farmbox:', response_farm)
+                print('\n\n')
                 print('response:', response_farm.status_code, response_farm.text)
                 
                 if response_farm.status_code == 201:
@@ -2450,9 +2467,9 @@ class PlantioViewSet(viewsets.ModelViewSet):
             plantio_map = Plantio.objects.values(
                 "map_geo_points", "map_centro_id", "talhao__id_talhao", "id_farmbox"
             ).filter(
-                safra__safra="2023/2024",
-                ciclo__ciclo="3",
-                finalizado_plantio=True,
+                safra__safra="2024/2025",
+                ciclo__ciclo="1",
+                # finalizado_plantio=True,
                 # programa__isnull=False,
                 talhao__fazenda__id_farmbox=projeto_filter,
             )
