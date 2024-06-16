@@ -62,6 +62,9 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django_crontab",
+    "django_apscheduler",
+    # "diamante.apps.DiamanteConfig",
     "csvexport",
     "debug_toolbar",
     "django_json_widget",
@@ -235,3 +238,7 @@ INTERNAL_IPS = [
 ]
 
 CRISPY_TEMPLATE_PACK = "bootstrap4"
+
+CRONJOBS = [
+    ('* * * * *', 'diamante.cron.get_hour_test')
+]
