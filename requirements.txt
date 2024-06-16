@@ -19,6 +19,7 @@ django-admin-csvexport==2.2
 django-admin-extra-buttons==1.5.6
 django-admin-material-dashboard==1.0.10
 django-adminlte3==0.1.6
+django-apscheduler==0.6.2
 django-cors-headers==3.14.0
 django-crispy-forms==2.1
 django-crontab==0.7.1
