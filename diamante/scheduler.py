@@ -28,7 +28,7 @@ def start():
         scheduler = BackgroundScheduler()
         scheduler.add_jobstore(DjangoJobStore(), "default")
 
-        if settings.DEBUG == False:
+        if settings.DEBUG == True:
             print('agendando funcao para rodar no servidor:')
             # Register the job with a textual reference
             scheduler.add_job(
@@ -37,7 +37,7 @@ def start():
                 day_of_week="*",
                 hour="*",
                 minute="*",
-                id="Imprimindo a cada segundo no servidor"
+                id="Imprimindo a cada segundo no servidor LOCAL"
             )
         else:
             print('funcionando, vai rodar somente no servidor')
