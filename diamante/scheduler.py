@@ -9,6 +9,10 @@ from diamante.cron import get_hour_test
 logger = logging.getLogger(__name__)
 
 from importlib import import_module
+from django.conf import settings
+
+
+
 
 
 def delete_old_job_executions(max_age=604_800):
@@ -20,20 +24,23 @@ def start():
         module_name, func_name = 'diamante.cron.get_hour_test'.rsplit('.', 1)
         module = import_module(module_name)
         func = getattr(module, func_name)
-        print(f"Function resolved: {func}")
+        print(f"Funcao encontrada: {func}")
         scheduler = BackgroundScheduler()
         scheduler.add_jobstore(DjangoJobStore(), "default")
 
-        # Register the job with a textual reference
-        scheduler.add_job(
-            func,
-            'cron',
-            day_of_week="*",
-            hour="*",
-            minute="*",
-            id="print everimmute at day"
-        )
-
+        if settings.DEBUG == False:
+            print('agendando funcao para rodar no servidor:')
+            # Register the job with a textual reference
+            scheduler.add_job(
+                func,
+                'cron',
+                day_of_week="*",
+                hour="*",
+                minute="*",
+                id="Imprimindo a cada segundo no servidor"
+            )
+        else:
+            print('funcionando, vai rodar somente no servidor')
         register_events(scheduler)
         scheduler.start()
         logger.info("Scheduler started!")
