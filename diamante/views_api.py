@@ -42,10 +42,13 @@ from .utils import (
     get_base_date,
     get_index_dict_estagio,
     get_cargas_model,
-    dictFarm
+    dictFarm,
+    get_date,
+    get_miliseconds,
+    Spinner
 )
 
-import qualidade_project.mongo_api as mongo_api
+from qualidade_project.mongo_api import generate_file_run
 
 # from qualidade_project.settings import db_name
 from .models import (
@@ -109,6 +112,8 @@ from qualidade_project.settings import DEBUG
 from qualidade_project.settings import FARMBOX_ID
 
 from collections import defaultdict
+
+from diamante.read_farm_data import get_applications
 
 main_path_upload_ids = (
     "http://localhost:5050"
@@ -2806,6 +2811,44 @@ class DefensivoViewSet(viewsets.ModelViewSet):
         else:
             response = {"message": "Você precisa estar logado!!!"}
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+
+# --------------------- ---------------------- DEFENSIVOS API END  --------------------- ----------------------#
+
+
+# --------------------- ---------------------- FARMBOX APPLICATIONS UPDATE API START  --------------------- ----------------------#
+    
+    @action(detail=False, methods=["GET"])
+    def update_farmbox_mongodb_data(self, request, pk=None):
+        number_of_days_before = 1
+        from_date = get_date(number_of_days_before)
+        last_up = get_miliseconds(from_date)
+        print(last_up)
+        
+        
+        data_applications = get_applications(updated_last=last_up)
+        # print(data_applications)
+        
+        for _ in range(2):
+            print(time.ctime())
+            # Prints the current time with a five second difference
+            time.sleep(1)
+        with Spinner("Atualizando..."):
+            generate_file_run(data_applications)
+            print("\nAplicações Atualizadas.")
+        
+        
+        
+        response = {
+            "msg": f"Banco de Dados atualizado com sucesso!!",
+            "dados": 'dados do banco',
+        }
+        return Response(response, status=status.HTTP_200_OK)
+                
+        
+
+
+# --------------------- ---------------------- FARMBOX APPLICATIONS UPDATE API END  --------------------- ----------------------#
 
 
 # --------------------- ---------------------- DEFENSIVOS API END  --------------------- ----------------------#

@@ -1,6 +1,8 @@
 from datetime import timedelta
 import datetime
-
+import sys
+import time
+import threading
 
 today = datetime.date.today()
 
@@ -629,3 +631,46 @@ dictFarm = [
     {"id": 12104, "name": "Fazenda Pau Brasil", "fazenda": "", "protId": ""},
     {"id": 12105, "name": "Fazenda Biguá", "fazenda": "", "protId": ""},
 ]
+
+
+# FOR FARMBOX API INTEGRATION
+
+def get_date(days_before):
+        today = datetime.datetime.now() - datetime.timedelta(days=days_before)
+
+        format_date = datetime.datetime.strftime(today, "%Y-%m-%d %H:%M")
+        return format_date
+
+def get_miliseconds(date_from):
+    # dt_obj = datetime.strptime("18.04.2023", "%d.%m.%Y %H:%M:%S,%f")
+    dt_obj = datetime.datetime.strptime(f"{date_from}", "%Y-%m-%d %H:%M")
+    millisec = dt_obj.timestamp() * 1000
+    print(millisec)
+    return millisec
+
+
+
+
+class Spinner:
+    def __init__(self, message="Processing"):
+        self.message = message
+        self.done = False
+        self.spinner_cycle = ['-', '\\', '|', '/']
+
+    def spinner_task(self):
+        while not self.done:
+            for spinner in self.spinner_cycle:
+                sys.stdout.write(f"\r{self.message} {spinner}")
+                sys.stdout.flush()
+                time.sleep(0.1)
+
+    def __enter__(self):
+        self.done = False
+        self.spinner_thread = threading.Thread(target=self.spinner_task)
+        self.spinner_thread.start()
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        self.done = True
+        self.spinner_thread.join()
+        sys.stdout.write("\r")
+        sys.stdout.flush()

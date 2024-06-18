@@ -32,6 +32,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = env("SECRET_KEY")
 FARMBOX_ID = env("FARM_API")
+MONGO_PASS_DEFENSIVOS = env("MONGO_PASS_DEFENSIVOS")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG_ENV = env("DEBUG")
