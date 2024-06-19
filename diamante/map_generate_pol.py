@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
 
 import matplotlib
+from PIL import Image
+
 
 matplotlib.use("Agg")
 
@@ -67,5 +69,18 @@ def draw_cartoon_map(
     )  # Save the figure to the buffer
     plt.close(fig)
     buffer.seek(0)
+    image = Image.open(buffer)
 
-    return buffer
+    # Rotate the image by 270 degrees
+    rotated_image = image.rotate(90, expand=True)
+    
+    rotated_buffer = io.BytesIO()
+
+    # Save the rotated image to the new buffer
+    rotated_image.save(rotated_buffer, format="png")
+
+    # Move the buffer position to the beginning
+    rotated_buffer.seek(0)
+
+
+    return rotated_buffer
