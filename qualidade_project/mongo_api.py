@@ -97,15 +97,24 @@ def update_mongo_db_many(db_name, data_from_json):
     # /Aplicacoes
     print(f"{Fore.GREEN}Start Update Aplications{Style.RESET_ALL}")
     list_to_update = []
-    for obj in data_from_json[0]:
-        id_json = obj["id"]
-        # print(id_json)
-        list_to_update.append(UpdateOne({"id": id_json}, {"$set": obj}, upsert=True))
-        # update_data_from_farm(db_name[0], obj, id_json)
-    result = db_name[0].bulk_write(list_to_update)
-    print(f"Encontrados {result.matched_count} documentos e atualizados {result.modified_count} documentos.")
+    if len(data_from_json[0]) > 0:
+        for obj in data_from_json[0]:
+            id_json = obj["id"]
+            # print(id_json)
+            list_to_update.append(UpdateOne({"id": id_json}, {"$set": obj}, upsert=True))
+            # update_data_from_farm(db_name[0], obj, id_json)
+        result = db_name[0].bulk_write(list_to_update)
+        print(f"Encontrados {result.matched_count} documentos e atualizados {result.modified_count} documentos.")
+    else:
+        print('Atualização do banco mongodb não necessário')
+        print('Sem documentos alterados para serem atualizados....')
+        
 
-    delete_data_from_farm(db_name[0], data_from_json[1])
+    if len(data_from_json[1]) > 0:
+        delete_data_from_farm(db_name[0], data_from_json[1])
+    else:
+        print('Atualização do banco mongodb não necessário')
+        print('Sem documentos deletados para serem atualizados....')
 
 
 def generate_file_run(data_from_farm):

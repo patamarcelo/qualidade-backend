@@ -25,21 +25,35 @@ def start():
         # remove all runing jobs
         scheduler.remove_all_jobs()
         if settings.DEBUG == False:
-            module_name, func_name = 'diamante.cron.get_hour_test'.rsplit('.', 1)
+            module_name, func_name = 'diamante.cron.update_farmbox_mongodb_app'.rsplit('.', 1)
             module = import_module(module_name)
             func = getattr(module, func_name)
             print(f"Funcao encontrada: {func}")
             scheduler.add_jobstore(DjangoJobStore(), "default")
             print('agendando funcao para rodar no servidor:')
             # Register the job with a textual reference
-            scheduler.add_job(
-                func,
-                'cron',
-                day_of_week="*",
-                hour="6-19",  # From 6 AM to 7:59 PM
-                minute="0,15,30,45",  # At 0, 15, 30, and 45 minutes of each hour
-                id="job_every_15_minutes__last__try"
-            )
+            job_id="Update farmbox applications getting from API and send to MongoDb"
+            existing_job = scheduler.get_job(job_id)
+            if existing_job:
+                print('job already registered', job_id)
+                existing_job.modify(
+                    func,
+                    'cron',
+                    day_of_week="*",
+                    hour="5-19",  # From 5 AM to 7:59 PM
+                    minute="15,30,45,58",  # At 15, 30, 45 and 58 minutes of each hour
+                    id=job_id
+                )
+            else:
+                print('job not exists yet, registering....', job_id)
+                scheduler.add_job(
+                    func,
+                    'cron',
+                    day_of_week="*",
+                    hour="6-19",  # From 6 AM to 7:59 PM
+                    minute="0,15,30,45",  # At 0, 15, 30, and 45 minutes of each hour
+                    id="job_every_15_minutes__last__try"
+                )
             register_events(scheduler)
             scheduler.start()
             logger.info("Scheduler started!")
