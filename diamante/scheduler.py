@@ -39,7 +39,8 @@ def start():
                 existing_job.modify(
                     func,
                     'cron',
-                    day_of_week="*",
+                    # day_of_week="*",
+                    day_of_week="mon-sat",
                     hour="5-19",  # From 5 AM to 7:59 PM
                     # minute="15,30,45,58",  # At 15, 30, 45 and 58 minutes of each hour
                     minute="10",  # At 15, 30, 45 and 58 minutes of each hour
