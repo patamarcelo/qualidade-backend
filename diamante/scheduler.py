@@ -32,7 +32,7 @@ def start():
             scheduler.add_jobstore(DjangoJobStore(), "default")
             print('agendando funcao para rodar no servidor:')
             # Register the job with a textual reference
-            job_id="Update farmbox applications getting from API and send to MongoDb"
+            job_id="Update farmbox apps - Hourly"
             existing_job = scheduler.get_job(job_id)
             if existing_job:
                 print('job already registered', job_id)
@@ -52,8 +52,8 @@ def start():
                     func,
                     'cron',
                     day_of_week="*",
-                    hour="6-19",  # From 6 AM to 7:59 PM
-                    minute="15,30,45,58",  # At 15, 30, 45 and 58 minutes of each hour
+                    hour="5-19",  # From 6 AM to 7:59 PM
+                    minute="59",  # At 15, 30, 45 and 58 minutes of each hour
                     id=job_id
                 )
             register_events(scheduler)
