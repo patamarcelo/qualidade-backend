@@ -32,7 +32,7 @@ def start():
             scheduler.add_jobstore(DjangoJobStore(), "default")
             print('agendando funcao para rodar no servidor:')
             # Register the job with a textual reference
-            job_id="Update farmbox apps - Hourly"
+            job_id = "Update_farmbox_apps_Hourly"
             existing_job = scheduler.get_job(job_id)
             if existing_job:
                 print('job already registered', job_id)
@@ -43,7 +43,7 @@ def start():
                     day_of_week="mon-sat",
                     hour="5-19",  # From 5 AM to 7:59 PM
                     # minute="15,30,45,58",  # At 15, 30, 45 and 58 minutes of each hour
-                    minute="10",  # At 15, 30, 45 and 58 minutes of each hour
+                    minute="59",  # At 15, 30, 45 and 58 minutes of each hour
                     id=job_id
                 )
             else:
