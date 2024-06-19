@@ -41,7 +41,8 @@ def start():
                     'cron',
                     day_of_week="*",
                     hour="5-19",  # From 5 AM to 7:59 PM
-                    minute="15,30,45,58",  # At 15, 30, 45 and 58 minutes of each hour
+                    # minute="15,30,45,58",  # At 15, 30, 45 and 58 minutes of each hour
+                    minute="10",  # At 15, 30, 45 and 58 minutes of each hour
                     id=job_id
                 )
             else:
@@ -51,7 +52,7 @@ def start():
                     'cron',
                     day_of_week="*",
                     hour="6-19",  # From 6 AM to 7:59 PM
-                    minute="0,15,30,45",  # At 0, 15, 30, and 45 minutes of each hour
+                    minute="15,30,45,58",  # At 15, 30, 45 and 58 minutes of each hour
                     id=job_id
                 )
             register_events(scheduler)
