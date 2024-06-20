@@ -32,7 +32,7 @@ def start():
             scheduler.add_jobstore(DjangoJobStore(), "default")
             print('agendando funcao para rodar no servidor:')
             # Register the job with a textual reference
-            job_id = "Update_farmbox_apps_Hourly"
+            job_id = "Update_farmbox_apps_Hourly_new_one"
             existing_job = scheduler.get_job(job_id)
             print(f'existing job: ID:{job_id} - job_Instance: {existing_job}')
             if existing_job:
