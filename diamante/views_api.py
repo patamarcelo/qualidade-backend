@@ -2045,6 +2045,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         "map_geo_points",
                     )
                     .filter(safra=s_dict[safra_filter], ciclo=c_dict[cicle_filter])
+                    .filter(plantio_descontinuado=False)
                 )
 
                 result = [
