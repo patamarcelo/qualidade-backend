@@ -521,6 +521,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     farm_name = i["farm_name"]
                     variedade_name = i["variety_name"]
                     area = i["area"]
+                    area_planejamento = i["area"]
                     id_plantio_farmbox = i["id"]
                     
                     planned_date = None
@@ -588,7 +589,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 map_centro_id=map_centro_id_farm,
                                 map_geo_points=map_geo_points_farm,
                                 id_farmbox=id_plantio_farmbox,
-                                data_prevista_plantio=planned_date
+                                data_prevista_plantio=planned_date,
+                                area_planejamento_plantio=area_planejamento,
                                 # data_plantio=data_plantio,
                             )
 
@@ -713,6 +715,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     farm_name = i["farm_name"]
                     variedade_name = i["variety_name"]
                     area = i["area"]
+                    area_planejamento = i["area"]
                     id_plantio_farmbox = i["id"]
                     
                     planned_date = None
@@ -780,6 +783,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                     field_to_update.data_prevista_plantio = planned_date
                                 if area:
                                     field_to_update.area_colheita = area
+                                    field_to_update.area_planejamento_plantio = area_planejamento
+                                    
 
                                 if map_centro_id_farm:
                                     field_to_update.map_centro_id = map_centro_id_farm
@@ -821,6 +826,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 safra=safra, ciclo=ciclo, talhao=talhao_id
                             )[0]
                             if area:
+                                field_to_update.area_colheita = area
                                 field_to_update.area_colheita = area
                             if map_centro_id_farm:
                                 field_to_update.map_centro_id = map_centro_id_farm
@@ -1027,9 +1033,15 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     cicle_filter = request.data["ciclo"]
                 except Exception as e:
                     print(e)
-
-                safra_filter = "2023/2024" if safra_filter == None else safra_filter
-                cicle_filter = "2" if cicle_filter == None else cicle_filter
+                
+                if safra_filter is None or cicle_filter is None: 
+                    print('safra ou filtro não informado')
+                    current_safra = CicloAtual.objects.filter(nome="Colheita")[0]
+                    safra_filter = current_safra.safra.safra
+                    cicle_filter = current_safra.ciclo.ciclo
+                    
+                safra_filter = "2024/2025" if safra_filter == None else safra_filter
+                cicle_filter = "1" if cicle_filter == None else cicle_filter
 
                 qs = (
                     Plantio.objects.values(
@@ -2278,8 +2290,11 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     try:
                         app_id_farm = parsed_json["plantations"][0]['plantation']['farm_name']
                         # app_fazenda = [ x['name'] for x in dictFarm if x['id'] == app_id_farm][0]
+                        number_app = parsed_json['code']
+                        name_app_op = parsed_json['inputs'][0]['input']['name']
+                        app_name = f'{number_app} - {name_app_op}'
                         nova_app = AppFarmboxIntegration(
-                            app_nuumero=parsed_json['code'],
+                            app_nuumero=app_name,
                             app_fazenda=app_id_farm,
                             app=parsed_json
                         )
@@ -2821,7 +2836,8 @@ class DefensivoViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=["GET"])
     def update_farmbox_mongodb_data(self, request, pk=None):
-        number_of_days_before = 1
+        
+        number_of_days_before = 5 if DEBUG == True else 1
         from_date = get_date(number_of_days_before)
         last_up = get_miliseconds(from_date)
         print(last_up)

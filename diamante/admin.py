@@ -954,6 +954,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
             "Plantio",
             {
                 "fields": (
+                    ("area_planejamento_plantio"),
                     (
                         "area_colheita",
                         "area_parcial",
