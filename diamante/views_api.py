@@ -2507,7 +2507,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             ).filter(
                 safra__safra=safra_filter,
                 # finalizado_plantio=True,
-                programa__isnull=False,
+                # programa__isnull=False,
                 talhao__fazenda__id_farmbox=projeto_filter,
             )
 
@@ -2544,6 +2544,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 for x in plantio_ids
                 if x["id_farmbox"] in parcelas_filter
             ]
+            print('parcelas filter', parcelas_filter)
 
             img_buffer = draw_cartoon_map(
                 polygons=polygons,
