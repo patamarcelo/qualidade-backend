@@ -19,6 +19,11 @@ from django.conf import settings
 from django.db.models import Q, Sum, F
 from django.db.models.functions import Coalesce, Round
 
+from django.db import transaction
+import time
+
+
+
 
 # pr_mungo = Programa.objects.all()[2]
 # pr_caupi = Programa.objects.all()[1]
@@ -265,10 +270,20 @@ def admin_form_alter_programa_and_save(
     nome_estagio_alterado,
     estagio_alterado,
 ):
+    start_time = time.time()
+    print(f"Start time: {start_time}")
+    from diamante.models import Plantio
+    updated_objects = []
+    
+    fetch_time = time.time()
+    print(f"Time after fetching objects: {fetch_time - start_time} seconds")
     for i in query:
         try:
+            loop_start_time = time.time()
             index = get_index_dict_estagio(i.cronograma_programa, operation)
             print("Index: ", index)
+            get_index_time = time.time()
+            print(f"Time to get index: {get_index_time - loop_start_time} seconds")
             if index:
                 if nome_estagio_alterado == True:
                     i.cronograma_programa[index]["estagio"] = estagio_alterado
@@ -282,8 +297,11 @@ def admin_form_alter_programa_and_save(
                         i.cronograma_programa[index].update(
                             {"data prevista": new_date, "dap": days}
                         )
-                    i.save()
+                    updated_objects.append(i)
+                    # i.save()
                     print(f"Alteração de programa salva com sucesso: {i}")
+                update_time = time.time()
+                print(f"Time to update cronograma_programa: {update_time - get_index_time} seconds")
             else:
                 operation_to_add = {
                     "dap": newDap,
@@ -296,10 +314,22 @@ def admin_form_alter_programa_and_save(
                     ),
                 }
                 i.cronograma_programa.append(operation_to_add)
-                i.save()
+                updated_objects.append(i)
+                # i.save()
                 print(f"Estágio incluído com sucesso: {i}")
         except Exception as e:
             print("Erro ao Salvar a alteração no programa do  plantio", e)
+    
+    if updated_objects:
+        print('atualizando Banco de Dados')
+        bulk_update_start_time = time.time()
+        with transaction.atomic():
+            Plantio.objects.bulk_update(updated_objects, ['cronograma_programa'])
+        print('atualizando Banco de Dados: Finalizado')
+        bulk_update_time = time.time()
+        print(f"Time for bulk update: {bulk_update_time - bulk_update_start_time} seconds")
+    end_time = time.time()
+    print(f"Total time: {end_time - start_time} seconds")
 
 
 def admin_form_remove_index(query, operation):

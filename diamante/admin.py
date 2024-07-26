@@ -463,12 +463,13 @@ class VariedadeAdmin(admin.ModelAdmin):
         "cultura",
         "dias_ciclo",
         "dias_germinacao",
+        "id_farmbox"
     )
     ordering = ("variedade",)
     list_filter = [
         "cultura",
     ]
-    search_fields = ["variedade"]
+    search_fields = ["variedade", "id_farmbox"]
 
 
 admin.site.register(Safra)
@@ -492,9 +493,10 @@ def export_plantio(modeladmin, request, queryset):
             "Variedade",
             "Plantio Finalizado",
             "Colheita Finalizada",
+            "Plantio Descontinuado",
             "Area",
-            "Data Plantio",
             "Data Prev Colheita",
+            "Data Plantio",
             # "Dap",
             "Ciclo Variedade",
             "Programa",
@@ -522,6 +524,7 @@ def export_plantio(modeladmin, request, queryset):
         "variedade__variedade",
         "finalizado_plantio",
         "finalizado_colheita",
+        "plantio_descontinuado",
         "area_colheita",
         "data_plantio",
         "variedade__dias_ciclo",
@@ -539,14 +542,14 @@ def export_plantio(modeladmin, request, queryset):
         prod_scs = 0
         if plantio[8]:
             try:
-                prod = total_filt_list / plantio[10]
+                prod = total_filt_list / plantio[11]
                 prod_scs = prod / 60
             except ZeroDivisionError:
                 value = float("Inf")
         if plantio[14]:
             try:
-                if plantio[14] is not None:
-                    prod = total_filt_list / plantio[14]
+                if plantio[15] is not None:
+                    prod = total_filt_list / plantio[15]
                     prod_scs = prod / 60
             except ZeroDivisionError:
                 value = float("Inf")
@@ -556,10 +559,11 @@ def export_plantio(modeladmin, request, queryset):
             return " - "
 
     def get_prev_colheita(data_plantio, timeDelta):
-        if data_plantio:
-            prev_date_delta = timedelta(timeDelta)
-            prev_date_final = data_plantio + prev_date_delta
-            return prev_date_final
+        if timeDelta != " - ":
+            if data_plantio:
+                prev_date_delta = timedelta(timeDelta)
+                prev_date_final = data_plantio + prev_date_delta
+                return prev_date_final
         else:
             return " - "
 
@@ -577,31 +581,31 @@ def export_plantio(modeladmin, request, queryset):
         plantio_detail.pop()
         lat = ""
         lng = ""
-        area_parcial = str(plantio_detail[14]).replace(".",",")
-        area_plantada = str(plantio_detail[10]).replace(".",",")
+        area_parcial = str(plantio_detail[15]).replace(".",",")
+        area_plantada = str(plantio_detail[11]).replace(".",",")
         area_considerar = area_plantada if plantio_detail[9] == True else area_parcial
-        if isinstance(plantio_detail[15], dict):
+        if isinstance(plantio_detail[16], dict):
             lat = (
-                str(plantio_detail[15]["lat"]).replace(".", ",")
-                if plantio_detail[15]["lat"] != None
+                str(plantio_detail[16]["lat"]).replace(".", ",")
+                if plantio_detail[16]["lat"] != None
                 else ""
             )
             lng = (
-                str(plantio_detail[15]["lng"]).replace(".", ",")
-                if plantio_detail[15]["lng"] != None
+                str(plantio_detail[16]["lng"]).replace(".", ",")
+                if plantio_detail[16]["lng"] != None
                 else ""
             )
-        plantio_detail.pop(15)
-        data_plantio = plantio_detail[11]
-        time_delta_plantio = plantio_detail[12]
-        plantio_detail[10] = localize(plantio_detail[10])
+        plantio_detail.pop(16)
+        data_plantio = plantio_detail[12]
+        time_delta_plantio = plantio_detail[13]
+        plantio_detail[11] = localize(plantio_detail[11])
         cargas_carregadas_filter = [
             (x[1] * 60) for x in cargas_list if plantio_detail[0] == x[0]
         ]
         cargas_carregadas_kg = localize(sum(cargas_carregadas_filter))
         cargas_carregadas_quantidade = len(cargas_carregadas_filter)
         produtividade = get_total_prod(cargas_list, plantio)
-        plantio_detail.pop(14)
+        plantio_detail.pop(15)
         plantio_detail.append(cargas_carregadas_quantidade)
         plantio_detail.append(cargas_carregadas_kg)
         plantio_detail.append(produtividade)
@@ -657,14 +661,14 @@ class ColheitaFilterNoProgram(SimpleListFilter):
 
     def lookups(self, request, model_admin):
         return [
-            ("Com Programa", "Programa"),
-            ("Sem Programa", "Sem Programa"),
+            ("com_programa", "Programa"),
+            ("sem_programa", "Sem Programa"),
         ]
 
     def queryset(self, request, queryset):
-        if self.value() == "Programa":
+        if self.value() == "com_programa":
             return queryset.filter(~Q(programa_id=None))
-        if self.value() == "Sem Programa":
+        if self.value() == "sem_programa":
             return queryset.filter(Q(programa_id=None))
 
 

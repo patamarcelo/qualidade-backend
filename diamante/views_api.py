@@ -858,10 +858,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 }
                 return Response(response, status=status.HTTP_200_OK)
             except Exception as e:
+                print(f"{Fore.RED}Problema ao ler o arquivo: {Style.RESET_ALL}{e}")
                 response = {"message": f"Ocorreu um Erro: {e}"}
-                return Response(response, status=status.HTTP_400_BAD_REQUEST)
-            else:
-                response = {"message": "Arquivo desconhecido"}
                 return Response(response, status=status.HTTP_400_BAD_REQUEST)
         else:
             response = {"message": "Você precisa estar logado!!!"}
@@ -2475,9 +2473,18 @@ class PlantioViewSet(viewsets.ModelViewSet):
         # get id_farmbox
         projeto_filter = request.data["projeto"]
         parcelas_filter = request.data["parcelas"]
-        safra_filter = request.data["safra"]
+        safra_filter = "2024/2025"
+        ciclo_filter = "1"
         
-        
+        try:
+            filter_safra_and_ciclo = parcelas_filter[0]
+            refer_plantio = Plantio.objects.get(id_farmbox=filter_safra_and_ciclo)
+            print('refer plantio Safra: ', refer_plantio.safra.safra)
+            print('refer plantio ciclo: ', refer_plantio.ciclo.ciclo)
+            safra_filter = refer_plantio.safra.safra
+            ciclo_filter = refer_plantio.ciclo.ciclo
+        except Exception as e:
+            print('error em filtrar safra e ciclo: ', e)
         print(parcelas_filter)
         for i in parcelas_filter:
             print(i)
@@ -2488,8 +2495,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
             plantio_map = Plantio.objects.values(
                 "map_geo_points", "map_centro_id", "talhao__id_talhao", "id_farmbox"
             ).filter(
-                safra__safra="2024/2025",
-                ciclo__ciclo="1",
+                safra__safra=safra_filter,
+                ciclo__ciclo=ciclo_filter,
                 # finalizado_plantio=True,
                 # programa__isnull=False,
                 talhao__fazenda__id_farmbox=projeto_filter,
@@ -2498,7 +2505,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             plantio_ids = Plantio.objects.values(
                 "id_farmbox", "talhao__id_talhao"
             ).filter(
-                safra__safra=safra_filter['safra'],
+                safra__safra=safra_filter,
                 # finalizado_plantio=True,
                 programa__isnull=False,
                 talhao__fazenda__id_farmbox=projeto_filter,
