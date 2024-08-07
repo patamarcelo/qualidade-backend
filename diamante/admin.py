@@ -2209,3 +2209,14 @@ class AppFarmBoxIntegrationAdmin(admin.ModelAdmin):
             "widget": JSONEditorWidget(width="200%", height="50vh", mode="tree")
         },
     }
+
+@admin.register(StProtheusIntegration)
+class StProtheusIntegrationAdmin(admin.ModelAdmin):
+    
+    list_display = ("criados", "st_numero", "st_fazenda")
+    
+    formfield_overrides = {
+        models.JSONField: {
+            "widget": JSONEditorWidget(width="200%", height="50vh", mode="tree")
+        },
+    }

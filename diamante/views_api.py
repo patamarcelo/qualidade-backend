@@ -13,6 +13,7 @@ from .serializers import (
     ColheitaSerializer,
     VisitasSerializer,
     RegistroVisitasSerializer,
+    StProtheusIntegrationSerializer
 )
 
 from rest_framework import viewsets, status
@@ -70,7 +71,8 @@ from .models import (
     PlantioDetail,
     CicloAtual,
     Fazenda,
-    AppFarmboxIntegration
+    AppFarmboxIntegration,
+    StProtheusIntegration
 )
 
 from functools import reduce
@@ -2385,6 +2387,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["GET", "POST"])
     def get_colheita_plantio_info(self, request, pk=None):
         if request.user.is_authenticated:
+            print('pegando dados da colheira: ')
             safra_filter = None
             cicle_filter = None
             try:
@@ -2394,6 +2397,11 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 print(e)
             safra_filter = "2023/2024" if safra_filter == None else safra_filter
             cicle_filter = "1" if cicle_filter == None else cicle_filter
+            print('safra e ciclo filtr', safra_filter, cicle_filter)
+            total_dias_plantado_acompanhamento = {
+                "arroz": 117,
+                "soja_feijao": 80
+            }
             try:
                 cargas_query = (
                     Colheita.objects.values(
@@ -2416,7 +2424,9 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         plantio__finalizado_plantio=True,
                         plantio__finalizado_colheita=False,
                         plantio__plantio_descontinuado=False,
-                        totaldays__gte=datetime.timedelta(days=117),
+                        totaldays__gte=datetime.timedelta(days=total_dias_plantado_acompanhamento["soja_feijao"]),
+                        # ARROZ = 117
+                        # totaldays__gte=datetime.timedelta(days=117),
                     )
                 )
                 qs = (
@@ -2449,7 +2459,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         finalizado_plantio=True,
                         finalizado_colheita=False,
                         plantio_descontinuado=False,
-                        totaldays__gte=datetime.timedelta(days=117),
+                        totaldays__gte=datetime.timedelta(days=total_dias_plantado_acompanhamento["soja_feijao"]),
                     )
                     .order_by("talhao__id_unico")
                 )
@@ -3525,3 +3535,30 @@ class PlantioDetailResumoApi(viewsets.ModelViewSet):
         except Exception as e:
             response = {"msg": f"Ocorreu um Erro: {e}"}
             return Response(response, status.HTTP_400_BAD_REQUEST)
+
+
+
+class StViewSet(viewsets.ModelViewSet):
+    queryset = StProtheusIntegration.objects.all()
+    serializer_class = StProtheusIntegrationSerializer
+    authentication_classes = (TokenAuthentication,)
+    permission_classes = (IsAuthenticated,)
+    
+    
+    @action(detail=False, methods=["GET", "POST"])
+    def open_st_by_protheus(self, request, pk=None):
+        if request.user.is_authenticated:
+            req_data = None
+            try:
+                req_data = request.data['dados_st']
+            except Exception as e:
+                print('erro ao pegar os dados', e)
+            print('dados recebidos: ', req_data)
+            response = {
+                'msg': 'St Aberta com Successo',
+                'st_number': 123,
+            }
+            return Response(response, status=status.HTTP_201_CREATED)
+        else:
+            response = {"message": "Você precisa estar logado!!!"}
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)

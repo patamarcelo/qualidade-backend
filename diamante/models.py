@@ -1210,3 +1210,12 @@ class AppFarmboxIntegration(Base):
     class Meta:
         verbose_name = 'Aps Integração'
         verbose_name_plural = 'Aps Integrações'
+
+class StProtheusIntegration(Base):
+    st_numero = models.CharField('AP Número', max_length=200, null=True, blank=True)
+    st_fazenda = models.CharField('Fazenda AP', max_length=200, null=True, blank=True)
+    app         = models.JSONField(null=True, blank=True)
+    
+    class Meta:
+        verbose_name = 'ST Integração'
+        verbose_name_plural = 'STs Integrações'
