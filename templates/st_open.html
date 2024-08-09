@@ -1,0 +1,65 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        /* Inline CSS */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+        }
+
+        .email-container {
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border: 1px solid #dddddd;
+            border-radius: 5px;
+        }
+
+        .header {
+            background-color: #007bff;
+            color: #ffffff;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .content {
+            padding: 20px;
+        }
+
+        .image {
+            max-width: 100%;
+            height: auto;
+        }
+
+        .footer {
+            background-color: #f0f0f0;
+            text-align: center;
+            padding: 10px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            <h1>This Email is sent from Django project</h1>
+        </div>
+        <div class="content">
+            <p>Hello {{ receiver_name }},</p>
+            <p>This is a sample email template for Medium article.</p>
+            <p> Your Age is: {{ age }} </p>
+            <!-- <img src=" static 'your/static/file/path'" alt="static image">
+            <img src="https://codeskulptor-demos.commondatastorage.googleapis.com/GalaxyInvaders/back01.jpg" alt="Image 3" class="image"> -->
+            <p>Your Profession: {{ profession }}</p>
+            <p> You are: {{ marital_status }}</p>
+            <p>Your address: {{ address }}</p>
+        </div>
+        <div class="footer">
+            &copy; {{ year }} ABC Inc. No rights reserved.
+        </div>
+    </div>
+</body>
+</html>

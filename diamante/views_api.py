@@ -117,6 +117,11 @@ from collections import defaultdict
 
 from diamante.read_farm_data import get_applications
 
+from django.core.mail import send_mail
+from django.template.loader import render_to_string
+from django.utils.html import strip_tags
+from django.conf import settings
+
 main_path_upload_ids = (
     "http://localhost:5050"
     if DEBUG == True
@@ -3547,17 +3552,48 @@ class StViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=["GET", "POST"])
     def open_st_by_protheus(self, request, pk=None):
+        context = {
+            "receiver_name": "Saium Khan",
+            "age": 27,
+            "profession": "Software Developer",
+            "marital_status": "Divorced",
+            "address": "Planet Earth",
+            "year": 2023
+        }
         if request.user.is_authenticated:
             req_data = None
             try:
                 req_data = request.data['dados_st']
             except Exception as e:
                 print('erro ao pegar os dados', e)
+            
             print('dados recebidos: ', req_data)
             response = {
                 'msg': 'St Aberta com Successo',
                 'st_number': 123,
             }
+            try:
+                subject = "Teste das ST's abertas"
+                message = req_data
+                from_email = 'patamarcelo@gmail.com'
+                recipient_list = ['marcelo@gdourado.com.br']
+                template_name = "st_open.html"
+                convert_to_html_content =  render_to_string(
+                    template_name=template_name, context=context
+                )
+                plain_message = strip_tags(convert_to_html_content)
+                
+                send_mail(
+                    subject=subject,
+                    message=plain_message,
+                    from_email=from_email, 
+                    recipient_list=recipient_list,
+                    html_message=convert_to_html_content
+                )
+            except Exception as e:
+                print('erro ao pegar os enviar email: ', e)
+                
+            
             return Response(response, status=status.HTTP_201_CREATED)
         else:
             response = {"message": "Você precisa estar logado!!!"}
