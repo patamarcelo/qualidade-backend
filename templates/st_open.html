@@ -1,6 +1,9 @@
 {% load static %}
+{% load l10n %}
+
 <!DOCTYPE html>
 <html>
+
 <head>
     <style>
         /* Inline CSS */
@@ -34,32 +37,86 @@
             height: auto;
         }
 
+        .projetos {
+            padding-top: 20px;
+            padding-bottom: 20px;
+            width: 100%;
+        }
+        
+        .produtos {
+            padding-top: 20px;
+            padding-bottom: 20px;
+            width: 100%;
+        }
+
         .footer {
             background-color: #f0f0f0;
             text-align: center;
             padding: 10px;
             font-size: 12px;
         }
+
+        table {
+            width: 100%;
+        }
+
+        .titleunder{
+            text-decoration: underline;
+        }
     </style>
 </head>
+
 <body>
     <div class="email-container">
         <div class="header">
-            <h1>This Email is sent from Django project</h1>
+            <h1>Abertura Pré ST</h1>
+            <h5>Pré ST Aberta: {{ st_number }}</h5>
         </div>
         <div class="content">
-            <p>Hello {{ receiver_name }},</p>
-            <p>This is a sample email template for Medium article.</p>
-            <p> Your Age is: {{ age }} </p>
+            <div class="projetos">
+                <p class="titleunder" >Projetos Solicitados</p>
+                <ul>
+                    {% for projeto in fazendas %}
+                    <li>{{projeto}}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            <div class="aplicacoes">
+                <p class="titleunder" >Ap's Solicitadas</p>
+                <ul>
+                    {% for ap in aplicacoes %}
+                    <li>{{ap}}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            <div class="produtos">
+                <p class="titleunder" >Produtos </p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="text-align: left" class="titleunder">Produto</th>
+                            <th style="text-align: left" class="titleunder">Quantidade</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for produto in produtos %}
+                        <tr>
+                            <td>{{ produto.insumo }}</td>
+                            <td>{{ produto.quantidade|localize }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
             <!-- <img src=" static 'your/static/file/path'" alt="static image">
             <img src="https://codeskulptor-demos.commondatastorage.googleapis.com/GalaxyInvaders/back01.jpg" alt="Image 3" class="image"> -->
-            <p>Your Profession: {{ profession }}</p>
-            <p> You are: {{ marital_status }}</p>
-            <p>Your address: {{ address }}</p>
+
         </div>
         <div class="footer">
-            &copy; {{ year }} ABC Inc. No rights reserved.
+            &copy; Pré ST {{ st_number }} aberta com os dados do Farmbox.
         </div>
     </div>
 </body>
+
 </html>

@@ -3543,6 +3543,17 @@ class PlantioDetailResumoApi(viewsets.ModelViewSet):
 
 
 
+def format_input_numbers(input_list):
+    def format_number(value):
+        # rounded_value = str(round(value, 2)).replace('.', ',')
+        rounded_value = round(value, 2)
+        return rounded_value
+    return [{**x, "quantidade": format_number(x['quantidade'])} for x in input_list]
+
+def formart_ap_list(input_list):
+    formated_list = [ x.split('|')[0].strip().replace('AP', 'AP ') for x in input_list]
+    return formated_list
+    
 class StViewSet(viewsets.ModelViewSet):
     queryset = StProtheusIntegration.objects.all()
     serializer_class = StProtheusIntegrationSerializer
@@ -3552,48 +3563,64 @@ class StViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=["GET", "POST"])
     def open_st_by_protheus(self, request, pk=None):
-        context = {
-            "receiver_name": "Saium Khan",
-            "age": 27,
-            "profession": "Software Developer",
-            "marital_status": "Divorced",
-            "address": "Planet Earth",
-            "year": 2023
-        }
         if request.user.is_authenticated:
             req_data = None
             try:
                 req_data = request.data['dados_st']
+                # string = response.read().decode('utf-8')
+                req_data = json.loads(req_data)
             except Exception as e:
                 print('erro ao pegar os dados', e)
             
+            print('dados recebidos: ', type(req_data))
             print('dados recebidos: ', req_data)
-            response = {
-                'msg': 'St Aberta com Successo',
-                'st_number': 123,
-            }
+            
+            st_number_protheus = 123
+            if req_data:
+                projetos = req_data["Projeto"]
+                datas = req_data["Data"]
+                apps = formart_ap_list(req_data["Ap"])
+                produtos = format_input_numbers(req_data['produtos'])
+                print('produtos: ', produtos)
+                fazenda_destino = req_data['fazendaDestino']
+                armazem_destino  = req_data['armazemDestino']
             try:
-                subject = "Teste das ST's abertas"
-                message = req_data
+                context = {
+                    "fazendas": projetos,
+                    "datas": datas,
+                    "aplicacoes": apps,
+                    "produtos": produtos,
+                    'fazenda_destino': fazenda_destino,
+                    'armazem_destino': armazem_destino,
+                    'st_number': st_number_protheus
+                }
+                subject = f"Pré ST Aberta: {st_number_protheus}"
                 from_email = 'patamarcelo@gmail.com'
                 recipient_list = ['marcelo@gdourado.com.br']
+                # recipient_list = ['raylton.sousa@diamanteagricola.com.br']
                 template_name = "st_open.html"
                 convert_to_html_content =  render_to_string(
                     template_name=template_name, context=context
                 )
                 plain_message = strip_tags(convert_to_html_content)
                 
-                send_mail(
+                sending_msg = send_mail(
                     subject=subject,
                     message=plain_message,
                     from_email=from_email, 
                     recipient_list=recipient_list,
-                    html_message=convert_to_html_content
+                    html_message=convert_to_html_content,
                 )
+                check_here = 'Sim' if sending_msg == 1 else 'Não'
+                print('Email foi enviado: ', check_here)
+                
             except Exception as e:
                 print('erro ao pegar os enviar email: ', e)
-                
-            
+            response = {
+                'msg': 'St Aberta com Successo',
+                'st_number': st_number_protheus,
+                'sent_by_email': check_here,
+            }
             return Response(response, status=status.HTTP_201_CREATED)
         else:
             response = {"message": "Você precisa estar logado!!!"}
