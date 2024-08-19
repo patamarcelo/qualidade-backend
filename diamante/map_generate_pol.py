@@ -9,6 +9,62 @@ from PIL import Image
 
 matplotlib.use("Agg")
 
+colos_map = {
+	'1':    "#e0f7fa",
+	'2':	"#b3e5fc",
+	'3':	"#81d4fa",
+	'4':	"#4fc3f7",
+	'5':	"#29b6f6",
+	'6':	"#03a9f4",
+	'7':	"#039be5",
+	'8':	"#0288d1",
+	'9':	"#0277bd",
+	'10':	"#01579b",
+	'11':	"#014f85",
+	'12':	"#01386f",
+	'13':	"#012259",
+	'14':	"#011643",
+	'15':	"#000d2c",
+	'16':	"#000215"
+}
+
+def get_color(index, colors):
+    final_color = 'white'
+    if index < 25:
+        final_color = colors.get("1")
+        return final_color
+    if index < 49:
+        final_color = colors.get("2")
+        return final_color
+    if index < 70:
+        final_color = colors.get("3")
+        return final_color
+    if index < 100:
+        final_color = colors.get("4")
+        return final_color
+    if index < 90:
+        final_color = colors.get("5")
+        return final_color
+    if index < 110:
+        final_color = colors.get("6")
+        return final_color
+    if index < 118:
+        final_color = colors.get("7")
+        return final_color
+    if index < 159:
+        final_color = colors.get("8")
+        return final_color
+    if index < 196:
+        final_color = colors.get("9")
+        return final_color
+    if index < 218:
+        final_color = colors.get("10")
+        return final_color
+    if index < 400:
+        final_color = colors.get("11")
+        return final_color
+    
+    return final_color
 
 def draw_cartoon_map(
     polygons,
@@ -18,7 +74,8 @@ def draw_cartoon_map(
     filled_polygon_index=[],
     filled_color="blue",
     fontsize=10,
-    edge_linewidth=0.5
+    edge_linewidth=0.5,
+    planejamento_plantio=False
 ):
     fig, ax = plt.subplots(
         edgecolor="none"
@@ -27,6 +84,9 @@ def draw_cartoon_map(
     for i, (polygon, label, centeri, id_farm) in enumerate(
         zip(polygons, labels, centerid, ids_farmbox)
     ):
+        # if planejamento_plantio == True:
+        #     filled_color = get_color(i, colos_map)
+        #     print('filled new color: ', filled_color)
         if id_farm in filled_polygon_index:
             ax.add_patch(
                 Polygon(
@@ -34,8 +94,9 @@ def draw_cartoon_map(
                 )
             )
         else:
+            # filled_color = filled_color if planejamento_plantio == False else 'white'
             ax.add_patch(
-                Polygon(polygon, edgecolor="black", facecolor="white", linewidth=edge_linewidth)
+                Polygon(polygon, edgecolor="black", facecolor='white', linewidth=edge_linewidth)
             )
         # ax.add_patch(Polygon(polygon, edgecolor="black", facecolor="none"))
         centroid = centeri

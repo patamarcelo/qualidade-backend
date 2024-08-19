@@ -2499,6 +2499,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
         parcelas_filter = request.data["parcelas"]
         safra_filter = "2024/2025"
         ciclo_filter = "1"
+        planejamento_plantio = False
         
         try:
             filter_safra_and_ciclo = parcelas_filter[0]
@@ -2516,24 +2517,46 @@ class PlantioViewSet(viewsets.ModelViewSet):
         start_time = time.time()
         print(start_time)
         try:
-            plantio_map = Plantio.objects.values(
-                "map_geo_points", "map_centro_id", "talhao__id_talhao", "id_farmbox"
-            ).filter(
-                safra__safra=safra_filter,
-                ciclo__ciclo=ciclo_filter,
-                # finalizado_plantio=True,
-                # programa__isnull=False,
-                talhao__fazenda__id_farmbox=projeto_filter,
-            )
+            if planejamento_plantio == True:
+                safra_filter = "2024/2025"
+                ciclo_filter = '3'
+                plantio_map = Plantio.objects.values(
+                    "map_geo_points", "map_centro_id", "talhao__id_talhao", "id_farmbox"
+                ).filter(
+                    safra__safra=safra_filter,
+                    ciclo__ciclo=ciclo_filter,
+                    # finalizado_plantio=True,
+                    # programa__isnull=False,
+                    talhao__fazenda__fazenda__id_d='1',
+                ).order_by('data_prevista_plantio')
 
-            plantio_ids = Plantio.objects.values(
-                "id_farmbox", "talhao__id_talhao"
-            ).filter(
-                safra__safra=safra_filter,
-                # finalizado_plantio=True,
-                # programa__isnull=False,
-                talhao__fazenda__id_farmbox=projeto_filter,
-            )
+                plantio_ids = Plantio.objects.values(
+                    "id_farmbox", "talhao__id_talhao"
+                ).filter(
+                    safra__safra=safra_filter,
+                    # finalizado_plantio=True,
+                    # programa__isnull=False,
+                    talhao__fazenda__fazenda__id_d='1',
+                ).order_by('data_prevista_plantio')
+            else:
+                plantio_map = Plantio.objects.values(
+                    "map_geo_points", "map_centro_id", "talhao__id_talhao", "id_farmbox"
+                ).filter(
+                    safra__safra=safra_filter,
+                    ciclo__ciclo=ciclo_filter,
+                    # finalizado_plantio=True,
+                    # programa__isnull=False,
+                    talhao__fazenda__id_farmbox=projeto_filter,
+                ).order_by('data_prevista_plantio')
+
+                plantio_ids = Plantio.objects.values(
+                    "id_farmbox", "talhao__id_talhao"
+                ).filter(
+                    safra__safra=safra_filter,
+                    # finalizado_plantio=True,
+                    # programa__isnull=False,
+                    talhao__fazenda__id_farmbox=projeto_filter,
+                ).order_by('data_prevista_plantio')
 
             print("depois de fazer a query")
             print(time.time() - start_time)
@@ -2579,6 +2602,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 filled_color=(0, 0.96, 0, 0.7),
                 # filled_color="#4191C4",
                 fontsize=3,
+                planejamento_plantio=planejamento_plantio
             )
 
             data_img = base64.b64encode(img_buffer.getvalue()).decode()
@@ -2823,6 +2847,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         "variedade__cultura__cultura",
                         "variedade__cultura__id_protheus_planejamento",
                         "variedade__id_protheus_planejamento_second_option",
+                        "variedade__variedade",
+                        "variedade__id_farmbox",
                         "area_colheita",
                         'id_farmbox'
                     ).filter(
@@ -2835,8 +2861,9 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 list_returned = [
                     {
                         'codigo_planejamento' : '??',
-                        'codigo_cultura': x['variedade__cultura__id_protheus_planejamento'] if x['variedade__cultura__cultura'] != 'Feijão' else x['variedade__cultura__id_protheus_planejamento'],
-                        'variedade': x['variedade__cultura__id_protheus_planejamento'],
+                        'codigo_cultura': x['variedade__cultura__id_protheus_planejamento'] if x['variedade__cultura__cultura'] != 'Feijão' else x['variedade__id_protheus_planejamento_second_option'],
+                        'variedade': x['variedade__variedade'],
+                        "id_variedade": x['variedade__id_farmbox'],
                         'parcela': x['talhao__id_talhao'],
                         'area_parcela': x['area_colheita'],
                         'id_talhao_farm': x['id_farmbox'],
