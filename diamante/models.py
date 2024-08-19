@@ -214,9 +214,6 @@ class Cultura(Base):
     id_protheus_planejamento = models.CharField(
         "ID Cultura", max_length=20, null=True, blank=True, help_text=" ID Cultura Planejamento Agrícola Protheus"
     )
-    id_cultura_dif_protheus_planejamento = models.CharField(
-        "ID Cultura", max_length=20, null=True, blank=True, help_text=" ID Cultura Planejamento Agrícola Protheus / mesma cultura diferentes codigos ( feijao)"
-    )
     tipo_producao = models.CharField(
         "Tipo Produção", max_length=20, null=True, blank=True
     )
@@ -247,6 +244,11 @@ class Variedade(Base):
     id_protheus_planejamento_second_option = models.CharField(
         "ID Cultura/Variedade", max_length=20, null=True, blank=True, help_text=" ID Cultura/Variedade Planejamento Agrícola Protheus"
     )
+    
+    id_cultura_dif_protheus_planejamento = models.CharField(
+        "ID Cultura", max_length=20, null=True, blank=True, help_text=" ID Cultura Planejamento Agrícola Protheus / mesma cultura diferentes codigos ( feijao)"
+    )
+    
     cultura = models.ForeignKey(Cultura, on_delete=models.PROTECT)
     dias_ciclo = models.PositiveIntegerField("Quantidade Dias do Ciclo", default=0)
     dias_germinacao = models.PositiveIntegerField(
