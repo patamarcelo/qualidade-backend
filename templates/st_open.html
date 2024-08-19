@@ -49,6 +49,12 @@
             width: 100%;
         }
 
+        .observations {
+            padding-top: 20px;
+            padding-bottom: 20px;
+            width: 100%;
+        }
+
         .footer {
             background-color: #f0f0f0;
             text-align: center;
@@ -90,7 +96,6 @@
                 </ul>
             </div>
             <div class="produtos">
-                <p class="titleunder" >Produtos </p>
                 <table>
                     <thead>
                         <tr>
@@ -108,6 +113,14 @@
                     </tbody>
                 </table>
             </div>
+            {% if observacao|length > 0 %}
+            <div class="observations">
+                <h4 class="titleunder"><b>Observações</b></h4>
+                <p>
+                    {{ observacao }}
+                </p>
+            </div>
+            {% endif %}
 
             <!-- <img src=" static 'your/static/file/path'" alt="static image">
             <img src="https://codeskulptor-demos.commondatastorage.googleapis.com/GalaxyInvaders/back01.jpg" alt="Image 3" class="image"> -->

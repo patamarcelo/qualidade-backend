@@ -127,9 +127,10 @@ class PlantioDetailAdmin(admin.ModelAdmin):
         request.GET = request.GET.copy()
         ciclo = request.GET.pop("ciclo", None)
         safra = request.GET.pop("safra", None)
+        print('ciclo: ', ciclo)
+        print('safra: ', safra)
         if ciclo:
             ciclo_index = int(ciclo[0]) - 1
-            print("ciclo Url: ", ciclo_index)
             safra_filter = safra[0].replace("_", "/").strip()
             cicle_filter = Ciclo.objects.all()[ciclo_index]
             safra_filter = Safra.objects.filter(safra=safra_filter)[0]
@@ -152,6 +153,7 @@ class PlantioDetailAdmin(admin.ModelAdmin):
             cicle_filter = cicle_filter.ciclo
             safra_filter = CicloAtual.objects.filter(nome="Colheita")[0]
             safra_filter = safra_filter.safra
+            print('retornando estes valores')
         return (
             super(PlantioDetailAdmin, self)
             .get_queryset(request)
@@ -449,7 +451,7 @@ class TalhaoAdmin(admin.ModelAdmin):
 
 @admin.register(Cultura)
 class CulturaAdmin(admin.ModelAdmin):
-    list_display = ("cultura", "tipo_producao")
+    list_display = ("cultura", "tipo_producao", 'id_protheus_planejamento')
     ordering = ("cultura",)
 
 
@@ -596,7 +598,7 @@ def export_plantio(modeladmin, request, queryset):
                 else ""
             )
         plantio_detail.pop(16)
-        data_plantio = plantio_detail[12]
+        data_plantio = plantio_detail[12] if plantio_detail[12] else plantio_detail[-1]
         time_delta_plantio = plantio_detail[13]
         plantio_detail[11] = localize(plantio_detail[11])
         cargas_carregadas_filter = [
@@ -615,6 +617,8 @@ def export_plantio(modeladmin, request, queryset):
         plantio_detail.append(lng)
         plantio_detail.pop(0)
         time_delta_calc = time_delta_plantio + time_delta_variedade_germinacao if time_delta_plantio is not None and time_delta_variedade_germinacao is not None else " - "
+        print('data plantio: ', data_plantio)
+        print('time delta: ', time_delta_calc)
         plantio_detail.insert(11, get_prev_colheita(data_plantio, time_delta_calc))
         plantio_detail.append(get_dap(data_plantio))
         print(plantio_detail)
@@ -2217,6 +2221,32 @@ class StProtheusIntegrationAdmin(admin.ModelAdmin):
     
     formfield_overrides = {
         models.JSONField: {
-            "widget": JSONEditorWidget(width="200%", height="50vh", mode="tree")
+            "widget": JSONEditorWidget(width="200%", height="75vh", mode="tree")
         },
     }
+    fieldsets = (
+        (
+            "Dados",
+            {
+                "fields": (
+                    ("ativo",),
+                    ("st_numero",),
+                    ("st_fazenda",),
+                    ("app",),
+                )
+            },
+        ),
+    )
+    
+    
+@admin.register(PlantioExtratoArea)
+class PlantioExtratoAreaAdmin(admin.ModelAdmin):
+    list_display = ("plantio", "data_plantio", "area_plantada")
+    autocomplete_fields = ["plantio"]
+    raw_id_fields = ["plantio"]
+
+@admin.register(ColheitaPlantioExtratoArea)
+class ColheitaPlantioExtratoAreaAdmin(admin.ModelAdmin):
+    list_display = ("plantio", "data_colheita", "area_colhida")
+    autocomplete_fields = ["plantio"]
+    raw_id_fields = ["plantio"]

@@ -211,6 +211,9 @@ class Cultura(Base):
     )
     id_d = models.PositiveIntegerField("ID_D", unique=True)
     id_farmbox = models.IntegerField("ID FarmBox", unique=True, blank=True, null=True)
+    id_protheus_planejamento = models.CharField(
+        "ID Cultura", max_length=20, null=True, blank=True, help_text=" ID Cultura Planejamento Agrícola Protheus"
+    )
     tipo_producao = models.CharField(
         "Tipo Produção", max_length=20, null=True, blank=True
     )
@@ -237,6 +240,9 @@ class Variedade(Base):
     id_farmbox = models.IntegerField("ID FarmBox", unique=True, blank=True, null=True)
     nome_fantasia = models.CharField(
         "Nome Fant.", max_length=100, blank=True, null=True
+    )
+    id_protheus_planejamento_second_option = models.CharField(
+        "ID Cultura/Variedade", max_length=20, null=True, blank=True, help_text=" ID Cultura/Variedade Planejamento Agrícola Protheus"
     )
     cultura = models.ForeignKey(Cultura, on_delete=models.PROTECT)
     dias_ciclo = models.PositiveIntegerField("Quantidade Dias do Ciclo", default=0)
@@ -782,6 +788,52 @@ class Plantio(Base):
             return f"{self.talhao.id_talhao} | {self.talhao.fazenda.nome} | {self.safra}-{self.ciclo} | {self.variedade.variedade}| {str(self.area_colheita)}"
         return f"{self.talhao.id_talhao} | {self.talhao.fazenda.nome} | {self.safra}-{self.ciclo} | {str(self.area_colheita)}"
 
+class PlantioExtratoArea(Base):
+    plantio = models.ForeignKey(Plantio,on_delete=models.PROTECT)
+    
+    area_plantada = models.DecimalField(
+        "Area plantada",
+        help_text="Area Parcial Plantada",
+        max_digits=8,
+        decimal_places=2,
+        blank=True,
+        null=True,
+    )
+    
+    data_plantio = models.DateField(
+        help_text="dd/mm/aaaa - Data Efetiva de Plantio",
+        blank=True,
+        null=True,
+    )
+    
+    class Meta:
+        ordering = ["data_plantio", 'plantio']
+        verbose_name = 'Extrato do Plantio'
+        verbose_name_plural = 'Extrato dos Plantios'
+
+
+class ColheitaPlantioExtratoArea(Base):
+    plantio = models.ForeignKey(Plantio,on_delete=models.PROTECT)
+    area_colhida = models.DecimalField(
+        "Area Colhida",
+        help_text="Area Parcial Colhida",
+        max_digits=8,
+        decimal_places=2,
+        blank=True,
+        null=True,
+    )
+    
+    data_colheita = models.DateField(
+        help_text="dd/mm/aaaa - Data Efetiva de Colheita",
+        blank=True,
+        null=True,
+    )
+    
+    class Meta:
+        ordering = ["data_colheita", 'plantio']
+        verbose_name = 'Extrato da Colheita'
+        verbose_name_plural = 'Extrato das Colheitas'
+    
 
 class Colheita(Base):
     AlphanumericValidator = RegexValidator(
@@ -1212,9 +1264,9 @@ class AppFarmboxIntegration(Base):
         verbose_name_plural = 'Aps Integrações'
 
 class StProtheusIntegration(Base):
-    st_numero = models.CharField('AP Número', max_length=200, null=True, blank=True)
-    st_fazenda = models.CharField('Fazenda AP', max_length=200, null=True, blank=True)
-    app         = models.JSONField(null=True, blank=True)
+    st_numero = models.CharField('ST Número', max_length=200, null=True, blank=True)
+    st_fazenda = models.CharField('Fazenda ST', max_length=200, null=True, blank=True)
+    app         = models.JSONField('Detalhes', null=True, blank=True)
     
     class Meta:
         verbose_name = 'ST Integração'

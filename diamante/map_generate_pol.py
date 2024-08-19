@@ -18,6 +18,7 @@ def draw_cartoon_map(
     filled_polygon_index=[],
     filled_color="blue",
     fontsize=10,
+    edge_linewidth=0.5
 ):
     fig, ax = plt.subplots(
         edgecolor="none"
@@ -29,12 +30,12 @@ def draw_cartoon_map(
         if id_farm in filled_polygon_index:
             ax.add_patch(
                 Polygon(
-                    polygon, edgecolor="black", facecolor=filled_color, linewidth=0.2
+                    polygon, edgecolor="black", facecolor=filled_color, linewidth=edge_linewidth
                 )
             )
         else:
             ax.add_patch(
-                Polygon(polygon, edgecolor="black", facecolor="white", linewidth=0.2)
+                Polygon(polygon, edgecolor="black", facecolor="white", linewidth=edge_linewidth)
             )
         # ax.add_patch(Polygon(polygon, edgecolor="black", facecolor="none"))
         centroid = centeri

@@ -1599,6 +1599,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         "variedade__cultura__cultura",
                         "area_colheita",
                         "data_plantio",
+                        "data_prevista_plantio",
                         "finalizado_plantio",
                         "programa",
                         "programa_id",
@@ -1665,6 +1666,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                     "plantio_finalizado": i["finalizado_plantio"],
                                     "area_colheita": i["area_colheita"],
                                     "data_plantio": i["data_plantio"],
+                                    "data_prevista_plantio": i["data_prevista_plantio"],
                                     "dap": get_dap(i["data_plantio"]),
                                     "programa_id": i["programa"],
                                     "programa": i["programa__nome"],
@@ -1737,6 +1739,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         projeto_id = vv["projeto_id"]
 
                         data_plantio = vv["data_plantio"]
+                        data_prevista_plantio = vv["data_prevista_plantio"]
                         area_colheita = vv["area_colheita"]
                         start_date = vv["programa_start_date"]
                         end_date = vv["programa_end_date"]
@@ -1760,7 +1763,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         if data_plantio is None:
                             final_result[k][kk].update(
                                 {
-                                    "data_plantio": prev_date[k]["data_inicial"]
+                                    "data_plantio": data_prevista_plantio if data_prevista_plantio else  prev_date[k]["data_inicial"]
                                     + datetime.timedelta(
                                         days=prev_date[k]["dias_necessários"]
                                     )
@@ -2333,9 +2336,15 @@ class PlantioViewSet(viewsets.ModelViewSet):
     def get_plantio_calendar_done(self, request, pk=None):
         if request.user.is_authenticated:
             try:
+                safra_filter = "2023/2024"
+                cicle_filter = "3"
+                if request.data["safra"]:
+                    safra_filter = request.data["safra"]
+                if request.data["ciclo"]:
+                    cicle_filter = request.data["ciclo"]
                 qs = (
                     Plantio.objects.filter(
-                        safra__safra="2023/2024",
+                        safra__safra=safra_filter,
                         finalizado_plantio=True,
                         plantio_descontinuado=False,
                     )
@@ -2692,6 +2701,9 @@ class PlantioViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=["GET", "POST"])
     def get_bio_prods_open_and_planted(self, request, pk=None):
+        # TODO
+        # alterar a safra e ciclo, recebendo direto da requisição
+        # verificar possibiliade de filtar somente safra e não ciclo
         if request.user.is_authenticated:
             try:
                 qs = (
@@ -2793,6 +2805,75 @@ class PlantioViewSet(viewsets.ModelViewSet):
         else:
             response = {"message": "Você precisa estar logado!!!"}
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
+        
+    
+    @action(detail=False, methods=['GET', 'POST'])
+    def save_planejamento_protheus(self, request, pk=None):
+        if request.user.is_authenticated:
+            try:
+                safra_filter = request.data["safra"]
+                cicle_filter = request.data["ciclo"]
+                query_plantio = Plantio.objects.values(
+                        "safra__safra",
+                        "pk",
+                        "ciclo__ciclo",
+                        "talhao__id_talhao",
+                        "talhao__fazenda__nome",
+                        "talhao__fazenda__fazenda__nome",
+                        "variedade__cultura__cultura",
+                        "variedade__cultura__id_protheus_planejamento",
+                        "variedade__id_protheus_planejamento_second_option",
+                        "area_colheita",
+                        'id_farmbox'
+                    ).filter(
+                        safra__safra=safra_filter,
+                        ciclo__ciclo=cicle_filter,
+                        plantio_descontinuado=False
+                    ).filter(~Q(variedade=None) & ~Q(variedade__cultura=None))
+                
+                
+                list_returned = [
+                    {
+                        'codigo_planejamento' : '??',
+                        'codigo_cultura': x['variedade__cultura__id_protheus_planejamento'] if x['variedade__cultura__cultura'] != 'Feijão' else x['variedade__cultura__id_protheus_planejamento'],
+                        'variedade': x['variedade__cultura__id_protheus_planejamento'],
+                        'parcela': x['talhao__id_talhao'],
+                        'area_parcela': x['area_colheita'],
+                        'id_talhao_farm': x['id_farmbox'],
+                        'index': index
+                    }
+                    for index, x in enumerate(query_plantio, start=1)
+                ]
+                
+                # TRATAR PARA ENVIAR PROJETOS PARA ABRIR OS HEADERS DO PLANEJAMENTO
+                farm_list = list(set([x['talhao__fazenda__nome'] for x in query_plantio]))
+                query_projetos = Projeto.objects.values(
+                    'nome',
+                    'fazenda__nome',
+                    'fazenda__id_d',
+                    'id_d',
+                )
+                filtered_farm_list = [{**x, 'safra': safra_filter, 'ciclo': cicle_filter, 'projeto': x['id_d'], 'fazenda_planejamento': x['fazenda__nome'], 'id_fazenda_planejamento' : x['fazenda__id_d']} for x in query_projetos if x['nome'] in farm_list]
+                
+                
+                response = {
+                    "msg": "Dados consolidados para enviar ao protheus com Sucesso!!",
+                    "projetos": filtered_farm_list,
+                    "dados": list_returned
+                }
+                return Response(response, status=status.HTTP_201_CREATED)
+            except Exception as e:
+                print('Problema em gerar os dados para enviar ao protheus', e)
+                response = {
+                    "message": "Arquivo desconhecido",
+                    "problem": e
+                    }
+                return Response(response, status=status.HTTP_400_BAD_REQUEST)
+            
+        else:
+            response = {"message": "Você precisa estar logado!!!"}
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
+            
 
 
 
@@ -3441,8 +3522,10 @@ class PlantioDetailResumoApi(viewsets.ModelViewSet):
             safra_filter = None
             cicle_filter = None
             try:
+                print(request)
                 safra_filter = request.data["safra"]
                 cicle_filter = request.data["ciclo"]
+                print('safra e ciclo passadas pela URL:')
                 print(safra_filter, cicle_filter)
             except Exception as e:
                 print(e)
@@ -3563,20 +3646,24 @@ class StViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=["GET", "POST"])
     def open_st_by_protheus(self, request, pk=None):
+        # Define if should send email
+        should_send_email = False
+        # If user is Authenticated
         if request.user.is_authenticated:
             req_data = None
             try:
+                # get data from request
                 req_data = request.data['dados_st']
                 # string = response.read().decode('utf-8')
                 req_data = json.loads(req_data)
             except Exception as e:
                 print('erro ao pegar os dados', e)
-            
-            print('dados recebidos: ', type(req_data))
             print('dados recebidos: ', req_data)
             
+            # should change after receive from protheus'api
             st_number_protheus = 123
             if req_data:
+                # handle data and format properly
                 projetos = req_data["Projeto"]
                 datas = req_data["Data"]
                 apps = formart_ap_list(req_data["Ap"])
@@ -3584,7 +3671,19 @@ class StViewSet(viewsets.ModelViewSet):
                 print('produtos: ', produtos)
                 fazenda_destino = req_data['fazendaDestino']
                 armazem_destino  = req_data['armazemDestino']
+                observacao  = req_data['observacao']
+                try:
+                    new_st_opened = StProtheusIntegration(
+                        st_numero=st_number_protheus,
+                        st_fazenda=projetos[0],
+                        app=req_data
+                    )
+                    new_st_opened.save()
+                    print('Nova ST salva com sucesso!!', new_st_opened)
+                except Exception as e:
+                    print('Erro ao salvar a ST', e)
             try:
+                # create context to send as response to frontend
                 context = {
                     "fazendas": projetos,
                     "datas": datas,
@@ -3592,34 +3691,41 @@ class StViewSet(viewsets.ModelViewSet):
                     "produtos": produtos,
                     'fazenda_destino': fazenda_destino,
                     'armazem_destino': armazem_destino,
-                    'st_number': st_number_protheus
+                    'st_number': st_number_protheus,
+                    'observacao': observacao
                 }
-                subject = f"Pré ST Aberta: {st_number_protheus}"
-                from_email = 'patamarcelo@gmail.com'
-                recipient_list = ['marcelo@gdourado.com.br']
-                # recipient_list = ['raylton.sousa@diamanteagricola.com.br']
-                template_name = "st_open.html"
-                convert_to_html_content =  render_to_string(
-                    template_name=template_name, context=context
-                )
-                plain_message = strip_tags(convert_to_html_content)
-                
-                sending_msg = send_mail(
-                    subject=subject,
-                    message=plain_message,
-                    from_email=from_email, 
-                    recipient_list=recipient_list,
-                    html_message=convert_to_html_content,
-                )
-                check_here = 'Sim' if sending_msg == 1 else 'Não'
-                print('Email foi enviado: ', check_here)
-                
+                # send email function and logic
+                if should_send_email == True:
+                    subject = f"Pré ST Aberta: {st_number_protheus}"
+                    from_email = 'patamarcelo@gmail.com'
+                    # recipient_list = ['raylton.sousa@diamanteagricola.com.br', 'melissa.bento@diamanteagricola.com.br']
+                    recipient_list = ['marcelo@gdourado.com.br']
+                    template_name = "st_open.html"
+                    convert_to_html_content =  render_to_string(
+                        template_name=template_name, context=context
+                    )
+                    plain_message = strip_tags(convert_to_html_content)
+                    
+                    sending_msg = send_mail(
+                        subject=subject,
+                        message=plain_message,
+                        from_email=from_email, 
+                        recipient_list=recipient_list,
+                        html_message=convert_to_html_content,
+                    )
+                    check_here = 'Sim' if sending_msg == 1 else 'Não'
+                    print('Email foi enviado: ', check_here)
+                else:
+                    print('Email não enviado, devido as configurações')
+                    check_here = 'Não'
             except Exception as e:
                 print('erro ao pegar os enviar email: ', e)
+                
             response = {
                 'msg': 'St Aberta com Successo',
                 'st_number': st_number_protheus,
                 'sent_by_email': check_here,
+                'dados_recebidos': req_data
             }
             return Response(response, status=status.HTTP_201_CREATED)
         else:
