@@ -2250,3 +2250,9 @@ class ColheitaPlantioExtratoAreaAdmin(admin.ModelAdmin):
     list_display = ("plantio", "data_colheita", "area_colhida")
     autocomplete_fields = ["plantio"]
     raw_id_fields = ["plantio"]
+    
+    
+@admin.register(HeaderPlanejamentoAgricola)
+class HeaderPlanejamentoAgricolaAdmin(admin.ModelAdmin):
+    list_display = ("criados", "projeto", "codigo_planejamento", "safra", "ciclo")
+    

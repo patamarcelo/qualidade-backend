@@ -9,7 +9,8 @@ from .models import (
     Colheita,
     Visitas,
     RegistroVisitas,
-    StProtheusIntegration
+    StProtheusIntegration,
+    ColheitaPlantioExtratoArea
 )
 from rest_framework.fields import CurrentUserDefault
 
@@ -122,4 +123,10 @@ class StProtheusIntegrationSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = StProtheusIntegration
+        fields = "__all__"
+
+class ColheitaPlantioExtratoAreaSerializer(serializers.ModelSerializer):
+    
+    class Meta:
+        model = ColheitaPlantioExtratoArea
         fields = "__all__"

@@ -13,7 +13,8 @@ from .serializers import (
     ColheitaSerializer,
     VisitasSerializer,
     RegistroVisitasSerializer,
-    StProtheusIntegrationSerializer
+    StProtheusIntegrationSerializer,
+    ColheitaPlantioExtratoAreaSerializer
 )
 
 from rest_framework import viewsets, status
@@ -72,7 +73,9 @@ from .models import (
     CicloAtual,
     Fazenda,
     AppFarmboxIntegration,
-    StProtheusIntegration
+    StProtheusIntegration,
+    HeaderPlanejamentoAgricola,
+    ColheitaPlantioExtratoArea
 )
 
 from functools import reduce
@@ -111,7 +114,7 @@ import base64
 from rest_framework.authtoken.models import Token
 
 from qualidade_project.settings import DEBUG
-from qualidade_project.settings import FARMBOX_ID
+from qualidade_project.settings import FARMBOX_ID, PROTHEUS_TOKEN
 
 from collections import defaultdict
 
@@ -121,6 +124,16 @@ from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 from django.conf import settings
+
+from django.db.models.functions import TruncDate
+from itertools import groupby
+from operator import itemgetter
+
+from requests.auth import HTTPBasicAuth
+
+from datetime import time as dateTime
+
+
 
 main_path_upload_ids = (
     "http://localhost:5050"
@@ -2520,6 +2533,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
             if planejamento_plantio == True:
                 safra_filter = "2024/2025"
                 ciclo_filter = '3'
+                filter_farm_id= "6"
+                
                 plantio_map = Plantio.objects.values(
                     "map_geo_points", "map_centro_id", "talhao__id_talhao", "id_farmbox"
                 ).filter(
@@ -2527,7 +2542,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     ciclo__ciclo=ciclo_filter,
                     # finalizado_plantio=True,
                     # programa__isnull=False,
-                    talhao__fazenda__fazenda__id_d='1',
+                    talhao__fazenda__fazenda__id_d=filter_farm_id,
                 ).order_by('data_prevista_plantio')
 
                 plantio_ids = Plantio.objects.values(
@@ -2536,9 +2551,30 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     safra__safra=safra_filter,
                     # finalizado_plantio=True,
                     # programa__isnull=False,
-                    talhao__fazenda__fazenda__id_d='1',
+                    talhao__fazenda__fazenda__id_d=filter_farm_id,
                 ).order_by('data_prevista_plantio')
+                
+                gp_date = ( 
+                        Plantio.objects.filter(safra__safra=safra_filter, ciclo__ciclo=ciclo_filter, programa__isnull=False)
+                                        .filter(talhao__fazenda__fazenda__id_d=filter_farm_id)
+                                        .annotate(date_only=TruncDate('data_prevista_plantio'))
+                                        .values('date_only', 'id_farmbox')
+                                        .order_by('date_only')
+                )
+                grouped_by_date = [
+                    {
+                        'index': idx, 'date': date, 'list': [item['id_farmbox'] for item in group]
+                    }
+                    for idx, (date, group) in enumerate(groupby(gp_date, key=itemgetter('date_only')), start=1)
+                ]
+                
+                print('Resultado dos campos consolidados')
+                for i in grouped_by_date:
+                    print(i)
+                    print('\n')
+                
             else:
+                grouped_by_date=[]
                 plantio_map = Plantio.objects.values(
                     "map_geo_points", "map_centro_id", "talhao__id_talhao", "id_farmbox"
                 ).filter(
@@ -2564,6 +2600,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             polygons = []
             labels = []
             farm_ids = []
+            ids_farmbox= []
             print("entrando no loop")
             print(time.time() - start_time)
             for i in plantio_map:
@@ -2580,8 +2617,9 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 polygons.append(np)
 
                 labels.append(i["talhao__id_talhao"])
-                # farm_ids.append(i["id_farmbox"])
                 farm_ids.append(i["talhao__id_talhao"])
+                ids_farmbox.append(i["id_farmbox"])
+                
 
             print("saindo do loop")
             print(time.time() - start_time)
@@ -2602,7 +2640,9 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 filled_color=(0, 0.96, 0, 0.7),
                 # filled_color="#4191C4",
                 fontsize=3,
-                planejamento_plantio=planejamento_plantio
+                planejamento_plantio=planejamento_plantio,
+                grouped_by_date=grouped_by_date,
+                ids_farmbox_planner=ids_farmbox,
             )
 
             data_img = base64.b64encode(img_buffer.getvalue()).decode()
@@ -2835,6 +2875,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
     def save_planejamento_protheus(self, request, pk=None):
         if request.user.is_authenticated:
             try:
+                projetos_response=[]
+                format_data_to_send=[]
                 safra_filter = request.data["safra"]
                 cicle_filter = request.data["ciclo"]
                 query_plantio = Plantio.objects.values(
@@ -2843,12 +2885,14 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         "ciclo__ciclo",
                         "talhao__id_talhao",
                         "talhao__fazenda__nome",
+                        "talhao__fazenda__id_d",
                         "talhao__fazenda__fazenda__nome",
                         "variedade__cultura__cultura",
                         "variedade__cultura__id_protheus_planejamento",
                         "variedade__id_protheus_planejamento_second_option",
                         "variedade__variedade",
                         "variedade__id_farmbox",
+                        "variedade__id_cultura_dif_protheus_planejamento",
                         "area_colheita",
                         'id_farmbox'
                     ).filter(
@@ -2861,12 +2905,14 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 list_returned = [
                     {
                         'codigo_planejamento' : '??',
-                        'codigo_cultura': x['variedade__cultura__id_protheus_planejamento'] if x['variedade__cultura__cultura'] != 'Feijão' else x['variedade__id_protheus_planejamento_second_option'],
+                        'codigo_cultura': x['variedade__cultura__id_protheus_planejamento'] if x['variedade__cultura__cultura'] != 'Feijão' else x['variedade__id_cultura_dif_protheus_planejamento'],
                         'variedade': x['variedade__variedade'],
                         "id_variedade": x['variedade__id_farmbox'],
                         'parcela': x['talhao__id_talhao'],
                         'area_parcela': x['area_colheita'],
                         'id_talhao_farm': x['id_farmbox'],
+                        'projeto': x['talhao__fazenda__id_d'],
+                        "projeto_nome": x["talhao__fazenda__nome"],
                         'index': index
                     }
                     for index, x in enumerate(query_plantio, start=1)
@@ -2882,11 +2928,85 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 )
                 filtered_farm_list = [{**x, 'safra': safra_filter, 'ciclo': cicle_filter, 'projeto': x['id_d'], 'fazenda_planejamento': x['fazenda__nome'], 'id_fazenda_planejamento' : x['fazenda__id_d']} for x in query_projetos if x['nome'] in farm_list]
                 
+                print('dados para enviar', filtered_farm_list)
                 
+                
+                # send to protheus saving headers
+                headers = {
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                    "Authorization": f'Basic ${PROTHEUS_TOKEN}',
+                    "Access-Control-Allow-Origin": "*"
+                }
+                url = "https://api.diamanteagricola.com.br:8089/rest/planejamento/cabecalho"
+                
+                payload = {
+                    "projetos": filtered_farm_list
+                }
+                # if len(farm_list) > 0:
+                #     try:
+                #         response_headers = requests.post(url, data=json.dumps(payload), headers=headers, verify=False, auth=HTTPBasicAuth('api', PROTHEUS_TOKEN))
+                        
+                #         print('response headers from protheus:', response_headers)
+                #         print('\n\n')
+                #         print('response:', response_headers.status_code, response_headers.text)
+                #         if response_headers.status_code == 201:
+                #             safra_id = Safra.objects.all()
+                #             cicle_id = Ciclo.objects.all()
+                #             projetos_to_query = Projeto.objects.all()
+                #             parsed_json = json.loads(response_headers.text)
+                #             print('\n')
+                #             print('Projetos of Response:', parsed_json['Projetos'])
+                #             projetos_response = parsed_json['Projetos']
+                #             for resp in projetos_response:
+                #                 if resp.get('codigo_planejamento') != None:
+                #                     try:
+                #                         ciclo_to_save = [x for x in cicle_id if x.ciclo == int(cicle_filter)][0]
+                #                         safra_to_save = [ x for x in safra_id if x.safra == safra_filter][0]
+                #                         projeto_to_save = [x for x in projetos_to_query if x.id_d == resp['projeto']][0]
+                #                         codigo_to_save = resp['codigo_planejamento']
+                #                         new_planner = HeaderPlanejamentoAgricola(
+                #                             projeto=projeto_to_save,
+                #                             codigo_planejamento=codigo_to_save,
+                #                             safra=safra_to_save,
+                #                             ciclo=ciclo_to_save
+                #                         )
+                #                         new_planner.save()
+                #                         print(f'{Fore.GREEN}Novo Planejamento incluido com sucesso!! - {Fore.BLUE} {new_planner}{Style.RESET_ALL}')
+                #                     except Exception as e:
+                #                         print(f'{Fore.LIGHTYELLOW_EX}Erro ao Salvar o Planejamento {Fore.LIGHTRED_EX}{e}{Style.RESET_ALL}')
+                #                 else:
+                #                     print('Projeto com erro de resposta', resp)
+                #     except Exception as e:
+                #         print('Erro ao enviar o cabeçalho para o protheus', e)
+                
+                
+                get_planner_codes = HeaderPlanejamentoAgricola.objects.values('projeto__id_d', 'codigo_planejamento').filter(safra__safra=safra_filter, ciclo__ciclo=cicle_filter)
+                format_data_to_send = [{**x,'area_parcela': float(x['area_parcela']) ,'codigo_planejamento': [cod['codigo_planejamento'] for cod in get_planner_codes if cod['projeto__id_d'] == x['projeto']][0] } for x in list_returned ]
+                url_talhoes = 'https://api.diamanteagricola.com.br:8089/rest/planejamento/talhoes'
+                payload_talhoes = {
+                    'parcelas': format_data_to_send
+                }
+                
+                print('Talhos a enviar: \n')
+                print(format_data_to_send)
+                
+                if len(format_data_to_send) > 0:
+                    try:
+                        response_talhoes = requests.post(url_talhoes,data=json.dumps(payload_talhoes), headers=headers, verify=False, auth=HTTPBasicAuth('api', PROTHEUS_TOKEN))
+                        print('response headers from protheus:', response_talhoes)
+                        print('\n\n')
+                        print('response:', response_talhoes.status_code, response_talhoes.text)
+                        
+                        
+                    except Exception as e:
+                        print('Erro ao enviar os talhoes para o protheus', e)
+                        
+                    
                 response = {
                     "msg": "Dados consolidados para enviar ao protheus com Sucesso!!",
-                    "projetos": filtered_farm_list,
-                    "dados": list_returned
+                    "projetos": projetos_response,
+                    "parcelas": format_data_to_send,
                 }
                 return Response(response, status=status.HTTP_201_CREATED)
             except Exception as e:
@@ -3753,6 +3873,55 @@ class StViewSet(viewsets.ModelViewSet):
                 'st_number': st_number_protheus,
                 'sent_by_email': check_here,
                 'dados_recebidos': req_data
+            }
+            return Response(response, status=status.HTTP_201_CREATED)
+        else:
+            response = {"message": "Você precisa estar logado!!!"}
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
+        
+        
+class ColheitaPlantioExtratoAreaViewSet(viewsets.ModelViewSet):
+    queryset = ColheitaPlantioExtratoArea.objects.all()
+    serializer_class = StProtheusIntegrationSerializer
+    authentication_classes = (TokenAuthentication,)
+    permission_classes = (IsAuthenticated,)
+    
+    @action(detail=False, methods=["GET", "POST"])
+    def update_colheita_area_from_farmbox(self, request, pk=None):
+        if request.user.is_authenticated:
+            req_data = None
+            try:
+                # get data from request
+                req_data = request.data
+            except Exception as e:
+                print('erro ao pegar os dados', e)
+            print('dados recebidos: ', req_data)
+            list_of_ids = [x['plantioId'] for x in req_data]
+            filtered_query = Plantio.objects.filter(id_farmbox__in=list_of_ids)
+            
+            for i in req_data:
+                try:
+                    plantio_id_to_save = i['plantioId']
+                    plantio_to_save = [x for x in filtered_query if x.id_farmbox == plantio_id_to_save][0]
+                    area_to_save = Decimal(i['Area Aplicada'].replace(',','.'))
+                    data_to_save = i['Data Aplicacao']
+                    hour_to_save = int(i['Hora Aplicacao'].split(':')[0])
+                    minute_to_save = int(i['Hora Aplicacao'].split(':')[1])
+                    
+                    new_colheita = ColheitaPlantioExtratoArea(
+                        plantio=plantio_to_save,
+                        area_colhida=area_to_save,
+                        data_colheita=data_to_save,
+                        time=dateTime(hour_to_save, minute_to_save)
+                    )
+                    new_colheita.save()
+                    print('Colheita Salva com sucesso!!')
+                    print(new_colheita)
+                except Exception as e:
+                    print(f'Problema em Salar o Plantio:{i} : Error: {e} ')
+            
+            response = {
+                'msg': 'Colheita Atualizada com sucesso!!'
             }
             return Response(response, status=status.HTTP_201_CREATED)
         else:

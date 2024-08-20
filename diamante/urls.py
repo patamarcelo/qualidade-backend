@@ -12,7 +12,8 @@ from .views_api import (
     VisitasConsultasApi,
     RegistroVisitasApi,
     PlantioDetailResumoApi,
-    StViewSet
+    StViewSet,
+    ColheitaPlantioExtratoAreaViewSet
 )
 
 router = routers.DefaultRouter()
@@ -25,6 +26,7 @@ router.register("visitas", VisitasConsultasApi)
 router.register("registrosvisita", RegistroVisitasApi)
 router.register("resumocolheita", PlantioDetailResumoApi)
 router.register("opensts", StViewSet)
+router.register("extratocolheitaarea", ColheitaPlantioExtratoAreaViewSet)
 
 
 urlpatterns = [

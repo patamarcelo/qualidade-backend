@@ -834,7 +834,10 @@ class ColheitaPlantioExtratoArea(Base):
         null=True,
     )
     
+    time = models.TimeField(blank=True, null=True)
+    
     class Meta:
+        unique_together = ('time', 'data_colheita', 'plantio')
         ordering = ["data_colheita", 'plantio']
         verbose_name = 'Extrato da Colheita'
         verbose_name_plural = 'Extrato das Colheitas'
@@ -1276,3 +1279,17 @@ class StProtheusIntegration(Base):
     class Meta:
         verbose_name = 'ST Integração'
         verbose_name_plural = 'STs Integrações'
+        
+class HeaderPlanejamentoAgricola(Base):
+    projeto = models.ForeignKey(Projeto, on_delete=models.PROTECT)
+    codigo_planejamento = models.CharField('Código do Planejamento', max_length=200)
+    safra = models.ForeignKey(Safra, on_delete=models.PROTECT)
+    ciclo = models.ForeignKey(Ciclo, on_delete=models.PROTECT)
+    
+    class Meta:
+        unique_together = ("projeto", "safra", "ciclo")
+        verbose_name = 'Header Planejamento Agrícola'
+        verbose_name_plural =  'Headers Planejamentos Agrícola'
+    
+    def __str__(self):
+        return f'{self.projeto} {self.safra} {self.ciclo} {self.codigo_planejamento}'

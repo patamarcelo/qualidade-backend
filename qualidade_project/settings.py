@@ -36,6 +36,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = env("SECRET_KEY")
 FARMBOX_ID = env("FARM_API")
 MONGO_PASS_DEFENSIVOS = env("MONGO_PASS_DEFENSIVOS")
+PROTHEUS_TOKEN = env("PROTHEUS_TOKEN")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG_ENV = env("DEBUG")
