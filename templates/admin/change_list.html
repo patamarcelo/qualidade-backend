@@ -142,6 +142,8 @@ $(function () {
         let val = 0
         let valBruto = 0
         let scsLiquido = 0
+        let areaColhida = 0
+
         $('.selected .field-peso_scs_limpo_e_seco').each((i, e) =>{
             const value = e.innerHTML.replace('.',"").replace(',',".")
 
@@ -160,9 +162,23 @@ $(function () {
 
             scsLiquido += parseFloat(valueScsLiquido)
         })
+
+        $('.selected .field-area_colhida').each((i, e) =>{
+            const valueAreaColhida = e.innerHTML.replace('.',"").replace(',',".")
+            areaColhida += parseFloat(valueAreaColhida)
+        })
+
+
         const pesoLiquido = $('.field-peso_scs_limpo_e_seco')
         const pesoBruto = $('.field-get_peso_liquido')
         const scsLiq = $('.field-peso_scs_liquido')
+        const areaCol = $('.field-area_colhida')
+        
+        if( areaCol.length > 0){
+            const total = "Total Selecionado: "
+            $(".select-result-total").html(total +  areaColhida.toLocaleString('pt-br',{  minimumFractionDigits: 2,
+                maximumFractionDigits: 2}) + " Ha")
+        }
         
         if (pesoLiquido.length > 0){
             const total = "Total Selecionado: "
