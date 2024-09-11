@@ -2943,42 +2943,42 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 payload = {
                     "projetos": filtered_farm_list
                 }
-                # if len(farm_list) > 0:
-                #     try:
-                #         response_headers = requests.post(url, data=json.dumps(payload), headers=headers, verify=False, auth=HTTPBasicAuth('api', PROTHEUS_TOKEN))
+                if len(farm_list) > 0:
+                    try:
+                        response_headers = requests.post(url, data=json.dumps(payload), headers=headers, verify=False, auth=HTTPBasicAuth('api', PROTHEUS_TOKEN))
                         
-                #         print('response headers from protheus:', response_headers)
-                #         print('\n\n')
-                #         print('response:', response_headers.status_code, response_headers.text)
-                #         if response_headers.status_code == 201:
-                #             safra_id = Safra.objects.all()
-                #             cicle_id = Ciclo.objects.all()
-                #             projetos_to_query = Projeto.objects.all()
-                #             parsed_json = json.loads(response_headers.text)
-                #             print('\n')
-                #             print('Projetos of Response:', parsed_json['Projetos'])
-                #             projetos_response = parsed_json['Projetos']
-                #             for resp in projetos_response:
-                #                 if resp.get('codigo_planejamento') != None:
-                #                     try:
-                #                         ciclo_to_save = [x for x in cicle_id if x.ciclo == int(cicle_filter)][0]
-                #                         safra_to_save = [ x for x in safra_id if x.safra == safra_filter][0]
-                #                         projeto_to_save = [x for x in projetos_to_query if x.id_d == resp['projeto']][0]
-                #                         codigo_to_save = resp['codigo_planejamento']
-                #                         new_planner = HeaderPlanejamentoAgricola(
-                #                             projeto=projeto_to_save,
-                #                             codigo_planejamento=codigo_to_save,
-                #                             safra=safra_to_save,
-                #                             ciclo=ciclo_to_save
-                #                         )
-                #                         new_planner.save()
-                #                         print(f'{Fore.GREEN}Novo Planejamento incluido com sucesso!! - {Fore.BLUE} {new_planner}{Style.RESET_ALL}')
-                #                     except Exception as e:
-                #                         print(f'{Fore.LIGHTYELLOW_EX}Erro ao Salvar o Planejamento {Fore.LIGHTRED_EX}{e}{Style.RESET_ALL}')
-                #                 else:
-                #                     print('Projeto com erro de resposta', resp)
-                #     except Exception as e:
-                #         print('Erro ao enviar o cabeçalho para o protheus', e)
+                        print('response headers from protheus:', response_headers)
+                        print('\n\n')
+                        print('response:', response_headers.status_code, response_headers.text)
+                        if response_headers.status_code == 201:
+                            safra_id = Safra.objects.all()
+                            cicle_id = Ciclo.objects.all()
+                            projetos_to_query = Projeto.objects.all()
+                            parsed_json = json.loads(response_headers.text)
+                            print('\n')
+                            print('Projetos of Response:', parsed_json['Projetos'])
+                            projetos_response = parsed_json['Projetos']
+                            for resp in projetos_response:
+                                if resp.get('codigo_planejamento') != None:
+                                    try:
+                                        ciclo_to_save = [x for x in cicle_id if x.ciclo == int(cicle_filter)][0]
+                                        safra_to_save = [ x for x in safra_id if x.safra == safra_filter][0]
+                                        projeto_to_save = [x for x in projetos_to_query if x.id_d == resp['projeto']][0]
+                                        codigo_to_save = resp['codigo_planejamento']
+                                        new_planner = HeaderPlanejamentoAgricola(
+                                            projeto=projeto_to_save,
+                                            codigo_planejamento=codigo_to_save,
+                                            safra=safra_to_save,
+                                            ciclo=ciclo_to_save
+                                        )
+                                        new_planner.save()
+                                        print(f'{Fore.GREEN}Novo Planejamento incluido com sucesso!! - {Fore.BLUE} {new_planner}{Style.RESET_ALL}')
+                                    except Exception as e:
+                                        print(f'{Fore.LIGHTYELLOW_EX}Erro ao Salvar o Planejamento {Fore.LIGHTRED_EX}{e}{Style.RESET_ALL}')
+                                else:
+                                    print('Projeto com erro de resposta', resp)
+                    except Exception as e:
+                        print('Erro ao enviar o cabeçalho para o protheus', e)
                 
                 
                 get_planner_codes = HeaderPlanejamentoAgricola.objects.values('projeto__id_d', 'codigo_planejamento').filter(safra__safra=safra_filter, ciclo__ciclo=cicle_filter)
@@ -3088,7 +3088,7 @@ class DefensivoViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["GET"])
     def update_farmbox_mongodb_data(self, request, pk=None):
         
-        number_of_days_before = 5 if DEBUG == True else 1
+        number_of_days_before = 1 if DEBUG == True else 1
         from_date = get_date(number_of_days_before)
         last_up = get_miliseconds(from_date)
         print(last_up)
@@ -3895,11 +3895,11 @@ class ColheitaPlantioExtratoAreaViewSet(viewsets.ModelViewSet):
                 req_data = request.data
             except Exception as e:
                 print('erro ao pegar os dados', e)
-            print('dados recebidos: ', req_data)
             list_of_ids = [x['plantioId'] for x in req_data]
             filtered_query = Plantio.objects.filter(id_farmbox__in=list_of_ids)
             
             for i in req_data:
+                print(i)
                 try:
                     plantio_id_to_save = i['plantioId']
                     plantio_to_save = [x for x in filtered_query if x.id_farmbox == plantio_id_to_save][0]
@@ -3908,6 +3908,10 @@ class ColheitaPlantioExtratoAreaViewSet(viewsets.ModelViewSet):
                     hour_to_save = int(i['Hora Aplicacao'].split(':')[0])
                     minute_to_save = int(i['Hora Aplicacao'].split(':')[1])
                     
+                    total_aplicado_to_save = Decimal(i['Total Aplicado'].replace(',','.'))
+                    plantio_to_save.area_parcial = total_aplicado_to_save
+                    plantio_to_save.save()
+                    
                     new_colheita = ColheitaPlantioExtratoArea(
                         plantio=plantio_to_save,
                         area_colhida=area_to_save,
@@ -3915,10 +3919,11 @@ class ColheitaPlantioExtratoAreaViewSet(viewsets.ModelViewSet):
                         time=dateTime(hour_to_save, minute_to_save)
                     )
                     new_colheita.save()
-                    print('Colheita Salva com sucesso!!')
+                    print(f'{Fore.GREEN}Colheita Salva com sucesso!!{Style.RESET_ALL}')
                     print(new_colheita)
+                    print('\n')
                 except Exception as e:
-                    print(f'Problema em Salar o Plantio:{i} : Error: {e} ')
+                    print(f'{Fore.LIGHTYELLOW_EX}Problema em Salvar o Plantio:{i} : \n{Fore.LIGHTRED_EX}Error: {e} {Style.RESET_ALL}')
             
             response = {
                 'msg': 'Colheita Atualizada com sucesso!!'

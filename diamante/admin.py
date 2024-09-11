@@ -207,6 +207,7 @@ class PlantioDetailAdmin(admin.ModelAdmin):
                 plantio_descontinuado=False,
             )
             .filter(~Q(variedade__cultura__cultura="Milheto"))
+            .filter(~Q(variedade__cultura__cultura="Algodão"))
             # .filter(~Q(talhao__fazenda__nome="Projeto Lago Verde"))
             .values(
                 "talhao__fazenda__nome",
@@ -329,6 +330,7 @@ class PlantioDetailPlantioAdmin(admin.ModelAdmin):
                 plantio_descontinuado=False,
             )
             .filter(~Q(variedade__cultura__cultura="Milheto"))
+            .filter(~Q(variedade__cultura__cultura="Algodão"))
             .filter(~Q(variedade=None))
             .values(
                 "talhao__fazenda__nome",
@@ -1116,7 +1118,8 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
     # TOTAL DE CARGAS CARREGADAS PARA O PLANTIO E KG
     def get_total_colheita_cargas_kg(self, obj):
         filtered_list = [(x[1] * 60) for x in self.total_c_2 if obj.id == x[0]]
-        return sum(filtered_list)
+        peso_total = sum(filtered_list) if sum(filtered_list) > 0 else " - "
+        return peso_total
 
     get_total_colheita_cargas_kg.short_description = "Peso Carr."
 
@@ -1906,6 +1909,7 @@ class OperacaoAdmin(admin.ModelAdmin):
 @admin.register(Defensivo)
 class DefensivoAdmin(admin.ModelAdmin):
     list_display = ("produto", "tipo", 'id_farmbox', 'unidade_medida')
+    # ordering = ["operacao__estagio", "produto"]
     ordering = ["produto"]
     search_fields = ["produto", "tipo", 'id_farmbox']
     list_filter = ("tipo",)
@@ -2247,9 +2251,87 @@ class PlantioExtratoAreaAdmin(admin.ModelAdmin):
 
 @admin.register(ColheitaPlantioExtratoArea)
 class ColheitaPlantioExtratoAreaAdmin(admin.ModelAdmin):
-    list_display = ("plantio", "data_colheita", "area_colhida")
+    list_display = ("talhao_description", "safra_description", "cultura_description", "variedade_description", "get_data", "area_colhida")
     autocomplete_fields = ["plantio"]
     raw_id_fields = ["plantio"]
+    ordering = ["-data_colheita"]
+    search_fields = [
+        "plantio__variedade__variedade", 
+        "plantio__variedade__cultura__cultura",
+        "plantio__talhao__fazenda__nome",
+        "plantio__talhao__fazenda__fazenda__nome",
+        "plantio__talhao__id_unico"
+        ]
+    
+    def get_queryset(self, request):
+        return (
+            super(ColheitaPlantioExtratoAreaAdmin, self)
+            .get_queryset(request)
+            .select_related(
+                "plantio__talhao",
+                "plantio__safra",
+                "plantio__ciclo",
+                "plantio__talhao__fazenda",
+                "plantio__variedade",
+                "plantio__variedade__cultura",
+            )
+        )
+    
+    def get_data(self, obj):
+        if obj.data_colheita:
+            return date_format(
+                obj.data_colheita, format="SHORT_DATE_FORMAT", use_l10n=True
+            )
+        else:
+            return " - "
+
+    get_data.short_description = "Data Colheita"
+    
+    
+    def safra_description(self, obj):
+        return f"{obj.plantio.safra.safra} - {obj.plantio.ciclo.ciclo}"
+
+    safra_description.short_description = "Safra"
+    
+    
+    def talhao_description(self, obj):
+        return obj.plantio.talhao
+    talhao_description.short_description = 'Talhão'
+    
+    def cultura_description(self, obj):
+        if obj.plantio.variedade is not None:
+            cultura = (
+                obj.plantio.variedade.cultura.cultura if obj.plantio.variedade.cultura.cultura else "-"
+            )
+            cultura_url = None
+            if cultura == "Soja":
+                cultura_url = "soy"
+            if cultura == "Feijão":
+                cultura_url = "beans2"
+            if cultura == "Arroz":
+                cultura_url = "rice"
+            image_url = None
+            if cultura_url is not None:
+                image_url = f"/static/images/icons/{cultura_url}.png"
+            if image_url is not None:
+                return format_html(
+                    f'<img style="width: 20px; height: 20px; text-align: center"  src="{image_url}">'
+                )
+        else:
+            cultura = "Não Planejado"
+        return cultura
+    cultura_description.short_description = "Cultura"
+    
+    def variedade_description(self, obj):
+        if obj.plantio.variedade:
+            variedade = (
+                obj.plantio.variedade.nome_fantasia if obj.plantio.variedade.nome_fantasia else "-"
+            )
+        else:
+            variedade = "Não Planejado"
+        return variedade
+
+    variedade_description.short_description = "Variedade"
     
     
 @admin.register(HeaderPlanejamentoAgricola)
