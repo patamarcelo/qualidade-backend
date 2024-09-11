@@ -44,7 +44,7 @@ if DEBUG_ENV == "1":
     DEBUG = True
 if DEBUG_ENV == "0":
     DEBUG = False
-
+print('DEBUG', DEBUG)
 
 ALLOWED_HOSTS = ["*"]
 

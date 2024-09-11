@@ -3020,8 +3020,107 @@ class PlantioViewSet(viewsets.ModelViewSet):
         else:
             response = {"message": "Você precisa estar logado!!!"}
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
-            
-
+    
+    @action(detail=False, methods=['POST'])
+    def open_bulcket_app_farmbox(self, request, pk=None):
+        if request.user.is_authenticated:
+            try:
+                file = request.FILES["insumos"]
+                dict_data = file.read()
+                load_data = json.loads(dict_data)
+                input_id = request.data['input_id']
+                input_operation = request.data['input_operation']
+                list_to_work = []
+                dict_app = []
+                
+                query_projetos = Plantio.objects.filter(safra__safra="2024/2025").values('talhao__fazenda__id_farmbox','id_farmbox','talhao__fazenda__fazenda__id_responsavel_farmbox','talhao__fazenda__fazenda__id_encarregado_farmbox')
+                
+                
+                for i in load_data:
+                    projeto = i['Projeto']
+                    area = i['Area']
+                    id_plantio = i['ID FarmBox']
+                    dose = i["Dose Kg"]
+                    get_index = [(index, x) for index, x in enumerate(dict_app) if x['projeto'] == projeto and x['dose'] == dose]
+                    plantation_to_append = {
+                                    'sought_area': float(str(area).replace(',','.')),
+                                    'plantation_id': id_plantio,
+                                }
+                    if get_index:
+                        index_of = get_index[0][0]
+                        dict_app[index_of]['plantations'].append(plantation_to_append)
+                    else:
+                        get_id = query_projetos.filter(id_farmbox=id_plantio).first()
+                        obj_to_add = {
+                            'projeto': projeto,
+                            'dose': dose,
+                            'date': '2024-09-11',
+                            'harvest_id': 3840,
+                            'farm_id':get_id['talhao__fazenda__id_farmbox'],
+                            'responsible_id': get_id['talhao__fazenda__fazenda__id_responsavel_farmbox'],
+                            'charge_id': get_id['talhao__fazenda__fazenda__id_encarregado_farmbox'],
+                            'plantations': [plantation_to_append],
+                            'inputs' : [
+                                # OPERACAO
+                                {
+                                    "dosage_value": 1,
+                                    "dosage_unity": "un_ha",
+                                    "input_id": input_operation
+                                },
+                                # PRODUTO
+                                {
+                                    "dosage_value": dose,
+                                    "dosage_unity": "kg_ha",
+                                    "input_id": input_id
+                                }
+                            ]
+                        }
+                        dict_app.append(obj_to_add)
+                        
+                for i in dict_app:
+                    i.pop('projeto')
+                    i.pop('dose')   
+                
+                # for payload in dict_app[:2]: 
+                #     print(payload) 
+                #     print('\n')
+                    
+                # for payload in dict_app[2:]: 
+                #     print(payload) 
+                #     print('\n')
+                # LOGICA PARA ABRIR AS APS DENTRO DO FARM
+                # for payload in dict_app[2:]:
+                #     url = "https://farmbox.cc/api/v1/applications"
+                #     payload = payload
+                #     headers = {
+                #         "content-type": "application/json",
+                #         "Authorization": FARMBOX_ID,
+                #     }
+                #     response_farm = requests.post(url, data=json.dumps(payload), headers=headers)
+                #     print('responseAll from farmbox:', response_farm)
+                #     print('\n\n')
+                #     print('response:', response_farm.status_code)
+                    
+                #     if response_farm.status_code == 201:
+                #         print('Ap Aberta com sucesso!!!')
+                
+                print('Total App to Open:')
+                print(len(dict_app))
+                
+                data = {
+                    'dados': 'dados tratados'
+                }
+                response = {
+                    "msg": f"Aplicação Aberta com sucesso!!!!",
+                    "dados": data,
+                }
+                return Response(response, status=status.HTTP_200_OK)
+            except Exception as e:
+                response = {"message": f"Ocorreu um Erro: {e}"}
+                return Response(response, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            response = {"message": "Você precisa estar logado!!!"}
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
 
 class DefensivoViewSet(viewsets.ModelViewSet):
@@ -3805,10 +3904,15 @@ class StViewSet(viewsets.ModelViewSet):
                 req_data = json.loads(req_data)
             except Exception as e:
                 print('erro ao pegar os dados', e)
+                response = {
+                    "msg": f"Erro ao Pegar os dados",
+                    "error": f"Error ao pegar os dados vindos do farm, Erro: {e}"  # General error message
+                }
+                return Response(response, status=status.HTTP_208_ALREADY_REPORTED)
             print('dados recebidos: ', req_data)
             
             # should change after receive from protheus'api
-            st_number_protheus = 123
+            st_number_protheus = 0
             if req_data:
                 # handle data and format properly
                 projetos = req_data["Projeto"]
@@ -3819,16 +3923,52 @@ class StViewSet(viewsets.ModelViewSet):
                 fazenda_destino = req_data['fazendaDestino']
                 armazem_destino  = req_data['armazemDestino']
                 observacao  = req_data['observacao']
+                
+                headers = {
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                    "Authorization": f'Basic ${PROTHEUS_TOKEN}',
+                    "Access-Control-Allow-Origin": "*"
+                }
+                
+                url = "https://api.diamanteagricola.com.br:8089/rest/apisolicitacao/new"
+                payload = req_data
+                
                 try:
-                    new_st_opened = StProtheusIntegration(
-                        st_numero=st_number_protheus,
-                        st_fazenda=projetos[0],
-                        app=req_data
-                    )
-                    new_st_opened.save()
-                    print('Nova ST salva com sucesso!!', new_st_opened)
+                    response_headers = requests.post(url, data=json.dumps(payload), headers=headers, verify=False, auth=HTTPBasicAuth('api', PROTHEUS_TOKEN))
+                    print('response headers from protheus:', response_headers)
+                    print('\n\n')
+                    print('response:', response_headers.status_code, response_headers.text)
+                    if response_headers.status_code == 201:
+                        print('ST Aberta com sucesso!!!')
+                        parsed_json = json.loads(response_headers.text)
+                        number_opened = parsed_json["codigo_pre_st"]
+                        st_number_protheus = int(number_opened)
+                        should_send_email = True
+                        try:
+                            new_st_opened = StProtheusIntegration(
+                                st_numero=st_number_protheus,
+                                st_fazenda=projetos[0],
+                                app=req_data
+                            )
+                            new_st_opened.save()
+                            print('Nova ST salva com sucesso!!', new_st_opened)
+                        except Exception as e:
+                            response = {
+                                "msg": f"Erro ao salvar a ST no banco de dados",
+                                "error": f"Error ao salvar os dados vindos do farm, Erro: {e}"  # General error message
+                            }
+                            return Response(response, status=status.HTTP_208_ALREADY_REPORTED)
+                    else:
+                        parsed_json = json.loads(response_headers.text)
+                        response = {
+                            "msg": f"Erro ao abrir a ST no Protheus - Code: {response_headers.status_code}",
+                            "error": f"Error ao Abrir ST no Protheus, erro: {parsed_json['message']}"  # General error message
+                        }
+                        return Response(response, status=status.HTTP_208_ALREADY_REPORTED)
                 except Exception as e:
-                    print('Erro ao salvar a ST', e)
+                    print('Erro ao enviar a ST', e)
+                
             try:
                 # create context to send as response to frontend
                 context = {
@@ -3845,8 +3985,8 @@ class StViewSet(viewsets.ModelViewSet):
                 if should_send_email == True:
                     subject = f"Pré ST Aberta: {st_number_protheus}"
                     from_email = 'patamarcelo@gmail.com'
-                    # recipient_list = ['raylton.sousa@diamanteagricola.com.br', 'melissa.bento@diamanteagricola.com.br']
-                    recipient_list = ['marcelo@gdourado.com.br']
+                    recipient_list = ['raylton.sousa@diamanteagricola.com.br', 'melissa.bento@diamanteagricola.com.br']
+                    # recipient_list = ['marcelo@gdourado.com.br']
                     template_name = "st_open.html"
                     convert_to_html_content =  render_to_string(
                         template_name=template_name, context=context
@@ -3866,7 +4006,12 @@ class StViewSet(viewsets.ModelViewSet):
                     print('Email não enviado, devido as configurações')
                     check_here = 'Não'
             except Exception as e:
-                print('erro ao pegar os enviar email: ', e)
+                print('erro ao pegar os dados e enviar por email: ', e)
+                response = {
+                            "msg": f"Erro ao enviar o E-mail",
+                            "error": f"Error ao enviar o e-mail com os dados da Pré ST, Erro: {e}"  # General error message
+                        }
+                return Response(response, status=status.HTTP_208_ALREADY_REPORTED)
                 
             response = {
                 'msg': 'St Aberta com Successo',
