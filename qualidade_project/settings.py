@@ -140,20 +140,32 @@ EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD_CONFIG")
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.postgresql",
+        'ENGINE': 'dj_db_conn_pool.backends.postgresql',
         "NAME": env("DB_EL_NAME"),
         "USER": env("DB_EL_USER"),
         "PASSWORD": env("DB_EL_PASSWORD"),
         "HOST": env("DB_EL_HOST"),
         "PORT": env("DB_EL_PORT"),
+        'POOL_OPTIONS': {
+            'POOL_SIZE': 20,            # Number of connections in the pool
+            'MAX_OVERFLOW': 10,         # Extra connections beyond the pool size
+            'RECYCLE': 1800,            # Recycle connections after a certain time to avoid stale connections
+            'PRE_PING': True,           # Check connections before using them to avoid using a broken connection
+        }
     },
     "dev": {
-        "ENGINE": "django.db.backends.postgresql",
+        'ENGINE': 'dj_db_conn_pool.backends.postgresql',
         "NAME": env("DB_EL_NAME_LOCAL"),
         "USER": env("DB_EL_USER_LOCAL"),
         "PASSWORD": env("DB_EL_PASSWORD_LOCAL"),
         "HOST": env("DB_EL_HOST_LOCAL"),
         "PORT": env("DB_EL_PORT_LOCAL"),
+        'POOL_OPTIONS': {
+            'POOL_SIZE': 20,            # Number of connections in the pool
+            'MAX_OVERFLOW': 10,         # Extra connections beyond the pool size
+            'RECYCLE': 1800,            # Recycle connections after a certain time to avoid stale connections
+            'PRE_PING': True,           # Check connections before using them to avoid using a broken connection
+        }
     },
 }
 
