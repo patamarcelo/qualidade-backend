@@ -3032,6 +3032,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 input_operation = request.data['input_operation']
                 list_to_work = []
                 dict_app = []
+                today_date = datetime.datetime.today().strftime('%Y-%m-%d')
+
                 
                 query_projetos = Plantio.objects.filter(safra__safra="2024/2025").values('talhao__fazenda__id_farmbox','id_farmbox','talhao__fazenda__fazenda__id_responsavel_farmbox','talhao__fazenda__fazenda__id_encarregado_farmbox')
                 
@@ -3054,7 +3056,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         obj_to_add = {
                             'projeto': projeto,
                             'dose': dose,
-                            'date': '2024-09-11',
+                            'date': today_date,
                             'harvest_id': 3840,
                             'farm_id':get_id['talhao__fazenda__id_farmbox'],
                             'responsible_id': get_id['talhao__fazenda__fazenda__id_responsavel_farmbox'],

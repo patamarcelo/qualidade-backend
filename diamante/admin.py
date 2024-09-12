@@ -81,6 +81,8 @@ from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from django.core.files.storage import FileSystemStorage
 
+from django.contrib.admin import DateFieldListFilter
+
 
 main_path = (
     "http://127.0.0.1:8000"
@@ -2221,7 +2223,10 @@ class AppFarmBoxIntegrationAdmin(admin.ModelAdmin):
 @admin.register(StProtheusIntegration)
 class StProtheusIntegrationAdmin(admin.ModelAdmin):
     
-    list_display = ("criados", "st_numero", "st_fazenda")
+    list_display = ("get_data", "st_numero", "st_fazenda")
+    list_filter = (
+        ("criados", DateFieldListFilter),  # Filters by the 'criados' date field
+    )
     
     formfield_overrides = {
         models.JSONField: {
@@ -2241,6 +2246,17 @@ class StProtheusIntegrationAdmin(admin.ModelAdmin):
             },
         ),
     )
+    
+    
+    def get_data(self, obj):
+        if obj.criados:
+            return date_format(
+                obj.criados, format="SHORT_DATE_FORMAT", use_l10n=True
+            )
+        else:
+            return " - "
+
+    get_data.short_description = "Data Abertura"
     
     
 @admin.register(PlantioExtratoArea)
