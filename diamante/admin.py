@@ -91,7 +91,7 @@ main_path = (
 )
 
 
-def get_cargas_model(safra_filter, ciclo_filter):
+def get_cargas_model(safra_filter, ciclo_filter, list_ids=[]):
     cargas_model = [
         x
         for x in Colheita.objects.values(
@@ -106,6 +106,7 @@ def get_cargas_model(safra_filter, ciclo_filter):
         .order_by("plantio__talhao__fazenda__nome")
         .filter(~Q(plantio__variedade__cultura__cultura="Milheto"))
         .filter(plantio__safra__safra=safra_filter, plantio__ciclo=ciclo_filter)
+        .filter(~Q(plantio__id_farmbox__in=list_ids))
     ]
     return cargas_model
 
@@ -123,6 +124,14 @@ class PlantioDetailAdmin(admin.ModelAdmin):
     # ]
     cicle_filter = None
     safra_filter = None
+    
+    
+    # ids parcelas J
+    exclude_j = False
+    if exclude_j:
+        list_ids = [263066,264740]
+    else:
+        list_ids = []
 
     def get_queryset(self, request):
         global cicle_filter, safra_filter
@@ -172,6 +181,7 @@ class PlantioDetailAdmin(admin.ModelAdmin):
         )
 
     def changelist_view(self, request, extra_context=None):
+        
         response = super().changelist_view(
             request,
             extra_context=extra_context,
@@ -210,6 +220,7 @@ class PlantioDetailAdmin(admin.ModelAdmin):
             )
             .filter(~Q(variedade__cultura__cultura="Milheto"))
             .filter(~Q(variedade__cultura__cultura="Algodão"))
+            .filter(~Q(id_farmbox__in=self.list_ids))
             # .filter(~Q(talhao__fazenda__nome="Projeto Lago Verde"))
             .values(
                 "talhao__fazenda__nome",
@@ -225,7 +236,7 @@ class PlantioDetailAdmin(admin.ModelAdmin):
         )
 
         response.context_data["colheita_2"] = json.dumps(
-            get_cargas_model(safra_filter, cicle_filter), cls=DjangoJSONEncoder
+            get_cargas_model(safra_filter, cicle_filter, self.list_ids), cls=DjangoJSONEncoder
         )
 
         return response

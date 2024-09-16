@@ -1954,11 +1954,13 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         "cronograma_programa",
                     )
                     .filter(~Q(programa_id=None))
-                    .filter(safra=s_dict[safra_filter], ciclo=c_dict[cicle_filter])
+                    .filter(safra=s_dict[safra_filter])
                     .filter(data_plantio__isnull=False)
                     .filter(plantio_descontinuado=False)
                     .filter(finalizado_colheita=False)
                 )
+                # if device == 'WEB':
+                #     qs_plantio = qs_plantio.filter(ciclo=c_dict[cicle_filter])
                 try:
                     result = [
                         {
@@ -3610,7 +3612,7 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                             "projeto": "SEM PLACA",
                             "romaneio": remove_leading_zeros(str(i["Ticket"])),
                             "error": "SEM PLACA",
-                            "id_farmtruck": id_farmtruck,
+                            "id_farmtruck": "SEM PLACA",
                         }
                         problem.append(problem_load)
                 except Exception as e:
@@ -3987,7 +3989,7 @@ class StViewSet(viewsets.ModelViewSet):
                 if should_send_email == True:
                     subject = f"Pré ST Aberta: {st_number_protheus}"
                     from_email = 'patamarcelo@gmail.com'
-                    recipient_list = ['raylton.sousa@diamanteagricola.com.br', 'melissa.bento@diamanteagricola.com.br']
+                    recipient_list = ['raylton.sousa@diamanteagricola.com.br', 'melissa.bento@diamanteagricola.com.br', 'adriana.goncalves@diamanteagricola.com.br']
                     # recipient_list = ['marcelo@gdourado.com.br']
                     template_name = "st_open.html"
                     convert_to_html_content =  render_to_string(
