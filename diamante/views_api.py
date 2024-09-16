@@ -2451,7 +2451,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         plantio__safra=s_dict[safra_filter],
                         plantio__ciclo=c_dict[cicle_filter],
                         plantio__finalizado_plantio=True,
-                        plantio__finalizado_colheita=False,
+                        # plantio__finalizado_colheita=False,
                         plantio__plantio_descontinuado=False,
                         totaldays__gte=datetime.timedelta(days=total_dias_plantado_acompanhamento["soja_feijao"]),
                         # ARROZ = 117
@@ -2486,7 +2486,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         safra=s_dict[safra_filter],
                         ciclo=c_dict[cicle_filter],
                         finalizado_plantio=True,
-                        finalizado_colheita=False,
+                        # finalizado_colheita=False,
                         plantio_descontinuado=False,
                         totaldays__gte=datetime.timedelta(days=total_dias_plantado_acompanhamento["soja_feijao"]),
                     )
