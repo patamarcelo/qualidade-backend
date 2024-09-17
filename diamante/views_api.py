@@ -2030,9 +2030,9 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     cache.set(cache_key, qs_plantio, timeout=60*5*6)  # cache for 5 minutes
                 qs_end_time = time.time()
                 print(f"Time for database query: {qs_end_time - qs_start_time:.2f} seconds")
-                # if device == 'WEB':
-                #     qs_plantio = qs_plantio.filter(ciclo=c_dict[cicle_filter])
                 process_start_time = time.time()
+                if device == 'WEB':
+                    qs_plantio = qs_plantio.filter(ciclo=c_dict[cicle_filter])
                 try:
                     result = [
                         {
