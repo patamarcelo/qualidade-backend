@@ -132,7 +132,7 @@ from operator import itemgetter
 from requests.auth import HTTPBasicAuth
 
 from datetime import time as dateTime
-
+from django.core.cache import cache
 
 
 main_path_upload_ids = (
@@ -157,6 +157,18 @@ s_dict = {
 }
 
 c_dict = {"1": 3, "2": 4, "3": 5}
+
+
+from django.db.models.signals import post_save, post_delete
+from django.dispatch import receiver
+
+@receiver(post_save, sender=Plantio)
+@receiver(post_delete, sender=Plantio)
+def invalidate_cache_on_update(sender, instance, **kwargs):
+    print('invalidando cache')
+    cache_key = f"get_plantio_operacoes_detail_json_program_qs_plantio_{instance.safra.safra}_{instance.ciclo.ciclo}"
+    print('cache_key:', cache_key)
+    cache.delete(cache_key)  # Invalidate cache whenever Plantio model changes
 
 
 class TalaoViewSet(viewsets.ModelViewSet):
@@ -1897,6 +1909,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["GET", "POST"])
     def get_plantio_operacoes_detail_json_program(self, request):
         if request.user.is_authenticated:
+            
+            start_time = time.time()  # Start time
             try:
                 safra_filter = request.data["safra"]
                 cicle_filter = request.data["ciclo"]
@@ -1912,55 +1926,63 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 else:
                     safra_filter = "2024/2025" if safra_filter == None else safra_filter
                     cicle_filter = "1" if cicle_filter == None else cicle_filter
-
-                qs_plantio = (
-                    Plantio.objects.select_related(
-                        "safra",
-                        "ciclo",
-                        "talhao",
-                        "fazenda",
-                        "programa",
-                        "variedade",
-                        "variedade__cultura",
-                        "talhao__fazenda",
-                        "talhao__fazenda__fazenda",
+                qs_start_time = time.time()
+                cache_key = f"get_plantio_operacoes_detail_json_program_qs_plantio_{safra_filter}_{cicle_filter}"
+                print('cache_key:', cache_key)
+                qs_plantio = cache.get(cache_key)
+                if not qs_plantio:
+                    qs_plantio = (
+                        Plantio.objects.select_related(
+                            "safra",
+                            "ciclo",
+                            "talhao",
+                            "fazenda",
+                            "programa",
+                            "variedade",
+                            "variedade__cultura",
+                            "talhao__fazenda",
+                            "talhao__fazenda__fazenda",
+                        )
+                        .values(
+                            "id",
+                            "talhao__id_talhao",
+                            "talhao__id_unico",
+                            "talhao_id",
+                            "id_farmbox",
+                            "safra__safra",
+                            "safra__id_farmbox",
+                            "ciclo__ciclo",
+                            "talhao__fazenda__nome",
+                            "talhao__fazenda__id_farmbox",
+                            "talhao__fazenda__fazenda__id_responsavel_farmbox",
+                            "talhao__fazenda__fazenda__id_encarregado_farmbox",
+                            "talhao__fazenda__fazenda__nome",
+                            "talhao__fazenda__fazenda__capacidade_plantio_ha_dia",
+                            "variedade__nome_fantasia",
+                            "variedade__cultura__cultura",
+                            "area_colheita",
+                            "data_plantio",
+                            "finalizado_plantio",
+                            "programa",
+                            "programa_id",
+                            "programa__start_date",
+                            "programa__end_date",
+                            "programa__nome",
+                            "programa__nome_fantasia",
+                            "cronograma_programa",
+                        )
+                        .filter(~Q(programa_id=None))
+                        .filter(safra=s_dict[safra_filter])
+                        .filter(data_plantio__isnull=False)
+                        .filter(plantio_descontinuado=False)
+                        .filter(finalizado_colheita=False)
                     )
-                    .values(
-                        "id",
-                        "talhao__id_talhao",
-                        "talhao__id_unico",
-                        "talhao_id",
-                        "id_farmbox",
-                        "safra__safra",
-                        "safra__id_farmbox",
-                        "ciclo__ciclo",
-                        "talhao__fazenda__nome",
-                        "talhao__fazenda__id_farmbox",
-                        "talhao__fazenda__fazenda__id_responsavel_farmbox",
-                        "talhao__fazenda__fazenda__id_encarregado_farmbox",
-                        "talhao__fazenda__fazenda__nome",
-                        "talhao__fazenda__fazenda__capacidade_plantio_ha_dia",
-                        "variedade__nome_fantasia",
-                        "variedade__cultura__cultura",
-                        "area_colheita",
-                        "data_plantio",
-                        "finalizado_plantio",
-                        "programa",
-                        "programa_id",
-                        "programa__start_date",
-                        "programa__end_date",
-                        "programa__nome",
-                        "programa__nome_fantasia",
-                        "cronograma_programa",
-                    )
-                    .filter(~Q(programa_id=None))
-                    .filter(safra=s_dict[safra_filter])
-                    .filter(data_plantio__isnull=False)
-                    .filter(plantio_descontinuado=False)
-                    .filter(finalizado_colheita=False)
-                )
+                    cache.set(cache_key, qs_plantio, timeout=60*5*6)  # cache for 5 minutes
+                qs_end_time = time.time()
+                print(f"Time for database query: {qs_end_time - qs_start_time:.2f} seconds")
                 # if device == 'WEB':
                 #     qs_plantio = qs_plantio.filter(ciclo=c_dict[cicle_filter])
+                process_start_time = time.time()
                 try:
                     result = [
                         {
@@ -2008,14 +2030,19 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         }
                         for i in qs_plantio
                     ]
+                    process_end_time = time.time()
+                    print(f"Time for data processing: {process_end_time - process_start_time:.2f} seconds")
                 except Exception as e:
                     print(f"erro ao gerar o cronograma {e}")
-
+                end_time = time.time()
+                print(f"Total time: {end_time - start_time:.2f} seconds")
                 response = {
                     "msg": f"Retorno com os arquivos Json com Sucesso!!",
                     "total_query_plantio": qs_plantio.count(),
                     "dados_plantio": result,
                 }
+                end_time = time.time()  # End time
+                print(f"Tempo total da requisição: {end_time - start_time:.2f} segundos")
                 return Response(response, status=status.HTTP_200_OK)
             except Exception as e:
                 response = {"message": f"Ocorreu um Erro: {e}"}
