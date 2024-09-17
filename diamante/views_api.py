@@ -1636,8 +1636,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 
                 cache_key_qs_plantio_get_plantio_operacoes_detail = f"get_plantio_operacoes_detail_qs_plantio_{safra_filter}_{cicle_filter}"
                 print('cache_key:', cache_key_qs_plantio_get_plantio_operacoes_detail)
-                cache_qs_planejamento_get_plantio_operacoes_detail = cache.get(cache_key_qs_plantio_get_plantio_operacoes_detail)
-                if not cache_qs_planejamento_get_plantio_operacoes_detail:
+                qs_plantio = cache.get(cache_key_qs_plantio_get_plantio_operacoes_detail)
+                if not qs_plantio:
                     qs_plantio = (
                         Plantio.objects.select_related(
                             "safra",
@@ -1688,8 +1688,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     
                 cache_key_qs_aplicacoes = f"get_plantio_operacoes_detail_qs_aplicacoes_{safra_filter}_{cicle_filter}"
                 print('cache_key:', cache_key_qs_aplicacoes)
-                qs_cache_key_qs_aplicacoes = cache.get(cache_key_qs_aplicacoes)
-                if not qs_cache_key_qs_aplicacoes:
+                qs_aplicacoes = cache.get(cache_key_qs_aplicacoes)
+                if not qs_aplicacoes:
                     qs_aplicacoes = (
                         Aplicacao.objects.select_related(
                             "defensivo",
