@@ -199,18 +199,18 @@
                         <td>[[ i.split("|")[0] ]]</td>
                         <td style="text-align: center"><img style="width: 26px; height: 26px; cursor: pointer"
                                 :src="customIcon(i.split('|')[1])" /> </td>
-                        <td style="text-align: center">[[ col?.areaTotal?.toLocaleString("pt-br", {
+                        <td style="text-align: center">[[ col?.areaTotal === 0 ? "-" : col?.areaTotal?.toLocaleString("pt-br", {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2
-                            }) ]] ha</td>
-                        <td style="text-align: center">[[ col?.areaColheita?.toLocaleString("pt-br", {
+                            }) + " ha" ]] </td>
+                        <td style="text-align: center">[[ col?.areaColheita === 0 ? "-" : col?.areaColheita?.toLocaleString("pt-br", {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2
-                            }) ]] ha</td>
-                        <td style="text-align: center">[[ col?.saldoColheita?.toLocaleString("pt-br", {
+                            }) + " ha" ]] </td>
+                        <td style="text-align: center">[[ col?.saldoColheita === 0 ? "-" : col?.saldoColheita?.toLocaleString("pt-br", {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2
-                            }) ]] ha</td>
+                            }) + " ha" ]] </td>
                         <td style="text-align: center">[[ Number(col.pesoColhido)?.toLocaleString("pt-br", {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2
@@ -224,26 +224,26 @@
                         v-if='iIn.split("|")[0] === farm.split("|")[0] && farm.split("|")[1] === colIn.cultura'
                         style="color: grey; font-style: italic" v-show="viewAllVareidades">
                         <td colspan="2" style="text-align: right">[[ colIn.variedade ]]</td>
-                        <td style="text-align: center">[[ colIn?.areaTotal?.toLocaleString("pt-br", {
+                        <td style="text-align: center">[[ colIn?.areaTotal === 0 ? "-" : colIn?.areaTotal?.toLocaleString("pt-br", {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2
-                            }) ]] ha</td>
-                        <td style="text-align: center">[[ colIn?.areaColheita?.toLocaleString("pt-br", {
+                            }) + " ha" ]] </td>
+                        <td style="text-align: center">[[ colIn?.areaColheita === 0 ? "-" :  colIn?.areaColheita?.toLocaleString("pt-br", {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2
-                            }) ]] ha</td>
-                        <td style="text-align: center">[[ colIn?.saldoColheita?.toLocaleString("pt-br", {
+                            }) + " ha" ]] </td>
+                        <td style="text-align: center">[[ colIn?.saldoColheita === 0 ? "-" : colIn?.saldoColheita?.toLocaleString("pt-br", {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2
-                            }) ]] ha</td>
-                        <td style="text-align: center">[[ Number(colIn.pesoColhido)?.toLocaleString("pt-br", {
+                            }) + " ha" ]] </td>
+                        <td style="text-align: center">[[ Number(colIn.pesoColhido) === 0 ? "-" : Number(colIn.pesoColhido)?.toLocaleString("pt-br", {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2
-                            }) ]] Scs</td>
-                        <td style="text-align: center">[[ colIn?.produtividade?.toLocaleString("pt-br", {
+                            }) + " Scs"]] </td>
+                        <td style="text-align: center">[[ colIn?.produtividade === 0 ? "-" : colIn?.produtividade?.toLocaleString("pt-br", {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2
-                            }) ]] Scs/ha</td>
+                            }) + " Scs/ha"]] </td>
                     </tr>
                 </template>
             </tbody>
