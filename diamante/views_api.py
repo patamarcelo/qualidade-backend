@@ -166,9 +166,38 @@ from django.dispatch import receiver
 @receiver(post_delete, sender=Plantio)
 def invalidate_cache_on_update(sender, instance, **kwargs):
     print('invalidando cache')
+    cicle_filter = instance.ciclo.ciclo
+    safra_filter = instance.safra.safra
     cache_key = f"get_plantio_operacoes_detail_json_program_qs_plantio_{instance.safra.safra}_{instance.ciclo.ciclo}"
+    cache_key_qs_plantio_get_plantio_operacoes_detail = f"get_plantio_operacoes_detail_qs_plantio_{safra_filter}_{cicle_filter}"
+    print('cache_key:', cache_key)
     print('cache_key:', cache_key)
     cache.delete(cache_key)  # Invalidate cache whenever Plantio model changes
+    cache.delete(cache_key_qs_plantio_get_plantio_operacoes_detail)  # Invalidate cache whenever Plantio model changes
+
+
+@receiver(post_save, sender=PlannerPlantio)
+@receiver(post_delete, sender=PlannerPlantio)
+def invalidate_cache_on_update(sender, instance, **kwargs):
+    print('invalidando cache PlannerPlantio')
+    cicle_filter = instance.ciclo.ciclo
+    safra_filter = instance.safra.safra
+    cache_key_qs_planejamento = f"get_plantio_operacoes_detail_qs_planejamento_{safra_filter}_{cicle_filter}"
+    print('cache_key:', cache_key_qs_planejamento)
+    cache.delete(cache_key_qs_planejamento)  # Invalidate cache whenever Plantio model changes
+
+
+@receiver(post_save, sender=Aplicacao)
+@receiver(post_delete, sender=Aplicacao)
+def invalidate_cache_on_update(sender, instance, **kwargs):
+    print('invalidando cache Aplicacao')
+    cicle_filter = instance.operacao.programa.ciclo.ciclo
+    safra_filter = instance.operacao.programa.safra.safra
+    cache_key_qs_aplicacoes = f"get_plantio_operacoes_detail_qs_aplicacoes_{safra_filter}_{cicle_filter}"
+    print('cache_key:', cache_key_qs_aplicacoes)
+    cache.delete(cache_key_qs_aplicacoes)  # Invalidate cache whenever Plantio model changes
+
+
 
 
 class TalaoViewSet(viewsets.ModelViewSet):
@@ -1576,101 +1605,122 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 print(cicle_filter)
                 safra_filter = "2023/2024" if safra_filter == None else safra_filter
                 cicle_filter = "1" if cicle_filter == None else cicle_filter
-                qs_planejamento = (
-                    PlannerPlantio.objects.select_related(
-                        "projeto",
-                        "cultura",
-                        "ciclo",
-                        "cultura",
-                        "projeto__fazenda",
-                        "safra",
+                
+                cache_key_qs_planejamento = f"get_plantio_operacoes_detail_qs_planejamento_{safra_filter}_{cicle_filter}"
+                print('cache_key:', cache_key_qs_planejamento)
+                qs_planejamento = cache.get(cache_key_qs_planejamento)
+                if not qs_planejamento:
+                    qs_planejamento = (
+                        PlannerPlantio.objects.select_related(
+                            "projeto",
+                            "cultura",
+                            "ciclo",
+                            "cultura",
+                            "projeto__fazenda",
+                            "safra",
+                        )
+                        .values(
+                            "projeto",
+                            "projeto__id",
+                            "projeto__nome",
+                            "cultura",
+                            "variedade",
+                            "safra__safra",
+                            "ciclo__ciclo",
+                            "start_date",
+                            "area",
+                        )
+                        .filter(safra__safra=safra_filter, ciclo__ciclo=cicle_filter)
                     )
-                    .values(
-                        "projeto",
-                        "projeto__id",
-                        "projeto__nome",
-                        "cultura",
-                        "variedade",
-                        "safra__safra",
-                        "ciclo__ciclo",
-                        "start_date",
-                        "area",
+                    cache.set(cache_key_qs_planejamento, qs_planejamento, timeout=60*5*6)  # cache for 5 minutes
+                
+                cache_key_qs_plantio_get_plantio_operacoes_detail = f"get_plantio_operacoes_detail_qs_plantio_{safra_filter}_{cicle_filter}"
+                print('cache_key:', cache_key_qs_plantio_get_plantio_operacoes_detail)
+                cache_qs_planejamento_get_plantio_operacoes_detail = cache.get(cache_key_qs_plantio_get_plantio_operacoes_detail)
+                if not cache_qs_planejamento_get_plantio_operacoes_detail:
+                    qs_plantio = (
+                        Plantio.objects.select_related(
+                            "safra",
+                            "ciclo",
+                            "talhao",
+                            "fazenda",
+                            "programa",
+                            "variedade",
+                            "variedade__cultura",
+                            "talhao__fazenda__fazenda",
+                        )
+                        .values(
+                            "id",
+                            "talhao__id_talhao",
+                            "talhao__id_unico",
+                            "talhao_id",
+                            "safra__safra",
+                            "ciclo__ciclo",
+                            "talhao__fazenda__nome",
+                            "talhao__fazenda__id",
+                            "talhao__fazenda__fazenda__nome",
+                            "talhao__fazenda__fazenda__capacidade_plantio_ha_dia",
+                            "variedade__nome_fantasia",
+                            "variedade__cultura__cultura",
+                            "area_colheita",
+                            "data_plantio",
+                            "data_prevista_plantio",
+                            "finalizado_plantio",
+                            "programa",
+                            "programa_id",
+                            "programa__start_date",
+                            "programa__end_date",
+                            "programa__nome",
+                        )
+                        .filter(~Q(programa_id=None))
+                        .filter(safra=s_dict[safra_filter], ciclo=c_dict[cicle_filter])
+                        .filter(Q(data_plantio=None))
+                        .filter(plantio_descontinuado=False)
+                        .filter(finalizado_colheita=False)
                     )
-                    .filter(safra__safra=safra_filter, ciclo__ciclo=cicle_filter)
-                )
-                qs_plantio = (
-                    Plantio.objects.select_related(
-                        "safra",
-                        "ciclo",
-                        "talhao",
-                        "fazenda",
-                        "programa",
-                        "variedade",
-                        "variedade__cultura",
-                        "talhao__fazenda__fazenda",
-                    )
-                    .values(
-                        "id",
-                        "talhao__id_talhao",
-                        "talhao__id_unico",
-                        "talhao_id",
-                        "safra__safra",
-                        "ciclo__ciclo",
-                        "talhao__fazenda__nome",
-                        "talhao__fazenda__id",
-                        "talhao__fazenda__fazenda__nome",
-                        "talhao__fazenda__fazenda__capacidade_plantio_ha_dia",
-                        "variedade__nome_fantasia",
-                        "variedade__cultura__cultura",
-                        "area_colheita",
-                        "data_plantio",
-                        "data_prevista_plantio",
-                        "finalizado_plantio",
-                        "programa",
-                        "programa_id",
-                        "programa__start_date",
-                        "programa__end_date",
-                        "programa__nome",
-                    )
-                    .filter(~Q(programa_id=None))
-                    .filter(safra=s_dict[safra_filter], ciclo=c_dict[cicle_filter])
-                    .filter(Q(data_plantio=None))
-                    .filter(plantio_descontinuado=False)
-                    .filter(finalizado_colheita=False)
-                )
+                    cache.set(cache_key_qs_plantio_get_plantio_operacoes_detail, qs_plantio, timeout=60*5*6)  # cache for 5 minutes
+                
+                
                 qs_programas = Operacao.objects.values(
                     "estagio", "programa_id", "prazo_dap", "id"
                 ).filter(ativo=True)
-                qs_aplicacoes = (
-                    Aplicacao.objects.select_related(
-                        "defensivo",
-                        "operacao",
-                        "operacao__programa",
-                        "operacao__programa__safra",
-                        "operacao__programa__ciclo",
-                        "operacao__programa__cultura",
+            
+                    
+                cache_key_qs_aplicacoes = f"get_plantio_operacoes_detail_qs_aplicacoes_{safra_filter}_{cicle_filter}"
+                print('cache_key:', cache_key_qs_aplicacoes)
+                qs_cache_key_qs_aplicacoes = cache.get(cache_key_qs_aplicacoes)
+                if not qs_cache_key_qs_aplicacoes:
+                    qs_aplicacoes = (
+                        Aplicacao.objects.select_related(
+                            "defensivo",
+                            "operacao",
+                            "operacao__programa",
+                            "operacao__programa__safra",
+                            "operacao__programa__ciclo",
+                            "operacao__programa__cultura",
+                        )
+                        .values(
+                            "defensivo__produto",
+                            "defensivo__tipo",
+                            "defensivo__id_farmbox",
+                            "dose",
+                            "operacao",
+                            "operacao__estagio",
+                            "operacao__prazo_dap",
+                            "operacao__programa",
+                            "operacao__programa__nome",
+                            "operacao__programa__safra__safra",
+                            "operacao__programa__ciclo__ciclo",
+                            "operacao__programa__cultura__cultura",
+                        )
+                        .filter(~Q(operacao__programa_id=None))
+                        .filter(
+                            operacao__programa__safra=s_dict[safra_filter],
+                            operacao__programa__ciclo=c_dict[cicle_filter],
+                            ativo=True,
+                        )
                     )
-                    .values(
-                        "defensivo__produto",
-                        "defensivo__tipo",
-                        "defensivo__id_farmbox",
-                        "dose",
-                        "operacao",
-                        "operacao__estagio",
-                        "operacao__prazo_dap",
-                        "operacao__programa",
-                        "operacao__programa__nome",
-                        "operacao__programa__safra__safra",
-                        "operacao__programa__ciclo__ciclo",
-                        "operacao__programa__cultura__cultura",
-                    )
-                    .filter(~Q(operacao__programa_id=None))
-                    .filter(
-                        operacao__programa__safra=s_dict[safra_filter],
-                        operacao__programa__ciclo=c_dict[cicle_filter],
-                        ativo=True,
-                    )
-                )
+                    cache.set(cache_key_qs_aplicacoes, qs_aplicacoes, timeout=60*5*6)  # cache for 5 minutes
 
                 final_result = {i["talhao__fazenda__nome"]: {} for i in qs_plantio}
                 try:
