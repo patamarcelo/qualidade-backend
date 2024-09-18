@@ -1209,6 +1209,11 @@ def get_img_upload_path(instance, filename):
     file_name = f"{instance.visita.data}_{instance.visita.fazenda.nome}/"
     return os.path.join(base_path, file_name, filename)
 
+def get_nf_path(instance, filename):
+    base_path = "notasfiscais"
+    file_name = f"{instance.defensivo.produto}/"
+    return os.path.join(base_path, file_name, filename)
+
 
 class RegistroVisitas(Base):
     visita = models.ForeignKey(Visitas, on_delete=models.PROTECT)
@@ -1293,3 +1298,25 @@ class HeaderPlanejamentoAgricola(Base):
     
     def __str__(self):
         return f'{self.projeto} {self.safra} {self.ciclo} {self.codigo_planejamento}'
+
+
+class BuyProducts(Base):
+    defensivo           = models.ForeignKey(Defensivo, on_delete=models.PROTECT)
+    quantidade_comprada = models.DecimalField('Quantidade Comprada em Kg', max_digits=12 , decimal_places=2)
+    fazenda             = models.ForeignKey(Fazenda, on_delete=models.PROTECT)
+    projeto             = models.ManyToManyField(Projeto, blank=True, null=True)
+    sit_pago            = models.BooleanField("Satus Pagamento" , default=False)
+    data_pagamento      = models.DateField('Data Pagamento', blank=True, null=True)
+    nota_fiscal         = models.CharField("Número da Nota Fiscal", max_length=255, blank=True, null=True)
+    nf_file             = models.FileField("NF", upload_to=get_nf_path, blank=True, null=True)
+    fornecedor          = models.CharField("Fornecedor", max_length=255, blank=True, null=True)
+    
+    
+    class Meta:
+        verbose_name = "Produto Comprado"
+        verbose_name_plural = "Produtos Comprados"
+        ordering = ["defensivo"]
+    
+    def __str__(self) -> str:
+        return f'{self.defensivo.produto} - {self.fazenda.nome}'
+        

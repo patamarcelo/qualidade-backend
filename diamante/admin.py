@@ -2364,4 +2364,9 @@ class ColheitaPlantioExtratoAreaAdmin(admin.ModelAdmin):
 @admin.register(HeaderPlanejamentoAgricola)
 class HeaderPlanejamentoAgricolaAdmin(admin.ModelAdmin):
     list_display = ("criados", "projeto", "codigo_planejamento", "safra", "ciclo")
+
+@admin.register(BuyProducts)
+class BuyProductsAdmin(admin.ModelAdmin):
+    pass
+    # list_display = ("criados", "projeto")
     
