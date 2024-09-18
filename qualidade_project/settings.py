@@ -96,9 +96,18 @@ MIDDLEWARE = [
     "debug_toolbar.middleware.DebugToolbarMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # 'diamante.middleware.AdminTokenAuthenticationMiddleware'
 ]
 
+
 SESSION_ENGINE = "django.contrib.sessions.backends.cache"
+SESSION_CACHE_ALIAS = "default"  # Use the default cache, or specify another cache alias
+
+APPEND_SLASH = False
+PREPEND_WWW = False
+
+WHITENOISE_USE_FINDERS = True  # Allow WhiteNoise to serve static files
+WHITENOISE_MAX_AGE = 31536000  # 1 year in seconds for versioned files
 
 
 CSRF_TRUSTED_ORIGINS = [

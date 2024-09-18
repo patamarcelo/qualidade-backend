@@ -23,6 +23,8 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.exceptions import AuthenticationFailed
+
 
 from django.contrib.auth.models import User
 from rest_framework.renderers import JSONRenderer
@@ -199,11 +201,39 @@ def invalidate_cache_on_update(sender, instance, **kwargs):
 
 
 
+class CachedTokenAuthentication(TokenAuthentication):
+    def authenticate(self, request):
+        # Ensure that the Authorization header exists
+        auth_header = request.META.get("HTTP_AUTHORIZATION")
+        
+        if not auth_header or not auth_header.startswith("Token "):
+            # If the token is missing or improperly formatted, raise AuthenticationFailed
+            raise AuthenticationFailed("No valid token provided")
+        
+        # Extract the token from the header
+        token_key = auth_header.split(" ")[1]
+        
+        # Check if the token is cached
+        cached_user = cache.get(f"token_{token_key}")
+        
+        if cached_user:
+            return (cached_user, None)
+        
+        # If not cached, authenticate normally
+        result = super().authenticate(request)
+        
+        if result:
+            # Cache the authenticated user for future requests
+            cache.set(f"token_{token_key}", result[0], timeout=3600)  # Cache user for 1 hour
+        
+        return result
+
+
 
 class TalaoViewSet(viewsets.ModelViewSet):
     queryset = Talhao.objects.all().order_by("id_talhao")
     serializer_class = TalhaoSerializer
-    authentication_classes = (TokenAuthentication,)
+    authentication_classes = (CachedTokenAuthentication,)
     permission_classes = (IsAuthenticated,)
 
     @action(detail=True, methods=["POST"])
@@ -317,7 +347,7 @@ class TalaoViewSet(viewsets.ModelViewSet):
 class PlantioViewSet(viewsets.ModelViewSet):
     queryset = Plantio.objects.all().order_by("data_plantio")
     serializer_class = PlantioSerializer
-    authentication_classes = (TokenAuthentication,)
+    authentication_classes = (CachedTokenAuthentication,)
     permission_classes = (IsAuthenticated,)
 
     # --------------------- --------------------- PLANTIO API --------------------- --------------------- #
@@ -3202,12 +3232,37 @@ class PlantioViewSet(viewsets.ModelViewSet):
         else:
             response = {"message": "Você precisa estar logado!!!"}
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
+    
+    
+    @action(detail=False, methods=['GET'])
+    def check_how_fast(self, request, *args, **kwargs):
+        start_time = time.time()
+
+        # Record processing start time
+        process_start = time.time()
+
+        response_data = { 'msg': 'good' }
+
+        # Processing done, measure the time taken
+        process_end = time.time()
+
+        # Send the response
+        end_time = time.time()
+
+        # Log the breakdown
+        print(f"Total Time Taken: {end_time - start_time:.4f} seconds")
+        print(f"Processing Time: {process_end - process_start:.4f} seconds")
+        print(f"Other Overheads: {end_time - process_end:.4f} seconds")
+
+
+        # Return the response
+        return Response(response_data, status=status.HTTP_200_OK)
 
 
 class DefensivoViewSet(viewsets.ModelViewSet):
     queryset = Defensivo.objects.all().order_by("produto")
     serializer_class = DefensivoSerializer
-    authentication_classes = (TokenAuthentication,)
+    authentication_classes = (CachedTokenAuthentication,)
     permission_classes = (IsAuthenticated,)
 
     @action(detail=True, methods=["POST"])
@@ -3308,7 +3363,7 @@ class DefensivoViewSet(viewsets.ModelViewSet):
 class ProgramasDetails(viewsets.ModelViewSet):
     queryset = Aplicacao.objects.all()
     serializer_class = AplicacaoSerializer
-    authentication_classes = (TokenAuthentication,)
+    authentication_classes = (CachedTokenAuthentication,)
     permission_classes = (IsAuthenticated,)
 
     @action(detail=False, methods=["GET", "POST"])
@@ -3411,7 +3466,7 @@ def adjust_percent_parcelas(percent):
 class ColheitaApiSave(viewsets.ModelViewSet):
     queryset = Colheita.objects.all()
     serializer_class = ColheitaSerializer
-    authentication_classes = (TokenAuthentication,)
+    authentication_classes = (CachedTokenAuthentication,)
     permission_classes = (IsAuthenticated,)
 
     @action(detail=False, methods=["GET", "POST"])
@@ -3740,7 +3795,7 @@ class ColheitaApiSave(viewsets.ModelViewSet):
 class VisitasConsultasApi(viewsets.ModelViewSet):
     queryset = Visitas.objects.all()
     serializer_class = VisitasSerializer
-    authentication_classes = (TokenAuthentication,)
+    authentication_classes = (CachedTokenAuthentication,)
     permission_classes = (IsAuthenticated,)
 
     @method_decorator(cache_page(300))
@@ -3773,7 +3828,7 @@ class VisitasConsultasApi(viewsets.ModelViewSet):
 class RegistroVisitasApi(viewsets.ModelViewSet):
     queryset = RegistroVisitas.objects.all()
     serializer_class = RegistroVisitasSerializer
-    authentication_classes = (TokenAuthentication,)
+    authentication_classes = (CachedTokenAuthentication,)
     permission_classes = (IsAuthenticated,)
 
     @action(detail=False, methods=["GET", "POST"])
@@ -3840,7 +3895,7 @@ class RegistroVisitasApi(viewsets.ModelViewSet):
 
 class PlantioDetailResumoApi(viewsets.ModelViewSet):
     queryset = PlantioDetail.objects.all()
-    authentication_classes = (TokenAuthentication,)
+    authentication_classes = (CachedTokenAuthentication,)
     permission_classes = (IsAuthenticated,)
 
     @action(detail=False, methods=["GET"])
@@ -3967,7 +4022,7 @@ def formart_ap_list(input_list):
 class StViewSet(viewsets.ModelViewSet):
     queryset = StProtheusIntegration.objects.all()
     serializer_class = StProtheusIntegrationSerializer
-    authentication_classes = (TokenAuthentication,)
+    authentication_classes = (CachedTokenAuthentication,)
     permission_classes = (IsAuthenticated,)
     
     
@@ -4109,7 +4164,7 @@ class StViewSet(viewsets.ModelViewSet):
 class ColheitaPlantioExtratoAreaViewSet(viewsets.ModelViewSet):
     queryset = ColheitaPlantioExtratoArea.objects.all()
     serializer_class = StProtheusIntegrationSerializer
-    authentication_classes = (TokenAuthentication,)
+    authentication_classes = (CachedTokenAuthentication,)
     permission_classes = (IsAuthenticated,)
     
     @action(detail=False, methods=["GET", "POST"])
