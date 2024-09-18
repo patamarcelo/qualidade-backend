@@ -2369,5 +2369,59 @@ class HeaderPlanejamentoAgricolaAdmin(admin.ModelAdmin):
 class BuyProductsAdmin(admin.ModelAdmin):
     filter_horizontal = ('projeto',) 
     autocomplete_fields = ["defensivo"]
-    # list_display = ("criados", "projeto")
+    list_display = ("defensivo", "get_fazenda_name", 'quantidade_comprada','sit_pago', 'get_data_pgto', 'fornecedor', 'nota_fiscal')
+    search_fields = ["defensivo", 'fazenda', 'quantidade_comprada','sit_pago', 'data_pagamento', 'fornecedor', 'nota_fiscal']
+    list_filter = ["fazenda",'sit_pago']
+    
+    
+    def get_fazenda_name(self, obj):
+        return obj.fazenda.nome
+
+    get_fazenda_name.short_description = "Fazenda"
+    
+    
+    def get_data_pgto(self, obj):
+        if obj.data_pagamento:
+            return date_format(
+                obj.data_pagamento, format="SHORT_DATE_FORMAT", use_l10n=True
+            )
+        else:
+            return " - "
+    get_data_pgto.short_description = "Data Pgto"
+    
+    readonly_fields = ("criados","modificado")
+    fieldsets = (
+        (
+            "Dados",
+            {
+                "fields": (
+                    ("ativo"),
+                    ("criados", "modificado"),
+                )
+            },
+        ),
+        (
+            "Produto",
+            {
+                "fields": (
+                    ("defensivo", "quantidade_comprada"),
+                    ("fazenda"),
+                    ("projeto"),
+                    ("sit_pago", 'data_pagamento'),
+                    ('fornecedor','nota_fiscal')
+                )
+            },
+        ),
+        (
+            "Arquivo",
+            {
+                "fields": (
+                    ("nf_file"),
+                )
+            },
+        ),
+        ("Observações", {"fields": (("observacao",))}),
+    )
+
+    
     
