@@ -143,6 +143,7 @@ $(function () {
         let valBruto = 0
         let scsLiquido = 0
         let areaColhida = 0
+        let prodCompr = 0
 
         $('.selected .field-peso_scs_limpo_e_seco').each((i, e) =>{
             const value = e.innerHTML.replace('.',"").replace(',',".")
@@ -167,12 +168,18 @@ $(function () {
             const valueAreaColhida = e.innerHTML.replace('.',"").replace(',',".")
             areaColhida += parseFloat(valueAreaColhida)
         })
+        
+        $('.selected .field-quantidade_comprada').each((i, e) =>{
+            const valueProdCompr = e.innerHTML.replace('.',"").replace(',',".")
+            prodCompr += parseFloat(valueProdCompr)
+        })
 
 
         const pesoLiquido = $('.field-peso_scs_limpo_e_seco')
         const pesoBruto = $('.field-get_peso_liquido')
         const scsLiq = $('.field-peso_scs_liquido')
         const areaCol = $('.field-area_colhida')
+        
         
         if( areaCol.length > 0){
             const total = "Total Selecionado: "
@@ -199,6 +206,13 @@ $(function () {
             const total = "Total Selecionado "
             $('.select-result-total').html(total + val.toLocaleString('pt-br',{  minimumFractionDigits: 2,
                 maximumFractionDigits: 2}) + " Ha")
+        }
+        
+        const prodComp = $('.field-quantidade_comprada')
+        if(prodComp.length > 0){
+            const total = "Total Selecionado "
+            $('.select-result-total').html(total + prodCompr.toLocaleString('pt-br',{  minimumFractionDigits: 2,
+                maximumFractionDigits: 2}) + " Kg")
         }
     })
     
