@@ -2367,6 +2367,7 @@ class HeaderPlanejamentoAgricolaAdmin(admin.ModelAdmin):
 
 @admin.register(BuyProducts)
 class BuyProductsAdmin(admin.ModelAdmin):
-    pass
+    filter_horizontal = ('projeto',) 
+    autocomplete_fields = ["defensivo"]
     # list_display = ("criados", "projeto")
     
