@@ -172,10 +172,13 @@ def invalidate_cache_on_update(sender, instance, **kwargs):
     safra_filter = instance.safra.safra
     cache_key = f"get_plantio_operacoes_detail_json_program_qs_plantio_{instance.safra.safra}_{instance.ciclo.ciclo}"
     cache_key_qs_plantio_get_plantio_operacoes_detail = f"get_plantio_operacoes_detail_qs_plantio_{safra_filter}_{cicle_filter}"
-    print('cache_key:', cache_key)
+    cache_key_qs_plantio_map = f"get_plantio_map_{safra_filter}_{cicle_filter}"
+    cache_key_filter = f"get_plantio_operacoes_detail_json_program_qs_plantio_filter{safra_filter}_{cicle_filter}"
     print('cache_key:', cache_key)
     cache.delete(cache_key)  # Invalidate cache whenever Plantio model changes
+    cache.delete(cache_key_filter)  # Invalidate cache whenever Plantio model changes
     cache.delete(cache_key_qs_plantio_get_plantio_operacoes_detail)  # Invalidate cache whenever Plantio model changes
+    cache.delete(cache_key_qs_plantio_map)  # Invalidate cache whenever Plantio model changes
 
 
 @receiver(post_save, sender=PlannerPlantio)
@@ -2062,7 +2065,15 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 print(f"Time for database query: {qs_end_time - qs_start_time:.2f} seconds")
                 process_start_time = time.time()
                 if device == 'WEB':
-                    qs_plantio = qs_plantio.filter(ciclo=c_dict[cicle_filter])
+                    cache_key = f"get_plantio_operacoes_detail_json_program_qs_plantio_filter{safra_filter}_{cicle_filter}"
+                    print('cache_key:', cache_key)
+                    qs_plantio_filter = cache.get(cache_key)
+                    if not qs_plantio_filter:
+                        print('not in cache yet')
+                        qs_plantio = qs_plantio.filter(ciclo=c_dict[cicle_filter])
+                        cache.set(cache_key, qs_plantio, timeout=60*5*6)  # cache for 5 minutes
+                    else:
+                        qs_plantio = qs_plantio_filter
                 try:
                     result = [
                         {
@@ -2151,45 +2162,49 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 safra_filter = "2023/2024" if safra_filter == None else safra_filter
                 cicle_filter = "1" if cicle_filter == None else cicle_filter
 
-                qs_plantio = (
-                    Plantio.objects.select_related(
-                        "safra",
-                        "ciclo",
-                        "talhao",
-                        "fazenda",
-                        "programa",
-                        "variedade",
-                        "variedade__cultura",
-                        "talhao__fazenda",
-                        "talhao__fazenda__fazenda",
+                cache_key_qs_plantio_map = f"get_plantio_map_{safra_filter}_{cicle_filter}"
+                print('cache_key:', cache_key_qs_plantio_map)
+                qs_plantio = cache.get(cache_key_qs_plantio_map)
+                if not qs_plantio:
+                    qs_plantio = (
+                        Plantio.objects.select_related(
+                            "safra",
+                            "ciclo",
+                            "talhao",
+                            "fazenda",
+                            "programa",
+                            "variedade",
+                            "variedade__cultura",
+                            "talhao__fazenda",
+                            "talhao__fazenda__fazenda",
+                        )
+                        .values(
+                            "id",
+                            "modificado",
+                            "talhao__id_talhao",
+                            "talhao__id_unico",
+                            "talhao_id",
+                            "safra__safra",
+                            "ciclo__ciclo",
+                            "talhao__fazenda__nome",
+                            "talhao__fazenda__map_centro_id",
+                            "talhao__fazenda__map_zoom",
+                            "talhao__fazenda__fazenda__nome",
+                            "variedade__nome_fantasia",
+                            "variedade__cultura__cultura",
+                            "variedade__cultura__map_color",
+                            "variedade__cultura__map_color_line",
+                            "finalizado_plantio",
+                            "finalizado_colheita",
+                            "plantio_descontinuado",
+                            "area_colheita",
+                            "map_centro_id",
+                            "map_geo_points",
+                        )
+                        .filter(safra=s_dict[safra_filter], ciclo=c_dict[cicle_filter])
+                        .filter(plantio_descontinuado=False)
                     )
-                    .values(
-                        "id",
-                        "modificado",
-                        "talhao__id_talhao",
-                        "talhao__id_unico",
-                        "talhao_id",
-                        "safra__safra",
-                        "ciclo__ciclo",
-                        "talhao__fazenda__nome",
-                        "talhao__fazenda__map_centro_id",
-                        "talhao__fazenda__map_zoom",
-                        "talhao__fazenda__fazenda__nome",
-                        "variedade__nome_fantasia",
-                        "variedade__cultura__cultura",
-                        "variedade__cultura__map_color",
-                        "variedade__cultura__map_color_line",
-                        "finalizado_plantio",
-                        "finalizado_colheita",
-                        "plantio_descontinuado",
-                        "area_colheita",
-                        "map_centro_id",
-                        "map_geo_points",
-                    )
-                    .filter(safra=s_dict[safra_filter], ciclo=c_dict[cicle_filter])
-                    .filter(plantio_descontinuado=False)
-                )
-
+                    cache.set(cache_key_qs_plantio_map, qs_plantio, timeout=60*5*6)  # cache for 5 minutes
                 result = [
                     {
                         "fazenda": i["talhao__fazenda__nome"],
