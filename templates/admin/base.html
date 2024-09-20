@@ -3,14 +3,46 @@
 
 {% block extra_head %}
 {{ block.super }}
+<style>
+    /* Spinner and content CSS */
+    .spinner {
+        border: 16px solid #f3f3f3;
+        border-top: 16px solid #3498db;
+        border-radius: 50%;
+        width: 60px;
+        height: 60px;
+        animation: spin 2s linear infinite;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        margin-left: -30px;
+        margin-top: -30px;
+        z-index: 9999;
+    }
+
+
+    .spinner.hidden {
+        display: none;
+    }
+
+    #content-main {
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.5s ease-in-out, visibility 0.5s ease-in-out;
+    }
+
+    #content-main.visible {
+        opacity: 1;
+        visibility: visible;
+    }
+</style>
 
 {% if LANGUAGE_BIDI %}
 <link rel="stylesheet" type="text/css"
     href="{% block stylesheet_rtl %}{% static 'admin/css/rtl.css' %}{% endblock %}" />
 {% endif %}
-<link rel="stylesheet" type="text/css"
-    href="{% static 'admin/css/base.css' %}" />
-    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.12"></script>
+<link rel="stylesheet" type="text/css" href="{% static 'admin/css/base.css' %}" />
+<script src="https://cdn.jsdelivr.net/npm/vue@2.6.12"></script>
 
 
 {% block extrastyle %}{% endblock %}
@@ -33,7 +65,7 @@
         {% block breadcrumbs %}
         <ol class="breadcrumb">
             <!-- <li class="breadcrumb-item"><a href="{% url 'admin:index' %}"><i class="fas fa-tachometer-alt"></i> {% trans 'Home' %}</a></li> -->
-            {% if title and "Resumo" not in title %}  {{ title }}{% endif %}
+            {% if title and "Resumo" not in title %} {{ title }}{% endif %}
         </ol>
         {% endblock %}
     </div>
@@ -43,11 +75,71 @@
 
 {% block content_block_wrap %}
 
-    {% block content %}
-        {% block object-tools %}{% endblock %}
-        {{ content }}
-        {% block sidebar %}{% endblock %}
-    {% endblock %}
+{% block content %}
+{% block object-tools %}{% endblock %}
+{{ content }}
+{% block sidebar %}{% endblock %}
+{% endblock %}
+<script type="text/javascript">
+    document.addEventListener('DOMContentLoaded', function () {
+        // Get reference to the spinner and the main content div
+        var mainContent = document.getElementById('content-main');
+
+        var spinner = document.createElement('div');
+        spinner.className = 'spinner';
+        spinner.id = 'spinner';
+        document.body.appendChild(spinner);
+
+        
+        // Ensure spinner is visible initially
+        if (spinner) {
+            spinner.classList.remove('hidden'); // Show spinner initially
+        }
+    
+        // Make sure the main content is hidden initially
+        if (mainContent) {
+            mainContent.classList.remove('visible');
+        }
+    
+        // Show spinner before the page unloads (refresh or navigation)
+        window.addEventListener('beforeunload', function () {
+            if (spinner) {
+                spinner.classList.remove('hidden'); // Show the spinner
+            }
+            if (mainContent) {
+                mainContent.classList.remove('visible'); // Ensure content is hidden
+            }
+        });
+    
+        // Hide spinner and show the main content after page has fully loaded
+        window.addEventListener('load', function () {
+            if (spinner) {
+                spinner.classList.add('hidden'); // Hide the spinner once the page has loaded
+            }
+            if (mainContent) {
+                mainContent.classList.add('visible'); // Make the content visible with transition
+            }
+        });
+    
+        // Handle AJAX calls in Django admin (optional if you're making AJAX calls)
+        if (window.jQuery) {
+            $(document).ajaxStart(function () {
+                
+                if (mainContent) {
+                    mainContent.classList.remove('visible');  // Hide content during AJAX load
+                }
+            }).ajaxStop(function () {
+                if (spinner) {
+                    spinner.classList.add('hidden');  // Hide spinner once AJAX is done
+                }
+                if (mainContent) {
+                    mainContent.classList.add('visible');  // Show content after AJAX load
+                }
+            });
+        }
+    });
+</script>
+
 
 
 {% endblock %}

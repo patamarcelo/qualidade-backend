@@ -3,6 +3,9 @@
 
 {% block content %}
 <div id="app">
+    <div id="main-content">
+
+    
 
     {% block content_title %}
 
@@ -203,14 +206,127 @@
         <hr>
     </div>
 </div>
+</div>
 
 
 
+<style>
+    .spinner {
+        display: block;
+        position: fixed; /* Ensure it stays in place */
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%); /* Center the spinner */
+        z-index: 9999; /* Ensure it's above everything */
+        background-color: rgba(255, 255, 255, 0.8); /* Optional: translucent background */
+        padding: 20px;
+        border-radius: 50%;
+        text-align: center;
+        font-size: 20px;
+        color: #333; /* You can style this or replace with an image */
+    }
+    
+    /* Spinner hidden */
+    .spinner.hidden {
+        display: none;
+    }
+
+    @keyframes spin {
+        0% {
+            transform: rotate(0deg);
+        }
+
+        100% {
+            transform: rotate(360deg);
+        }
+    }
+    
+
+    /* Spinner visible by default */
+.spinner {
+    display: block;
+}
+
+/* Main content hidden by default */
+#main-content {
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.5s ease-in-out, visibility 0.5s ease-in-out;
+}
+
+/* Main content visible */
+#main-content.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* To hide the spinner when not needed */
+.hidden {
+    display: none;
+}
+    
+    
+</style>
 
 <script type='text/javascript'>
     var plantio = {{ summary_2| safe }}
     var colheita = {{ colheita_2| safe }}
     let url = new URL(window.location.href);
+
+    document.addEventListener('DOMContentLoaded', function () {
+        // Get reference to the spinner and the main content div
+        var spinner = document.getElementById('spinner');
+        var mainContent = document.getElementById('main-content');
+        
+        // Ensure spinner is visible initially
+        if (spinner) {
+            spinner.classList.remove('hidden'); // Show spinner initially
+        }
+    
+        // Make sure the main content is hidden initially
+        if (mainContent) {
+            mainContent.classList.remove('visible');
+        }
+    
+        // Show spinner before the page unloads (refresh or navigation)
+        window.addEventListener('beforeunload', function () {
+            if (spinner) {
+                spinner.classList.remove('hidden'); // Show the spinner
+            }
+            if (mainContent) {
+                mainContent.classList.remove('visible'); // Ensure content is hidden
+            }
+        });
+    
+        // Hide spinner and show the main content after page has fully loaded
+        window.addEventListener('load', function () {
+            if (spinner) {
+                spinner.classList.add('hidden'); // Hide the spinner once the page has loaded
+            }
+            if (mainContent) {
+                mainContent.classList.add('visible'); // Make the content visible with transition
+            }
+        });
+    
+        // Handle AJAX calls in Django admin (optional if you're making AJAX calls)
+        if (window.jQuery) {
+            $(document).ajaxStart(function () {
+                if (spinner) {
+                    spinner.classList.remove('hidden');  // Show spinner on AJAX start
+                }
+                if (mainContent) {
+                    mainContent.classList.remove('visible');  // Hide content during AJAX load
+                }
+            }).ajaxStop(function () {
+                if (spinner) {
+                    spinner.classList.add('hidden');  // Hide spinner once AJAX is done
+                }
+                if (mainContent) {
+                    mainContent.classList.add('visible');  // Show content after AJAX load
+                }
+            });
+        }
+    });
 </script>
 <script src="{% static 'admin/js/custom_temp_plantio.js' %}" type="text/javascript"></script>
 
