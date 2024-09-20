@@ -105,7 +105,7 @@ def get_cargas_model(safra_filter, ciclo_filter, list_ids=[]):
         )
         .order_by("plantio__talhao__fazenda__nome")
         .filter(~Q(plantio__variedade__cultura__cultura="Milheto"))
-        .filter(plantio__safra__safra=safra_filter, plantio__ciclo=ciclo_filter)
+        .filter(plantio__safra__safra=safra_filter, plantio__ciclo__ciclo=ciclo_filter)
         .filter(~Q(plantio__id_farmbox__in=list_ids))
     ]
     return cargas_model
@@ -141,9 +141,9 @@ class PlantioDetailAdmin(admin.ModelAdmin):
         print('ciclo: ', ciclo)
         print('safra: ', safra)
         if ciclo:
-            ciclo_index = int(ciclo[0]) - 1
+            ciclo_index = ciclo[0]
             safra_filter = safra[0].replace("_", "/").strip()
-            cicle_filter = Ciclo.objects.all()[ciclo_index]
+            cicle_filter = Ciclo.objects.filter(ciclo=ciclo_index)[0]
             safra_filter = Safra.objects.filter(safra=safra_filter)[0]
             return (
                 super(PlantioDetailAdmin, self)
@@ -176,19 +176,32 @@ class PlantioDetailAdmin(admin.ModelAdmin):
                 "variedade",
                 "programa",
             )
-            .filter(ciclo=cicle_filter, safra=safra_filter)
+            # .filter(ciclo=cicle_filter, safra=safra_filter)
             .order_by("data_plantio")
         )
 
     def changelist_view(self, request, extra_context=None):
         
+        
+        request.GET = request.GET.copy()
+        ciclo = request.GET.pop("ciclo", None)
+        safra = request.GET.pop("safra", None)
+        print('cicle here: ', ciclo)
+        print('safra here: ', safra)
+        
         response = super().changelist_view(
             request,
             extra_context=extra_context,
         )
-        safra_filter = CicloAtual.objects.filter(nome="Colheita")[0]
-        safra_filter = safra_filter.safra
-
+        safra_ciclo = CicloAtual.objects.filter(nome="Colheita")[0]
+        safra_filter = safra_ciclo.safra.safra
+        cicle_filter = safra_ciclo.ciclo.ciclo
+        
+        print('self cicle filter', cicle_filter)
+        if ciclo and safra:
+            print('filter here: ')
+            safra_filter = safra[0].replace('_', '/')
+            cicle_filter = ciclo[0]
         # ciclo_filter = "1"
         # cicle_filter = Ciclo.objects.all()[0]
         try:
@@ -210,11 +223,11 @@ class PlantioDetailAdmin(admin.ModelAdmin):
                 #     output_field=DecimalField(),
             ),
         }
-
+        
         query_data = (
             qs.filter(
                 safra__safra=safra_filter,
-                ciclo=cicle_filter,
+                ciclo__ciclo=cicle_filter,
                 finalizado_plantio=True,
                 plantio_descontinuado=False,
             )
@@ -230,6 +243,8 @@ class PlantioDetailAdmin(admin.ModelAdmin):
             .annotate(**metrics)
             .order_by("talhao__fazenda__nome")
         )
+        
+        print(query_data)
 
         response.context_data["summary_2"] = json.dumps(
             list(query_data), cls=DjangoJSONEncoder
@@ -262,12 +277,10 @@ class PlantioDetailPlantioAdmin(admin.ModelAdmin):
         ciclo = request.GET.pop("ciclo", None)
         safra = request.GET.pop("safra", None)
         if ciclo:
-            ciclo_index = int(ciclo[0]) - 1
-            cicle_filter = Ciclo.objects.all()[ciclo_index]
-
-            if safra:
-                safra_filter = safra[0].replace("_", "/").strip()
-                safra_filter = Safra.objects.filter(safra=safra_filter)[0]
+            ciclo_index = ciclo[0]
+            safra_filter = safra[0].replace("_", "/").strip()
+            cicle_filter = Ciclo.objects.filter(ciclo=ciclo_index)[0]
+            safra_filter = Safra.objects.filter(safra=safra_filter)[0]
             return (
                 super(PlantioDetailPlantioAdmin, self)
                 .get_queryset(request)
@@ -279,7 +292,7 @@ class PlantioDetailPlantioAdmin(admin.ModelAdmin):
                     "variedade",
                     "programa",
                 )
-                .filter(ciclo=cicle_filter)
+                .filter(ciclo=cicle_filter, safra=safra_filter)
                 .order_by("data_plantio")
             )
         else:
@@ -298,22 +311,32 @@ class PlantioDetailPlantioAdmin(admin.ModelAdmin):
                 "variedade",
                 "programa",
             )
-            .filter(ciclo=cicle_filter, safra=safra_filter)
+            # .filter(ciclo=cicle_filter, safra=safra_filter)
             .order_by("data_plantio")
         )
 
     def changelist_view(self, request, extra_context=None):
         # global safra_filter
+        request.GET = request.GET.copy()
+        ciclo = request.GET.pop("ciclo", None)
+        safra = request.GET.pop("safra", None)
+        print('cicle here: ', ciclo)
+        print('safra here: ', safra)
         response = super().changelist_view(
             request,
             extra_context=extra_context,
         )
-        # safra_filter = "2023/2024"
-        # safra_filter = CicloAtual.objects.filter(nome="Plantio")[0]
-        # safra_filter = safra_filter.safra
-        # ciclo_filter = "2"
-        # ciclo_filter = request.GET["ciclo"]
-        # print(ciclo_filter)
+        safra_ciclo = CicloAtual.objects.filter(nome="Colheita")[0]
+        safra_filter = safra_ciclo.safra.safra
+        cicle_filter = safra_ciclo.ciclo.ciclo
+        
+        print('self cicle filter', cicle_filter)
+        if ciclo and safra:
+            print('filter here: ')
+            safra_filter = safra[0].replace('_', '/')
+            cicle_filter = ciclo[0]
+        # ciclo_filter = "1"
+        # cicle_filter = Ciclo.objects.all()[0]
         try:
             qs = response.context_data["cl"].queryset
         except (AttributeError, KeyError):
@@ -340,6 +363,7 @@ class PlantioDetailPlantioAdmin(admin.ModelAdmin):
         query_data = (
             qs.filter(
                 safra__safra=safra_filter,
+                ciclo__ciclo=cicle_filter,
                 plantio_descontinuado=False,
             )
             .filter(~Q(variedade__cultura__cultura="Milheto"))
