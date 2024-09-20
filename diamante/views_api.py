@@ -2400,6 +2400,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 id_list = [x["id"] for x in params]
                 print("list of IDS: ", id_list)
                 list_updated = []
+                updated_instances = []
                 for i in params:
                     try:
                         update_field = Plantio.objects.get(pk=i["id"])
@@ -2416,15 +2417,22 @@ class PlantioViewSet(viewsets.ModelViewSet):
                             "aplicado"
                         ]
 
-                        new_value = None
-                        if field_to_update == True:
-                            new_value = False
+                        # new_value = None
+                        # if field_to_update == True:
+                        #     new_value = False
 
-                        if field_to_update == False:
-                            new_value = True
+                        # if field_to_update == False:
+                        #     new_value = True
 
+                        new_value = not field_to_update
+                        
                         update_field.cronograma_programa[index]["aplicado"] = new_value
-                        update_field.save()
+
+
+                        # update_field.save()
+                        updated_instances.append(update_field)
+
+                        
 
                         updated = {
                             "talhao": update_field.talhao.id_talhao,
@@ -2439,7 +2447,10 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         list_updated.append(updated)
                     except Exception as e:
                         print("Erro ao atualizar a Ap no DB", e)
-
+                Plantio.objects.bulk_update(updated_instances, ['cronograma_programa'])
+                for instance in updated_instances[0:1]:
+                    post_save.send(sender=Plantio, instance=instance, created=False)
+                
                 response = {
                     "msg": "Atualização realizada com sucesso!",
                     "data": params,

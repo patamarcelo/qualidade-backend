@@ -2238,6 +2238,7 @@ class StProtheusIntegrationAdmin(admin.ModelAdmin):
     list_filter = (
         ("criados", DateFieldListFilter),  # Filters by the 'criados' date field
     )
+    readonly_fields = ("criados","modificado")
     
     formfield_overrides = {
         models.JSONField: {
@@ -2249,7 +2250,8 @@ class StProtheusIntegrationAdmin(admin.ModelAdmin):
             "Dados",
             {
                 "fields": (
-                    ("ativo",),
+                    ("criados"),
+                    ("ativo"),
                     ("st_numero",),
                     ("st_fazenda",),
                     ("app",),

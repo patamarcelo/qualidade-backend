@@ -9,16 +9,20 @@ const filterVariedadesDif = plantio.map((data, i) => {
 const filterVar = ["Todas", ...filterVariedades];
 const filterVarDif = ["Todas", ...filterVariedadesDif];
 
+console.log('url', url?.search?.length > 0 && url.search.split("&")[1].split("=")[1].replace("_",'/'))
+console.log('url', url?.search)
 var app = new Vue({
 	delimiters: ["[[", "]]"],
 	el: "#app",
 	data: {
 		message: "Hello Vue!",
 		ciclos: ["1", "2", "3"],
-		selectedCiclo: url.search.split("=")[1]
-			? url.search.split("=")[1]
-			: "1",
-		selecredSafra: "2024/2025",
+		selectedCiclo: url?.search?.length > 0 ? url.search.split("&")[0].split("=")[1] : "",
+		// selecredSafra: "2024/2025",
+		// selectedCiclo: '',
+		// 	? url.search.split("=")[1]
+		// 	: "1",
+		selecredSafra: url?.search?.length > 0 ? url.search.split("&")[1].split("=")[1].replace("_",'/') : "",
 		safras: ["2022/2023", "2023/2024", "2024/2025"],
 		plantio: plantio,
 		colheita: colheita,
@@ -37,7 +41,8 @@ var app = new Vue({
 			backgroundColor: "blue",
 			borderRadius: '12px'
 		},
-		imageField: "soy"
+		imageField: "soy",
+		disabledBtn: true,
 	},
 	methods: {
 		navGo() {
@@ -73,6 +78,24 @@ var app = new Vue({
 		}
 	},
 	watch: {
+		selectedCiclo (){
+			if(this.selectedCiclo.length > 0 && this.selecredSafra.length > 0){
+				this.disabledBtn = false
+				console.log('selected Ciclo cicko: ', this.selectedCiclo);
+				console.log('selected safra safra: ', this.selecredSafra);
+			} else {
+				this.disabledBtn = true
+			}
+		},
+		selecredSafra (){
+			if(this.selectedCiclo.length > 0 && this.selecredSafra.length > 0){
+				console.log('selected Ciclo: ', this.selectedCiclo);
+				console.log('selected safra: ', this.selecredSafra);
+				this.disabledBtn = false
+			} else {
+				this.disabledBtn = true
+			}
+		},
 		filteredCutulre() {
 			if (this.filteredCutulre === "Todas") {
 				this.style.backgroundColor = "blue";
@@ -106,6 +129,7 @@ var app = new Vue({
 		}
 	},
 	computed: {
+		
 		customUrl() {
 			return `/admin/diamante/plantiodetailplantio/?ciclo=${this.selectedCiclo}&safra=${this.selecredSafra.replace('/','_')}`;
 		},

@@ -100,8 +100,8 @@ MIDDLEWARE = [
 ]
 
 
-SESSION_ENGINE = "django.contrib.sessions.backends.cache"
-SESSION_CACHE_ALIAS = "default"  # Use the default cache, or specify another cache alias
+# SESSION_ENGINE = "django.contrib.sessions.backends.cache"
+# SESSION_CACHE_ALIAS = "default"  # Use the default cache, or specify another cache alias
 
 APPEND_SLASH = False
 PREPEND_WWW = False
