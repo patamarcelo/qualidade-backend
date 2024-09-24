@@ -891,6 +891,15 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
 
         # Exclude only for autocomplete
         print("resquest_Path", request.path)
+        model_request =  request.GET.get('model_name')
+        if model_request and model_request == 'plantioextratoarea':
+            queryset = queryset.filter(
+                ciclo__ciclo="3",
+                safra__safra="2024/2025",
+                finalizado_colheita=False,
+                plantio_descontinuado=False,
+            )
+            return queryset, use_distinct
 
         if request.path == "/admin/autocomplete/":
             queryset = queryset.filter(
@@ -899,8 +908,8 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
                 finalizado_colheita=False,
                 plantio_descontinuado=False,
             )
+            return queryset, use_distinct
 
-        return queryset, use_distinct
 
     formfield_overrides = {
         models.JSONField: {
@@ -2299,9 +2308,97 @@ class StProtheusIntegrationAdmin(admin.ModelAdmin):
     
 @admin.register(PlantioExtratoArea)
 class PlantioExtratoAreaAdmin(admin.ModelAdmin):
-    list_display = ("plantio", "data_plantio", "area_plantada")
+    list_display = ("talhao_description", "safra_description", "cultura_description", "variedade_description", "get_data", "area_plantada")
     autocomplete_fields = ["plantio"]
     raw_id_fields = ["plantio"]
+    readonly_fields = ("criados","modificado")
+    ordering = ["-data_plantio"]
+    list_filter = ['aguardando_chuva']
+    search_fields = [
+        "plantio__variedade__variedade", 
+        "plantio__variedade__cultura__cultura",
+        "plantio__talhao__fazenda__nome",
+        "plantio__talhao__fazenda__fazenda__nome",
+        "plantio__talhao__id_unico"
+        ]
+    
+    fieldsets = (
+        (
+            "Dados",
+            {
+                "fields": (
+                    ("ativo"),
+                    ("criados", 'modificado'),
+                )
+            },
+        ),
+        (
+            "Plantio",
+            {
+                'fields': (
+                    ("plantio",),
+                    ("data_plantio", 'area_plantada'),
+                    ("aguardando_chuva",)
+                )
+            }
+        ),
+    )
+    
+    def talhao_description(self, obj):
+        return obj.plantio.talhao
+    talhao_description.short_description = 'Talhão'
+    
+    def get_data(self, obj):
+        if obj.data_plantio:
+            return date_format(
+                obj.data_plantio, format="SHORT_DATE_FORMAT", use_l10n=True
+            )
+        else:
+            return " - "
+
+    get_data.short_description = "Data Plantio"
+    
+    
+    def safra_description(self, obj):
+        return f"{obj.plantio.safra.safra} - {obj.plantio.ciclo.ciclo}"
+
+    safra_description.short_description = "Safra"
+    
+    def cultura_description(self, obj):
+        if obj.plantio.variedade is not None:
+            cultura = (
+                obj.plantio.variedade.cultura.cultura if obj.plantio.variedade.cultura.cultura else "-"
+            )
+            cultura_url = None
+            if cultura == "Soja":
+                cultura_url = "soy"
+            if cultura == "Feijão":
+                cultura_url = "beans2"
+            if cultura == "Arroz":
+                cultura_url = "rice"
+            image_url = None
+            if cultura_url is not None:
+                image_url = f"/static/images/icons/{cultura_url}.png"
+            if image_url is not None:
+                return format_html(
+                    f'<img style="width: 20px; height: 20px; text-align: center"  src="{image_url}">'
+                )
+        else:
+            cultura = "Não Planejado"
+        return cultura
+    cultura_description.short_description = "Cultura"
+    
+    def variedade_description(self, obj):
+        if obj.plantio.variedade:
+            variedade = (
+                obj.plantio.variedade.nome_fantasia if obj.plantio.variedade.nome_fantasia else "-"
+            )
+        else:
+            variedade = "Não Planejado"
+        return variedade
+
+    variedade_description.short_description = "Variedade"
+    
 
 @admin.register(ColheitaPlantioExtratoArea)
 class ColheitaPlantioExtratoAreaAdmin(admin.ModelAdmin):

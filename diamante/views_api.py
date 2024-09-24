@@ -202,7 +202,6 @@ def invalidate_cache_on_update(sender, instance, **kwargs):
     cache.delete(cache_key_qs_aplicacoes)  # Invalidate cache whenever Plantio model changes
 
 
-
 class CachedTokenAuthentication(TokenAuthentication):
     def authenticate(self, request):
         # Ensure that the Authorization header exists
@@ -229,7 +228,6 @@ class CachedTokenAuthentication(TokenAuthentication):
             cache.set(f"token_{token_key}", result[0], timeout=3600)  # Cache user for 1 hour
         
         return result
-
 
 
 class TalaoViewSet(viewsets.ModelViewSet):
@@ -616,11 +614,11 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     area = i["area"]
                     area_planejamento = i["area"]
                     id_plantio_farmbox = i["id"]
-                    
+
                     planned_date = None
                     if i["planned_date"]:
                         planned_date = i["planned_date"].split('T')[0]
-                    
+
                     variedade_planejada = i["planned_variety_name"]
                     cultura_planejada = i["planned_culture_name"]
 
@@ -810,7 +808,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     area = i["area"]
                     area_planejamento = i["area"]
                     id_plantio_farmbox = i["id"]
-                    
+
                     planned_date = None
                     if i["planned_date"]:
                         planned_date = i["planned_date"].split('T')[0]
@@ -877,7 +875,6 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 if area:
                                     field_to_update.area_colheita = area
                                     field_to_update.area_planejamento_plantio = area_planejamento
-                                    
 
                                 if map_centro_id_farm:
                                     field_to_update.map_centro_id = map_centro_id_farm
@@ -1124,13 +1121,13 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     cicle_filter = request.data["ciclo"]
                 except Exception as e:
                     print(e)
-                
+
                 if safra_filter is None or cicle_filter is None: 
                     print('safra ou filtro não informado')
                     current_safra = CicloAtual.objects.filter(nome="Colheita")[0]
                     safra_filter = current_safra.safra.safra
                     cicle_filter = current_safra.ciclo.ciclo
-                    
+
                 safra_filter = "2024/2025" if safra_filter == None else safra_filter
                 cicle_filter = "1" if cicle_filter == None else cicle_filter
 
@@ -1637,7 +1634,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 print(cicle_filter)
                 safra_filter = "2023/2024" if safra_filter == None else safra_filter
                 cicle_filter = "1" if cicle_filter == None else cicle_filter
-                
+
                 cache_key_qs_planejamento = f"get_plantio_operacoes_detail_qs_planejamento_{safra_filter}_{cicle_filter}"
                 print('cache_key:', cache_key_qs_planejamento)
                 qs_planejamento = cache.get(cache_key_qs_planejamento)
@@ -1665,7 +1662,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         .filter(safra__safra=safra_filter, ciclo__ciclo=cicle_filter)
                     )
                     cache.set(cache_key_qs_planejamento, qs_planejamento, timeout=60*5*6)  # cache for 5 minutes
-                
+
                 cache_key_qs_plantio_get_plantio_operacoes_detail = f"get_plantio_operacoes_detail_qs_plantio_{safra_filter}_{cicle_filter}"
                 print('cache_key:', cache_key_qs_plantio_get_plantio_operacoes_detail)
                 qs_plantio = cache.get(cache_key_qs_plantio_get_plantio_operacoes_detail)
@@ -1711,13 +1708,11 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         .filter(finalizado_colheita=False)
                     )
                     cache.set(cache_key_qs_plantio_get_plantio_operacoes_detail, qs_plantio, timeout=60*5*6)  # cache for 5 minutes
-                
-                
+
                 qs_programas = Operacao.objects.values(
                     "estagio", "programa_id", "prazo_dap", "id"
                 ).filter(ativo=True)
-            
-                    
+
                 cache_key_qs_aplicacoes = f"get_plantio_operacoes_detail_qs_aplicacoes_{safra_filter}_{cicle_filter}"
                 print('cache_key:', cache_key_qs_aplicacoes)
                 qs_aplicacoes = cache.get(cache_key_qs_aplicacoes)
@@ -1991,7 +1986,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["GET", "POST"])
     def get_plantio_operacoes_detail_json_program(self, request):
         if request.user.is_authenticated:
-            
+
             start_time = time.time()  # Start time
             try:
                 safra_filter = request.data["safra"]
@@ -2425,14 +2420,11 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         #     new_value = True
 
                         new_value = not field_to_update
-                        
-                        update_field.cronograma_programa[index]["aplicado"] = new_value
 
+                        update_field.cronograma_programa[index]["aplicado"] = new_value
 
                         # update_field.save()
                         updated_instances.append(update_field)
-
-                        
 
                         updated = {
                             "talhao": update_field.talhao.id_talhao,
@@ -2450,7 +2442,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 Plantio.objects.bulk_update(updated_instances, ['cronograma_programa'])
                 for instance in updated_instances[0:1]:
                     post_save.send(sender=Plantio, instance=instance, created=False)
-                
+
                 response = {
                     "msg": "Atualização realizada com sucesso!",
                     "data": params,
@@ -2465,7 +2457,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             response = {"message": "Você precisa estar logado!!!"}
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
-#TODO
+    # TODO
     @action(detail=False, methods=["GET", "POST", "PUT"])
     def open_app_farmbox(sef, request, pk=None):
         if request.user.is_authenticated:
@@ -2483,7 +2475,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 print('responseAll from farmbox:', response_farm)
                 print('\n\n')
                 print('response:', response_farm.status_code, response_farm.text)
-                
+
                 if response_farm.status_code == 201:
                     parsed_json = json.loads(response_farm.text)
                     try:
@@ -2691,7 +2683,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
         safra_filter = "2024/2025"
         ciclo_filter = "1"
         planejamento_plantio = False
-        
+
         try:
             filter_safra_and_ciclo = parcelas_filter[0]
             refer_plantio = Plantio.objects.get(id_farmbox=filter_safra_and_ciclo)
@@ -2712,7 +2704,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 safra_filter = "2024/2025"
                 ciclo_filter = '3'
                 filter_farm_id= "6"
-                
+
                 plantio_map = Plantio.objects.values(
                     "map_geo_points", "map_centro_id", "talhao__id_talhao", "id_farmbox"
                 ).filter(
@@ -2731,7 +2723,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     # programa__isnull=False,
                     talhao__fazenda__fazenda__id_d=filter_farm_id,
                 ).order_by('data_prevista_plantio')
-                
+
                 gp_date = ( 
                         Plantio.objects.filter(safra__safra=safra_filter, ciclo__ciclo=ciclo_filter, programa__isnull=False)
                                         .filter(talhao__fazenda__fazenda__id_d=filter_farm_id)
@@ -2745,12 +2737,12 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     }
                     for idx, (date, group) in enumerate(groupby(gp_date, key=itemgetter('date_only')), start=1)
                 ]
-                
+
                 print('Resultado dos campos consolidados')
                 for i in grouped_by_date:
                     print(i)
                     print('\n')
-                
+
             else:
                 grouped_by_date=[]
                 plantio_map = Plantio.objects.values(
@@ -2797,7 +2789,6 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 labels.append(i["talhao__id_talhao"])
                 farm_ids.append(i["talhao__id_talhao"])
                 ids_farmbox.append(i["id_farmbox"])
-                
 
             print("saindo do loop")
             print(time.time() - start_time)
@@ -2938,9 +2929,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
         except Exception as e:
             response = {"message": f"Ocorreu um Erro: {e}"}
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
-    
-    
-    
+
     @action(detail=False, methods=["GET", "POST"])
     def get_bio_prods_open_and_planted(self, request, pk=None):
         # TODO
@@ -2969,7 +2958,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 bio_prods_geral = []
                 today = datetime.datetime.today()
                 check_date = today + datetime.timedelta(days=15)
-                
+
                 print('check_date: ', check_date)
                 for i in qs:
                     cronograma = i['cronograma_programa']
@@ -3014,8 +3003,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                     prods_formated_geral["area"] = area
                                     prods_formated_geral["estagio"] = estagio
                                     bio_prods_geral.append(prods_formated_geral)
-                
-                # summed_quantities = defaultdict(int)                
+
+                # summed_quantities = defaultdict(int)
                 # for obj in bio_prods:
                 #     summed_quantities[obj['id_farmbox']] += obj['quantidade aplicar']
                 # total_prods = [{'id': key, 'quantity': value} for key, value in summed_quantities.items()]
@@ -3024,8 +3013,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 #     cout_total += i['quantity']
                 # print('total: ', cout_total)
                 # print(len(bio_prods))
-                
-                # summed_quantities_geral = defaultdict(int)                
+
+                # summed_quantities_geral = defaultdict(int)
                 # for obj in bio_prods_geral:
                 #     summed_quantities_geral[obj['id_farmbox']] += obj['quantidade aplicar']
                 # total_prods_geral = [{'id': key, 'quantity': value} for key, value in summed_quantities_geral.items()]
@@ -3047,8 +3036,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
         else:
             response = {"message": "Você precisa estar logado!!!"}
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
-        
-    
+
     @action(detail=False, methods=['GET', 'POST'])
     def save_planejamento_protheus(self, request, pk=None):
         if request.user.is_authenticated:
@@ -3078,8 +3066,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         ciclo__ciclo=cicle_filter,
                         plantio_descontinuado=False
                     ).filter(~Q(variedade=None) & ~Q(variedade__cultura=None))
-                
-                
+
                 list_returned = [
                     {
                         'codigo_planejamento' : '??',
@@ -3095,7 +3082,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     }
                     for index, x in enumerate(query_plantio, start=1)
                 ]
-                
+
                 # TRATAR PARA ENVIAR PROJETOS PARA ABRIR OS HEADERS DO PLANEJAMENTO
                 farm_list = list(set([x['talhao__fazenda__nome'] for x in query_plantio]))
                 query_projetos = Projeto.objects.values(
@@ -3105,10 +3092,9 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     'id_d',
                 )
                 filtered_farm_list = [{**x, 'safra': safra_filter, 'ciclo': cicle_filter, 'projeto': x['id_d'], 'fazenda_planejamento': x['fazenda__nome'], 'id_fazenda_planejamento' : x['fazenda__id_d']} for x in query_projetos if x['nome'] in farm_list]
-                
+
                 print('dados para enviar', filtered_farm_list)
-                
-                
+
                 # send to protheus saving headers
                 headers = {
                     "Accept": "application/json",
@@ -3117,14 +3103,14 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "Access-Control-Allow-Origin": "*"
                 }
                 url = "https://api.diamanteagricola.com.br:8089/rest/planejamento/cabecalho"
-                
+
                 payload = {
                     "projetos": filtered_farm_list
                 }
                 if len(farm_list) > 0:
                     try:
                         response_headers = requests.post(url, data=json.dumps(payload), headers=headers, verify=False, auth=HTTPBasicAuth('api', PROTHEUS_TOKEN))
-                        
+
                         print('response headers from protheus:', response_headers)
                         print('\n\n')
                         print('response:', response_headers.status_code, response_headers.text)
@@ -3157,30 +3143,27 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                     print('Projeto com erro de resposta', resp)
                     except Exception as e:
                         print('Erro ao enviar o cabeçalho para o protheus', e)
-                
-                
+
                 get_planner_codes = HeaderPlanejamentoAgricola.objects.values('projeto__id_d', 'codigo_planejamento').filter(safra__safra=safra_filter, ciclo__ciclo=cicle_filter)
                 format_data_to_send = [{**x,'area_parcela': float(x['area_parcela']) ,'codigo_planejamento': [cod['codigo_planejamento'] for cod in get_planner_codes if cod['projeto__id_d'] == x['projeto']][0] } for x in list_returned ]
                 url_talhoes = 'https://api.diamanteagricola.com.br:8089/rest/planejamento/talhoes'
                 payload_talhoes = {
                     'parcelas': format_data_to_send
                 }
-                
+
                 print('Talhos a enviar: \n')
                 print(format_data_to_send)
-                
+
                 if len(format_data_to_send) > 0:
                     try:
                         response_talhoes = requests.post(url_talhoes,data=json.dumps(payload_talhoes), headers=headers, verify=False, auth=HTTPBasicAuth('api', PROTHEUS_TOKEN))
                         print('response headers from protheus:', response_talhoes)
                         print('\n\n')
                         print('response:', response_talhoes.status_code, response_talhoes.text)
-                        
-                        
+
                     except Exception as e:
                         print('Erro ao enviar os talhoes para o protheus', e)
-                        
-                    
+
                 response = {
                     "msg": "Dados consolidados para enviar ao protheus com Sucesso!!",
                     "projetos": projetos_response,
@@ -3194,11 +3177,11 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "problem": e
                     }
                 return Response(response, status=status.HTTP_400_BAD_REQUEST)
-            
+
         else:
             response = {"message": "Você precisa estar logado!!!"}
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
-    
+
     @action(detail=False, methods=['POST'])
     def open_bulcket_app_farmbox(self, request, pk=None):
         if request.user.is_authenticated:
@@ -3212,10 +3195,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 dict_app = []
                 today_date = datetime.datetime.today().strftime('%Y-%m-%d')
 
-                
                 query_projetos = Plantio.objects.filter(safra__safra="2024/2025").values('talhao__fazenda__id_farmbox','id_farmbox','talhao__fazenda__fazenda__id_responsavel_farmbox','talhao__fazenda__fazenda__id_encarregado_farmbox')
-                
-                
+
                 for i in load_data:
                     projeto = i['Projeto']
                     area = i['Area']
@@ -3256,17 +3237,17 @@ class PlantioViewSet(viewsets.ModelViewSet):
                             ]
                         }
                         dict_app.append(obj_to_add)
-                        
+
                 for i in dict_app:
                     i.pop('projeto')
                     i.pop('dose')   
-                
-                # for payload in dict_app[:2]: 
-                #     print(payload) 
+
+                # for payload in dict_app[:2]:
+                #     print(payload)
                 #     print('\n')
-                    
-                # for payload in dict_app[2:]: 
-                #     print(payload) 
+
+                # for payload in dict_app[2:]:
+                #     print(payload)
                 #     print('\n')
                 # LOGICA PARA ABRIR AS APS DENTRO DO FARM
                 # for payload in dict_app[2:]:
@@ -3280,13 +3261,13 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 #     print('responseAll from farmbox:', response_farm)
                 #     print('\n\n')
                 #     print('response:', response_farm.status_code)
-                    
+
                 #     if response_farm.status_code == 201:
                 #         print('Ap Aberta com sucesso!!!')
-                
+
                 print('Total App to Open:')
                 print(len(dict_app))
-                
+
                 data = {
                     'dados': 'dados tratados'
                 }
@@ -3301,8 +3282,50 @@ class PlantioViewSet(viewsets.ModelViewSet):
         else:
             response = {"message": "Você precisa estar logado!!!"}
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
-    
-    
+
+    @action(detail=False, methods=["GET"])
+    def get_plantio_planner_data(self, request, *args, **kwargs):
+        try:
+            qs_planned = (
+                Plantio.objects.select_related(
+                    "safra",
+                    "ciclo",
+                    "talhao",
+                    "fazenda",
+                    "variedade",
+                    "variedade__cultura",
+                    "talhao__fazenda__fazenda",
+                )
+                .values(
+                    "area_planejamento_plantio",
+                    "id_farmbox",
+                    "data_prevista_plantio",
+                    "talhao__fazenda__nome",
+                    "talhao__id_talhao",
+                )
+                .filter(safra__safra="2024/2025", ciclo__ciclo="3")
+                .filter(variedade__variedade__isnull=False)
+            )
+            only_proj = list(set([x["talhao__fazenda__nome"] for x in qs_planned]))
+            data = {
+                "qs_planned_size": len(qs_planned),
+                'qs_planned_area_total': qs_planned.aggregate(Sum('area_planejamento_plantio')),
+                "qs_planned": qs_planned,
+                "qs_planned_projetos": only_proj
+                }
+            response = {
+                "msg": f"Aplicação Aberta com sucesso!!!!",
+                "dados": data,
+            }
+            return Response(response, status=status.HTTP_200_OK)
+        except Exception as e:
+            print("erro ao pegar os dados do plantio", e)
+            response = {
+                "msg": f"Erro gerar os dados do plantio",
+                "error": f"Error ao pegar os dados do plantio , Erro: {e}",  # General error message
+            }
+            return Response(response, status=status.HTTP_208_ALREADY_REPORTED)
+
     @action(detail=False, methods=['GET'])
     def check_how_fast(self, request, *args, **kwargs):
         start_time = time.time()
@@ -3322,7 +3345,6 @@ class PlantioViewSet(viewsets.ModelViewSet):
         print(f"Total Time Taken: {end_time - start_time:.4f} seconds")
         print(f"Processing Time: {process_end - process_start:.4f} seconds")
         print(f"Other Overheads: {end_time - process_end:.4f} seconds")
-
 
         # Return the response
         return Response(response_data, status=status.HTTP_200_OK)
@@ -3416,8 +3438,6 @@ class DefensivoViewSet(viewsets.ModelViewSet):
             "dados": 'dados do banco',
         }
         return Response(response, status=status.HTTP_200_OK)
-                
-        
 
 
 # --------------------- ---------------------- FARMBOX APPLICATIONS UPDATE API END  --------------------- ----------------------#
@@ -4076,7 +4096,6 @@ class PlantioDetailResumoApi(viewsets.ModelViewSet):
             return Response(response, status.HTTP_400_BAD_REQUEST)
 
 
-
 def format_input_numbers(input_list):
     def format_number(value):
         # rounded_value = str(round(value, 2)).replace('.', ',')
@@ -4087,7 +4106,7 @@ def format_input_numbers(input_list):
 def formart_ap_list(input_list):
     formated_list = [ x.split('|')[0].strip().replace('AP', 'AP ') for x in input_list]
     return formated_list
-    
+
 class StViewSet(viewsets.ModelViewSet):
     queryset = StProtheusIntegration.objects.all()
     serializer_class = StProtheusIntegrationSerializer
@@ -4228,8 +4247,8 @@ class StViewSet(viewsets.ModelViewSet):
         else:
             response = {"message": "Você precisa estar logado!!!"}
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
-        
-        
+
+
 class ColheitaPlantioExtratoAreaViewSet(viewsets.ModelViewSet):
     queryset = ColheitaPlantioExtratoArea.objects.all()
     serializer_class = StProtheusIntegrationSerializer
