@@ -811,6 +811,12 @@ class PlantioExtratoArea(Base):
         null=True,
     )
     
+    aguardando_chuva = models.BooleanField(
+        "Plantio Aguardando a chuva",
+        default=False,
+        help_text="Apontar caso o Plantio esteja aguardando a chuva",
+    )
+    
     class Meta:
         ordering = ["data_plantio", 'plantio']
         verbose_name = 'Extrato do Plantio'

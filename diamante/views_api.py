@@ -3392,7 +3392,7 @@ class DefensivoViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["GET"])
     def update_farmbox_mongodb_data(self, request, pk=None):
         
-        number_of_days_before = 1 if DEBUG == True else 1
+        number_of_days_before = 2 if DEBUG == True else 1
         from_date = get_date(number_of_days_before)
         last_up = get_miliseconds(from_date)
         print(last_up)
@@ -3813,7 +3813,7 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                             "projeto": "SEM PLACA",
                             "romaneio": remove_leading_zeros(str(i["Ticket"])),
                             "error": "SEM PLACA",
-                            "id_farmtruck": "SEM PLACA",
+                            "id_farmtruck": id_farmtruck,
                         }
                         problem.append(problem_load)
                 except Exception as e:

@@ -128,6 +128,7 @@ class PlantioDetailAdmin(admin.ModelAdmin):
     
     # ids parcelas J
     exclude_j = False
+    # exclude_j = True
     if exclude_j:
         list_ids = [263066,264740]
     else:
