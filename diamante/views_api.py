@@ -3302,6 +3302,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "data_prevista_plantio",
                     "talhao__fazenda__nome",
                     "talhao__id_talhao",
+                    "variedade__variedade",
+                    "variedade__cultura__cultura"
                 )
                 .filter(safra__safra="2024/2025", ciclo__ciclo="3")
                 .filter(variedade__variedade__isnull=False)
