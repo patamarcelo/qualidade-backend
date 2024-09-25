@@ -900,7 +900,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         model_request =  request.GET.get('model_name')
         if model_request and model_request == 'plantioextratoarea':
             queryset = queryset.filter(
-                ciclo=ciclo_filter.ciclo,
+                ciclo__ciclo__in=["2", "3"],
                 safra__safra="2024/2025",
                 finalizado_colheita=False,
                 plantio_descontinuado=False,
