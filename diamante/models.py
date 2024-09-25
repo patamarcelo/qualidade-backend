@@ -817,6 +817,9 @@ class PlantioExtratoArea(Base):
         help_text="Apontar caso o Plantio esteja aguardando a chuva",
     )
     
+    def __str__(self):
+        return f'{self.plantio.talhao.fazenda.nome} | {self.plantio.talhao.id_talhao} | {self.plantio.safra}-{self.plantio.ciclo} | {str(self.area_plantada)}'
+    
     class Meta:
         ordering = ["data_plantio", 'plantio']
         verbose_name = 'Extrato do Plantio'

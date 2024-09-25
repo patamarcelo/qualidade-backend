@@ -77,7 +77,8 @@ from .models import (
     AppFarmboxIntegration,
     StProtheusIntegration,
     HeaderPlanejamentoAgricola,
-    ColheitaPlantioExtratoArea
+    ColheitaPlantioExtratoArea,
+    PlantioExtratoArea
 )
 
 from functools import reduce
@@ -3309,11 +3310,35 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 .filter(variedade__variedade__isnull=False)
             )
             only_proj = list(set([x["talhao__fazenda__nome"] for x in qs_planned]))
+            
+            qs_executed = (
+                PlantioExtratoArea.objects.select_related(
+                    "plantio__safra",
+                    "plantio__ciclo",
+                    "plantio__talhao",
+                    "plantio__fazenda",
+                    "plantio__variedade",
+                    "plantio__variedade__cultura",
+                    "plantio__talhao__fazenda__fazenda",
+                ).values(
+                    "plantio__id_farmbox",
+                    "plantio__talhao__fazenda__nome",
+                    "plantio__talhao__id_talhao",
+                    "plantio__variedade__variedade",
+                    "plantio__variedade__cultura__cultura",
+                    "data_plantio",
+                    "area_plantada",
+                    "aguardando_chuva"
+                )
+                .filter(plantio__safra__safra="2024/2025", plantio__ciclo__ciclo="3")
+            )
+            
             data = {
                 "qs_planned_size": len(qs_planned),
                 'qs_planned_area_total': qs_planned.aggregate(Sum('area_planejamento_plantio')),
                 "qs_planned": qs_planned,
-                "qs_planned_projetos": only_proj
+                "qs_planned_projetos": only_proj,
+                "qs_executed_area": qs_executed,
                 }
             response = {
                 "msg": f"Aplicação Aberta com sucesso!!!!",
