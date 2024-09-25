@@ -883,32 +883,43 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
             )
         )
 
-    # def get_search_results(self, request, queryset, search_term):
-    #     ciclo_filter = CicloAtual.objects.filter(nome="Colheita")[0]
-    #     queryset, use_distinct = super().get_search_results(
-    #         request, queryset, search_term
-    #     )
+    def get_search_results(self, request, queryset, search_term):
+        try:
+            ciclo_filter = CicloAtual.objects.filter(nome="Colheita")[0]
+        except IndexError:
+            # Handle the case where CicloAtual doesn't exist
+            # Return None or an empty queryset
+            return None, False
 
-    #     # Exclude only for autocomplete
-    #     print("resquest_Path", request.path)
-    #     model_request =  request.GET.get('model_name')
-    #     if model_request and model_request == 'plantioextratoarea':
-    #         queryset = queryset.filter(
-    #             ciclo__ciclo="3",
-    #             safra__safra="2024/2025",
-    #             finalizado_colheita=False,
-    #             plantio_descontinuado=False,
-    #         )
-    #         return queryset, use_distinct
+        queryset, use_distinct = super().get_search_results(
+            request, queryset, search_term
+        )
 
-    #     if request.path == "/admin/autocomplete/":
-    #         queryset = queryset.filter(
-    #             ciclo=ciclo_filter.ciclo,
-    #             finalizado_plantio=True,
-    #             finalizado_colheita=False,
-    #             plantio_descontinuado=False,
-    #         )
-    #         return queryset, use_distinct
+        # Exclude only for autocomplete
+        print("resquest_Path", request.path)
+        model_request =  request.GET.get('model_name')
+        if model_request and model_request == 'plantioextratoarea':
+            queryset = queryset.filter(
+                ciclo=ciclo_filter.ciclo,
+                safra__safra="2024/2025",
+                finalizado_colheita=False,
+                plantio_descontinuado=False,
+            )
+            if not queryset.exists():  # Check for empty queryset
+                return None, False 
+            return queryset, use_distinct
+
+        if request.path == "/admin/autocomplete/":
+            queryset = queryset.filter(
+                ciclo=ciclo_filter.ciclo,
+                finalizado_plantio=True,
+                finalizado_colheita=False,
+                plantio_descontinuado=False,
+            )
+            if not queryset.exists():  # Check for empty queryset
+                return None, False 
+            return queryset, use_distinct
+        return queryset, use_distinct
 
 
     formfield_overrides = {

@@ -3204,54 +3204,56 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     id_plantio = i['ID FarmBox']
                     dose = i["Dose Kg"]
                     get_index = [(index, x) for index, x in enumerate(dict_app) if x['projeto'] == projeto and x['dose'] == dose]
-                    plantation_to_append = {
-                                    'sought_area': float(str(area).replace(',','.')),
-                                    'plantation_id': id_plantio,
-                                }
-                    if get_index:
-                        index_of = get_index[0][0]
-                        dict_app[index_of]['plantations'].append(plantation_to_append)
-                    else:
-                        get_id = query_projetos.filter(id_farmbox=id_plantio).first()
-                        obj_to_add = {
-                            'projeto': projeto,
-                            'dose': dose,
-                            'date': today_date,
-                            'harvest_id': 3840,
-                            'farm_id':get_id['talhao__fazenda__id_farmbox'],
-                            'responsible_id': get_id['talhao__fazenda__fazenda__id_responsavel_farmbox'],
-                            'charge_id': get_id['talhao__fazenda__fazenda__id_encarregado_farmbox'],
-                            'plantations': [plantation_to_append],
-                            'inputs' : [
-                                # OPERACAO
-                                {
-                                    "dosage_value": 1,
-                                    "dosage_unity": "un_ha",
-                                    "input_id": input_operation
-                                },
-                                # PRODUTO
-                                {
-                                    "dosage_value": dose,
-                                    "dosage_unity": "kg_ha",
-                                    "input_id": input_id
-                                }
-                            ]
-                        }
-                        dict_app.append(obj_to_add)
+                    if area:
+                        plantation_to_append = {
+                                        'sought_area': float(str(area).replace(',','.')),
+                                        'plantation_id': id_plantio,
+                                    }
+                        if get_index:
+                            index_of = get_index[0][0]
+                            dict_app[index_of]['plantations'].append(plantation_to_append)
+                        else:
+                            get_id = query_projetos.filter(id_farmbox=id_plantio).first()
+                            obj_to_add = {
+                                'projeto': projeto,
+                                'dose': dose,
+                                'date': today_date,
+                                'harvest_id': 3840,
+                                'farm_id':get_id['talhao__fazenda__id_farmbox'],
+                                'responsible_id': get_id['talhao__fazenda__fazenda__id_responsavel_farmbox'],
+                                'charge_id': get_id['talhao__fazenda__fazenda__id_encarregado_farmbox'],
+                                'plantations': [plantation_to_append],
+                                'inputs' : [
+                                    # OPERACAO
+                                    {
+                                        "dosage_value": 1,
+                                        "dosage_unity": "un_ha",
+                                        "input_id": input_operation
+                                    },
+                                    # PRODUTO
+                                    {
+                                        "dosage_value": dose,
+                                        "dosage_unity": "kg_ha",
+                                        "input_id": input_id
+                                    }
+                                ]
+                            }
+                            dict_app.append(obj_to_add)
 
                 for i in dict_app:
                     i.pop('projeto')
                     i.pop('dose')   
 
-                # for payload in dict_app[:2]:
+                # for payload in dict_app:
                 #     print(payload)
                 #     print('\n')
 
                 # for payload in dict_app[2:]:
                 #     print(payload)
                 #     print('\n')
+                
                 # LOGICA PARA ABRIR AS APS DENTRO DO FARM
-                # for payload in dict_app[2:]:
+                # for payload in dict_app:
                 #     url = "https://farmbox.cc/api/v1/applications"
                 #     payload = payload
                 #     headers = {
