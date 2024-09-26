@@ -166,10 +166,10 @@
                         maximumFractionDigits: 2
                         })]] ha</td>
                     <td style="text-align: center; font-weight: bold">
-                        [[newTotals?.saldoColheita?.toLocaleString("pt-br", {
+                        [[newTotals?.saldoColheita === 0 ? " - " : newTotals?.saldoColheita?.toLocaleString("pt-br", {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2
-                        })]] ha</td>
+                        }) + " ha"]]</td>
                     <td style="text-align: center; font-weight: bold">[[newTotals?.pesoColhido?.toLocaleString("pt-br",
                         {
                         minimumFractionDigits: 2,
@@ -287,10 +287,10 @@
                         maximumFractionDigits: 2
                         })]] ha</td>
                     <td style="text-align: center; font-weight: bold">
-                        [[newTotals?.saldoColheita?.toLocaleString("pt-br", {
+                        [[newTotals?.saldoColheita === 0 ? " - " : newTotals?.saldoColheita?.toLocaleString("pt-br", {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2
-                        })]] ha</td>
+                        }) + " ha"]] </td>
                     <td style="text-align: center; font-weight: bold">[[newTotals?.pesoColhido?.toLocaleString("pt-br",
                         {
                         minimumFractionDigits: 2,

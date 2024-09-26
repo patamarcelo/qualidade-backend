@@ -2938,10 +2938,15 @@ class PlantioViewSet(viewsets.ModelViewSet):
         # verificar possibiliade de filtar somente safra e não ciclo
         if request.user.is_authenticated:
             try:
+                safra_filter = request.data["safra"]
+                safra_filter = safra_filter if safra_filter else "2024/2025"
+                cicle_filter = request.data["ciclo"]
+                print('cicle filter here: ', cicle_filter)
+                # cicle_filter = cicle_filter if cicle_filter else "2"
                 qs = (
                     Plantio.objects.filter(
-                        safra__safra="2024/2025",
-                        ciclo__ciclo="1",
+                        safra__safra=safra_filter,
+                        ciclo__ciclo=cicle_filter,
                         finalizado_plantio=True,
                         plantio_descontinuado=False,
                         programa__isnull=False,
