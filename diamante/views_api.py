@@ -1983,6 +1983,356 @@ class PlantioViewSet(viewsets.ModelViewSet):
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
     # --------------------- ---------------------- PLANTIO APLICACOES API END --------------------- ----------------------#
+    
+    
+    # --------------------- ---------------------- PLANTIO BIO APLICACOES API START --------------------- ----------------------#
+
+    @action(detail=False, methods=["GET", "POST"])
+    def get_plantio_operacoes_detail_biologico_api(self, request):
+        if request.user.is_authenticated:
+            try:
+                safra_filter = request.data["safra"]
+                cicle_filter = request.data["ciclo"]
+                print(safra_filter)
+                print(cicle_filter)
+                safra_filter = "2023/2024" if safra_filter == None else safra_filter
+                cicle_filter = "1" if cicle_filter == None else cicle_filter
+                cicle_fitler = [cicle_filter]
+                
+                # cicle_fitler = ["1", "2", "3"]
+                qs_planejamento = (
+                    PlannerPlantio.objects.select_related(
+                        "projeto",
+                        "cultura",
+                        "ciclo",
+                        "cultura",
+                        "projeto__fazenda",
+                        "safra",
+                    )
+                    .values(
+                        "projeto",
+                        "projeto__id",
+                        "projeto__nome",
+                        "cultura",
+                        "variedade",
+                        "safra__safra",
+                        "ciclo__ciclo",
+                        "start_date",
+                        "area",
+                    )
+                    .filter(safra__safra=safra_filter)
+                    .filter(ciclo__ciclo__in=cicle_fitler)
+                )
+                
+                qs_plantio = (
+                    Plantio.objects.select_related(
+                        "safra",
+                        "ciclo",
+                        "talhao",
+                        "fazenda",
+                        "programa",
+                        "variedade",
+                        "variedade__cultura",
+                        "talhao__fazenda__fazenda",
+                    )
+                    .values(
+                        "id",
+                        "talhao__id_talhao",
+                        "talhao__id_unico",
+                        "talhao_id",
+                        "safra__safra",
+                        "ciclo__ciclo",
+                        "talhao__fazenda__nome",
+                        "talhao__fazenda__id",
+                        "talhao__fazenda__fazenda__nome",
+                        "talhao__fazenda__fazenda__capacidade_plantio_ha_dia",
+                        "variedade__nome_fantasia",
+                        "variedade__cultura__cultura",
+                        "area_colheita",
+                        "data_plantio",
+                        "data_prevista_plantio",
+                        "finalizado_plantio",
+                        "programa",
+                        "programa_id",
+                        "programa__start_date",
+                        "programa__end_date",
+                        "programa__nome",
+                    )
+                    .filter(~Q(programa_id=None))
+                    .filter(safra=s_dict[safra_filter])
+                    .filter(ciclo__ciclo__in=cicle_fitler)
+                    .filter(Q(data_plantio=None))
+                    .filter(plantio_descontinuado=False)
+                    .filter(finalizado_colheita=False)
+                )
+
+                qs_programas = Operacao.objects.values(
+                    "estagio", "programa_id", "prazo_dap", "id"
+                ).filter(ativo=True)
+
+
+                qs_aplicacoes = (
+                    Aplicacao.objects.select_related(
+                        "defensivo",
+                        "operacao",
+                        "operacao__programa",
+                        "operacao__programa__safra",
+                        "operacao__programa__ciclo",
+                        "operacao__programa__cultura",
+                    )
+                    .values(
+                        "defensivo__produto",
+                        "defensivo__tipo",
+                        "defensivo__id_farmbox",
+                        "dose",
+                        "operacao",
+                        "operacao__estagio",
+                        "operacao__prazo_dap",
+                        "operacao__programa",
+                        "operacao__programa__nome",
+                        "operacao__programa__safra__safra",
+                        "operacao__programa__ciclo__ciclo",
+                        "operacao__programa__cultura__cultura",
+                    )
+                    .filter(~Q(operacao__programa_id=None))
+                    .filter(
+                        operacao__programa__safra=s_dict[safra_filter],
+                        ativo=True,
+                    )
+                    .filter(operacao__programa__ciclo__ciclo__in=cicle_fitler)
+                )
+
+                print('tamanho do qs plantio: ', len(qs_plantio))
+                final_result = {i["talhao__fazenda__nome"]: {} for i in qs_plantio}
+                try:
+                    {
+                        final_result[i["talhao__fazenda__nome"]].update(
+                            {
+                                i["talhao__id_talhao"]: {
+                                    "safra": i["safra__safra"],
+                                    "ciclo": i["ciclo__ciclo"],
+                                    "cultura": i["variedade__cultura__cultura"],
+                                    "variedade": i["variedade__nome_fantasia"],
+                                    "plantio_id": i["id"],
+                                    "fazenda_grupo": i[
+                                        "talhao__fazenda__fazenda__nome"
+                                    ],
+                                    "projeto_id": i["talhao__fazenda__id"],
+                                    "talhao_id_unico": i["talhao__id_unico"],
+                                    "plantio_finalizado": i["finalizado_plantio"],
+                                    "area_colheita": i["area_colheita"],
+                                    "data_plantio": i["data_plantio"],
+                                    "data_prevista_plantio": i["data_prevista_plantio"],
+                                    "dap": get_dap(i["data_plantio"]),
+                                    "programa_id": i["programa"],
+                                    "programa": i["programa__nome"],
+                                    "programa_start_date": i["programa__start_date"],
+                                    "programa_end_date": i["programa__end_date"],
+                                    "capacidade_plantio_dia": i[
+                                        "talhao__fazenda__fazenda__capacidade_plantio_ha_dia"
+                                    ],
+                                    "cronograma": [
+                                        {
+                                            "estagio": x["estagio"],
+                                            "dap": x["prazo_dap"],
+                                            "data prevista": get_prev_app_date(
+                                                i["data_plantio"], x["prazo_dap"]
+                                            ),
+                                            "produtos": [
+                                                {
+                                                    "produto": y["defensivo__produto"],
+                                                    "tipo": y["defensivo__tipo"],
+                                                    "dose": y["dose"],
+                                                    "id_farmbox": y["defensivo__id_farmbox"],
+                                                    "quantidade aplicar": get_quantidade_aplicar(
+                                                        y["dose"], i["area_colheita"]
+                                                    ),
+                                                }
+                                                for y in qs_aplicacoes
+                                                if x["programa_id"] == i["programa"]
+                                                and y["operacao"] == x["id"]
+                                            ],
+                                        }
+                                        for x in qs_programas
+                                        if x["programa_id"] == i["programa"]
+                                    ],
+                                }
+                            }
+                        )
+                        for i in qs_plantio
+                    }
+                except Exception as e:
+                    print("erro ao gerar", e)
+
+                prev_date = {}
+                # 50 ha por dia
+                # max_day = 50
+
+                # PROGRAMA PARA GERAR DATAS FUTURAS DE ACORDO COM A LÓGICA PARA
+                for k, v in final_result.items():
+                    prev_date.update(
+                        {
+                            k: {
+                                "area": 0,
+                                "dias_necessários": 0,
+                                "data_inicial": None,
+                                "data_final": None,
+                            }
+                        }
+                    )
+                    # print("inside loop : ", k)
+                    filtered_planner = qs_planejamento.filter(projeto__nome=k)
+                    planner_date = False
+                    if filtered_planner:
+                        # print("aqui temos planejamneto: , ", filtered_planner)
+                        current_planner = filtered_planner[0]
+                        inital_date_planner = current_planner["start_date"]
+                        planner_date = True
+
+                    for kk, vv in v.items():
+                        # print("VVV :", vv)
+                        # print("\n")
+                        projeto_id = vv["projeto_id"]
+
+                        data_plantio = vv["data_plantio"]
+                        data_prevista_plantio = vv["data_prevista_plantio"]
+                        area_colheita = vv["area_colheita"]
+                        start_date = vv["programa_start_date"]
+                        end_date = vv["programa_end_date"]
+                        cronograma = vv["cronograma"]
+                        capacidade_dia = vv["capacidade_plantio_dia"]
+
+                        prev_date[k]["area"] += vv["area_colheita"]
+                        prev_date[k]["dias_necessários"] = round(
+                            prev_date[k]["area"] / capacidade_dia
+                        )
+                        if planner_date:
+                            prev_date[k]["data_inicial"] = get_base_date(
+                                inital_date_planner
+                            )
+                        else:
+                            prev_date[k]["data_inicial"] = get_base_date(start_date)
+                        prev_date[k]["data_final"] = prev_date[k][
+                            "data_inicial"
+                        ] + datetime.timedelta(days=prev_date[k]["dias_necessários"])
+                        # ------------HERE is the challenge-------------------#
+                        if data_plantio is None:
+                            final_result[k][kk].update(
+                                {
+                                    "data_plantio": data_prevista_plantio if data_prevista_plantio else  prev_date[k]["data_inicial"]
+                                    + datetime.timedelta(
+                                        days=prev_date[k]["dias_necessários"]
+                                    )
+                                }
+                            )
+                        prev_date[k]["dias_necessários"] = round(
+                            prev_date[k]["area"] / capacidade_dia
+                        )
+                        index = 0
+                        for vvv in final_result[k][kk]["cronograma"]:
+                            final_result[k][kk]["cronograma"][index].update(
+                                {
+                                    "data prevista": final_result[k][kk]["data_plantio"]
+                                    + datetime.timedelta(days=vvv["dap"] - 1),
+                                    "aplicado": False,
+                                }
+                            )
+                            index += 1
+
+                # RESUMO POR DIA COM TOTAIS DE APLICACOES
+                final_by_day = []
+
+                final = []
+
+                def find_exs(x):
+                    if x["data"]:
+                        return True
+                    else:
+                        return False
+                count_prod = 0
+                for k, v in final_result.items():
+                    for kk, vv in v.items():
+                        final.append({"fazenda": k, "parcela": kk, "dados": vv})
+                        cronograma = vv["cronograma"]
+                        for kkk in cronograma:
+                            data_prev_cronograma = kkk["data prevista"]
+                            produtos_cronograma = kkk["produtos"]
+                            exists = [
+                                [x["data"], ind]
+                                for ind, x in enumerate(final_by_day)
+                                if x["data"] == data_prev_cronograma
+                            ]
+                            if exists:
+                                indice_data_existente = exists[0][1]
+                                dict_to_update = final_by_day[exists[0][1]]["produtos"]
+
+                                for i in produtos_cronograma:
+                                    filtered = [
+                                        (index, x["produto"], x["quantidade"])
+                                        for index, x in enumerate(
+                                            final_by_day[exists[0][1]]["produtos"]
+                                        )
+                                        if x["produto"] == i["produto"]
+                                    ]
+
+                                    # add quantity to product that already exists
+                                    if filtered:
+                                        index_of = filtered[0][0]
+                                        value_of_upda = filtered[0][2]
+                                        final_by_day[exists[0][1]]["produtos"][
+                                            index_of
+                                        ].update(
+                                            {
+                                                "produto": i["produto"],
+                                                "tipo": i["tipo"],
+                                                "id_farmbox": i["id_farmbox"],
+                                                "quantidade": i["quantidade aplicar"] + value_of_upda,
+                                            }
+                                        )
+                                    else:
+                                        dict_to_update.append(
+                                            {
+                                                "produto": i["produto"],
+                                                "tipo": i["tipo"],
+                                                "id_farmbox": i["id_farmbox"],
+                                                "quantidade": i["quantidade aplicar"],
+                                            }
+                                        )
+                            else:
+                                final_by_day.append(
+                                    {
+                                        "data": data_prev_cronograma,
+                                        "produtos": [
+                                            {
+                                                "produto": x["produto"],
+                                                "quantidade": x["quantidade aplicar"],
+                                                "tipo": x["tipo"],
+                                                "id_farmbox": x["id_farmbox"],
+                                            }
+                                            for x in produtos_cronograma
+                                        ],
+                                    }
+                                )
+                response = {
+                    "msg": f"Consulta realizada com sucesso!!",
+                    "prev_date": prev_date,
+                    "app_date": final_by_day,
+                    "total_query_plantio": qs_plantio.count(),
+                    "total_return_plantio": len(final_result),
+                    "dados": final,
+                    # "dados_plantio": qs_plantio,
+                    # "total_return_aplicacoes": len(qs_aplicacoes),
+                    # "dados_aplicacoes": qs_aplicacoes,
+                }
+                return Response(response, status=status.HTTP_200_OK)
+            except Exception as e:
+                response = {"message": f"Ocorreu um Erro: {e}"}
+                return Response(response, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            response = {"message": "Você precisa estar logado!!!"}
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+    # --------------------- ---------------------- PLANTIO APLICACOES API END --------------------- ----------------------#
 
     @action(detail=False, methods=["GET", "POST"])
     def get_plantio_operacoes_detail_json_program(self, request):
@@ -2944,9 +3294,13 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 print('cicle filter here: ', cicle_filter)
                 # cicle_filter = cicle_filter if cicle_filter else "2"
                 qs = (
-                    Plantio.objects.filter(
+                    Plantio.objects
+                    .select_related(
+                            "talhao__fazenda__fazenda",
+                        )
+                    .filter(
                         safra__safra=safra_filter,
-                        ciclo__ciclo=cicle_filter,
+                        # ciclo__ciclo=cicle_filter,
                         finalizado_plantio=True,
                         plantio_descontinuado=False,
                         programa__isnull=False,
@@ -2965,7 +3319,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 today = datetime.datetime.today()
                 check_date = today + datetime.timedelta(days=15)
 
-                print('check_date: ', check_date)
+                # print('check_date: ', check_date)
                 for i in qs:
                     cronograma = i['cronograma_programa']
                     area = i["area_colheita"]
@@ -2981,11 +3335,11 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 for prods in check_prods:
                                     if prods['tipo'] == 'biologico':
                                         estagio = program['estagio']
-                                        print('estagio: ', estagio)
-                                        print('data Prevista: ',program["data prevista"])
-                                        print('check_date: ', check_date)
-                                        print('\n')
-                                        print(prods)
+                                        # print('estagio: ', estagio)
+                                        # print('data Prevista: ',program["data prevista"])
+                                        # print('check_date: ', check_date)
+                                        # print('\n')
+                                        # print(prods)
                                         prods_formated = prods
                                         prods_formated["quantidade aplicar"] = float(area) * float(prods["dose"])
                                         prods_formated["parcela"] = parcela
@@ -2997,11 +3351,11 @@ class PlantioViewSet(viewsets.ModelViewSet):
                             for prods in check_prods_geral:
                                 if prods['tipo'] == 'biologico':
                                     estagio = program['estagio']
-                                    print('estagio: ', estagio)
-                                    print('data Prevista: ',program["data prevista"])
-                                    print('check_date: ', check_date)
-                                    print('\n')
-                                    print(prods)
+                                    # print('estagio: ', estagio)
+                                    # print('data Prevista: ',program["data prevista"])
+                                    # print('check_date: ', check_date)
+                                    # print('\n')
+                                    # print(prods)
                                     prods_formated_geral = prods
                                     prods_formated_geral["quantidade aplicar"] = float(area) * float(prods["dose"])
                                     prods_formated_geral["parcela"] = parcela
