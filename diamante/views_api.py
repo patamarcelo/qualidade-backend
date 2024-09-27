@@ -49,7 +49,8 @@ from .utils import (
     dictFarm,
     get_date,
     get_miliseconds,
-    Spinner
+    Spinner,
+    is_older_than_7_days,
 )
 
 from qualidade_project.mongo_api import generate_file_run
@@ -4614,6 +4615,9 @@ class ColheitaPlantioExtratoAreaViewSet(viewsets.ModelViewSet):
     authentication_classes = (CachedTokenAuthentication,)
     permission_classes = (IsAuthenticated,)
     
+    
+    
+    
     @action(detail=False, methods=["GET", "POST"])
     def update_colheita_area_from_farmbox(self, request, pk=None):
         if request.user.is_authenticated:
@@ -4627,31 +4631,33 @@ class ColheitaPlantioExtratoAreaViewSet(viewsets.ModelViewSet):
             filtered_query = Plantio.objects.filter(id_farmbox__in=list_of_ids)
             
             for i in req_data:
-                print(i)
-                try:
-                    plantio_id_to_save = i['plantioId']
-                    plantio_to_save = [x for x in filtered_query if x.id_farmbox == plantio_id_to_save][0]
-                    area_to_save = Decimal(i['Area Aplicada'].replace(',','.'))
-                    data_to_save = i['Data Aplicacao']
-                    hour_to_save = int(i['Hora Aplicacao'].split(':')[0])
-                    minute_to_save = int(i['Hora Aplicacao'].split(':')[1])
-                    
-                    total_aplicado_to_save = Decimal(i['Total Aplicado'].replace(',','.'))
-                    plantio_to_save.area_parcial = total_aplicado_to_save
-                    plantio_to_save.save()
-                    
-                    new_colheita = ColheitaPlantioExtratoArea(
-                        plantio=plantio_to_save,
-                        area_colhida=area_to_save,
-                        data_colheita=data_to_save,
-                        time=dateTime(hour_to_save, minute_to_save)
-                    )
-                    new_colheita.save()
-                    print(f'{Fore.GREEN}Colheita Salva com sucesso!!{Style.RESET_ALL}')
-                    print(new_colheita)
-                    print('\n')
-                except Exception as e:
-                    print(f'{Fore.LIGHTYELLOW_EX}Problema em Salvar o Plantio:{i} : \n{Fore.LIGHTRED_EX}Error: {e} {Style.RESET_ALL}')
+                check_this = is_older_than_7_days(i['editado'])
+                if check_this:
+                    print('check here: ', i)
+                    try:
+                        plantio_id_to_save = i['plantioId']
+                        plantio_to_save = [x for x in filtered_query if x.id_farmbox == plantio_id_to_save][0]
+                        area_to_save = Decimal(i['Area Aplicada'].replace(',','.'))
+                        data_to_save = i['Data Aplicacao']
+                        hour_to_save = int(i['Hora Aplicacao'].split(':')[0])
+                        minute_to_save = int(i['Hora Aplicacao'].split(':')[1])
+                        
+                        total_aplicado_to_save = Decimal(i['Total Aplicado'].replace(',','.'))
+                        plantio_to_save.area_parcial = total_aplicado_to_save
+                        plantio_to_save.save()
+                        
+                        new_colheita = ColheitaPlantioExtratoArea(
+                            plantio=plantio_to_save,
+                            area_colhida=area_to_save,
+                            data_colheita=data_to_save,
+                            time=dateTime(hour_to_save, minute_to_save)
+                        )
+                        new_colheita.save()
+                        print(f'{Fore.GREEN}Colheita Salva com sucesso!!{Style.RESET_ALL}')
+                        print(new_colheita)
+                        print('\n')
+                    except Exception as e:
+                        print(f'{Fore.LIGHTYELLOW_EX}Problema em Salvar o Plantio:{i} : \n{Fore.LIGHTRED_EX}Error: {e} {Style.RESET_ALL}')
             
             response = {
                 'msg': 'Colheita Atualizada com sucesso!!'

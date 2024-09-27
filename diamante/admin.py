@@ -2538,6 +2538,36 @@ class BuyProductsAdmin(admin.ModelAdmin):
             return " - "
     get_data_pgto.short_description = "Data Pgto"
     
+    def changelist_view(self, request, extra_context=None):
+        queryset = BuyProducts.objects.all()
+
+        # Aggregate by defensivo and then by fazenda
+        aggregated_data = {}
+
+        # Group by defensivo
+        defensivo_totals = queryset.values('defensivo__produto').annotate(
+            total_defensivo=Sum('quantidade_comprada')
+        )
+
+        for defensivo in defensivo_totals:
+            defensivo_name = defensivo['defensivo__produto']
+            total_defensivo = defensivo['total_defensivo']
+
+            # For each defensivo, get the subtotals by fazenda
+            fazenda_totals = queryset.filter(defensivo__produto=defensivo_name).values('fazenda__nome').annotate(
+                total_fazenda=Sum('quantidade_comprada')
+            )
+
+            aggregated_data[defensivo_name] = {
+                'total_defensivo': total_defensivo,
+                'fazendas': fazenda_totals
+            }
+
+        extra_context = extra_context or {}
+        extra_context['aggregated_data'] = aggregated_data
+
+        return super().changelist_view(request, extra_context=extra_context)
+    
     readonly_fields = ("criados","modificado")
     fieldsets = (
         (

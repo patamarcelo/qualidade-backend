@@ -1,0 +1,83 @@
+{% extends "admin/change_list.html" %}
+
+{% block content %}
+{{ block.super }}
+
+<style>
+    .search-bar{
+        display: flex;
+        justify-content: flex-end;
+        flex-direction: row;
+        width: 100%;
+    }
+
+</style>
+    <!-- Search Box -->
+    <div class="search-bar" >
+        <input type="text" id="search-box" placeholder="Procure por produto" style="margin-bottom: 20px; width: 200px; padding: 10px; margin-right: 300px; font-size: 16px; ">
+    </div>
+
+<div class="container-fluid w-75">
+
+    <!-- Custom table for Defensivo and Fazenda totals -->
+    <h2>Totais de Defensivos</h2>
+    <table class="table table-striped" id="totals-table">
+        <thead>
+            <tr>
+                <th style="max-width: 70px; word-wrap: break-word;">Defensivo</th>
+                <th style="max-width: 100px; word-wrap: break-word;">Fazenda</th>
+                <th>Quantidade Comprada (Kg)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for defensivo, data in aggregated_data.items %}
+            <!-- Row for Defensivo -->
+            <tr class="defensivo-row"  style="border-top: 1px solid black !important ;color: blue"">
+                <td class="defensivo-name" style="max-width: 70px; word-wrap: break-word;"><strong>{{ defensivo }}</strong></td>
+                <td></td>
+                <td><strong>{{ data.total_defensivo|floatformat:0 }}</strong></td>
+            </tr>
+            <!-- Rows for Fazendas under each Defensivo -->
+            {% for fazenda in data.fazendas %}
+            <tr class="fazenda-row">
+                <td></td>
+                <td style="max-width: 100px; word-wrap: break-word;">{{ fazenda.fazenda__nome }}</td>
+                <td>{{ fazenda.total_fazenda|floatformat:0 }}</td>
+            </tr>
+            {% endfor %}
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<script>
+    // Step 2: JavaScript to filter table based on Defensivo input
+    document.getElementById('search-box').addEventListener('keyup', function() {
+        const searchValue = this.value.toLowerCase();
+        const defensivoRows = document.querySelectorAll('.defensivo-row');
+        
+        defensivoRows.forEach(function(row) {
+            const defensivoText = row.querySelector('.defensivo-name').textContent.toLowerCase();
+            
+            // Check if the Defensivo matches the search value
+            if (defensivoText.includes(searchValue)) {
+                // Show the Defensivo row and all its related Fazenda rows
+                row.style.display = '';
+                let nextRow = row.nextElementSibling;
+                while (nextRow && nextRow.classList.contains('fazenda-row')) {
+                    nextRow.style.display = '';
+                    nextRow = nextRow.nextElementSibling;
+                }
+            } else {
+                // Hide the Defensivo row and all its related Fazenda rows
+                row.style.display = 'none';
+                let nextRow = row.nextElementSibling;
+                while (nextRow && nextRow.classList.contains('fazenda-row')) {
+                    nextRow.style.display = 'none';
+                    nextRow = nextRow.nextElementSibling;
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}
