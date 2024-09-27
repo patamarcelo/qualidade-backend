@@ -344,14 +344,14 @@ class PlantioDetailPlantioAdmin(admin.ModelAdmin):
             return response
 
         metrics = {
-            "area_total": Sum("area_colheita"),
+            "area_total": Sum("area_planejamento_plantio"),
             "area_plantada": Case(
                 When(finalizado_plantio=True, then=Coalesce(Sum("area_colheita"), 0)),
                 default=Value(0),
                 output_field=DecimalField(),
             ),
             "area_projetada": Case(
-                When(finalizado_plantio=False, then=Coalesce(Sum("area_colheita"), 0)),
+                When(finalizado_plantio=False, then=Coalesce(Sum("area_planejamento_plantio"), 0)),
                 default=Value(0),
                 output_field=DecimalField(),
                 # ),
@@ -2319,7 +2319,7 @@ class StProtheusIntegrationAdmin(admin.ModelAdmin):
     
 @admin.register(PlantioExtratoArea)
 class PlantioExtratoAreaAdmin(admin.ModelAdmin):
-    list_display = ("talhao_description", "safra_description", "cultura_description", "variedade_description", "get_data", "area_plantada")
+    list_display = ("talhao_description" , "get_data", "safra_description", "cultura_description", "variedade_description", "area_plantada")
     autocomplete_fields = ["plantio"]
     raw_id_fields = ["plantio"]
     readonly_fields = ("criados","modificado")
@@ -2332,6 +2332,20 @@ class PlantioExtratoAreaAdmin(admin.ModelAdmin):
         "plantio__talhao__fazenda__fazenda__nome",
         "plantio__talhao__id_unico"
         ]
+    
+    def get_queryset(self, request):
+        return (
+            super(PlantioExtratoAreaAdmin, self)
+            .get_queryset(request)
+            .select_related(
+                "plantio__talhao",
+                "plantio__safra",
+                "plantio__ciclo",
+                "plantio__talhao__fazenda",
+                "plantio__variedade",
+                "plantio__variedade__cultura",
+            )
+        )
     
     fieldsets = (
         (
@@ -2541,9 +2555,10 @@ class BuyProductsAdmin(admin.ModelAdmin):
                 "fields": (
                     ("defensivo", "quantidade_comprada"),
                     ("fazenda"),
-                    ("projeto"),
+                    # ("projeto"),
                     ("sit_pago", 'data_pagamento'),
-                    ('fornecedor','nota_fiscal')
+                    ('fornecedor','nota_fiscal'),
+                    ('nr_pedido'),
                 )
             },
         ),

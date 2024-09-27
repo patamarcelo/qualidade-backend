@@ -144,6 +144,7 @@ $(function () {
         let scsLiquido = 0
         let areaColhida = 0
         let prodCompr = 0
+        let extratAreaPlant = 0
 
         $('.selected .field-peso_scs_limpo_e_seco').each((i, e) =>{
             const value = e.innerHTML.replace('.',"").replace(',',".")
@@ -173,12 +174,19 @@ $(function () {
             const valueProdCompr = e.innerHTML.replace('.',"").replace(',',".")
             prodCompr += parseFloat(valueProdCompr)
         })
+        
+        $('.selected .field-area_plantada').each((i, e) =>{
+            const valuePlantExtra = e.innerHTML.replace('.',"").replace(',',".")
+            extratAreaPlant += parseFloat(valuePlantExtra)
+        })
 
 
         const pesoLiquido = $('.field-peso_scs_limpo_e_seco')
         const pesoBruto = $('.field-get_peso_liquido')
         const scsLiq = $('.field-peso_scs_liquido')
         const areaCol = $('.field-area_colhida')
+        const prodComp = $('.field-quantidade_comprada')
+        const plantArea = $('.field-area_plantada')
         
         
         if( areaCol.length > 0){
@@ -201,18 +209,24 @@ $(function () {
             val += parseFloat(value)
         })
         const areaColheita = $('.field-area_colheita')
-
         if(areaColheita.length > 0){
             const total = "Total Selecionado "
             $('.select-result-total').html(total + val.toLocaleString('pt-br',{  minimumFractionDigits: 2,
                 maximumFractionDigits: 2}) + " Ha")
         }
         
-        const prodComp = $('.field-quantidade_comprada')
+        
         if(prodComp.length > 0){
             const total = "Total Selecionado "
             $('.select-result-total').html(total + prodCompr.toLocaleString('pt-br',{  minimumFractionDigits: 2,
                 maximumFractionDigits: 2}) + " Kg")
+        }
+        
+        
+        if(plantArea.length > 0){
+            const total = "Total Selecionado "
+            $('.select-result-total').html(total + extratAreaPlant.toLocaleString('pt-br',{  minimumFractionDigits: 2,
+                maximumFractionDigits: 2}) + " Ha")
         }
     })
     

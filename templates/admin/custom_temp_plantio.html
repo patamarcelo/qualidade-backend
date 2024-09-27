@@ -81,7 +81,21 @@
             </thead>
             <tbody v-if="filteredArray">
                 <tr v-for="(col,i) in filteredArray">
-                    <td><b>[[ i.split("|")[0] ]]</b></td>
+                    <td style="padding-bottom: 0.25rem !important; padding-top: 0.25rem!important">
+                        <div class="d-flex w-75 justify-content-between">
+                            <span> [[ i.split("|")[0] ]]</span>
+                        </div>
+                        <div class="progress" style="background-color: rgba(128,128,128,0.3); border-radius: 8px;">
+                            <div :class="getClass(((col?.areaPlantada/col?.areaTotal)*100).toFixed(0))"
+                                role="progressbar"
+                                :style="getwidth(((col?.areaPlantada/col?.areaTotal)*100).toFixed(2))"
+                                :aria-valuenow="((col?.areaPlantada/col?.areaTotal)*100).toFixed(0)"
+                                aria-valuemin="0" aria-valuemax="100">
+                                [[((col?.areaPlantada/col?.areaTotal)*100).toFixed(0) ]] %
+                            </div>
+                        </div>
+                    </td>
+                    <!-- <td><b>[[ i.split("|")[0] ]]</b></td> -->
                     <td style="text-align: center"><img style="width: 26px; height: 26px; cursor: pointer"
                             :src="customIcon(i.split('|')[1])" /> </td>
                     <td style="text-align: center">[[ col?.areaTotal?.toLocaleString("pt-br", {
@@ -100,7 +114,17 @@
                 </tr>
             </tbody>
             <tfoot style="background-color: rgb(12,94,145); color: whitesmoke">
-                <th scope="row">Totais</th>
+                <td>
+                    <div class="progress" style="background-color: white; border-radius: 8px; margin-top: 4px">
+                        <div :class="getClass(((newTotals?.areaPlantada/newTotals?.areaTotal)*100).toFixed(0))"
+                            role="progressbar"
+                            :style="getwidth(((newTotals?.areaPlantada/newTotals?.areaTotal)*100).toFixed(0))"
+                            :aria-valuenow="((newTotals?.areaPlantada/newTotals?.areaTotal)*100).toFixed(0)"
+                            aria-valuemin="0" aria-valuemax="100">
+                            [[((newTotals?.areaPlantada/newTotals?.areaTotal)*100).toFixed(2) ]] %
+                        </div>
+                    </div>
+                </td>
                 <td style="text-align: center"></td>
                 <td style="text-align: center; font-weight: bold">[[newTotals?.areaTotal?.toLocaleString("pt-br", {
                     minimumFractionDigits: 2,

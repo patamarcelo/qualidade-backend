@@ -2101,7 +2101,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     )
                     .filter(operacao__programa__ciclo__ciclo__in=cicle_fitler)
                 )
-
+                # TODO
                 print('tamanho do qs plantio: ', len(qs_plantio))
                 final_result = {i["talhao__fazenda__nome"]: {} for i in qs_plantio}
                 try:

@@ -1319,6 +1319,7 @@ class BuyProducts(Base):
     nota_fiscal         = models.CharField("Número da Nota Fiscal", max_length=255, blank=True, null=True)
     nf_file             = models.FileField("NF", upload_to=get_nf_path, blank=True, null=True)
     fornecedor          = models.CharField("Fornecedor", max_length=255, blank=True, null=True)
+    nr_pedido           = models.CharField("Número do pedido", max_length=255, blank=True, null=True)
     
     
     class Meta:
