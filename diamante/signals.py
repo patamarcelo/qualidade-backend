@@ -6,8 +6,8 @@ from .models import Plantio, Aplicacao,PlannerPlantio
 from django.core.cache import cache
     
     
-@receiver(post_save, sender=Plantio)
-@receiver(post_delete, sender=Plantio)
+@receiver(post_save, sender=Plantio, weak=False)
+@receiver(post_delete, sender=Plantio, weak=False)
 def invalidate_cache_on_update(sender, instance, **kwargs):
     print('invalidando cache')
     cicle_filter = instance.ciclo.ciclo
@@ -22,8 +22,8 @@ def invalidate_cache_on_update(sender, instance, **kwargs):
     cache.delete(cache_key_qs_plantio_map)  # Invalidate cache whenever Plantio model changes
 
 
-@receiver(post_save, sender=PlannerPlantio)
-@receiver(post_delete, sender=PlannerPlantio)
+@receiver(post_save, sender=PlannerPlantio, weak=False)
+@receiver(post_delete, sender=PlannerPlantio, weak=False)
 def invalidate_cache_on_update(sender, instance, **kwargs):
     print('invalidando cache PlannerPlantio')
     cicle_filter = instance.ciclo.ciclo
@@ -33,8 +33,8 @@ def invalidate_cache_on_update(sender, instance, **kwargs):
     cache.delete(cache_key_qs_planejamento)  # Invalidate cache whenever Plantio model changes
 
 
-@receiver(post_save, sender=Aplicacao)
-@receiver(post_delete, sender=Aplicacao)
+@receiver(post_save, sender=Aplicacao, weak=False)
+@receiver(post_delete, sender=Aplicacao, weak=False)
 def invalidate_cache_on_update(sender, instance, **kwargs):
     print('invalidando cache Aplicacao')
     cicle_filter = instance.operacao.programa.ciclo.ciclo
