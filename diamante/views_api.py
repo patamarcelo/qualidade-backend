@@ -165,43 +165,6 @@ c_dict = {"1": 3, "2": 4, "3": 5}
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 
-@receiver(post_save, sender=Plantio)
-@receiver(post_delete, sender=Plantio)
-def invalidate_cache_on_update(sender, instance, **kwargs):
-    print('invalidando cache')
-    cicle_filter = instance.ciclo.ciclo
-    safra_filter = instance.safra.safra
-    cache_key = f"get_plantio_operacoes_detail_json_program_qs_plantio_{instance.safra.safra}_{instance.ciclo.ciclo}"
-    cache_key_qs_plantio_get_plantio_operacoes_detail = f"get_plantio_operacoes_detail_qs_plantio_{safra_filter}_{cicle_filter}"
-    cache_key_qs_plantio_map = f"get_plantio_map_{safra_filter}_{cicle_filter}"
-    cache_key_web = f"get_plantio_operacoes_detail_json_program_qs_plantio_web_{safra_filter}_{cicle_filter}"
-    cache.delete(cache_key)  # Invalidate cache whenever Plantio model changes
-    cache.delete(cache_key_web)  # Invalidate cache whenever Plantio model changes
-    cache.delete(cache_key_qs_plantio_get_plantio_operacoes_detail)  # Invalidate cache whenever Plantio model changes
-    cache.delete(cache_key_qs_plantio_map)  # Invalidate cache whenever Plantio model changes
-
-
-@receiver(post_save, sender=PlannerPlantio)
-@receiver(post_delete, sender=PlannerPlantio)
-def invalidate_cache_on_update(sender, instance, **kwargs):
-    print('invalidando cache PlannerPlantio')
-    cicle_filter = instance.ciclo.ciclo
-    safra_filter = instance.safra.safra
-    cache_key_qs_planejamento = f"get_plantio_operacoes_detail_qs_planejamento_{safra_filter}_{cicle_filter}"
-    print('cache_key:', cache_key_qs_planejamento)
-    cache.delete(cache_key_qs_planejamento)  # Invalidate cache whenever Plantio model changes
-
-
-@receiver(post_save, sender=Aplicacao)
-@receiver(post_delete, sender=Aplicacao)
-def invalidate_cache_on_update(sender, instance, **kwargs):
-    print('invalidando cache Aplicacao')
-    cicle_filter = instance.operacao.programa.ciclo.ciclo
-    safra_filter = instance.operacao.programa.safra.safra
-    cache_key_qs_aplicacoes = f"get_plantio_operacoes_detail_qs_aplicacoes_{safra_filter}_{cicle_filter}"
-    print('cache_key:', cache_key_qs_aplicacoes)
-    cache.delete(cache_key_qs_aplicacoes)  # Invalidate cache whenever Plantio model changes
-
 
 class CachedTokenAuthentication(TokenAuthentication):
     def authenticate(self, request):
@@ -2167,6 +2130,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 prev_date = {}
                 # 50 ha por dia
                 # max_day = 50
+                
+                print('final result :', final_result)
 
                 # PROGRAMA PARA GERAR DATAS FUTURAS DE ACORDO COM A LÓGICA PARA
                 for k, v in final_result.items():
@@ -2180,7 +2145,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                             }
                         }
                     )
-                    # print("inside loop : ", k)
+                    print("inside loop : ", k)
                     filtered_planner = qs_planejamento.filter(projeto__nome=k)
                     planner_date = False
                     if filtered_planner:

@@ -7,6 +7,7 @@ class DiamanteConfig(AppConfig):
 
     def ready(self):
         from diamante.scheduler import start
+        import diamante.signals
         start()
 
 # your_app/apps.py
