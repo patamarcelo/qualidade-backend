@@ -137,6 +137,9 @@ from requests.auth import HTTPBasicAuth
 from datetime import time as dateTime
 from django.core.cache import cache
 
+from django.db import transaction
+
+
 
 main_path_upload_ids = (
     "http://localhost:5050"
@@ -2131,7 +2134,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 # 50 ha por dia
                 # max_day = 50
                 
-                print('final result :', final_result)
+                # print('final result :', final_result)
 
                 # PROGRAMA PARA GERAR DATAS FUTURAS DE ACORDO COM A LÓGICA PARA
                 for k, v in final_result.items():
@@ -2145,7 +2148,6 @@ class PlantioViewSet(viewsets.ModelViewSet):
                             }
                         }
                     )
-                    print("inside loop : ", k)
                     filtered_planner = qs_planejamento.filter(projeto__nome=k)
                     planner_date = False
                     if filtered_planner:
@@ -2755,9 +2757,13 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         list_updated.append(updated)
                     except Exception as e:
                         print("Erro ao atualizar a Ap no DB", e)
-                Plantio.objects.bulk_update(updated_instances, ['cronograma_programa'])
-                for instance in updated_instances[0:1]:
-                    post_save.send(sender=Plantio, instance=instance, created=False)
+                # Ensure atomicity using transaction.atomic
+                with transaction.atomic():        
+                    Plantio.objects.bulk_update(updated_instances, ['cronograma_programa'])
+                
+                    for instance in updated_instances[0:1]:
+                        post_save.send(sender=Plantio, instance=instance, created=False)
+                        print('signals sent!!')
 
                 response = {
                     "msg": "Atualização realizada com sucesso!",
