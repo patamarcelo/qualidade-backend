@@ -83,6 +83,8 @@ from django.core.files.storage import FileSystemStorage
 
 from django.contrib.admin import DateFieldListFilter
 
+from .forms import PlantioExtratoAreaForm
+
 
 main_path = (
     "http://127.0.0.1:8000"
@@ -2319,6 +2321,8 @@ class StProtheusIntegrationAdmin(admin.ModelAdmin):
     
 @admin.register(PlantioExtratoArea)
 class PlantioExtratoAreaAdmin(admin.ModelAdmin):
+    form = PlantioExtratoAreaForm
+    
     list_display = ("talhao_description" , "get_data", "safra_description", "cultura_description", "variedade_description", "area_plantada")
     autocomplete_fields = ["plantio"]
     raw_id_fields = ["plantio"]
@@ -2362,7 +2366,8 @@ class PlantioExtratoAreaAdmin(admin.ModelAdmin):
             {
                 'fields': (
                     ("plantio",),
-                    ("data_plantio", 'area_plantada'),
+                    ("data_plantio"),
+                    ("area_plantada"),
                     ("aguardando_chuva",)
                 )
             }
@@ -2423,6 +2428,11 @@ class PlantioExtratoAreaAdmin(admin.ModelAdmin):
         return variedade
 
     variedade_description.short_description = "Variedade"
+    
+    class Media:
+        css = {
+            'all': ('admin/css/custom.css',)  # Path to your custom CSS
+        }
     
 
 @admin.register(ColheitaPlantioExtratoArea)

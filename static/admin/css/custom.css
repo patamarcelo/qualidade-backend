@@ -1,0 +1,50 @@
+/* Ensure form controls take up full width on mobile */
+.form-control {
+    width: 100%;
+    /* color: red; */
+}
+
+.form-check-input {
+    margin-left: 0;
+}
+
+/* You can also add additional mobile-specific styles */
+@media (max-width: 768px) {
+    .form-group {
+        margin-bottom: 15px;
+    }
+}
+
+.submit-row input {
+    display: block !important;  /* Ensure buttons are visible */
+    width: 100%;                /* Make buttons take full width */
+    margin-bottom: 10px;        /* Add spacing between buttons */
+}
+
+@media (min-width: 768px) {
+    .submit-row input {
+        width: auto;            /* For medium screens, restore default width */
+    }
+}
+
+.select2-container--admin-autocomplete {
+    width: 100% !important;
+}
+
+.form-check .form-check-input {
+    margin-top: 0.3rem;  /* Adjust to vertically align checkbox */
+}
+
+.form-check .help-text {
+    margin-top: 0.5rem;  /* Ensure there is space between checkbox and help text */
+}
+
+.col-sm-4.p-1:has(.form-check-input.check-custom) {
+    padding: 10px;
+    display: flex;
+    flex-direction: row; 
+}
+
+.check-custom + .help {
+    margin-top: 20px;
+  }

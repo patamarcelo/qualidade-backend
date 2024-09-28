@@ -1,17 +1,45 @@
 {% load i18n admin_urls %}
-<div class="submit-row d-flex flex-row-reverse">
-{% block submit-row %}
-{% if show_save %}<input type="submit" value="{% translate 'Save' %}" class="default" name="_save">{% endif %}
-{% if show_save_as_new %}<input type="submit" value="{% translate 'Save as new' %}" name="_saveasnew">{% endif %}
-{% if show_save_and_add_another %}<input type="submit" value="{% translate 'Save and add another' %}" name="_addanother">{% endif %}
-{% if show_save_and_continue %}<input type="submit" value="{% if can_change %}{% translate 'Save and continue editing' %}{% else %}{% translate 'Save and view' %}{% endif %}" name="_continue">{% endif %}
-{% if show_close %}
-    {% url opts|admin_urlname:'changelist' as changelist_url %}
-    <a href="{% add_preserved_filters changelist_url %}" class="closelink">{% translate 'Close' %}</a>
-{% endif %}
-{% if show_delete_link and original %}
-    {% url opts|admin_urlname:'delete' original.pk|admin_urlquote as delete_url %}
-    <a href="{% add_preserved_filters delete_url %}" class="deletelink mr-auto">{% translate "Delete" %}</a>
-{% endif %}
-{% endblock %}
+<div class="submit-row d-flex flex-row-reverse flex-wrap">
+    <!-- <div class="submit-row d-flex flex-wrap justify-content-end"></div> -->
+    {% block submit-row %}
+    
+    <div class="col-12 col-md-3 mb-2 d-flex justify-content-end">
+        {% if show_save %}
+        <input type="submit" value="{% translate 'Save' %}" class="default btn btn-primary btn-block" name="_save">
+        {% endif %}
+    </div>
+
+    <div class="col-12 col-md-3 mb-2 d-flex justify-content-end">
+        {% if show_save_as_new %}
+        <input type="submit" value="{% translate 'Save as new' %}" class="btn btn-secondary btn-block" name="_saveasnew">
+        {% endif %}
+    </div>
+
+    <div class="col-12 col-md-3 mb-2 d-flex justify-content-end">
+        {% if show_save_and_add_another %}
+        <input type="submit" value="{% translate 'Save and add another' %}" class="btn btn-success btn-block" name="_addanother">
+        {% endif %}
+    </div>
+
+    <div class="col-12 col-md-3 mb-2 d-flex justify-content-end">
+        {% if show_save_and_continue %}
+        <input type="submit" value="{% if can_change %}{% translate 'Save and continue editing' %}{% else %}{% translate 'Save and view' %}{% endif %}" class="btn btn-info btn-block" name="_continue">
+        {% endif %}
+    </div>
+
+    <div class="col-12 col-md-12 d-flex justify-content-start">
+        {% if show_close %}
+        {% url opts|admin_urlname:'changelist' as changelist_url %}
+        <a href="{% add_preserved_filters changelist_url %}" class="closelink">{% translate 'Close' %}</a>
+        {% endif %}
+    </div>
+
+    <div class="col-12 col-md-12 d-flex justify-content-start">
+        {% if show_delete_link and original %}
+        {% url opts|admin_urlname:'delete' original.pk|admin_urlquote as delete_url %}
+        <a href="{% add_preserved_filters delete_url %}" class="deletelink btn btn-danger mr-auto">{% translate "Delete" %}</a>
+        {% endif %}
+    </div>
+
+    {% endblock %}
 </div>
