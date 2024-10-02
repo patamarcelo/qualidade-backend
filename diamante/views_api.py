@@ -141,7 +141,6 @@ from django.core.cache import cache
 from django.db import transaction
 
 
-
 main_path_upload_ids = (
     "http://localhost:5050"
     if DEBUG == True
@@ -1950,8 +1949,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
     # --------------------- ---------------------- PLANTIO APLICACOES API END --------------------- ----------------------#
-    
-    
+
     # --------------------- ---------------------- PLANTIO BIO APLICACOES API START --------------------- ----------------------#
 
     @action(detail=False, methods=["GET", "POST"])
@@ -1965,7 +1963,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 safra_filter = "2023/2024" if safra_filter == None else safra_filter
                 cicle_filter = "1" if cicle_filter == None else cicle_filter
                 cicle_fitler = [cicle_filter]
-                
+
                 # cicle_fitler = ["1", "2", "3"]
                 qs_planejamento = (
                     PlannerPlantio.objects.select_related(
@@ -1990,7 +1988,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     .filter(safra__safra=safra_filter)
                     .filter(ciclo__ciclo__in=cicle_fitler)
                 )
-                
+
                 qs_plantio = (
                     Plantio.objects.select_related(
                         "safra",
@@ -2036,7 +2034,6 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 qs_programas = Operacao.objects.values(
                     "estagio", "programa_id", "prazo_dap", "id"
                 ).filter(ativo=True)
-
 
                 qs_aplicacoes = (
                     Aplicacao.objects.select_related(
@@ -2134,7 +2131,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 prev_date = {}
                 # 50 ha por dia
                 # max_day = 50
-                
+
                 # print('final result :', final_result)
 
                 # PROGRAMA PARA GERAR DATAS FUTURAS DE ACORDO COM A LÓGICA PARA
@@ -2761,7 +2758,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 # Ensure atomicity using transaction.atomic
                 with transaction.atomic():        
                     Plantio.objects.bulk_update(updated_instances, ['cronograma_programa'])
-                
+
                     for instance in updated_instances[0:1]:
                         post_save.send(sender=Plantio, instance=instance, created=False)
                         print('signals sent!!')
@@ -3582,7 +3579,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 # for payload in dict_app[2:]:
                 #     print(payload)
                 #     print('\n')
-                
+
                 # LOGICA PARA ABRIR AS APS DENTRO DO FARM
                 # for payload in dict_app:
                 #     url = "https://farmbox.cc/api/v1/applications"
@@ -3643,7 +3640,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 .filter(variedade__variedade__isnull=False)
             )
             only_proj = list(set([x["talhao__fazenda__nome"] for x in qs_planned]))
-            
+
             qs_executed = (
                 PlantioExtratoArea.objects.select_related(
                     "plantio__safra",
@@ -3665,7 +3662,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 )
                 .filter(plantio__safra__safra="2024/2025", plantio__ciclo__ciclo="3")
             )
-            
+
             data = {
                 "qs_planned_size": len(qs_planned),
                 'qs_planned_area_total': qs_planned.aggregate(Sum('area_planejamento_plantio')),
@@ -3685,6 +3682,46 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 "error": f"Error ao pegar os dados do plantio , Erro: {e}",  # General error message
             }
             return Response(response, status=status.HTTP_208_ALREADY_REPORTED)
+
+    @action(detail=False, methods=["GET"])
+    def get_map_plot_app_fetch_app(self, request, *args, **kwargs):
+        try:
+            query_data = (
+                Plantio.objects.select_related(
+                    "safra",
+                    "ciclo",
+                    "talhao",
+                    "fazenda",
+                    "programa",
+                    "variedade",
+                    "variedade__cultura",
+                    "talhao__fazenda__fazenda",
+                )
+                .values(
+                    "talhao__id_talhao",
+                    "talhao__fazenda__nome",
+                    "talhao__fazenda__id_farmbox",
+                    "talhao__fazenda__map_centro_id",
+                    "area_colheita",
+                    "map_centro_id",
+                    "id_farmbox",
+                    "map_geo_points",
+                    "map_centro_id",
+                )
+                .filter(safra__safra="2024/2025", ciclo__ciclo="3")
+            )
+            response = {
+                "msg": f"Aplicação Aberta com sucesso!!!!",
+                "dados": query_data,
+            }
+            return Response(response, status=status.HTTP_200_OK)
+        except Exception as e:
+            print("erro ao pegar os dados do plantio", e)
+            response = {
+                "msg": f"Erro gerar os dados do plantio",
+                "error": f"Error ao pegar os dados do plantio , Erro: {e}",  # General error message
+            }
+        return Response(response, status=status.HTTP_208_ALREADY_REPORTED)
 
     @action(detail=False, methods=['GET'])
     def check_how_fast(self, request, *args, **kwargs):

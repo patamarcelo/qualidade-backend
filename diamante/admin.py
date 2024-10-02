@@ -879,6 +879,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
                 "safra",
                 "ciclo",
                 "talhao__fazenda",
+                "talhao__fazenda__fazenda",
                 "variedade",
                 "variedade__cultura",
                 "programa",
@@ -954,6 +955,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         "finalizado_plantio",
         "finalizado_colheita",
         "plantio_descontinuado",
+        "talhao__fazenda__fazenda",
         "programa__nome",
         # "talhao__fazenda__nome",
         "variedade",
@@ -967,6 +969,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         "variedade_description",
         "safra_description",
         "programa",
+        "get_data_prev_plantio",
         "get_description_finalizado_plantio",
         "get_data",
         "get_data_prev_col",
@@ -1294,6 +1297,16 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
             return " - "
 
     get_data_prev_col.short_description = "Data Prev. Col."
+    
+    def get_data_prev_plantio(self, obj):
+        if obj.data_prevista_plantio and obj.variedade:
+            return date_format(
+                obj.data_prevista_plantio, format="SHORT_DATE_FORMAT", use_l10n=True
+            )
+        else:
+            return " - "
+
+    get_data_prev_plantio.short_description = "Data Prev. Plantio"
 
     def variedade_description(self, obj):
         if obj.variedade:
@@ -2322,6 +2335,7 @@ class StProtheusIntegrationAdmin(admin.ModelAdmin):
 @admin.register(PlantioExtratoArea)
 class PlantioExtratoAreaAdmin(admin.ModelAdmin):
     form = PlantioExtratoAreaForm
+    
     
     list_display = ("talhao_description" , "get_data", "safra_description", "cultura_description", "variedade_description", "area_plantada")
     autocomplete_fields = ["plantio"]
