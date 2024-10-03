@@ -1183,7 +1183,7 @@ class PlannerPlantio(Base):
 
 class Visitas(Base):
     fazenda = models.ForeignKey(Fazenda, on_delete=models.PROTECT)
-    projeto = models.ManyToManyField(Projeto, blank=True, null=True)
+    projeto = models.ManyToManyField(Projeto)
     data = models.DateField(
         "Data Visita", help_text="dd/mm/aaaa - Data efetiva da Visita"
     )
@@ -1313,7 +1313,7 @@ class BuyProducts(Base):
     defensivo           = models.ForeignKey(Defensivo, on_delete=models.PROTECT)
     quantidade_comprada = models.DecimalField('Quantidade Comprada em Kg', max_digits=12 , decimal_places=2)
     fazenda             = models.ForeignKey(Fazenda, on_delete=models.PROTECT)
-    projeto             = models.ManyToManyField(Projeto, blank=True, null=True)
+    projeto             = models.ManyToManyField(Projeto)
     sit_pago            = models.BooleanField("Satus Pagamento" , default=False)
     data_pagamento      = models.DateField('Data Pagamento', blank=True, null=True)
     nota_fiscal         = models.CharField("Número da Nota Fiscal", max_length=255, blank=True, null=True)
@@ -1329,4 +1329,59 @@ class BuyProducts(Base):
     
     def __str__(self) -> str:
         return f'{self.defensivo.produto} - {self.fazenda.nome}'
-        
+
+class SentSeeds(Base):
+    data_envio      = models.DateField(help_text="dd/mm/aaaa - Data Envio da Semente", blank=True, null=True)
+    variedade       = models.ForeignKey(Variedade, on_delete=models.PROTECT, blank=True, null=True)
+    quantidade_bags = models.IntegerField("Quantidade de Bags Enviados", blank=True, null=True)
+    peso_bag        = models.DecimalField('Peso dos Bags Enviados em Kg', max_digits=12 , decimal_places=2,default=700)
+    peso_total      = models.DecimalField('Peso total da carga enviada em Kg', max_digits=12 , decimal_places=2, blank=True, null=True)
+    nota_fiscal     = models.CharField("Número da Nota Fiscal", max_length=255, blank=True, null=True, unique=True)
+    origem          = models.ForeignKey(Fazenda, on_delete=models.PROTECT, blank=True, null=True,  related_name="related_origem_semente", default=17)
+    destino         = models.ForeignKey(Fazenda, on_delete=models.PROTECT, blank=True, null=True, related_name="related_destino_semente")
+    safra           = models.ForeignKey(Safra, on_delete=models.PROTECT, blank=True, null=True, default=3)
+    ciclo           = models.ForeignKey(Ciclo, on_delete=models.PROTECT, blank=True, null=True, default=5)
+    
+    
+    
+    def save(self, *args, **kwargs):
+        if self.quantidade_bags is not None and self.peso_bag is not None:
+            self.peso_total = self.peso_bag * self.quantidade_bags
+        super(SentSeeds, self).save(*args, **kwargs)
+    
+    
+    class Meta:
+        verbose_name = "Envio de Semente"
+        verbose_name_plural = "Envio de Sementes"
+        ordering = ["-data_envio"]
+    
+    def __str__(self) -> str:
+        return f'{self.data_envio} - {self.destino.nome} - {self.peso_total}'
+    
+class SeedStock(Base):
+    data_apontamento = models.DateField(help_text="dd/mm/aaaa - Data Apontamento do Estoque", blank=True, null=True)
+    estoque_atual    = models.DecimalField('Estoque Atual na Data em Kg', max_digits=12 , decimal_places=2)
+    variedade        = models.ForeignKey(Variedade, on_delete=models.PROTECT, blank=True, null=True)
+    fazenda          = models.ForeignKey(Fazenda, on_delete=models.PROTECT, blank=True, null=True,  related_name="related_origem_semente_estoque")
+    
+    
+    class Meta:
+        verbose_name = "Estoque de Semente"
+        verbose_name_plural = "Estoque de Sementes"
+        ordering = ["-data_apontamento"]
+    
+    def __str__(self) -> str:
+        return f'{self.data_apontamento} - {self.fazenda.nome} - {self.estoque_atual}'
+class SeedConfig(Base):
+    data_apontamento = models.DateField(help_text="dd/mm/aaaa - Data última Regulagem", blank=True, null=True)
+    regulagem        = models.DecimalField('Regulagem das Plantadeiras em Kg/ha', max_digits=12 , decimal_places=2)
+    fazenda          = models.ForeignKey(Fazenda, on_delete=models.PROTECT, blank=True, null=True,  related_name="related_origem_semente_regulagem")
+    
+    
+    class Meta:
+        verbose_name = "Regulagem da Plantadeira"
+        verbose_name_plural = "Regulagem das Plantadeiras"
+        ordering = ["-data_apontamento"]
+    
+    def __str__(self) -> str:
+        return f'{self.data_apontamento} - {self.fazenda.nome} - {self.regulagem}'

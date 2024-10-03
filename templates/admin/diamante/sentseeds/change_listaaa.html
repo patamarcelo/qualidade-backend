@@ -1,0 +1,35 @@
+{% extends "admin/change_list.html" %}
+
+{% block extra_js %}
+
+<script>
+    console.log('carregou o script')
+    $(document).on('change', '#result_list', () => {
+        
+        let extratAreaPlant = 0
+        console.log('peso alterado')
+
+     
+        
+        $('.selected .field-peso_total').each((i, e) =>{
+            const valuePlantExtra = e.innerHTML.replace('.',"").replace(',',".")
+            extratAreaPlant += parseFloat(valuePlantExtra)
+        })
+
+
+        const plantArea = $('.field-peso_total')
+        
+  
+        
+        if(plantArea.length > 0){
+            const total = "Total Selecionado "
+            $('.select-result-total').html(total + extratAreaPlant.toLocaleString('pt-br',{  minimumFractionDigits: 2,
+                maximumFractionDigits: 2}) + " Ha")
+        }
+    })
+    
+
+</script>
+
+
+{% endblock %}

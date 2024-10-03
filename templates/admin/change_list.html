@@ -228,7 +228,37 @@ $(function () {
             $('.select-result-total').html(total + extratAreaPlant.toLocaleString('pt-br',{  minimumFractionDigits: 2,
                 maximumFractionDigits: 2}) + " Ha")
         }
+
+
+
+        //ENVIO DE SEMENTES LOGIC
+
+        let pesoTotalSemente = 0
+        console.log('peso alterado here')
+    
+     
+        
+        $('.selected .field-peso_total').each((i, e) =>{
+            const valuePlantExtra = e.innerHTML.replace('.',"").replace(',',".")
+            pesoTotalSemente += parseFloat(valuePlantExtra)
+        })
+    
+    
+        const pesoTotalSeed = $('.field-peso_total')
+        
+    
+        
+        if(pesoTotalSeed.length > 0){
+            const total = "Total Selecionado "
+            $('.select-result-total').html(total + pesoTotalSemente.toLocaleString('pt-br',{  minimumFractionDigits: 2,
+                maximumFractionDigits: 2}) + " Ha")
+        }
     })
+
+
+
+
+
     
 
 </script>

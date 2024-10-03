@@ -1458,7 +1458,8 @@ class ColheitaAdmin(admin.ModelAdmin):
 
     def get_urls(self):
         urls = super().get_urls()
-        my_urls = [path(r"^upload_csv/$", self.upload_csv, name="upload_csv")]
+        # my_urls = [path(r"^upload_csv/$", self.upload_csv, name="upload_csv")]
+        my_urls = [path("upload_csv/", self.upload_csv, name="upload_csv")]
 
         return my_urls + urls
 
@@ -2628,4 +2629,108 @@ class BuyProductsAdmin(admin.ModelAdmin):
     )
 
     
+@admin.register(SentSeeds)
+class SentSeedsAdmin(admin.ModelAdmin):
+    readonly_fields = ("peso_total","criados", "modificado")
+    autocomplete_fields = ["variedade",'origem', 'destino']
+    raw_id_fields = ["variedade"]
+    list_display = [
+        "get_data_envio", "origem", 'get_destino_name',"safra_description", 'cultura_description' , 'variedade', 'peso_total', 'nota_fiscal'
+    ]
+    search_fields = [
+        "data_envio", "origem", 'destino', 'variedade', 'peso_total', 'nota_fiscal'
+    ]
+    list_filter = ['destino', 'variedade']
     
+    fieldsets = (
+        (
+            "Dados",
+            {
+                "fields": (
+                    ("ativo"),
+                    ("criados", "modificado"),
+                )
+            },
+        ),
+        (
+            "Envio Da semente",
+            {
+                "fields": (
+                    ("data_envio", "variedade"),
+                    ("quantidade_bags", 'peso_bag'),
+                    ("peso_total"),
+                    ("nota_fiscal"),
+                    ("origem", 'destino'),
+                    ('safra', 'ciclo')
+                    
+                )
+            },
+        ),
+        ("Observações", {"fields": (("observacao",))}),
+    )
+
+    
+    def get_destino_name(self, obj):
+        return obj.destino.nome.replace('Fazenda ', '')
+
+    get_destino_name.short_description = "Destino"
+    
+    def get_queryset(self, request):
+        return (
+            super(SentSeedsAdmin, self)
+            .get_queryset(request)
+            .select_related(
+                "safra",
+                "ciclo",
+                "origem",
+                "destino",
+                "variedade",
+                "variedade__cultura",
+            )
+        )
+    
+    def get_data_envio(self, obj):
+        if obj.data_envio:
+            return date_format(
+                obj.data_envio, format="SHORT_DATE_FORMAT", use_l10n=True
+            )
+        else:
+            return " - "
+    get_data_envio.short_description = "Data Pgto"
+    
+    def safra_description(self, obj):
+        return f"{obj.safra.safra} - {obj.ciclo.ciclo}"
+
+    safra_description.short_description = "Safra"
+    
+    def cultura_description(self, obj):
+        if obj.variedade is not None:
+            cultura = (
+                obj.variedade.cultura.cultura if obj.variedade.cultura.cultura else "-"
+            )
+            cultura_url = None
+            if cultura == "Soja":
+                cultura_url = "soy"
+            if cultura == "Feijão":
+                cultura_url = "beans2"
+            if cultura == "Arroz":
+                cultura_url = "rice"
+            image_url = None
+            if cultura_url is not None:
+                image_url = f"/static/images/icons/{cultura_url}.png"
+            if image_url is not None:
+                return format_html(
+                    f'<img style="width: 20px; height: 20px; text-align: center"  src="{image_url}">'
+                )
+        else:
+            cultura = "Não Planejado"
+        return cultura
+    cultura_description.short_description = "Cultura"
+
+    @admin.register(SeedStock)
+    class SeedStockAdmin(admin.ModelAdmin):
+        pass
+    
+    @admin.register(SeedConfig)
+    class SeedConfigAdmin(admin.ModelAdmin):
+        pass

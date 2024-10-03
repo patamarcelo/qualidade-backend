@@ -3686,6 +3686,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["GET"])
     def get_map_plot_app_fetch_app(self, request, *args, **kwargs):
         try:
+            print('Start to get Data to plot MAP on APP ')
             query_data = (
                 Plantio.objects.select_related(
                     "safra",
@@ -3714,6 +3715,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 "msg": f"Aplicação Aberta com sucesso!!!!",
                 "dados": query_data,
             }
+            print('Data to plot map successfully sent')
             return Response(response, status=status.HTTP_200_OK)
         except Exception as e:
             print("erro ao pegar os dados do plantio", e)
