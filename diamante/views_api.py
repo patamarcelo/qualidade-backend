@@ -2064,6 +2064,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         ativo=True,
                     )
                     .filter(operacao__programa__ciclo__ciclo__in=cicle_fitler)
+                    .filter(defensivo__tipo='biologico')
                 )
                 # TODO
                 print('tamanho do qs plantio: ', len(qs_plantio))
