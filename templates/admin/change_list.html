@@ -238,20 +238,20 @@ $(function () {
     
      
         
-        $('.selected .field-peso_total').each((i, e) =>{
+        $('.selected .field-get_peso_enviado').each((i, e) =>{
             const valuePlantExtra = e.innerHTML.replace('.',"").replace(',',".")
             pesoTotalSemente += parseFloat(valuePlantExtra)
         })
     
     
-        const pesoTotalSeed = $('.field-peso_total')
+        const pesoTotalSeed = $('.field-get_peso_enviado')
         
     
         
         if(pesoTotalSeed.length > 0){
             const total = "Total Selecionado "
-            $('.select-result-total').html(total + pesoTotalSemente.toLocaleString('pt-br',{  minimumFractionDigits: 2,
-                maximumFractionDigits: 2}) + " Ha")
+            $('.select-result-total').html(total + pesoTotalSemente.toLocaleString('pt-br',{  minimumFractionDigits: 0,
+                maximumFractionDigits: 0}) + " Kg")
         }
     })
 

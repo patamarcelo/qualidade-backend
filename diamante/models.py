@@ -1376,6 +1376,7 @@ class SeedConfig(Base):
     data_apontamento = models.DateField(help_text="dd/mm/aaaa - Data última Regulagem", blank=True, null=True)
     regulagem        = models.DecimalField('Regulagem das Plantadeiras em Kg/ha', max_digits=12 , decimal_places=2)
     fazenda          = models.ForeignKey(Fazenda, on_delete=models.PROTECT, blank=True, null=True,  related_name="related_origem_semente_regulagem")
+    variedade        = models.ForeignKey(Variedade, on_delete=models.PROTECT, blank=True, null=True)
     
     
     class Meta:

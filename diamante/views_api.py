@@ -79,8 +79,14 @@ from .models import (
     StProtheusIntegration,
     HeaderPlanejamentoAgricola,
     ColheitaPlantioExtratoArea,
-    PlantioExtratoArea
+    PlantioExtratoArea,
+    SentSeeds,
+    SeedStock,
+    SeedConfig
 )
+
+from django.db.models import OuterRef, Subquery
+
 
 from functools import reduce
 
@@ -167,6 +173,9 @@ c_dict = {"1": 3, "2": 4, "3": 5}
 
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
+
+from concurrent.futures import ThreadPoolExecutor
+from django.db.models import Sum, OuterRef, Subquery
 
 
 class CachedTokenAuthentication(TokenAuthentication):
@@ -2740,7 +2749,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
 
                         update_field.cronograma_programa[index]["aplicado"] = new_value
 
-                        # update_field.save()
+                        update_field.save()
                         updated_instances.append(update_field)
 
                         updated = {
@@ -2757,9 +2766,9 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     except Exception as e:
                         print("Erro ao atualizar a Ap no DB", e)
                 # Ensure atomicity using transaction.atomic
+                
                 with transaction.atomic():        
-                    Plantio.objects.bulk_update(updated_instances, ['cronograma_programa'])
-
+                    # Plantio.objects.bulk_update(updated_instances, ['cronograma_programa'])
                     for instance in updated_instances[0:1]:
                         post_save.send(sender=Plantio, instance=instance, created=False)
                         print('signals sent!!')
@@ -3725,6 +3734,200 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 "error": f"Error ao pegar os dados do plantio , Erro: {e}",  # General error message
             }
         return Response(response, status=status.HTTP_208_ALREADY_REPORTED)
+
+    @action(detail=False, methods=["GET"])
+    def get_sent_seeds_data(self, request, *args, **kwargs):
+        try:
+            safra_filter = '2024/2025'
+            cicle_filter = '3'
+            
+            # # GET TOTAL PLANTED
+            qs_plantio = (
+                PlantioExtratoArea.objects.select_related(
+                    "plantio",
+                    "plantio__talhao__fazenda",
+                    "plantio__talhao__fazenda__fazenda",
+                    "plantio__safra",
+                    "plantio__ciclo",
+                    "plantio__variedade",
+                    "plantio__variedade__cultura"
+                ).values(
+                "plantio__talhao__fazenda__fazenda__nome",  # Group by fazenda__nome
+                "plantio__variedade__variedade"  # Group by variedade
+            ).annotate(
+                total_area_plantada=Sum("area_plantada")  # Sum the area_plantada for each group
+            ).filter(plantio__safra__safra=safra_filter, plantio__ciclo__ciclo=cicle_filter)
+            )
+            
+            qs_sent_seeds = (
+                SentSeeds.objects.select_related(
+                    "variedade", 
+                    "fazenda",
+                ).values(
+                "destino__nome",  # Group by fazenda__nome
+                "variedade__variedade"  # Group by variedade
+            ).annotate(
+                total_area_plantada=Sum("peso_total")  # Sum the area_plantada for each group
+            ).filter(safra__safra=safra_filter, ciclo__ciclo=cicle_filter)
+            )
+            
+         
+            
+            # Subquery to get the last (most recent) data_apontamento for each variedade and fazenda
+            # latest_stock = SeedStock.objects.filter(
+            #     fazenda=OuterRef('fazenda'),
+            #     variedade=OuterRef('variedade')
+            # ).order_by('-data_apontamento').values('estoque_atual')[:1]
+
+            # Query to get the latest estoque_atual for each variedade and fazenda
+            seed_stocks = SeedStock.objects.filter(
+                data_apontamento=Subquery(
+                    SeedStock.objects.filter(
+                        fazenda=OuterRef('fazenda'),
+                        variedade=OuterRef('variedade')
+                    ).order_by('-data_apontamento').values('data_apontamento')[:1]
+                )
+            ).values(
+                'fazenda__nome', 'variedade__variedade', 'estoque_atual', 'data_apontamento'
+            )
+            
+            seed_config = SeedConfig.objects.filter(
+                data_apontamento=Subquery(
+                    SeedStock.objects.filter(
+                        fazenda=OuterRef('fazenda'),
+                        variedade=OuterRef('variedade')
+                    ).order_by('-data_apontamento').values('data_apontamento')[:1]
+                )
+            ).values(
+                'fazenda__nome', 'variedade__variedade', 'regulagem', 'data_apontamento'
+            )
+            
+            
+            # def fetch_qs_plantio(safra_filter, cicle_filter):
+            #     return (
+            #         PlantioExtratoArea.objects.select_related(
+            #             "plantio",
+            #             "plantio__talhao__fazenda",
+            #             "plantio__talhao__fazenda__fazenda",
+            #             "plantio__safra",
+            #             "plantio__ciclo",
+            #             "plantio__variedade",
+            #             "plantio__variedade__cultura"
+            #         ).values(
+            #             "plantio__talhao__fazenda__fazenda__nome",  # Group by fazenda__nome
+            #             "plantio__variedade__variedade"  # Group by variedade
+            #         ).annotate(
+            #             total_area_plantada=Sum("area_plantada")  # Sum the area_plantada for each group
+            #         ).filter(plantio__safra__safra=safra_filter, plantio__ciclo__ciclo=cicle_filter)
+            #     )
+
+            # def fetch_qs_sent_seeds(safra_filter, cicle_filter):
+            #     return (
+            #         SentSeeds.objects.select_related(
+            #             "variedade", 
+            #             "fazenda",
+            #         ).values(
+            #             "destino__nome",  # Group by fazenda__nome
+            #             "variedade__variedade"  # Group by variedade
+            #         ).annotate(
+            #             total_area_plantada=Sum("peso_total")  # Sum the area_plantada for each group
+            #         ).filter(safra__safra=safra_filter, ciclo__ciclo=cicle_filter)
+            #     )
+
+            # def fetch_seed_stocks():
+            #     return SeedStock.objects.filter(
+            #         data_apontamento=Subquery(
+            #             SeedStock.objects.filter(
+            #                 fazenda=OuterRef('fazenda'),
+            #                 variedade=OuterRef('variedade')
+            #             ).order_by('-data_apontamento').values('data_apontamento')[:1]
+            #         )
+            #     ).values(
+            #         'fazenda__nome', 'variedade__variedade', 'estoque_atual', 'data_apontamento'
+            #     )
+
+            # def fetch_seed_config():
+            #     return SeedConfig.objects.filter(
+            #         data_apontamento=Subquery(
+            #             SeedStock.objects.filter(
+            #                 fazenda=OuterRef('fazenda'),
+            #                 variedade=OuterRef('variedade')
+            #             ).order_by('-data_apontamento').values('data_apontamento')[:1]
+            #         )
+            #     ).values(
+            #         'fazenda__nome', 'variedade__variedade', 'regulagem', 'data_apontamento'
+            #     )
+
+            # def fetch_all_queries(safra_filter, cicle_filter):
+            #     with ThreadPoolExecutor() as executor:
+            #         # Submitting each query to the executor
+            #         future_qs_plantio = executor.submit(fetch_qs_plantio, safra_filter, cicle_filter)
+            #         future_qs_sent_seeds = executor.submit(fetch_qs_sent_seeds, safra_filter, cicle_filter)
+            #         future_seed_stocks = executor.submit(fetch_seed_stocks)
+            #         future_seed_config = executor.submit(fetch_seed_config)
+
+            #         # Fetching the results
+            #         qs_plantio = future_qs_plantio.result()
+            #         qs_sent_seeds = future_qs_sent_seeds.result()
+            #         seed_stocks = future_seed_stocks.result()
+            #         seed_config = future_seed_config.result()
+
+            #     return qs_plantio, qs_sent_seeds, seed_stocks, seed_config
+
+            # qs_plantio, qs_sent_seeds, seed_stocks, seed_config = fetch_all_queries(safra_filter, cicle_filter)
+            
+            # Initialize an empty list to hold the data for the table
+            table_data = []
+
+            # Loop through the qs_plantio queryset to populate the base of each row
+            for plantio in qs_plantio:
+                fazenda_nome = plantio["plantio__talhao__fazenda__fazenda__nome"]
+                variedade_nome = plantio["plantio__variedade__variedade"]
+                
+                # Fetch the corresponding values from the other querysets
+                sent_seeds = qs_sent_seeds.filter(destino__nome=fazenda_nome, variedade__variedade=variedade_nome).order_by('destino__nome').first()
+                seed_stock = seed_stocks.filter(fazenda__nome=fazenda_nome, variedade__variedade=variedade_nome).order_by('fazenda__nome').first()
+                seed_config_value = seed_config.filter(fazenda__nome=fazenda_nome, variedade__variedade=variedade_nome).order_by('fazenda__nome').first()
+
+                # Fill in values for each column
+                peso_total = sent_seeds["total_area_plantada"] if sent_seeds else 0
+                estoque = seed_stock["estoque_atual"] if seed_stock else 0
+                utilizado = peso_total - estoque
+                semente_ha = round((utilizado / plantio["total_area_plantada"]),2)
+                row = {
+                    "Destino": fazenda_nome,
+                    "Produto": variedade_nome,
+                    "Peso_Total": peso_total,
+                    "Estoque": estoque,
+                    "Utilizado": utilizado,
+                    "Area_Plantada": plantio["total_area_plantada"],
+                    "Semente_Ha": semente_ha,
+                    "Ultima_Regulagem": seed_config_value["regulagem"] if seed_config_value else 0
+                }
+
+                # Add the row to the table data
+                table_data.append(row)
+            
+            
+            data = {
+                'qs_plantio': qs_plantio,
+                "qs_sent_seed": qs_sent_seeds,
+                'qs_stock': seed_stocks,
+                'qs_regulagem': seed_config,
+                'query_table': table_data
+            }
+            response = {
+                "msg": f"Consulta sobre as sementes realizada com sucesso!!",
+                "dados": data,
+            }
+            return Response(response, status=status.HTTP_200_OK)
+        except Exception as e:
+            print("erro ao pegar os dados das Sementes", e)
+            response = {
+                "msg": f"Erro gerar os dados das Sementes",
+                "error": f"Error ao pegar os dados das Sementes , Erro: {e}",  # General error message
+            }
+            return Response(response, status=status.HTTP_208_ALREADY_REPORTED)
 
     @action(detail=False, methods=['GET'])
     def check_how_fast(self, request, *args, **kwargs):

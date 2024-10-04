@@ -2628,14 +2628,24 @@ class BuyProductsAdmin(admin.ModelAdmin):
         ("Observações", {"fields": (("observacao",))}),
     )
 
+def format_number_nf(number_str):
+    # Reverse the string to process it from the end
+    reversed_str = str(number_str)[::-1]
     
+    # Group digits in chunks of 3 and join them with a dot
+    grouped = ".".join(reversed_str[i:i+3] for i in range(0, len(reversed_str), 3))
+    
+    # Reverse the result back to the original order
+    formatted_number = grouped[::-1]
+    
+    return formatted_number
 @admin.register(SentSeeds)
 class SentSeedsAdmin(admin.ModelAdmin):
     readonly_fields = ("peso_total","criados", "modificado")
     autocomplete_fields = ["variedade",'origem', 'destino']
     raw_id_fields = ["variedade"]
     list_display = [
-        "get_data_envio", "origem", 'get_destino_name',"safra_description", 'cultura_description' , 'variedade', 'peso_total', 'nota_fiscal'
+        "get_data_envio", "origem", 'get_destino_name',"safra_description", 'cultura_description' , 'variedade', "get_quantidade_bags","get_peso_bag",  'get_peso_enviado', 'get_nf'
     ]
     search_fields = [
         "data_envio", "origem", 'destino', 'variedade', 'peso_total', 'nota_fiscal'
@@ -2670,9 +2680,25 @@ class SentSeedsAdmin(admin.ModelAdmin):
     )
 
     
+    
+    def get_peso_bag(self, obj):
+        return obj.peso_bag
+    get_peso_bag.short_description = "Peso Bag"
+    
+    def get_nf(self, obj):
+        return format_number_nf(obj.nota_fiscal)
+    get_nf.short_description = "Nº NF"
+    
+    def get_peso_enviado(self, obj):
+        return obj.peso_total
+    get_peso_enviado.short_description = "Peso Enviado / Kg"
+    
+    def get_quantidade_bags(self, obj):
+        return obj.quantidade_bags
+    get_quantidade_bags.short_description = "Bags"
+    
     def get_destino_name(self, obj):
         return obj.destino.nome.replace('Fazenda ', '')
-
     get_destino_name.short_description = "Destino"
     
     def get_queryset(self, request):
