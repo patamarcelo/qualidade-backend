@@ -3753,7 +3753,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "plantio__variedade__cultura"
                 ).values(
                 "plantio__talhao__fazenda__fazenda__nome",  # Group by fazenda__nome
-                "plantio__variedade__variedade"  # Group by variedade
+                "plantio__variedade__variedade",  # Group by variedade
+                "plantio__variedade__cultura__cultura",  # Group by variedade
             ).annotate(
                 total_area_plantada=Sum("area_plantada")  # Sum the area_plantada for each group
             ).filter(plantio__safra__safra=safra_filter, plantio__ciclo__ciclo=cicle_filter)
@@ -3894,15 +3895,21 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 estoque = seed_stock["estoque_atual"] if seed_stock else 0
                 utilizado = peso_total - estoque
                 semente_ha = round((utilizado / plantio["total_area_plantada"]),2)
+                ultima_reg = seed_config_value["regulagem"] if seed_config_value else 0
+                if ultima_reg > 0:
+                    date_string = seed_config_value['data_apontamento']
+                    formatted_date = date_string.strftime("%d/%m/%Y")
+                    ultima_reg = f"{formatted_date} - {str(ultima_reg).replace('.', ',')} Kg"
                 row = {
                     "Destino": fazenda_nome,
                     "Produto": variedade_nome,
+                    "Cultura": plantio["plantio__variedade__cultura__cultura"],
                     "Peso_Total": peso_total,
                     "Estoque": estoque,
                     "Utilizado": utilizado,
                     "Area_Plantada": plantio["total_area_plantada"],
                     "Semente_Ha": semente_ha,
-                    "Ultima_Regulagem": seed_config_value["regulagem"] if seed_config_value else 0
+                    "Ultima_Regulagem": ultima_reg
                 }
 
                 # Add the row to the table data

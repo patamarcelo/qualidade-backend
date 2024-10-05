@@ -329,7 +329,7 @@ class PlantioDetailPlantioAdmin(admin.ModelAdmin):
             request,
             extra_context=extra_context,
         )
-        safra_ciclo = CicloAtual.objects.filter(nome="Colheita")[0]
+        safra_ciclo = CicloAtual.objects.filter(nome="Plantio")[0]
         safra_filter = safra_ciclo.safra.safra
         cicle_filter = safra_ciclo.ciclo.ciclo
         
@@ -2753,10 +2753,54 @@ class SentSeedsAdmin(admin.ModelAdmin):
         return cultura
     cultura_description.short_description = "Cultura"
 
-    @admin.register(SeedStock)
-    class SeedStockAdmin(admin.ModelAdmin):
-        pass
+@admin.register(SeedStock)
+class SeedStockAdmin(admin.ModelAdmin):
+    list_display = ["get_data_envio", 'fazenda', "cultura_description", 'variedade', 'estoque_atual']
     
-    @admin.register(SeedConfig)
-    class SeedConfigAdmin(admin.ModelAdmin):
-        pass
+    def get_queryset(self, request):
+        return (
+            super(SeedStockAdmin, self)
+            .get_queryset(request)
+            .select_related(
+                "fazenda",
+                "variedade",
+                "variedade__cultura",
+            )
+        )
+    def get_data_envio(self, obj):
+        if obj.data_apontamento:
+            return date_format(
+                obj.data_apontamento, format="SHORT_DATE_FORMAT", use_l10n=True
+            )
+        else:
+            return " - "
+    get_data_envio.short_description = "Data Envio"
+    
+    def cultura_description(self, obj):
+        if obj.variedade is not None:
+            cultura = (
+                obj.variedade.cultura.cultura if obj.variedade.cultura.cultura else "-"
+            )
+            cultura_url = None
+            if cultura == "Soja":
+                cultura_url = "soy"
+            if cultura == "Feijão":
+                cultura_url = "beans2"
+            if cultura == "Arroz":
+                cultura_url = "rice"
+            image_url = None
+            if cultura_url is not None:
+                image_url = f"/static/images/icons/{cultura_url}.png"
+            if image_url is not None:
+                return format_html(
+                    f'<img style="width: 20px; height: 20px; text-align: center"  src="{image_url}">'
+                )
+        else:
+            cultura = "Não Planejado"
+        return cultura
+    cultura_description.short_description = "Cultura"
+    
+
+@admin.register(SeedConfig)
+class SeedConfigAdmin(admin.ModelAdmin):
+    pass
