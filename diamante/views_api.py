@@ -3794,7 +3794,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             
             seed_config = SeedConfig.objects.filter(
                 data_apontamento=Subquery(
-                    SeedStock.objects.filter(
+                    SeedConfig.objects.filter(
                         fazenda=OuterRef('fazenda'),
                         variedade=OuterRef('variedade')
                     ).order_by('-data_apontamento').values('data_apontamento')[:1]
