@@ -953,6 +953,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         ColheitaFilter,
         ColheitaFilterNoProgram,
         "finalizado_plantio",
+        "inicializado_plantio",
         "finalizado_colheita",
         "plantio_descontinuado",
         "talhao__fazenda__fazenda",
@@ -1034,6 +1035,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
                     ),
                     ("safra", "ciclo"),
                     ("variedade", "programa"),
+                    ("inicializado_plantio"),
                     ("finalizado_plantio", "finalizado_colheita"),
                     (
                         "data_plantio",
@@ -2383,7 +2385,8 @@ class PlantioExtratoAreaAdmin(admin.ModelAdmin):
                     ("plantio",),
                     ("data_plantio"),
                     ("area_plantada"),
-                    ("aguardando_chuva",)
+                    ("aguardando_chuva",),
+                    ("finalizado_plantio",)
                 )
             }
         ),
@@ -2544,7 +2547,7 @@ class BuyProductsAdmin(admin.ModelAdmin):
     filter_horizontal = ('projeto',) 
     autocomplete_fields = ["defensivo"]
     list_display = ("defensivo", "get_fazenda_name", 'quantidade_comprada','sit_pago', 'get_data_pgto', 'fornecedor', 'nota_fiscal')
-    search_fields = ["defensivo", 'fazenda', 'quantidade_comprada','sit_pago', 'data_pagamento', 'fornecedor', 'nota_fiscal']
+    search_fields = ["defensivo__produto", 'fazenda__nome', 'quantidade_comprada','sit_pago', 'data_pagamento', 'fornecedor', 'nota_fiscal']
     list_filter = ["fazenda",'sit_pago']
     
     
@@ -2803,4 +2806,47 @@ class SeedStockAdmin(admin.ModelAdmin):
 
 @admin.register(SeedConfig)
 class SeedConfigAdmin(admin.ModelAdmin):
-    pass
+    list_display = ["get_data_envio", 'fazenda', "variedade", 'variedade', 'regulagem']
+    
+    def get_queryset(self, request):
+        return (
+            super(SeedConfigAdmin, self)
+            .get_queryset(request)
+            .select_related(
+                "fazenda",
+                "variedade",
+                "variedade__cultura",
+            )
+        )
+    def get_data_envio(self, obj):
+        if obj.data_apontamento:
+            return date_format(
+                obj.data_apontamento, format="SHORT_DATE_FORMAT", use_l10n=True
+            )
+        else:
+            return " - "
+    get_data_envio.short_description = "Data Envio"
+    
+    def cultura_description(self, obj):
+        if obj.variedade is not None:
+            cultura = (
+                obj.variedade.cultura.cultura if obj.variedade.cultura.cultura else "-"
+            )
+            cultura_url = None
+            if cultura == "Soja":
+                cultura_url = "soy"
+            if cultura == "Feijão":
+                cultura_url = "beans2"
+            if cultura == "Arroz":
+                cultura_url = "rice"
+            image_url = None
+            if cultura_url is not None:
+                image_url = f"/static/images/icons/{cultura_url}.png"
+            if image_url is not None:
+                return format_html(
+                    f'<img style="width: 20px; height: 20px; text-align: center"  src="{image_url}">'
+                )
+        else:
+            cultura = "Não Planejado"
+        return cultura
+    cultura_description.short_description = "Cultura"

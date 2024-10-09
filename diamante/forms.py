@@ -1,5 +1,7 @@
 from django import forms
 from .models import PlantioExtratoArea
+from django.core.exceptions import ValidationError
+from django.db.models import Sum
 
 class PlantioExtratoAreaForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
@@ -18,10 +20,58 @@ class PlantioExtratoAreaForm(forms.ModelForm):
         #     'class': 'form-control',
         #     'type': 'date',  # HTML5 date input
         # })
+    
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        plantio = cleaned_data.get('plantio')
+        area_plantada_form = cleaned_data.get('area_plantada')
+        plantio_finalizado = cleaned_data.get('finalizado_plantio')
+        area_plantada_form = area_plantada_form if area_plantada_form is not None else 0
+        
+        if plantio:
+            # Access fields from the Plantio model, e.g., area_planejamento_plantio
+            area_planejamento = plantio.area_planejamento_plantio
+            # print('Area Disponível conforme planejamento: ', area_planejamento)
+            
+            # print('area Informada: ', area_plantada_form)
+            
+            # If this is an update (not a new instance), exclude the current instance from the total area calculation
+            if self.instance and self.instance.pk:
+                total_area = PlantioExtratoArea.objects.filter(plantio=plantio).exclude(pk=self.instance.pk).aggregate(
+                    total_area_plantada=Sum("area_plantada")
+                )['total_area_plantada'] or 0
+            else:
+                # For new instances, include all areas
+                total_area = PlantioExtratoArea.objects.filter(plantio=plantio).aggregate(
+                    total_area_plantada=Sum("area_plantada")
+                )['total_area_plantada'] or 0
+
+            # print('Total Area Já Apontada: ', total_area)
+            
+            # # You can now use this field for validation or other logic
+            # if area_planejamento and area_planejamento < 50:
+            #     raise ValidationError(
+            #         f'The planned planting area (area_planejamento_plantio) is too small: {area_planejamento}.'
+            #     )
+
+            area_total_informada = total_area + area_plantada_form
+            # print('area total informada: ', area_total_informada)
+            # format_area_planejamento = 
+            if area_planejamento < area_total_informada:
+                raise ValidationError(
+                    f"Area total disponível:  {str(area_planejamento).replace('.', ',')}, Area total já informada plantada:  ({str(total_area).replace('.', ',')}), Area ainda disponível: {str((area_planejamento - total_area)).replace('.', ',')}"
+                )
+            if area_plantada_form == 0 and plantio_finalizado == False:
+                raise ValidationError(
+                    f"Area Precisa ser informada, ou Plantio Finalizado precisa ser informado"
+                )
+
+        return cleaned_data
 
     class Meta:
         model = PlantioExtratoArea
-        fields = ['plantio', 'area_plantada', 'aguardando_chuva', 'data_plantio']
+        fields = ['plantio', 'area_plantada', 'aguardando_chuva', 'data_plantio', 'finalizado_plantio']
         
         # Customize widgets for responsiveness
         widgets = {
@@ -34,8 +84,13 @@ class PlantioExtratoAreaForm(forms.ModelForm):
             'aguardando_chuva': forms.CheckboxInput(attrs={
                 'class': 'form-check-input check-custom',
             }),
+            'finalizado_plantio': forms.CheckboxInput(attrs={
+                'class': 'form-check-input check-custom',
+            }),
             # 'data_plantio': forms.DateInput(attrs={
             #     'class': 'form-control',
             #     'type': 'date',  # HTML5 date input
             # }),
         }
+        
+    

@@ -12,8 +12,10 @@ import decimal
 
 connection.queries
 from django.core.validators import RegexValidator, MinLengthValidator
+from django.core.exceptions import ValidationError
 
-from django.db.models import Count
+
+from django.db.models import Count, Sum
 
 import uuid
 from os.path import join
@@ -508,6 +510,10 @@ class Plantio(Base):
     finalizado_plantio = models.BooleanField(
         "Finalizado Plantio", default=False, help_text="Finalizado o Plantio"
     )
+    
+    inicializado_plantio = models.BooleanField(
+        "Plantio Começou", default=False, help_text="Informar se começou o plantio"
+    )
     finalizado_colheita = models.BooleanField(
         "Finalizado Colheita", default=False, help_text="Finalizada a Colheita"
     )
@@ -795,7 +801,7 @@ class Plantio(Base):
 
 class PlantioExtratoArea(Base):
     plantio = models.ForeignKey(Plantio,on_delete=models.PROTECT)
-    
+
     area_plantada = models.DecimalField(
         "Area plantada",
         help_text="Area Parcial Plantada",
@@ -804,22 +810,57 @@ class PlantioExtratoArea(Base):
         blank=True,
         null=True,
     )
-    
+
     data_plantio = models.DateField(
         help_text="dd/mm/aaaa - Data Efetiva de Plantio",
         blank=True,
         null=True,
     )
-    
+
     aguardando_chuva = models.BooleanField(
         "Plantio Aguardando a chuva",
         default=False,
         help_text="Apontar caso o Plantio esteja aguardando a chuva",
     )
     
+    finalizado_plantio = models.BooleanField(
+        "Plantio da parcela finalizado",
+        default=False,
+        help_text="Informar se o plantio da parcela encerrou",
+    )
+
+    def save(self, *args, **kwargs):
+        plantio = self.plantio
+        area_informada = self.area_plantada if self.area_plantada else 0
+        if self.pk:
+            total_area = PlantioExtratoArea.objects.filter(plantio=plantio).exclude(pk=self.pk).aggregate(
+                total_area_plantada=Sum("area_plantada")
+            )['total_area_plantada'] or 0
+        else:
+            # For new instances, include all areas
+            total_area = PlantioExtratoArea.objects.filter(plantio=plantio).aggregate(
+                total_area_plantada=Sum("area_plantada")
+            )['total_area_plantada'] or 0
+        
+        # print("Plantio to update: ", plantio)
+        # print('salvando area plantada para o plantio', total_area)
+        # print('area informada: ', self.area_plantada)
+        if self.finalizado_plantio:
+            plantio.area_colheita = plantio.area_planejamento_plantio
+            if self.area_plantada:
+                pass
+            else:
+                self.area_plantada = plantio.area_planejamento_plantio - total_area
+            
+        else:
+            plantio.area_colheita = total_area + area_informada
+        plantio.inicializado_plantio = True
+        plantio.save()
+        super(PlantioExtratoArea, self).save(*args, **kwargs)
+
     def __str__(self):
         return f'{self.plantio.talhao.fazenda.nome} | {self.plantio.talhao.id_talhao} | {self.plantio.safra}-{self.plantio.ciclo} | {str(self.area_plantada)}'
-    
+
     class Meta:
         ordering = ["data_plantio", 'plantio']
         verbose_name = 'Extrato do Plantio'
@@ -850,7 +891,7 @@ class ColheitaPlantioExtratoArea(Base):
         ordering = ["data_colheita", 'plantio']
         verbose_name = 'Extrato da Colheita'
         verbose_name_plural = 'Extrato das Colheitas'
-    
+
 
 class Colheita(Base):
     AlphanumericValidator = RegexValidator(
@@ -1275,7 +1316,6 @@ class RegistroVisitas(Base):
     #     super().save(*args, **kwargs)
 
 
-
 class AppFarmboxIntegration(Base):
     app_nuumero = models.CharField('AP Número', max_length=200, null=True, blank=True)
     app_fazenda = models.CharField('Fazenda AP', max_length=200, null=True, blank=True)
@@ -1293,7 +1333,7 @@ class StProtheusIntegration(Base):
     class Meta:
         verbose_name = 'ST Integração'
         verbose_name_plural = 'STs Integrações'
-        
+
 class HeaderPlanejamentoAgricola(Base):
     projeto = models.ForeignKey(Projeto, on_delete=models.PROTECT)
     codigo_planejamento = models.CharField('Código do Planejamento', max_length=200)
@@ -1357,7 +1397,7 @@ class SentSeeds(Base):
     
     def __str__(self) -> str:
         return f'{self.data_envio} - {self.destino.nome} - {self.peso_total}'
-    
+
 class SeedStock(Base):
     data_apontamento = models.DateField(help_text="dd/mm/aaaa - Data Apontamento do Estoque", blank=True, null=True)
     estoque_atual    = models.DecimalField('Estoque Atual na Data em Kg', max_digits=12 , decimal_places=2)
