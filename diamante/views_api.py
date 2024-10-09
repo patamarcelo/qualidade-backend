@@ -3766,13 +3766,13 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "fazenda",
                 ).values(
                 "destino__nome",  # Group by fazenda__nome
-                "variedade__variedade"  # Group by variedade
+                "variedade__variedade",  # Group by variedade
+                "variedade__cultura__cultura", 
             ).annotate(
                 total_area_plantada=Sum("peso_total")  # Sum the area_plantada for each group
             ).filter(safra__safra=safra_filter, ciclo__ciclo=cicle_filter)
             )
             
-         
             
             # Subquery to get the last (most recent) data_apontamento for each variedade and fazenda
             # latest_stock = SeedStock.objects.filter(
@@ -3880,12 +3880,25 @@ class PlantioViewSet(viewsets.ModelViewSet):
             # Initialize an empty list to hold the data for the table
             table_data = []
 
-            # Loop through the qs_plantio queryset to populate the base of each row
+            # Create a set of all unique (fazenda, variedade) pairs from qs_plantio and qs_sent_seeds
+            all_fazenda_variedade_pairs = set()
+
+            # Add pairs from qs_plantio
             for plantio in qs_plantio:
                 fazenda_nome = plantio["plantio__talhao__fazenda__fazenda__nome"]
                 variedade_nome = plantio["plantio__variedade__variedade"]
-                
-                # Fetch the corresponding values from the other querysets
+                all_fazenda_variedade_pairs.add((fazenda_nome, variedade_nome))
+
+            # Add pairs from qs_sent_seeds
+            for sent_seed in qs_sent_seeds:
+                fazenda_nome = sent_seed["destino__nome"]
+                variedade_nome = sent_seed["variedade__variedade"]
+                all_fazenda_variedade_pairs.add((fazenda_nome, variedade_nome))
+
+            # Loop through all unique (fazenda, variedade) pairs
+            for fazenda_nome, variedade_nome in all_fazenda_variedade_pairs:
+                # Fetch data from both querysets based on the current fazenda and variedade
+                plantio = qs_plantio.filter(plantio__talhao__fazenda__fazenda__nome=fazenda_nome, plantio__variedade__variedade=variedade_nome).order_by('plantio__talhao__fazenda__fazenda__nome').first()
                 sent_seeds = qs_sent_seeds.filter(destino__nome=fazenda_nome, variedade__variedade=variedade_nome).order_by('destino__nome').first()
                 seed_stock = seed_stocks.filter(fazenda__nome=fazenda_nome, variedade__variedade=variedade_nome).order_by('fazenda__nome').first()
                 seed_config_value = seed_config.filter(fazenda__nome=fazenda_nome, variedade__variedade=variedade_nome).order_by('fazenda__nome').first()
@@ -3894,28 +3907,31 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 peso_total = sent_seeds["total_area_plantada"] if sent_seeds else 0
                 estoque = seed_stock["estoque_atual"] if seed_stock else 0
                 utilizado = peso_total - estoque
-                semente_ha = round((utilizado / plantio["total_area_plantada"]),2)
+                area_plantada = plantio["total_area_plantada"] if plantio else 0
+                semente_ha = round((utilizado / area_plantada), 2) if area_plantada else 0
                 ultima_reg = seed_config_value["regulagem"] if seed_config_value else 0
+
                 if ultima_reg > 0:
                     date_string = seed_config_value['data_apontamento']
                     formatted_date = date_string.strftime("%d/%m/%Y")
                     ultima_reg = f"{formatted_date} - {str(ultima_reg).replace('.', ',')} Kg"
+
+                # Add the row to the table data
                 row = {
                     "Destino": fazenda_nome,
                     "Produto": variedade_nome,
-                    "Cultura": plantio["plantio__variedade__cultura__cultura"],
+                    "Cultura": sent_seeds["variedade__cultura__cultura"] if sent_seeds else '',
                     "Peso_Total": peso_total,
                     "Estoque": estoque,
                     "Utilizado": utilizado,
-                    "Area_Plantada": plantio["total_area_plantada"],
+                    "Area_Plantada": area_plantada,
                     "Semente_Ha": semente_ha,
                     "Ultima_Regulagem": ultima_reg
                 }
 
-                # Add the row to the table data
                 table_data.append(row)
-            
-            
+                        
+            table_data.sort(key = lambda x : x['Destino'])
             data = {
                 'qs_plantio': qs_plantio,
                 "qs_sent_seed": qs_sent_seeds,
