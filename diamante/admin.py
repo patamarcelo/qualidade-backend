@@ -348,12 +348,16 @@ class PlantioDetailPlantioAdmin(admin.ModelAdmin):
         metrics = {
             "area_total": Sum("area_planejamento_plantio"),
             "area_plantada": Case(
-                When(finalizado_plantio=True, then=Coalesce(Sum("area_colheita"), 0)),
+                When(
+                    Q(finalizado_plantio=True) | Q(inicializado_plantio=True),
+                    then=Coalesce(Sum("area_colheita"), 0)),
                 default=Value(0),
                 output_field=DecimalField(),
             ),
             "area_projetada": Case(
-                When(finalizado_plantio=False, then=Coalesce(Sum("area_planejamento_plantio"), 0)),
+                When(
+                    Q(finalizado_plantio=False) | Q(inicializado_plantio=False),
+                    then=Coalesce(Sum("area_planejamento_plantio"), 0)),
                 default=Value(0),
                 output_field=DecimalField(),
                 # ),
@@ -368,6 +372,7 @@ class PlantioDetailPlantioAdmin(admin.ModelAdmin):
                 safra__safra=safra_filter,
                 ciclo__ciclo=cicle_filter,
                 plantio_descontinuado=False,
+                programa__isnull=False
             )
             .filter(~Q(variedade__cultura__cultura="Milheto"))
             .filter(~Q(variedade__cultura__cultura="Algodão"))
