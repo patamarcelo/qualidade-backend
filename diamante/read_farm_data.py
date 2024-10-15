@@ -48,6 +48,11 @@ dict_area_app = []
 last_page_app = 0
 deleted_app_array = []
 
+
+dict_area_app_pluvi = []
+last_page_app_pluvi = 0
+deleted_app_array_pluvi = []
+
 def get_applications(page=None, updated_last=None, safra=safra_23_24, url=None):
     global dict_area_app, last_page_app, deleted_app_array
 
@@ -93,3 +98,52 @@ def get_applications(page=None, updated_last=None, safra=safra_23_24, url=None):
         print("error na pagina, finalizando o código", e)
 
     return [dict_area_app, deleted_app_array]
+
+def get_applications_pluvi(page=None, updated_last=None, safra=safra_23_24, url=None):
+    global dict_area_app_pluvi, last_page_app_pluvi, deleted_app_array_pluvi
+
+    if url:
+        api_url = url
+    else:
+        api_url = f"https://farmbox.cc/api/v1/pluviometer_monitorings"
+        if updated_last:
+            api_url = f"https://farmbox.cc/api/v1/pluviometer_monitorings?updated_since={updated_last}"
+
+    print(api_url)
+    try:
+        response = requests.get(api_url, headers=headers)
+        data = response.json()
+        deleted_app_array_pluvi = data["deleted_since"]
+        for i in data["pluviometer_monitorings"]:
+            dict_area_app_pluvi.append(i)
+        next_page = None
+
+        if data["next_page_url"] != None:
+            next_page = data["next_page_url"]
+            print("\n")
+            print(f"Proximo Pagina: {next_page}")
+            print("\n\n")
+            url = f"https://farmbox.cc{next_page}"
+            if next_page:
+                try:
+                    get_applications_pluvi(
+                        page=next_page, updated_last=updated_last, url=url
+                    )
+                except Exception as e:
+                    print("erro em pegar os dados da página selecionada", e)
+        else:
+            if last_page_app_pluvi == 0:
+                print(
+                    f"{Fore.YELLOW}Sem atualizações no período selecionado{Style.RESET_ALL}"
+                )
+            else:
+                print(
+                    f"{Fore.GREEN}Todas as páginas já foram retornadas{Style.RESET_ALL}"
+                )
+    except Exception as e:
+        print("error na pagina, finalizando o código", e)
+
+    for i in dict_area_app_pluvi:
+        print(i)
+
+    return [dict_area_app_pluvi, deleted_app_array_pluvi]

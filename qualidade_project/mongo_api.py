@@ -103,7 +103,7 @@ def update_mongo_db_many(db_name, data_from_json):
             # print(id_json)
             list_to_update.append(UpdateOne({"id": id_json}, {"$set": obj}, upsert=True))
             # update_data_from_farm(db_name[0], obj, id_json)
-        result = db_name[0].bulk_write(list_to_update)
+        result = db_name.bulk_write(list_to_update)
         print(f"Encontrados {result.matched_count} documentos e atualizados {result.modified_count} documentos.")
     else:
         print('Atualização do banco mongodb não necessário')
@@ -111,17 +111,22 @@ def update_mongo_db_many(db_name, data_from_json):
         
 
     if len(data_from_json[1]) > 0:
-        delete_data_from_farm(db_name[0], data_from_json[1])
+        delete_data_from_farm(db_name, data_from_json[1])
     else:
         print('Atualização do banco mongodb não necessário')
         print('Sem documentos deletados para serem atualizados....')
 
 
-def generate_file_run(data_from_farm):
+def generate_file_run(type_up, data_from_farm):
     # get_applications_cal()
     db_name = conect_mongo_db()
     # read_data_from_db(db_name)
-    update_mongo_db_many(db_name, data_from_farm)
+    # print('dbName: ', db_name[0])
+    # print('dbName: ', db_name[1])
+    if type_up == 'Aplicacoes':
+        update_mongo_db_many(db_name[0], data_from_farm)
+    if type_up == 'Pluvi':
+        update_mongo_db_many(db_name[1], data_from_farm)
     # update_mongo_db(db_name)
 
 

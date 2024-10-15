@@ -128,7 +128,7 @@ from qualidade_project.settings import FARMBOX_ID, PROTHEUS_TOKEN
 
 from collections import defaultdict
 
-from diamante.read_farm_data import get_applications
+from diamante.read_farm_data import get_applications, get_applications_pluvi
 
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
@@ -4069,17 +4069,29 @@ class DefensivoViewSet(viewsets.ModelViewSet):
         last_up = get_miliseconds(from_date)
         print(last_up)
         
+        number_of_days_before_pluvi = 5 if DEBUG == True else 4
+        from_date_pluvi = get_date(number_of_days_before_pluvi)
+        last_up_pluvi = get_miliseconds(from_date_pluvi)
+        print(last_up_pluvi)
+        
         
         data_applications = get_applications(updated_last=last_up)
+        data_applications_pluvi = get_applications_pluvi(updated_last=last_up_pluvi)
         # print(data_applications)
         
         for _ in range(2):
             print(time.ctime())
             # Prints the current time with a five second difference
             time.sleep(1)
-        with Spinner("Atualizando..."):
-            generate_file_run(data_applications)
+        with Spinner("Atualizando Aplicacoes..."):
+            type_up_aplicacoes = 'Aplicacoes'
+            generate_file_run(type_up_aplicacoes, data_applications)
             print("\nAplicações Atualizadas.")
+        
+        with Spinner("Atualizando Pluviometria..."):
+            type_up_pluvi = 'Pluvi'
+            generate_file_run(type_up_pluvi, data_applications_pluvi)
+            print("\nPluviometrias Atualizadas.")
         
         
         
