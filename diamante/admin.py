@@ -113,6 +113,19 @@ def get_cargas_model(safra_filter, ciclo_filter, list_ids=[]):
     return cargas_model
 
 
+
+
+# class MyAdminSite(admin.AdminSite):
+#     site_header = "teste para site header"
+#     site_title = "teste para site title"
+#     index_title = "Welcome to Admin index_title"
+    
+#     def get_urls(self):
+#         urls = super().get_urls()
+#         return urls
+    
+# admin_site = MyAdminSite(name="myadmin")
+
 @admin.register(PlantioDetail)
 class PlantioDetailAdmin(admin.ModelAdmin):
     model = PlantioDetail
@@ -957,8 +970,8 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         "variedade__cultura",
         ColheitaFilter,
         ColheitaFilterNoProgram,
-        "finalizado_plantio",
         "inicializado_plantio",
+        "finalizado_plantio",
         "finalizado_colheita",
         "plantio_descontinuado",
         "talhao__fazenda__fazenda",
@@ -976,6 +989,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         "safra_description",
         "programa",
         "get_data_prev_plantio",
+        "get_description_inicializado_plantio",
         "get_description_finalizado_plantio",
         "get_data",
         "get_data_prev_col",
@@ -1269,11 +1283,17 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
     get_description_descontinuado_plantio.boolean = True
     get_description_descontinuado_plantio.short_description = "Interrom? "
 
+    def get_description_inicializado_plantio(self, obj):
+        return obj.inicializado_plantio
+
+    get_description_inicializado_plantio.boolean = True
+    get_description_inicializado_plantio.short_description = "Start Plantio"
+    
     def get_description_finalizado_plantio(self, obj):
         return obj.finalizado_plantio
 
     get_description_finalizado_plantio.boolean = True
-    get_description_finalizado_plantio.short_description = "Plantio"
+    get_description_finalizado_plantio.short_description = "End Plantio"
 
     def get_description_finalizado_colheita(self, obj):
         return obj.finalizado_colheita
@@ -2390,7 +2410,7 @@ class PlantioExtratoAreaAdmin(admin.ModelAdmin):
                     ("plantio",),
                     ("data_plantio"),
                     ("area_plantada"),
-                    ("aguardando_chuva",),
+                    # ("aguardando_chuva",),
                     ("finalizado_plantio",)
                 )
             }

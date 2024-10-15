@@ -813,8 +813,7 @@ class PlantioExtratoArea(Base):
 
     data_plantio = models.DateField(
         help_text="dd/mm/aaaa - Data Efetiva de Plantio",
-        blank=True,
-        null=True,
+        null=True
     )
 
     aguardando_chuva = models.BooleanField(

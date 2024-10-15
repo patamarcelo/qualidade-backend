@@ -773,154 +773,178 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 projetos = Projeto.objects.all()
 
                 count_total = 0
-                for i in new_list:
-                    state = i["state"]
-                    date_plantio = i["date"]
-                    emergence_date = i["emergence_date"]
-                    activation_date = ["activation_date"]
-                    parcela = i["name"].replace(" ", "")
-                    farm_name = i["farm_name"]
-                    variedade_name = i["variety_name"]
-                    area = i["area"]
-                    area_planejamento = i["area"]
-                    id_plantio_farmbox = i["id"]
+                ids_farmbox_list = [x['id'] for x in new_list]
+                print('newList IDs: ', ids_farmbox_list)
+                plantio_extrato_area = (
+                    PlantioExtratoArea.objects
+                    .select_related('plantio')
+                    .filter(plantio__id_farmbox__in=ids_farmbox_list)
+                    .values('plantio__id_farmbox')
+                    .annotate(total_area_plantada=Sum('area_plantada'))
+                )
+                print('newList IDs plantio area: ', plantio_extrato_area)
+                
+                dev_mode = True
+                if dev_mode:
+                    for i in new_list:
+                        state = i["state"]
+                        date_plantio = i["date"]
+                        emergence_date = i["emergence_date"]
+                        activation_date = ["activation_date"]
+                        parcela = i["name"].replace(" ", "")
+                        farm_name = i["farm_name"]
+                        variedade_name = i["variety_name"]
+                        area = i["area"]
+                        area_planejamento = i["area"]
+                        id_plantio_farmbox = i["id"]
 
-                    planned_date = None
-                    if i["planned_date"]:
-                        planned_date = i["planned_date"].split('T')[0]
+                        planned_date = None
+                        if i["planned_date"]:
+                            planned_date = i["planned_date"].split('T')[0]
 
-                    variedade_planejada = i["planned_variety_name"]
-                    cultura_planejada = i["planned_culture_name"]
+                        variedade_planejada = i["planned_variety_name"]
+                        cultura_planejada = i["planned_culture_name"]
 
-                    culture_id = i["culture_id"]
-                    variety_id = i["variety_id"]
-                    fazenda_id = i["farm"]["id"]
-                    variedade_planejada_id = i["planned_variety_id"]
-                    cultura_planejada_id = i["planned_culture_id"]
+                        culture_id = i["culture_id"]
+                        variety_id = i["variety_id"]
+                        fazenda_id = i["farm"]["id"]
+                        variedade_planejada_id = i["planned_variety_id"]
+                        cultura_planejada_id = i["planned_culture_id"]
 
-                    map_centro_id_farm = i["centroid"]
-                    map_geo_points_farm = i["geo_points"]
+                        map_centro_id_farm = i["centroid"]
+                        map_geo_points_farm = i["geo_points"]
 
-                    safra_farm = i["harvest_name"]
-                    ciclo_json = i["cycle"]
+                        safra_farm = i["harvest_name"]
+                        ciclo_json = i["cycle"]
 
-                    ciclo = ciclo_list[ciclo_json - 1]
-                    safra = [s for s in safra_list if s.safra == safra_farm][0]
+                        ciclo = ciclo_list[ciclo_json - 1]
+                        safra = [s for s in safra_list if s.safra == safra_farm][0]
 
-                    id_talhao = [
-                        x.id_d for x in projetos if x.id_farmbox == fazenda_id
-                    ][0]
+                        id_talhao = [
+                            x.id_d for x in projetos if x.id_farmbox == fazenda_id
+                        ][0]
 
-                    id_variedade = [
-                        x
-                        for x in variedade_list
-                        if x.id_farmbox == variedade_planejada_id
-                    ][0]
-
-                    if id_talhao:
-                        try:
-                            talhao_id = f"{id_talhao}{parcela}"
-                            talhao_id = [
-                                x for x in talhao_list if x.id_unico == talhao_id
-                            ][0]
-                        except Exception as e:
-                            print(
-                                f"{Fore.RED}id sem cadastro: {id_talhao}{parcela} - {farm_name} - Ciclo: {ciclo}{Style.RESET_ALL}"
-                            )
-                    else:
-                        talhao_id = 0
-                    try:
                         id_variedade = [
                             x
                             for x in variedade_list
                             if x.id_farmbox == variedade_planejada_id
                         ][0]
-                    except Exception as e:
-                        print(
-                            f"{Fore.RED}variedade sem cadastro: {id_variedade}{Style.RESET_ALL}"
-                        )
-                    if cultura_planejada or variety_id:
-                        try:
-                            field_to_update = Plantio.objects.filter(
-                                safra=safra, ciclo=ciclo, talhao=talhao_id
-                            )[0]
-                            field_to_update.id_farmbox = id_plantio_farmbox
-                            if field_to_update.finalizado_colheita == False:
-                                if planned_date:
-                                    field_to_update.data_prevista_plantio = planned_date
-                                if area:
-                                    field_to_update.area_colheita = area
-                                    field_to_update.area_planejamento_plantio = area_planejamento
 
+                        if id_talhao:
+                            try:
+                                talhao_id = f"{id_talhao}{parcela}"
+                                talhao_id = [
+                                    x for x in talhao_list if x.id_unico == talhao_id
+                                ][0]
+                            except Exception as e:
+                                print(
+                                    f"{Fore.RED}id sem cadastro: {id_talhao}{parcela} - {farm_name} - Ciclo: {ciclo}{Style.RESET_ALL}"
+                                )
+                        else:
+                            talhao_id = 0
+                        try:
+                            id_variedade = [
+                                x
+                                for x in variedade_list
+                                if x.id_farmbox == variedade_planejada_id
+                            ][0]
+                        except Exception as e:
+                            print(
+                                f"{Fore.RED}variedade sem cadastro: {id_variedade}{Style.RESET_ALL}"
+                            )
+                        
+                        
+                        # PEGANDO AREA PLANTADA DO EXTRATO DE PLANTIO, CASO NAO ACHE USE A AREA COMO PADRAO
+                        get_plantio_area = plantio_extrato_area.filter(plantio__id_farmbox=id_plantio_farmbox).order_by('?').first()
+                        if get_plantio_area:
+                            total_area_plantada = get_plantio_area.get('total_area_plantada', 0)  # 0 as a fallback if not found
+                            print('area planted here: ', total_area_plantada)
+                        else:
+                            total_area_plantada = area # If no result found
+                        
+                        if cultura_planejada or variety_id:
+                            try:
+                                field_to_update = Plantio.objects.filter(
+                                    safra=safra, ciclo=ciclo, talhao=talhao_id
+                                )[0]
+                                field_to_update.id_farmbox = id_plantio_farmbox
+                                if field_to_update.finalizado_colheita == False:
+                                    if planned_date:
+                                        field_to_update.data_prevista_plantio = planned_date
+                                    if area:
+                                        field_to_update.area_colheita = total_area_plantada
+                                        field_to_update.area_planejamento_plantio = area_planejamento
+
+                                    if map_centro_id_farm:
+                                        field_to_update.map_centro_id = map_centro_id_farm
+
+                                    if map_geo_points_farm:
+                                        field_to_update.map_geo_points = map_geo_points_farm
+
+                                    if state == "active":
+                                        if date_plantio:
+                                            field_to_update.data_plantio = date_plantio
+                                            field_to_update.finalizado_plantio = True
+                                            field_to_update.area_colheita = total_area_plantada
+
+                                        if emergence_date:
+                                            field_to_update.data_emergencia = emergence_date
+
+                                    if variety_id:
+                                        id_variedade_done = [
+                                            x
+                                            for x in variedade_list
+                                            if x.id_farmbox == variety_id
+                                        ][0]
+                                        field_to_update.variedade = id_variedade_done
+                                    else:
+                                        field_to_update.variedade = id_variedade
+                                    field_to_update.save()
+                                    print(
+                                        f"{Fore.GREEN}Plantio Alterado com sucesso: {field_to_update} - {safra} - {ciclo} | {Fore.CYAN}{field_to_update.variedade} | {field_to_update.programa}{Style.RESET_ALL}"
+                                    )
+                                    print("\n")
+                                    count_total += 1
+                            except Exception as e:
+                                print(
+                                    f"{Fore.RED}Problema em salvar o plantio: {talhao_id} - {safra} - {ciclo}{Style.RESET_ALL}{e}"
+                                )
+                        else:
+                            try:
+                                field_to_update = Plantio.objects.filter(
+                                    safra=safra, ciclo=ciclo, talhao=talhao_id
+                                )[0]
+                                if area:
+                                    field_to_update.area_colheita = total_area_plantada
                                 if map_centro_id_farm:
                                     field_to_update.map_centro_id = map_centro_id_farm
-
                                 if map_geo_points_farm:
                                     field_to_update.map_geo_points = map_geo_points_farm
+                                field_to_update.variedade = None
+                                field_to_update.programa = None
+                                field_to_update.id_farmbox = id_plantio_farmbox
 
-                                if state == "active":
-                                    if date_plantio:
-                                        field_to_update.data_plantio = date_plantio
-                                        field_to_update.finalizado_plantio = True
-                                        field_to_update.area_colheita = area
-
-                                    if emergence_date:
-                                        field_to_update.data_emergencia = emergence_date
-
-                                if variety_id:
-                                    id_variedade_done = [
-                                        x
-                                        for x in variedade_list
-                                        if x.id_farmbox == variety_id
-                                    ][0]
-                                    field_to_update.variedade = id_variedade_done
-                                else:
-                                    field_to_update.variedade = id_variedade
                                 field_to_update.save()
                                 print(
-                                    f"{Fore.GREEN}Plantio Alterado com sucesso: {field_to_update} - {safra} - {ciclo} | {Fore.CYAN}{field_to_update.variedade} | {field_to_update.programa}{Style.RESET_ALL}"
+                                    f"{Fore.YELLOW}Plantio Alterado com sucesso para SEM VARIEDADE: {field_to_update}- {safra} - {ciclo}{Style.RESET_ALL}"
                                 )
                                 print("\n")
                                 count_total += 1
-                        except Exception as e:
-                            print(
-                                f"{Fore.RED}Problema em salvar o plantio: {talhao_id} - {safra} - {ciclo}{Style.RESET_ALL}{e}"
-                            )
-                    else:
-                        try:
-                            field_to_update = Plantio.objects.filter(
-                                safra=safra, ciclo=ciclo, talhao=talhao_id
-                            )[0]
-                            if area:
-                                field_to_update.area_colheita = area
-                                field_to_update.area_colheita = area
-                            if map_centro_id_farm:
-                                field_to_update.map_centro_id = map_centro_id_farm
-                            if map_geo_points_farm:
-                                field_to_update.map_geo_points = map_geo_points_farm
-                            field_to_update.variedade = None
-                            field_to_update.programa = None
-                            field_to_update.id_farmbox = id_plantio_farmbox
-
-                            field_to_update.save()
-                            print(
-                                f"{Fore.YELLOW}Plantio Alterado com sucesso para SEM VARIEDADE: {field_to_update}- {safra} - {ciclo}{Style.RESET_ALL}"
-                            )
-                            print("\n")
-                            count_total += 1
-                        except Exception as e:
-                            print(
-                                f"{Fore.RED}Problema em salvar o plantio Não Planejado: {talhao_id} - {safra} - {ciclo}{Style.RESET_ALL}{e}"
-                            )
-
+                            except Exception as e:
+                                print(
+                                    f"{Fore.RED}Problema em salvar o plantio Não Planejado: {talhao_id} - {safra} - {ciclo}{Style.RESET_ALL}{e}"
+                                )
+                else:
+                    print('dev mode')
                 qs_plantio = Plantio.objects.filter(safra__safra="2023/2024")
 
-                serializer_plantio = PlantioSerializer(qs_plantio, many=True)
+                # serializer_plantio = PlantioSerializer(qs_plantio, many=True)
                 response = {
                     "msg": f"Consulta realizada com sucesso!!",
                     "total_return": len(qs_plantio),
                     "Total de Talhões alterados": count_total,
-                    "dados": serializer_plantio.data,
+                    # 'total soma plantado': plantio_extrato_area
+                    # "dados": serializer_plantio.data,
                 }
                 return Response(response, status=status.HTTP_200_OK)
             except Exception as e:
