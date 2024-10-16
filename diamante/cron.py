@@ -1,7 +1,7 @@
 from datetime import datetime
 from .utils import get_date, get_miliseconds
 import time
-from .read_farm_data import get_applications
+from .read_farm_data import get_applications, get_applications_pluvi
 from qualidade_project.mongo_api import generate_file_run
 
 def get_hour_test():
@@ -18,11 +18,20 @@ def update_farmbox_mongodb_app():
     
     data_applications = get_applications(updated_last=last_up)
     # print(data_applications)
-    
     for _ in range(2):
         print(time.ctime())
         # Prints the current time with a five second difference
         time.sleep(1)
-    generate_file_run(data_applications)
+    type_app = 'Aplicacoes'
+    generate_file_run(type_app, data_applications)
     print("\nAplicações Atualizadas.")
+    
+    number_of_days_before_pluvi = 4
+    from_date_pluvi = get_date(number_of_days_before_pluvi)
+    last_up_pluvi = get_miliseconds(from_date_pluvi)
+    data_applications_pluvi = get_applications_pluvi(updated_last=last_up_pluvi)
+    
+    type_pluvi = 'Pluvi'
+    generate_file_run(type_pluvi, data_applications_pluvi)
+    print("\nPluviometrias Atualizadas.")
         

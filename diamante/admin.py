@@ -556,19 +556,21 @@ def export_plantio(modeladmin, request, queryset):
             "Plantio Finalizado",
             "Colheita Finalizada",
             "Plantio Descontinuado",
-            "Area",
+            "Area Planejada",
             "Data Prev Colheita",
+            "area Plantada",
             "Data Plantio",
             # "Dap",
             "Ciclo Variedade",
             "Programa",
             "ID FarmBox",
             "Data Prevista Plantio",
+            'Plantio Iniciado',
             "Cargas Carregadas",
             "Carregado Kg",
             "Produtividade",
-            "Area Parcial",
-            "Area a Considerar",
+            # "Area Parcial",
+            # "Area a Considerar",
             "lat",
             "long",
             "dap",
@@ -587,6 +589,7 @@ def export_plantio(modeladmin, request, queryset):
         "finalizado_plantio",
         "finalizado_colheita",
         "plantio_descontinuado",
+        "area_planejamento_plantio",
         "area_colheita",
         "data_plantio",
         "variedade__dias_ciclo",
@@ -595,6 +598,7 @@ def export_plantio(modeladmin, request, queryset):
         "map_centro_id",
         "id_farmbox",
         "data_prevista_plantio",
+        "inicializado_plantio",
         "variedade__dias_germinacao",
     )
     cargas_list = modeladmin.total_c_2
@@ -610,8 +614,8 @@ def export_plantio(modeladmin, request, queryset):
                 value = float("Inf")
         if plantio[14]:
             try:
-                if plantio[15] is not None:
-                    prod = total_filt_list / plantio[15]
+                if plantio[16] is not None:
+                    prod = total_filt_list / plantio[16]
                     prod_scs = prod / 60
             except ZeroDivisionError:
                 value = float("Inf")
@@ -644,22 +648,21 @@ def export_plantio(modeladmin, request, queryset):
         lat = ""
         lng = ""
         area_parcial = str(plantio_detail[15]).replace(".",",")
-        area_plantada = str(plantio_detail[11]).replace(".",",")
-        area_considerar = area_plantada if plantio_detail[9] == True else area_parcial
-        if isinstance(plantio_detail[16], dict):
+        area_plantada = str(plantio_detail[12]).replace(".",",") if plantio_detail[20] == True else ' - '
+        if isinstance(plantio_detail[17], dict):
             lat = (
-                str(plantio_detail[16]["lat"]).replace(".", ",")
-                if plantio_detail[16]["lat"] != None
+                str(plantio_detail[17]["lat"]).replace(".", ",")
+                if plantio_detail[17]["lat"] != None
                 else ""
             )
             lng = (
-                str(plantio_detail[16]["lng"]).replace(".", ",")
-                if plantio_detail[16]["lng"] != None
+                str(plantio_detail[17]["lng"]).replace(".", ",")
+                if plantio_detail[17]["lng"] != None
                 else ""
             )
-        plantio_detail.pop(16)
-        data_plantio = plantio_detail[12] if plantio_detail[12] else plantio_detail[-1]
-        time_delta_plantio = plantio_detail[13]
+        plantio_detail.pop(17)
+        data_plantio = plantio_detail[13] if plantio_detail[13] else plantio_detail[-1]
+        time_delta_plantio = plantio_detail[14]
         plantio_detail[11] = localize(plantio_detail[11])
         cargas_carregadas_filter = [
             (x[1] * 60) for x in cargas_list if plantio_detail[0] == x[0]
@@ -667,12 +670,12 @@ def export_plantio(modeladmin, request, queryset):
         cargas_carregadas_kg = localize(sum(cargas_carregadas_filter))
         cargas_carregadas_quantidade = len(cargas_carregadas_filter)
         produtividade = get_total_prod(cargas_list, plantio)
-        plantio_detail.pop(15)
+        plantio_detail.pop(16)
         plantio_detail.append(cargas_carregadas_quantidade)
         plantio_detail.append(cargas_carregadas_kg)
         plantio_detail.append(produtividade)
-        plantio_detail.append(str(area_parcial).replace(".", ','))
-        plantio_detail.append(area_considerar)
+        # plantio_detail.append(str(area_parcial).replace(".", ','))
+        # plantio_detail.append(area_considerar)
         plantio_detail.append(lat)
         plantio_detail.append(lng)
         plantio_detail.pop(0)
@@ -681,6 +684,7 @@ def export_plantio(modeladmin, request, queryset):
         print('time delta: ', time_delta_calc)
         plantio_detail.insert(11, get_prev_colheita(data_plantio, time_delta_calc))
         plantio_detail.append(get_dap(data_plantio))
+        plantio_detail[12] = area_plantada
         print(plantio_detail)
         print(lat, lng)
         plantio = tuple(plantio_detail)
