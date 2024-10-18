@@ -8,6 +8,7 @@ primary_region = 'gru'
 console_command = '/code/manage.py shell'
 
 [build]
+  builder = "paketobuildpacks/builder:base"
 
 [deploy]
   release_command = 'python manage.py migrate --noinput'
