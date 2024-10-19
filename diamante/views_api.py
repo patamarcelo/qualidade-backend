@@ -1813,7 +1813,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 prev_date = {}
                 # 50 ha por dia
                 # max_day = 50
-
+                today_check = datetime.datetime.now().date()
                 # PROGRAMA PARA GERAR DATAS FUTURAS DE ACORDO COM A LÓGICA PARA
                 for k, v in final_result.items():
                     prev_date.update(
@@ -1862,10 +1862,16 @@ class PlantioViewSet(viewsets.ModelViewSet):
                             "data_inicial"
                         ] + datetime.timedelta(days=prev_date[k]["dias_necessários"])
                         # ------------HERE is the challenge-------------------#
+                        # print('data Prevista: ', data_prevista_plantio)
+                        # print('data Prevista: ', type(data_prevista_plantio))
+                        # print('data Prevista check: ', today_check)
+                        # print('data Prevista check: ', type(today_check))
+                        # print(data_prevista_plantio > today_check)
+                        print('\n')
                         if data_plantio is None:
                             final_result[k][kk].update(
                                 {
-                                    "data_plantio": data_prevista_plantio if data_prevista_plantio else  prev_date[k]["data_inicial"]
+                                    "data_plantio": data_prevista_plantio if data_prevista_plantio and data_prevista_plantio > today_check else  prev_date[k]["data_inicial"]
                                     + datetime.timedelta(
                                         days=prev_date[k]["dias_necessários"]
                                     )

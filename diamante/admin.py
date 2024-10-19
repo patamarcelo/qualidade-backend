@@ -661,7 +661,7 @@ def export_plantio(modeladmin, request, queryset):
                 else ""
             )
         plantio_detail.pop(17)
-        data_plantio = plantio_detail[13] if plantio_detail[13] else plantio_detail[-1]
+        data_plantio = plantio_detail[13] if plantio_detail[13] else plantio_detail[-2]
         time_delta_plantio = plantio_detail[14]
         plantio_detail[11] = localize(plantio_detail[11])
         cargas_carregadas_filter = [
