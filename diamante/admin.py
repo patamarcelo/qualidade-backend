@@ -430,17 +430,27 @@ class PlantioDetailPlantioAdmin(admin.ModelAdmin):
 # --------------------------- DELETAR SE NÃO FIZER FALTA - 18/10/2023 ---------------------------#
 
 
-class EstagiosProgramaInline(admin.StackedInline):
+class EstagiosProgramaInline(admin.TabularInline):
     model = Operacao
     extra = 0
     fields = ["ativo", "estagio", "operacao_numero", "prazo_dap"]
+    
+    class Media:
+        css = {
+            'all': ('admin/css/custom_admin.css',)  # Add your custom CSS file here
+        }
 
 
-class AplicacoesProgramaInline(admin.StackedInline):
+class AplicacoesProgramaInline(admin.TabularInline):
     model = Aplicacao
     extra = 0
     fields = ["defensivo", "dose", "ativo"]
     autocomplete_fields = ["defensivo"]
+    
+    class Media:
+        css = {
+            'all': ('admin/css/custom_admin.css',)  # Add your custom CSS file here
+        }
 
 
 @admin.register(Deposito)
@@ -2171,7 +2181,7 @@ class PlannerPlantioAdmin(admin.ModelAdmin):
     start_date_description.short_description = "Start Plantio"
 
 
-class RegistroVisitasAdminInline(admin.StackedInline):
+class RegistroVisitasAdminInline(admin.TabularInline):
     model = RegistroVisitas
     extra = 0
     fields = ["ativo", "image", "image_title", "obs"]

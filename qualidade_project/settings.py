@@ -91,6 +91,7 @@ MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
+    'django.middleware.gzip.GZipMiddleware',
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "debug_toolbar.middleware.DebugToolbarMiddleware",
@@ -157,10 +158,11 @@ DATABASES = {
         "PASSWORD": env("DB_EL_PASSWORD"),
         "HOST": env("DB_EL_HOST"),
         "PORT": env("DB_EL_PORT"),
+        'CONN_MAX_AGE': 300,  # Keep connections alive for 5 minutes
         'POOL_OPTIONS': {
-            'POOL_SIZE': 20,            # Number of connections in the pool
-            'MAX_OVERFLOW': 10,         # Extra connections beyond the pool size
-            'RECYCLE': 1800,            # Recycle connections after a certain time to avoid stale connections
+            'POOL_SIZE': 10,            # Number of connections in the pool
+            'MAX_OVERFLOW': 5,         # Extra connections beyond the pool size
+            'RECYCLE': 900,            # Recycle connections after a certain time to avoid stale connections
             'PRE_PING': True,           # Check connections before using them to avoid using a broken connection
         }
     },

@@ -869,8 +869,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 )[0]
                                 field_to_update.id_farmbox = id_plantio_farmbox
                                 if field_to_update.finalizado_colheita == False:
-                                    if planned_date:
-                                        field_to_update.data_prevista_plantio = planned_date
+                                    # if planned_date:
+                                    #     field_to_update.data_prevista_plantio = planned_date
                                     if area:
                                         field_to_update.area_colheita = total_area_plantada
                                         field_to_update.area_planejamento_plantio = area_planejamento
