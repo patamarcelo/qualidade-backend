@@ -3145,7 +3145,6 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 print('poligons to exportL ', poligons_to_export)
                 try:
                     kml_content = self.create_kml(poligons_to_export)
-                    print(kml_content)
                 except Exception as e:
                     print('erro ao gerar o KML: ', e)
 
@@ -3813,9 +3812,13 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "area_planejamento_plantio",
                     "id_farmbox",
                     "data_prevista_plantio",
+                    "data_plantio",
+                    "finalizado_plantio",
+                    "data_prevista_colheita",
                     "talhao__fazenda__nome",
                     "talhao__id_talhao",
                     "variedade__variedade",
+                    'variedade__dias_ciclo',
                     "variedade__cultura__cultura"
                 )
                 .filter(safra__safra="2024/2025", ciclo__ciclo="3")
