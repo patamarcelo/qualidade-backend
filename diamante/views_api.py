@@ -3092,7 +3092,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             # Create a separate placemark for the label
             label_placemark = f'''
             <Placemark>
-                <name>Talhão {item['talhao__id_talhao']}</name> <!-- This is the label -->
+                <name>{item['talhao__id_talhao']}</name> <!-- This is the label -->
                 <styleUrl>#style1</styleUrl>  <!-- You can use the same style or define a new one -->
                 <Point>
                     <coordinates>{center_lng},{center_lat}</coordinates> <!-- Center coordinates for the label -->
