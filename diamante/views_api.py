@@ -3034,6 +3034,148 @@ class PlantioViewSet(viewsets.ModelViewSet):
         else:
             response = {"message": "Você precisa estar logado!!!"}
             return Response(response, status=status.HTTP_401_UNAUTHORIZED)
+        
+    def create_kml(self, queryset):
+        kml_header = '''<?xml version="1.0" encoding="UTF-8"?>
+                    <kml xmlns="http://www.opengis.net/kml/2.2">
+                        <Document>
+                            <Style id="style1">
+                                <LineStyle>
+                                    <color>80000000</color>  <!-- Black fill, fully opaque -->
+                                    <width>2</width>
+                                </LineStyle>
+                                <PolyStyle>
+                                    <color>80ffffff</color>  <!-- White line with 80% opacity -->
+                                    
+                                </PolyStyle>
+                                <IconStyle>
+                                    <scale>0</scale>  <!-- Set scale to 0 to hide the icon -->
+                                </IconStyle>
+                            </Style>
+                    '''
+        kml_footer = '</Document>\n</kml>\n'
+
+        placemarks = ""
+
+        # Loop through each item in the queryset
+        for item in queryset:
+            # Extract the points for each item
+            coordinates = []
+            for point in item['map_geo_points']:  # Assuming `map_geo_points` is a JSON field or similar
+                lat = point['latitude']
+                lng = point['longitude']
+                coordinates.append(f"{lng},{lat}")  # KML format is lng,lat
+            coordinates.append(f"{item['map_geo_points'][0]['longitude']},{item['map_geo_points'][0]['latitude']}")  # KML format is lng,lat
+            
+            # Calculate the center of the polygon for the label
+            center_lat = sum(float(point['latitude']) for point in item['map_geo_points']) / len(item['map_geo_points'])
+            center_lng = sum(float(point['longitude']) for point in item['map_geo_points']) / len(item['map_geo_points'])
+            
+            
+            # Create a placemark for each item with additional details
+            # Create a placemark for the polygon
+            polygon_placemark = f'''
+            <Placemark>
+                <name>{item['talhao__id_talhao']}</name> <!-- This is the polygon name -->
+                <description>Farmbox ID: {item['id_farmbox']}</description>
+                <styleUrl>#style1</styleUrl>
+                <Polygon>
+                    <outerBoundaryIs>
+                        <LinearRing>
+                            <coordinates>{" ".join(coordinates)}</coordinates>
+                        </LinearRing>
+                    </outerBoundaryIs>
+                </Polygon>
+            </Placemark>
+            '''
+
+            # Create a separate placemark for the label
+            label_placemark = f'''
+            <Placemark>
+                <name>Talhão {item['talhao__id_talhao']}</name> <!-- This is the label -->
+                <styleUrl>#style1</styleUrl>  <!-- You can use the same style or define a new one -->
+                <Point>
+                    <coordinates>{center_lng},{center_lat}</coordinates> <!-- Center coordinates for the label -->
+                </Point>
+                <LabelStyle>
+                    <color>ff0000ff</color>  <!-- Red label (fully opaque) -->
+                    <scale>1.2</scale>  <!-- Adjust the label size -->
+                </LabelStyle>
+            </Placemark>
+            '''
+
+            placemarks += polygon_placemark + label_placemark
+
+        return kml_header + placemarks + kml_footer
+    
+    @action(detail=False, methods=["GET", "POST"])
+    def get_kmls_aviacao(self, request, pk=None):
+        # get id_farmbox
+        projeto_filter = request.data["projeto"]
+        parcelas_filter = request.data["parcelas"]
+        safra_filter = "2024/2025"
+        ciclo_filter = "1"
+        try:
+            filter_safra_and_ciclo = parcelas_filter[0]
+            refer_plantio = Plantio.objects.get(id_farmbox=filter_safra_and_ciclo)
+            print('refer plantio Safra: ', refer_plantio.safra.safra)
+            print('refer plantio ciclo: ', refer_plantio.ciclo.ciclo)
+            safra_filter = refer_plantio.safra.safra
+            ciclo_filter = refer_plantio.ciclo.ciclo
+        except Exception as e:
+            print('error em filtrar safra e ciclo: ', e)
+        for i in parcelas_filter:
+            print(i)
+
+        start_time = time.time()
+        print(start_time)
+        try:
+            plantio_map = Plantio.objects.values(
+                "map_geo_points", "map_centro_id", "talhao__id_talhao", "id_farmbox"
+            ).filter(
+                safra__safra=safra_filter,
+                ciclo__ciclo=ciclo_filter,
+                # finalizado_plantio=True,
+                # programa__isnull=False,
+                talhao__fazenda__id_farmbox=projeto_filter,
+            ).order_by('data_prevista_plantio')
+            
+            if parcelas_filter:
+                poligons_to_export = plantio_map.filter(id_farmbox__in=parcelas_filter)
+                print('poligons to exportL ', poligons_to_export)
+                try:
+                    kml_content = self.create_kml(poligons_to_export)
+                    print(kml_content)
+                except Exception as e:
+                    print('erro ao gerar o KML: ', e)
+
+
+            # Prepare the KML content as a base64 encoded string if needed
+            kml_data = base64.b64encode(kml_content.encode()).decode()
+            kml_data_uri = f"data:application/vnd.google-earth.kml+xml;base64,{kml_data}"
+
+            response = {
+                "msg": "Mapa gerado com sucesso!!",
+                "data": {
+                    # Include the image data URI
+                    "kml": kml_data_uri   
+                },
+            }
+            return Response(
+                response,
+                content_type="application/json",  # Use JSON response type
+                status=status.HTTP_200_OK,
+            )
+
+            # POSTMAN
+            # return HttpResponse(
+            #     img_buffer.getvalue(),
+            #     content_type="image/png",
+            #     status=status.HTTP_200_OK,
+            # )
+        except Exception as e:
+            response = {"message": f"Ocorreu um Erro: {e}"}
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=False, methods=["GET", "POST"])
     def get_matplot_draw(self, request, pk=None):
@@ -3803,6 +3945,18 @@ class PlantioViewSet(viewsets.ModelViewSet):
             ).filter(safra__safra=safra_filter, ciclo__ciclo=cicle_filter)
             )
             
+            qs_sent_seeds_totals = (
+                SentSeeds.objects.select_related(
+                    "variedade", 
+                    "fazenda",
+                ).values(
+                "variedade__variedade",  # Group by variedade
+                "variedade__cultura__cultura", 
+            ).annotate(
+                total_area_plantada=Sum("peso_total")  # Sum the area_plantada for each group
+            ).filter(safra__safra=safra_filter, ciclo__ciclo=cicle_filter)
+            )
+            
             
             # Subquery to get the last (most recent) data_apontamento for each variedade and fazenda
             # latest_stock = SeedStock.objects.filter(
@@ -3965,9 +4119,11 @@ class PlantioViewSet(viewsets.ModelViewSet):
             data = {
                 'qs_plantio': qs_plantio,
                 "qs_sent_seed": qs_sent_seeds,
+                "qs_sent_seeds_totals": qs_sent_seeds_totals,
                 'qs_stock': seed_stocks,
                 'qs_regulagem': seed_config,
-                'query_table': table_data
+                'query_table': table_data,
+                
             }
             response = {
                 "msg": f"Consulta sobre as sementes realizada com sucesso!!",
@@ -4877,7 +5033,8 @@ class StViewSet(viewsets.ModelViewSet):
                 if should_send_email == True:
                     subject = f"Pré ST Aberta: {st_number_protheus}"
                     from_email = 'patamarcelo@gmail.com'
-                    recipient_list = ['raylton.sousa@diamanteagricola.com.br', 'melissa.bento@diamanteagricola.com.br', 'adriana.goncalves@diamanteagricola.com.br']
+                    # recipient_list = ['raylton.sousa@diamanteagricola.com.br', 'melissa.bento@diamanteagricola.com.br', 'adriana.goncalves@diamanteagricola.com.br']
+                    recipient_list = ['raylton.sousa@diamanteagricola.com.br', 'adriana.goncalves@diamanteagricola.com.br']
                     # recipient_list = ['marcelo@gdourado.com.br']
                     template_name = "st_open.html"
                     convert_to_html_content =  render_to_string(

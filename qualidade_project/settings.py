@@ -152,18 +152,19 @@ EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD_CONFIG")
 
 DATABASES = {
     "default": {
-        'ENGINE': 'dj_db_conn_pool.backends.postgresql',
+        'ENGINE': 'django.db.backends.postgresql',
         "NAME": env("DB_EL_NAME"),
         "USER": env("DB_EL_USER"),
         "PASSWORD": env("DB_EL_PASSWORD"),
         "HOST": env("DB_EL_HOST"),
         "PORT": env("DB_EL_PORT"),
-        'CONN_MAX_AGE': 300,  # Keep connections alive for 5 minutes
+        # 'CONN_MAX_AGE': 10,  # Keep connections alive for 5 minutes
+        'ATOMIC_REQUESTS': True,
         'POOL_OPTIONS': {
-            'POOL_SIZE': 10,            # Number of connections in the pool
-            'MAX_OVERFLOW': 5,         # Extra connections beyond the pool size
-            'RECYCLE': 900,            # Recycle connections after a certain time to avoid stale connections
-            'PRE_PING': True,           # Check connections before using them to avoid using a broken connection
+            'POOL_SIZE': 10,        # Increase from 5
+            'MAX_OVERFLOW': 20,     # Increase from 10
+            'RECYCLE': 300,
+            'PRE_PING': True,
         }
     },
     "dev": {
@@ -281,3 +282,20 @@ CRISPY_TEMPLATE_PACK = "bootstrap4"
 CRONJOBS = [
     ('* * * * *', 'diamante.cron.get_hour_test')
 ]
+
+
+# LOGGING = {
+#     'version': 1,
+#     'disable_existing_loggers': False,
+#     'handlers': {
+#         'console': {
+#             'class': 'logging.StreamHandler',
+#         },
+#     },
+#     'loggers': {
+#         'django.db.backends': {
+#             'level': 'DEBUG',
+#             'handlers': ['console'],
+#         },
+#     },
+# }

@@ -2325,7 +2325,18 @@ class RegistroVisitasAdmin(admin.ModelAdmin):
 @admin.register(AppFarmboxIntegration)
 class AppFarmBoxIntegrationAdmin(admin.ModelAdmin):
     
-    list_display = ("criados", "app_nuumero", "app_fazenda")
+    list_display = ("get_data", "app_nuumero", "app_fazenda")
+    search_fields=("app_nuumero",)
+
+    def get_data(self, obj):
+        if obj.criados:
+            return date_format(
+                obj.criados, format="SHORT_DATE_FORMAT", use_l10n=True
+            )
+        else:
+            return " - "
+
+    get_data.short_description = "Data Abertura"
     
     formfield_overrides = {
         models.JSONField: {
@@ -2373,10 +2384,45 @@ class StProtheusIntegrationAdmin(admin.ModelAdmin):
 
     get_data.short_description = "Data Abertura"
     
+
+@admin.action(description="Exportar Plantio para Excel")
+def export_plantio_extrato(modeladmin, request, queryset):
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = 'attachment; filename="ExtratoPlantio.csv"'
+    response.write(codecs.BOM_UTF8)
+    writer = csv.writer(response, delimiter=";")
+    writer.writerow([
+        "data",
+        "Parcela",
+        'Projeto',
+        'Safra',
+        'Ciclo',
+        'Cultura',
+        'Variedade',
+        'Area'
+    ])
     
+    plantios = queryset.select_related('plantio', 'plantio__safra', 'plantio__ciclo').values_list(
+        'data_plantio',
+        'plantio__talhao__id_talhao',
+        'plantio__talhao__fazenda__nome',
+        'plantio__safra__safra',
+        "plantio__ciclo__ciclo",
+        'plantio__variedade__cultura__cultura',
+        "plantio__variedade__variedade",
+        "area_plantada"
+    )
+    
+    for plantio in plantios:
+        plantio_detail = list(plantio)
+        plantio_detail[-1] = str(plantio_detail[-1]).replace('.', ',')
+        plantio = tuple(plantio_detail)
+        writer.writerow(plantio)
+    return response
 @admin.register(PlantioExtratoArea)
 class PlantioExtratoAreaAdmin(admin.ModelAdmin):
     form = PlantioExtratoAreaForm
+    actions =[export_plantio_extrato]
     
     
     list_display = ("talhao_description" , "get_data", "safra_description", "cultura_description", "variedade_description", "area_plantada")
@@ -2671,6 +2717,8 @@ class BuyProductsAdmin(admin.ModelAdmin):
     )
 
 def format_number_nf(number_str):
+    if not number_str:
+        return ' - '
     # Reverse the string to process it from the end
     reversed_str = str(number_str)[::-1]
     
@@ -2684,7 +2732,7 @@ def format_number_nf(number_str):
 @admin.register(SentSeeds)
 class SentSeedsAdmin(admin.ModelAdmin):
     readonly_fields = ("peso_total","criados", "modificado")
-    autocomplete_fields = ["variedade",'origem', 'destino']
+    autocomplete_fields = ["variedade",'origem']
     raw_id_fields = ["variedade"]
     list_display = [
         "get_data_envio", "origem", 'get_destino_name',"safra_description", 'cultura_description' , 'variedade', "get_quantidade_bags","get_peso_bag",  'get_peso_enviado', 'get_nf'
@@ -2713,12 +2761,13 @@ class SentSeedsAdmin(admin.ModelAdmin):
                     ("peso_total"),
                     ("nota_fiscal"),
                     ("origem", 'destino'),
-                    ('safra', 'ciclo')
+                    ('safra', 'ciclo'),
+                    ("observacao",)
                     
                 )
             },
         ),
-        ("Observações", {"fields": (("observacao",))}),
+        # ("Observações", {"fields": (("observacao",))}),
     )
 
     
