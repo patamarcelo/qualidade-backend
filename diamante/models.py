@@ -832,12 +832,12 @@ class PlantioExtratoArea(Base):
         plantio = self.plantio
         area_informada = self.area_plantada if self.area_plantada else 0
         if self.pk:
-            total_area = PlantioExtratoArea.objects.filter(plantio=plantio).exclude(pk=self.pk).aggregate(
+            total_area = PlantioExtratoArea.objects.filter(plantio=plantio, ativo=True).exclude(pk=self.pk).aggregate(
                 total_area_plantada=Sum("area_plantada")
             )['total_area_plantada'] or 0
         else:
             # For new instances, include all areas
-            total_area = PlantioExtratoArea.objects.filter(plantio=plantio).aggregate(
+            total_area = PlantioExtratoArea.objects.filter(plantio=plantio, ativo=True).aggregate(
                 total_area_plantada=Sum("area_plantada")
             )['total_area_plantada'] or 0
         

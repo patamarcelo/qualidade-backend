@@ -779,6 +779,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     PlantioExtratoArea.objects
                     .select_related('plantio')
                     .filter(plantio__id_farmbox__in=ids_farmbox_list)
+                    .filter(ativo=True)
                     .values('plantio__id_farmbox')
                     .annotate(total_area_plantada=Sum('area_plantada'))
                 )
@@ -2176,6 +2177,10 @@ class PlantioViewSet(viewsets.ModelViewSet):
 
                 # PROGRAMA PARA GERAR DATAS FUTURAS DE ACORDO COM A LÓGICA PARA
                 for k, v in final_result.items():
+                    # print('chave: ', k)
+                    # for parcela, dados in v.items():
+                    #     print(f'parcela: {parcela} - Cronograma: ', dados['cronograma'])
+                    # print('\n')
                     prev_date.update(
                         {
                             k: {
@@ -2324,7 +2329,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "app_date": final_by_day,
                     "total_query_plantio": qs_plantio.count(),
                     "total_return_plantio": len(final_result),
-                    "dados": final,
+                    # "dados": final,
                     # "dados_plantio": qs_plantio,
                     # "total_return_aplicacoes": len(qs_aplicacoes),
                     # "dados_aplicacoes": qs_aplicacoes,
@@ -3846,6 +3851,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "aguardando_chuva"
                 )
                 .filter(plantio__safra__safra="2024/2025", plantio__ciclo__ciclo="3")
+                .filter(ativo=True)
             )
 
             data = {
@@ -3933,7 +3939,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             ).annotate(
                 total_area_plantada=Sum("area_plantada")  # Sum the area_plantada for each group
             ).filter(plantio__safra__safra=safra_filter, plantio__ciclo__ciclo=cicle_filter)
-            )
+            ).filter(ativo=True)
             
             qs_sent_seeds = (
                 SentSeeds.objects.select_related(
@@ -5037,7 +5043,7 @@ class StViewSet(viewsets.ModelViewSet):
                     subject = f"Pré ST Aberta: {st_number_protheus}"
                     from_email = 'patamarcelo@gmail.com'
                     # recipient_list = ['raylton.sousa@diamanteagricola.com.br', 'melissa.bento@diamanteagricola.com.br', 'adriana.goncalves@diamanteagricola.com.br']
-                    recipient_list = ['raylton.sousa@diamanteagricola.com.br', 'adriana.goncalves@diamanteagricola.com.br']
+                    recipient_list = ['raylton.sousa@diamanteagricola.com.br', 'adriana.goncalves@diamanteagricola.com.br', 'arthur.rosal@diamanteagricola.com.br']
                     # recipient_list = ['marcelo@gdourado.com.br']
                     template_name = "st_open.html"
                     convert_to_html_content =  render_to_string(
