@@ -1077,6 +1077,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
                     ("data_prevista_colheita", "data_prevista_plantio"),
                     ("area_aferida",),
                     ("plantio_descontinuado",),
+                    ("farmbox_update",),
                     ("observacao",),
                 )
             },
@@ -2425,12 +2426,12 @@ class PlantioExtratoAreaAdmin(admin.ModelAdmin):
     actions =[export_plantio_extrato]
     
     
-    list_display = ("talhao_description" , "get_data", "safra_description", "cultura_description", "variedade_description", "area_plantada")
+    list_display = ("talhao_description" , "get_data", "safra_description", "cultura_description", "variedade_description", "area_plantada", 'ativo')
     autocomplete_fields = ["plantio"]
     raw_id_fields = ["plantio"]
     readonly_fields = ("criados","modificado")
     ordering = ["-data_plantio"]
-    list_filter = ['aguardando_chuva']
+    list_filter = ['aguardando_chuva', 'ativo']
     search_fields = [
         "plantio__variedade__variedade", 
         "plantio__variedade__cultura__cultura",

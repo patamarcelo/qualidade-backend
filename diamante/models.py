@@ -577,6 +577,12 @@ class Plantio(Base):
         default=False,
         help_text="Apontar caso tenha ocorrido replantio nesta Parcela / Safra / Ciclo",
     )
+    
+    farmbox_update = models.BooleanField(
+        "Atualziar via Farmbox",
+        default=True,
+        help_text="Falso caso não seja pra atualizar com os dados do Farmbox",
+    )
 
     talhao_desativado = models.BooleanField(
         "Parcela Desativada",
@@ -829,32 +835,35 @@ class PlantioExtratoArea(Base):
     )
 
     def save(self, *args, **kwargs):
-        plantio = self.plantio
-        area_informada = self.area_plantada if self.area_plantada else 0
-        if self.pk:
-            total_area = PlantioExtratoArea.objects.filter(plantio=plantio, ativo=True).exclude(pk=self.pk).aggregate(
-                total_area_plantada=Sum("area_plantada")
-            )['total_area_plantada'] or 0
-        else:
-            # For new instances, include all areas
-            total_area = PlantioExtratoArea.objects.filter(plantio=plantio, ativo=True).aggregate(
-                total_area_plantada=Sum("area_plantada")
-            )['total_area_plantada'] or 0
         
-        # print("Plantio to update: ", plantio)
-        # print('salvando area plantada para o plantio', total_area)
-        # print('area informada: ', self.area_plantada)
-        if self.finalizado_plantio:
-            plantio.area_colheita = plantio.area_planejamento_plantio
-            if self.area_plantada:
-                pass
+        if self.ativo == True:
+            print('Extrato ativo')
+            plantio = self.plantio
+            area_informada = self.area_plantada if self.area_plantada else 0
+            if self.pk:
+                total_area = PlantioExtratoArea.objects.filter(plantio=plantio, ativo=True).exclude(pk=self.pk).aggregate(
+                    total_area_plantada=Sum("area_plantada")
+                )['total_area_plantada'] or 0
             else:
-                self.area_plantada = plantio.area_planejamento_plantio - total_area
+                # For new instances, include all areas
+                total_area = PlantioExtratoArea.objects.filter(plantio=plantio, ativo=True).aggregate(
+                    total_area_plantada=Sum("area_plantada")
+                )['total_area_plantada'] or 0
             
-        else:
-            plantio.area_colheita = total_area + area_informada
-        plantio.inicializado_plantio = True
-        plantio.save()
+            # print("Plantio to update: ", plantio)
+            # print('salvando area plantada para o plantio', total_area)
+            # print('area informada: ', self.area_plantada)
+            if self.finalizado_plantio:
+                plantio.area_colheita = plantio.area_planejamento_plantio
+                if self.area_plantada:
+                    pass
+                else:
+                    self.area_plantada = plantio.area_planejamento_plantio - total_area
+                
+            else:
+                plantio.area_colheita = total_area + area_informada
+            plantio.inicializado_plantio = True
+            plantio.save()
         super(PlantioExtratoArea, self).save(*args, **kwargs)
 
     def __str__(self):
