@@ -318,7 +318,7 @@ class Programa(Base):
     cultura = models.ForeignKey(
         Cultura, on_delete=models.PROTECT, blank=True, null=True
     )
-
+    variedade = models.ManyToManyField(Variedade, blank=True, default=None)
     programa_por_data = models.BooleanField(
         "Regra por data",
         default=True,
@@ -469,8 +469,8 @@ class Aplicacao(Base):
     dose = models.DecimalField(
         "Dose KG/LT por ha",
         help_text="Dose aplicada de Kg ou Lt por ha.",
-        max_digits=8,
-        decimal_places=3,
+        max_digits=10,
+        decimal_places=4,
     )
     obs = models.TextField("Observação", max_length=500, blank=True)
 

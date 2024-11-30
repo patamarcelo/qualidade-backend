@@ -1132,7 +1132,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     cicle_filter = current_safra.ciclo.ciclo
 
                 safra_filter = "2024/2025" if safra_filter == None else safra_filter
-                cicle_filter = "1" if cicle_filter == None else cicle_filter
+                cicle_filter = "2" if cicle_filter == None else cicle_filter
 
                 qs = (
                     Plantio.objects.values(
@@ -3189,7 +3189,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
         projeto_filter = request.data["projeto"]
         parcelas_filter = request.data["parcelas"]
         safra_filter = "2024/2025"
-        ciclo_filter = "1"
+        ciclo_filter = "3"
         planejamento_plantio = False
 
         try:
@@ -3957,6 +3957,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             ).annotate(
                 total_area_plantada=Sum("peso_total")  # Sum the area_plantada for each group
             ).filter(safra__safra=safra_filter, ciclo__ciclo=cicle_filter)
+            .filter(ativo=True)
             )
             
             qs_sent_seeds_totals = (
@@ -3969,6 +3970,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             ).annotate(
                 total_area_plantada=Sum("peso_total")  # Sum the area_plantada for each group
             ).filter(safra__safra=safra_filter, ciclo__ciclo=cicle_filter)
+            .filter(ativo=True)
             )
             
             

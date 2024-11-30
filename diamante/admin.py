@@ -1783,6 +1783,7 @@ class ProgramaAdmin(admin.ModelAdmin):
 
     show_full_result_count = False
     readonly_fields = ["modificado"]
+    filter_vertical = ('variedade',)  # Field name
 
     inlines = [EstagiosProgramaInline]
     list_display = (
@@ -1813,6 +1814,7 @@ class ProgramaAdmin(admin.ModelAdmin):
                     ("cultura"),
                     ("programa_por_data", "programa_por_estagio"),
                     ("start_date", "end_date"),
+                    ("variedade"),
                     ("versao"),
                 )
             },
@@ -2055,6 +2057,7 @@ class AplicacaoAdmin(admin.ModelAdmin):
         "defensivo__id_farmbox",
         "dose",
         "get_operacao_prazo_dap",
+        "related_link",
         "ativo",
     )
     search_fields = [
@@ -2079,6 +2082,13 @@ class AplicacaoAdmin(admin.ModelAdmin):
         "criados",
         "modificado",
     )
+    
+    def related_link(self, obj):
+            if obj.operacao:
+                url = reverse('admin:diamante_operacao_change', args=[obj.operacao.id])
+                return format_html('<a href="{}">{}</a>', url, obj.operacao)
+            return "-"
+    related_link.short_description = "Estágio"
 
     
     def defensivo__id_farmbox(self, obj):
@@ -2327,7 +2337,7 @@ class RegistroVisitasAdmin(admin.ModelAdmin):
 class AppFarmBoxIntegrationAdmin(admin.ModelAdmin):
     
     list_display = ("get_data", "app_nuumero", "app_fazenda")
-    search_fields=("app_nuumero",)
+    search_fields=("app_nuumero","criados")
 
     def get_data(self, obj):
         if obj.criados:
@@ -2426,7 +2436,7 @@ class PlantioExtratoAreaAdmin(admin.ModelAdmin):
     actions =[export_plantio_extrato]
     
     
-    list_display = ("talhao_description" , "get_data", "safra_description", "cultura_description", "variedade_description", "area_plantada", 'ativo')
+    list_display = ("talhao_description", "get_data", "safra_description", "cultura_description", "variedade_description", "area_plantada","related_link", 'ativo')
     autocomplete_fields = ["plantio"]
     raw_id_fields = ["plantio"]
     readonly_fields = ("criados","modificado")
@@ -2481,6 +2491,14 @@ class PlantioExtratoAreaAdmin(admin.ModelAdmin):
     def talhao_description(self, obj):
         return obj.plantio.talhao
     talhao_description.short_description = 'Talhão'
+    
+    def related_link(self, obj):
+        if obj.plantio:
+            url = reverse('admin:diamante_plantio_change', args=[obj.plantio.id])
+            return format_html('<a href="{}">{}</a>', url, obj.plantio)
+        return "-"
+    related_link.short_description = "Plantio"
+
     
     def get_data(self, obj):
         if obj.data_plantio:
@@ -2739,7 +2757,7 @@ class SentSeedsAdmin(admin.ModelAdmin):
         "get_data_envio", "origem", 'get_destino_name',"safra_description", 'cultura_description' , 'variedade', "get_quantidade_bags","get_peso_bag",  'get_peso_enviado', 'get_nf'
     ]
     search_fields = [
-        "data_envio", "origem", 'destino', 'variedade', 'peso_total', 'nota_fiscal'
+        "data_envio", "origem__nome", 'destino__nome', 'variedade__variedade', 'peso_total', 'nota_fiscal'
     ]
     list_filter = ['destino', 'variedade']
     
