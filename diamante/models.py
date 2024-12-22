@@ -318,7 +318,7 @@ class Programa(Base):
     cultura = models.ForeignKey(
         Cultura, on_delete=models.PROTECT, blank=True, null=True
     )
-    variedade = models.ManyToManyField(Variedade, blank=True, default=None)
+    variedade = models.ManyToManyField(Variedade, blank=True, default=None, related_name="variedade_programa")
     programa_por_data = models.BooleanField(
         "Regra por data",
         default=True,

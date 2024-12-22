@@ -907,6 +907,12 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                         )
                                         print("\n")
                                         count_total += 1
+                                else:    
+                                    if map_centro_id_farm:
+                                        field_to_update.map_centro_id = map_centro_id_farm
+                                    if map_geo_points_farm:
+                                        field_to_update.map_geo_points = map_geo_points_farm
+                                    field_to_update.save()
                             except Exception as e:
                                 print(
                                     f"{Fore.RED}Problema em salvar o plantio: {talhao_id} - {safra} - {ciclo}{Style.RESET_ALL}{e}"
@@ -926,13 +932,19 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                     field_to_update.variedade = None
                                     field_to_update.programa = None
                                     field_to_update.id_farmbox = id_plantio_farmbox
-
                                     field_to_update.save()
                                     print(
                                         f"{Fore.YELLOW}Plantio Alterado com sucesso para SEM VARIEDADE: {field_to_update}- {safra} - {ciclo}{Style.RESET_ALL}"
                                     )
                                     print("\n")
                                     count_total += 1
+                                else:
+                                    if map_centro_id_farm:
+                                        field_to_update.map_centro_id = map_centro_id_farm
+                                    if map_geo_points_farm:
+                                        field_to_update.map_geo_points = map_geo_points_farm
+                                    field_to_update.save()
+                                    
                             except Exception as e:
                                 print(
                                     f"{Fore.RED}Problema em salvar o plantio Não Planejado: {talhao_id} - {safra} - {ciclo}{Style.RESET_ALL}{e}"
@@ -2604,6 +2616,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         )
                         .filter(safra=s_dict[safra_filter], ciclo=c_dict[cicle_filter])
                         .filter(plantio_descontinuado=False)
+                        .filter(variedade__cultura__isnull=False)
                     )
                     cache.set(cache_key_qs_plantio_map, qs_plantio, timeout=60*5*6)  # cache for 5 minutes
                 result = [
@@ -2709,7 +2722,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     safra=s_dict[safra_filter],
                     ciclo=c_dict[cicle_filter],
                     plantio_descontinuado=False,
-                )
+                ).filter(variedade__cultura__isnull=False)
 
                 result = [x for x in qs_plantio]
                 for i in qs_colheita:
@@ -2964,7 +2977,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             print('safra e ciclo filtr', safra_filter, cicle_filter)
             total_dias_plantado_acompanhamento = {
                 "arroz": 117,
-                "soja_feijao": 80
+                "soja_feijao": 10
             }
             try:
                 cargas_query = (
@@ -4242,7 +4255,7 @@ class DefensivoViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["GET"])
     def update_farmbox_mongodb_data(self, request, pk=None):
         
-        number_of_days_before = 2 if DEBUG == True else 1
+        number_of_days_before = 3 if DEBUG == True else 1
         from_date = get_date(number_of_days_before)
         last_up = get_miliseconds(from_date)
         print(last_up)
@@ -4454,6 +4467,8 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                             destino = 1
                         elif "BIGUA" in str(destino):
                             destino = 3
+                        elif "JK" in str(destino):
+                            destino = 7
 
                         final_ticket = f"{filial}{ticket}"
                         print(i)
@@ -5112,21 +5127,30 @@ class ColheitaPlantioExtratoAreaViewSet(viewsets.ModelViewSet):
             filtered_query = Plantio.objects.filter(id_farmbox__in=list_of_ids)
             
             for i in req_data:
-                check_this = is_older_than_7_days(i['editado'])
-                if check_this:
-                    print('check here: ', i)
-                    try:
-                        plantio_id_to_save = i['plantioId']
-                        plantio_to_save = [x for x in filtered_query if x.id_farmbox == plantio_id_to_save][0]
-                        area_to_save = Decimal(i['Area Aplicada'].replace(',','.'))
-                        data_to_save = i['Data Aplicacao']
-                        hour_to_save = int(i['Hora Aplicacao'].split(':')[0])
-                        minute_to_save = int(i['Hora Aplicacao'].split(':')[1])
-                        
-                        total_aplicado_to_save = Decimal(i['Total Aplicado'].replace(',','.'))
-                        plantio_to_save.area_parcial = total_aplicado_to_save
-                        plantio_to_save.save()
-                        
+                try:
+                    check_this = is_older_than_7_days(i['editado'])
+                    if not check_this:
+                        continue
+
+                    print('check here:', i)
+
+                    plantio_id_to_save = i['plantioId']
+                    plantio_to_save = next(
+                        (x for x in filtered_query if x.id_farmbox == plantio_id_to_save), None
+                    )
+                    if not plantio_to_save:
+                        raise ValueError(f"Plantio with id_farmbox={plantio_id_to_save} not found")
+
+                    area_to_save = Decimal(i['Area Aplicada'].replace(',', '.'))
+                    data_to_save = i['Data Aplicacao']
+                    hour_to_save, minute_to_save = map(int, i['Hora Aplicacao'].split(':'))
+                    total_aplicado_to_save = Decimal(i['Total Aplicado'].replace(',', '.'))
+
+                    plantio_to_save.area_parcial = total_aplicado_to_save
+                    plantio_to_save.save()
+
+                    # Wrap critical operation in a separate atomic block
+                    with transaction.atomic():
                         new_colheita = ColheitaPlantioExtratoArea(
                             plantio=plantio_to_save,
                             area_colhida=area_to_save,
@@ -5134,11 +5158,14 @@ class ColheitaPlantioExtratoAreaViewSet(viewsets.ModelViewSet):
                             time=dateTime(hour_to_save, minute_to_save)
                         )
                         new_colheita.save()
-                        print(f'{Fore.GREEN}Colheita Salva com sucesso!!{Style.RESET_ALL}')
-                        print(new_colheita)
-                        print('\n')
-                    except Exception as e:
-                        print(f'{Fore.LIGHTYELLOW_EX}Problema em Salvar o Plantio:{i} : \n{Fore.LIGHTRED_EX}Error: {e} {Style.RESET_ALL}')
+
+                    print(f'{Fore.GREEN}Colheita Salva com sucesso!!{Style.RESET_ALL}')
+                    print(new_colheita)
+                    print('\n')
+
+                except Exception as e:
+                    print(f'{Fore.LIGHTYELLOW_EX}Problema em Salvar o Plantio: {i} \n{Fore.LIGHTRED_EX}Error: {e} {Style.RESET_ALL}')
+
             
             response = {
                 'msg': 'Colheita Atualizada com sucesso!!'

@@ -27,7 +27,7 @@ import csv
 from django.http import HttpResponse
 import codecs
 
-from django.db.models import Q, Sum, F
+from django.db.models import Q, Sum, F, Exists
 
 from django.db.models import Subquery, OuterRef
 from django.utils.formats import localize
@@ -733,6 +733,32 @@ class ColheitaFilter(SimpleListFilter):
             return queryset.exclude(id__in=id_list)
 
 
+# class VariedadeInProgramaFilter(SimpleListFilter):
+#     title = "Variedade in Programa"
+#     parameter_name = "variedade_in_programa"
+
+#     def lookups(self, request, model_admin):
+#         return (
+#             ("yes", "Sim"),
+#             ("no", "Não"),
+#         )
+
+#     def queryset(self, request, queryset):
+#         """
+#         Filters the queryset based on the selected value.
+#         """
+#         queryset = queryset.select_related("variedade")
+#         print('queryset', queryset)
+        
+#         if self.value() == "yes":
+#             return queryset.filter(
+#                 programa__variedade__pk__in=queryset.values_list("variedade__pk", flat=True)
+#             ).distinct()
+#         elif self.value() == "no":
+#             return queryset.exclude(
+#                 programa__variedade__pk__in=queryset.values_list("variedade__pk", flat=True)
+#             ).distinct()
+#         return queryset
 class ColheitaFilterNoProgram(SimpleListFilter):
     title = "Sem Programa"  # or use _('country') for translated title
     parameter_name = "programas"
@@ -914,7 +940,10 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
                 "talhao__fazenda__fazenda",
                 "variedade",
                 "variedade__cultura",
-                "programa",
+                "programa"
+            )
+            .prefetch_related(
+                "programa__variedade"
             )
         )
 
@@ -984,6 +1013,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         "variedade__cultura",
         ColheitaFilter,
         ColheitaFilterNoProgram,
+        # VariedadeInProgramaFilter,
         "inicializado_plantio",
         "finalizado_plantio",
         "finalizado_colheita",
@@ -1002,12 +1032,13 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         "variedade_description",
         "safra_description",
         "programa",
+        "get_data",
+        "area_colheita",
+        "get_dap_description",
         "get_data_prev_plantio",
         "get_description_inicializado_plantio",
         "get_description_finalizado_plantio",
-        "get_data",
         "get_data_prev_col",
-        "area_colheita",
         "get_description_finalizado_colheita",
         # "get_area_parcial",
         "get_total_colheita_cargas_kg",
@@ -1016,11 +1047,11 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         "get_data_primeira_carga",
         "get_data_ultima_carga",
         "get_total_colheita_cargas",
-        "get_dap_description",
         "get_dias_ciclo",
         "get_description_descontinuado_plantio",
         "area_aferida",
         "area_parcial",
+        # "check_var_on_programa_list"
         # "detail",
     )
 
@@ -1390,6 +1421,16 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         return f"{obj.safra.safra} - {obj.ciclo.ciclo}"
 
     safra_description.short_description = "Safra"
+    
+    def check_var_on_programa_list(self,obj):
+        if obj.programa and obj.variedade:
+                
+            ins_in_programa =  obj.programa.variedade.filter(pk=obj.variedade.pk).exists()
+            return ins_in_programa
+    
+    check_var_on_programa_list.boolean = True  # Display as a boolean field
+    check_var_on_programa_list.short_description = "Variedade / Programa"
+        
 
     # def talhao_description(self, obj):
     #     projeto_name = "Projeto"
@@ -1783,7 +1824,7 @@ class ProgramaAdmin(admin.ModelAdmin):
 
     show_full_result_count = False
     readonly_fields = ["modificado"]
-    filter_vertical = ('variedade',)  # Field name
+    filter_horizontal = ('variedade',)  # Field name
 
     inlines = [EstagiosProgramaInline]
     list_display = (
@@ -2337,7 +2378,7 @@ class RegistroVisitasAdmin(admin.ModelAdmin):
 class AppFarmBoxIntegrationAdmin(admin.ModelAdmin):
     
     list_display = ("get_data", "app_nuumero", "app_fazenda")
-    search_fields=("app_nuumero","criados")
+    search_fields=("app_nuumero","criados",'app_fazenda')
 
     def get_data(self, obj):
         if obj.criados:
@@ -2410,7 +2451,8 @@ def export_plantio_extrato(modeladmin, request, queryset):
         'Ciclo',
         'Cultura',
         'Variedade',
-        'Area'
+        'Area',
+        'Ativo'
     ])
     
     plantios = queryset.select_related('plantio', 'plantio__safra', 'plantio__ciclo').values_list(
@@ -2421,7 +2463,8 @@ def export_plantio_extrato(modeladmin, request, queryset):
         "plantio__ciclo__ciclo",
         'plantio__variedade__cultura__cultura',
         "plantio__variedade__variedade",
-        "area_plantada"
+        "area_plantada",
+        'ativo'
     )
     
     for plantio in plantios:
