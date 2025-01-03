@@ -621,14 +621,16 @@ def export_plantio(modeladmin, request, queryset):
                 prod = total_filt_list / plantio[11]
                 prod_scs = prod / 60
             except ZeroDivisionError:
-                value = float("Inf")
+                prod_scs = float("Inf")
         if plantio[14]:
             try:
                 if plantio[16] is not None:
+                    print('total_filt', total_filt_list, 'plantio 16', plantio[16])
+                    print('\n')
                     prod = total_filt_list / plantio[16]
                     prod_scs = prod / 60
             except ZeroDivisionError:
-                value = float("Inf")
+                prod_scs = float("Inf")
         if prod_scs:
             return localize(round(prod_scs, 2))
         else:
@@ -679,7 +681,10 @@ def export_plantio(modeladmin, request, queryset):
         ]
         cargas_carregadas_kg = localize(sum(cargas_carregadas_filter))
         cargas_carregadas_quantidade = len(cargas_carregadas_filter)
-        produtividade = get_total_prod(cargas_list, plantio)
+        try:
+            produtividade = get_total_prod(cargas_list, plantio)
+        except:
+            produtividade = 0
         plantio_detail.pop(16)
         plantio_detail.append(cargas_carregadas_quantidade)
         plantio_detail.append(cargas_carregadas_kg)
@@ -2469,7 +2474,7 @@ def export_plantio_extrato(modeladmin, request, queryset):
     
     for plantio in plantios:
         plantio_detail = list(plantio)
-        plantio_detail[-1] = str(plantio_detail[-1]).replace('.', ',')
+        plantio_detail[-2] = str(plantio_detail[-2]).replace('.', ',')
         plantio = tuple(plantio_detail)
         writer.writerow(plantio)
     return response

@@ -1,0 +1,160 @@
+{% load static %}
+{% load l10n %}
+
+<!DOCTYPE html>
+<html>
+
+<head>
+    <style>
+        /* Inline CSS */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+        }
+
+        .email-container {
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border: 1px solid #dddddd;
+            border-radius: 5px;
+        }
+
+        .header {
+            background-color: #007bff;
+            color: #ffffff;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .content {
+            padding: 20px;
+        }
+
+        .image {
+            max-width: 100%;
+            height: auto;
+        }
+
+        .projetos {
+            padding-top: 20px;
+            padding-bottom: 20px;
+            width: 100%;
+        }
+        
+        .produtos {
+            padding-top: 20px;
+            padding-bottom: 20px;
+            width: 100%;
+        }
+
+        .observations {
+            padding-top: 20px;
+            padding-bottom: 20px;
+            width: 100%;
+        }
+
+        .footer {
+            background-color: #f0f0f0;
+            text-align: center;
+            padding: 10px;
+            font-size: 12px;
+        }
+
+        table {
+            width: 100%;
+        }
+
+        .titleunder{
+            text-decoration: underline;
+        }
+
+        .totalProds{
+            font-weight: bold;
+            font-size: 18px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="email-container">
+        <div class="header">
+            <h1>Abertura Pré ST</h1>
+            <h5>Pré ST: {{ st_number }}</h5>
+        </div>
+        <div class="content">
+            <div class="projetos">
+                <p class="titleunder" >Projetos Solicitados</p>
+                <ul>
+                    {% for projeto in fazendas %}
+                    <li>{{projeto}}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            <div class="aplicacoes">
+                <p class="titleunder" >Ap's Solicitadas</p>
+                <ul>
+                    {% for ap in aplicacoes %}
+                    <li>{{ap}}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            <div class="produtos">
+                <p class="titleunder totalProds" >Insumos das Ap's Solicitadas</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="text-align: left" class="titleunder">Produto</th>
+                            <th style="text-align: left" class="titleunder">Quantidade</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for produto in produtos %}
+                        <tr>
+                            <td>{{ produto.insumo }}</td>
+                            <td>{{ produto.quantidade|localize }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div>
+                <p class="titleunder totalProds" >Insumos consolidados de todas Aplicações em Aberto</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="text-align: left" class="titleunder">Produto</th>
+                            <th style="text-align: left" class="titleunder">Quantidade</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for produto in produtosGeral %}
+                        <tr>
+                            <td>{{ produto.inputName }}</td>
+                            <td>{{ produto.totalQuantityOpen|localize }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if observacao|length > 0 %}
+            <div class="observations">
+                <h4 class="titleunder"><b>Observações</b></h4>
+                <p>
+                    {{ observacao }}
+                </p>
+            </div>
+            {% endif %}
+
+            <!-- <img src=" static 'your/static/file/path'" alt="static image">
+            <img src="https://codeskulptor-demos.commondatastorage.googleapis.com/GalaxyInvaders/back01.jpg" alt="Image 3" class="image"> -->
+
+        </div>
+        <div class="footer">
+            &copy; Pré ST {{ st_number }} aberta com os dados do Farmbox.
+        </div>
+    </div>
+</body>
+
+</html>

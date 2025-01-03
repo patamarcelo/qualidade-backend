@@ -131,6 +131,7 @@ from collections import defaultdict
 from diamante.read_farm_data import get_applications, get_applications_pluvi
 
 from django.core.mail import send_mail
+from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 from django.conf import settings
@@ -176,6 +177,9 @@ from django.dispatch import receiver
 
 from concurrent.futures import ThreadPoolExecutor
 from django.db.models import Sum, OuterRef, Subquery
+
+import pandas as pd
+from io import BytesIO
 
 
 class CachedTokenAuthentication(TokenAuthentication):
@@ -4958,6 +4962,13 @@ def format_input_numbers(input_list):
         return rounded_value
     return [{**x, "quantidade": format_number(x['quantidade'])} for x in input_list]
 
+def format_input_numbers_for_geral(input_list):
+    def format_number(value):
+        # rounded_value = str(round(value, 2)).replace('.', ',')
+        rounded_value = round(value, 2)
+        return rounded_value
+    return [{**x, "totalQuantityOpen": format_number(x['totalQuantityOpen'])} for x in input_list]
+
 def formart_ap_list(input_list):
     formated_list = [ x.split('|')[0].strip().replace('AP', 'AP ') for x in input_list]
     return formated_list
@@ -4967,13 +4978,51 @@ class StViewSet(viewsets.ModelViewSet):
     serializer_class = StProtheusIntegrationSerializer
     authentication_classes = (CachedTokenAuthentication,)
     permission_classes = (IsAuthenticated,)
-    
-    
+
+    emails_list_by_farm = [
+        {
+            "projetos": ["Fazenda Benção de Deus"],
+            "emails_abertura_st": ["luana.moura@diamanteagricola.com.br"],
+        },
+        {
+            "projetos": ["Fazenda Cacique", "Fazenda Campo Guapo", "Fazenda Safira"],
+            "emails_abertura_st": ["raquel.marques@diamanteagricola.com.br"],
+        },
+        {
+            "projetos": [
+                "Fazenda Capivara",
+                "Fazenda Cervo",
+                "Fazenda Jacaré",
+                "Fazenda Tucano",
+                "Fazenda Tuiuiu",
+            ],
+            "emails_abertura_st": ["vinicius.costa@diamanteagricola.com.br", 'alessandro.chagas@diamanteagricola.com.br'],
+        },
+        {
+            "projetos": [
+                "Fazenda Lago Verde",
+                "Fazenda Fazendinha",
+                "Fazenda Santa Maria",
+            ],
+            "emails_abertura_st": ["raylla.aguiar@diamanteagricola.com.br"],
+        },
+    ]
+
+    def find_emails_by_farm(self, farm, emails_list_by_farm):
+        for entry in emails_list_by_farm:
+            if farm in entry["projetos"]:
+                return entry["emails_abertura_st"]
+        return None  # Return None if the farm is not found
+
     @action(detail=False, methods=["GET", "POST"])
     def open_st_by_protheus(self, request, pk=None):
         # Define if should send email
         should_send_email = False
-        # If user is Authenticated
+
+        # Define if should open pre st
+        generate_pre_st = True
+
+        list_emails = []
         if request.user.is_authenticated:
             req_data = None
             try:
@@ -4989,65 +5038,83 @@ class StViewSet(viewsets.ModelViewSet):
                 }
                 return Response(response, status=status.HTTP_208_ALREADY_REPORTED)
             print('dados recebidos: ', req_data)
-            
+
             # should change after receive from protheus'api
             st_number_protheus = 0
             if req_data:
                 # handle data and format properly
-                projetos = req_data["Projeto"]
-                datas = req_data["Data"]
-                apps = formart_ap_list(req_data["Ap"])
-                produtos = format_input_numbers(req_data['produtos'])
+                projetos = req_data.get("Projeto")
+                if projetos:
+                    if generate_pre_st:
+                        list_emails = self.find_emails_by_farm(projetos[0], self.emails_list_by_farm)
+                    else:
+                        list_emails = ["mtpata@icloud.com"]
+                print('\n')
+                print('should sent to: ', list_emails)
+                print('\n')
+                datas = req_data.get("Data")
+
+                if req_data.get("Ap"):
+                    apps = formart_ap_list(req_data.get("Ap"))
+
+                if req_data.get('produtos'):
+                    produtos = format_input_numbers(req_data.get('produtos'))
+
                 print('produtos: ', produtos)
-                fazenda_destino = req_data['fazendaDestino']
-                armazem_destino  = req_data['armazemDestino']
-                observacao  = req_data['observacao']
-                
+                fazenda_destino = req_data.get('fazendaDestino')
+                armazem_destino  = req_data.get('armazemDestino')
+                observacao  = req_data.get('observacao')
+
+                produtos_geral = req_data.get('produtosGeral')
+                if produtos_geral:
+                    produtos_geral = format_input_numbers_for_geral(produtos_geral)
+
                 headers = {
                     "Accept": "application/json",
                     "Content-Type": "application/json",
                     "Authorization": f'Basic ${PROTHEUS_TOKEN}',
                     "Access-Control-Allow-Origin": "*"
                 }
-                
+
                 url = "https://api.diamanteagricola.com.br:8089/rest/apisolicitacao/new"
                 payload = req_data
-                
+
                 try:
-                    response_headers = requests.post(url, data=json.dumps(payload), headers=headers, verify=False, auth=HTTPBasicAuth('api', PROTHEUS_TOKEN))
-                    print('response headers from protheus:', response_headers)
-                    print('\n\n')
-                    print('response:', response_headers.status_code, response_headers.text)
-                    if response_headers.status_code == 201:
-                        print('ST Aberta com sucesso!!!')
-                        parsed_json = json.loads(response_headers.text)
-                        number_opened = parsed_json["codigo_pre_st"]
-                        st_number_protheus = int(number_opened)
-                        should_send_email = True
-                        try:
-                            new_st_opened = StProtheusIntegration(
-                                st_numero=st_number_protheus,
-                                st_fazenda=projetos[0],
-                                app=req_data
-                            )
-                            new_st_opened.save()
-                            print('Nova ST salva com sucesso!!', new_st_opened)
-                        except Exception as e:
+                    if generate_pre_st:
+                        response_headers = requests.post(url, data=json.dumps(payload), headers=headers, verify=False, auth=HTTPBasicAuth('api', PROTHEUS_TOKEN))
+                        print('response headers from protheus:', response_headers)
+                        print('\n\n')
+                        print('response:', response_headers.status_code, response_headers.text)
+                        if response_headers.status_code == 201:
+                            print('ST Aberta com sucesso!!!')
+                            parsed_json = json.loads(response_headers.text)
+                            number_opened = parsed_json["codigo_pre_st"]
+                            st_number_protheus = int(number_opened)
+                            should_send_email = True
+                            try:
+                                new_st_opened = StProtheusIntegration(
+                                    st_numero=st_number_protheus,
+                                    st_fazenda=projetos[0],
+                                    app=req_data
+                                )
+                                new_st_opened.save()
+                                print('Nova ST salva com sucesso!!', new_st_opened)
+                            except Exception as e:
+                                response = {
+                                    "msg": f"Erro ao salvar a ST no banco de dados",
+                                    "error": f"Error ao salvar os dados vindos do farm, Erro: {e}"  # General error message
+                                }
+                                return Response(response, status=status.HTTP_208_ALREADY_REPORTED)
+                        else:
+                            parsed_json = json.loads(response_headers.text)
                             response = {
-                                "msg": f"Erro ao salvar a ST no banco de dados",
-                                "error": f"Error ao salvar os dados vindos do farm, Erro: {e}"  # General error message
+                                "msg": f"Erro ao abrir a ST no Protheus - Code: {response_headers.status_code}",
+                                "error": f"Error ao Abrir ST no Protheus, erro: {parsed_json['message']}"  # General error message
                             }
                             return Response(response, status=status.HTTP_208_ALREADY_REPORTED)
-                    else:
-                        parsed_json = json.loads(response_headers.text)
-                        response = {
-                            "msg": f"Erro ao abrir a ST no Protheus - Code: {response_headers.status_code}",
-                            "error": f"Error ao Abrir ST no Protheus, erro: {parsed_json['message']}"  # General error message
-                        }
-                        return Response(response, status=status.HTTP_208_ALREADY_REPORTED)
                 except Exception as e:
                     print('Erro ao enviar a ST', e)
-                
+
             try:
                 # create context to send as response to frontend
                 context = {
@@ -5058,30 +5125,77 @@ class StViewSet(viewsets.ModelViewSet):
                     'fazenda_destino': fazenda_destino,
                     'armazem_destino': armazem_destino,
                     'st_number': st_number_protheus,
-                    'observacao': observacao
+                    'observacao': observacao,
+                    'produtosGeral': produtos_geral
                 }
                 # send email function and logic
                 if should_send_email == True:
+
+                    df = pd.DataFrame(produtos_geral)
+                    
+                    # Keep only the desired columns and rename them
+                    df = df[['inputName', 'totalQuantityOpen']].rename(columns={
+                        'inputName': 'Produto',
+                        'totalQuantityOpen': 'Quantidade'
+                    })
+
+                    # Generate Excel file in memory
+                    excel_file = BytesIO()
+                    with pd.ExcelWriter(excel_file, engine='openpyxl') as writer:
+                        df.to_excel(writer, index=False, sheet_name="Produtos")
+                    excel_file.seek(0)
+
                     subject = f"Pré ST Aberta: {st_number_protheus}"
                     from_email = 'patamarcelo@gmail.com'
-                    # recipient_list = ['raylton.sousa@diamanteagricola.com.br', 'melissa.bento@diamanteagricola.com.br', 'adriana.goncalves@diamanteagricola.com.br']
-                    recipient_list = ['raylton.sousa@diamanteagricola.com.br', 'adriana.goncalves@diamanteagricola.com.br', 'arthur.rosal@diamanteagricola.com.br']
-                    # recipient_list = ['marcelo@gdourado.com.br']
-                    template_name = "st_open.html"
+
+                    if generate_pre_st:
+                        cc_list = [
+                            "raylton.sousa@diamanteagricola.com.br",
+                            "adriana.goncalves@diamanteagricola.com.br",
+                            "arthur.rosal@diamanteagricola.com.br",
+                            "marcelo.pata@diamanteagricola.com.br",
+                        ]
+                    else:
+                        cc_list = ["marcelo.pata@diamanteagricola.com.br"]
+                    
+
+                    template_name = "email/st_open.html"
                     convert_to_html_content =  render_to_string(
                         template_name=template_name, context=context
                     )
                     plain_message = strip_tags(convert_to_html_content)
                     
-                    sending_msg = send_mail(
+
+                    email = EmailMultiAlternatives(
                         subject=subject,
-                        message=plain_message,
-                        from_email=from_email, 
-                        recipient_list=recipient_list,
-                        html_message=convert_to_html_content,
+                        body=convert_to_html_content,  # Set plain text version
+                        from_email=from_email,
+                        to=list_emails,
+                        cc=cc_list or [],  # Add CC list (default to empty if not provided)
                     )
-                    check_here = 'Sim' if sending_msg == 1 else 'Não'
+                    
+                    
+                    email.attach_alternative(convert_to_html_content, "text/html")  # Add HTML alternative
+                    current_date = datetime.datetime.now().strftime("%d-%m-%Y")
+                    
+                    # Attach the Excel file
+                    email.attach(
+                        f"produtos_geral-{current_date}.xlsx",
+                        excel_file.read(),
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+                    
+                    # Attach HTML file
+                    email.attach(
+                        f"resumo_solicitacao-{current_date}.html",
+                        convert_to_html_content,
+                        "text/html"  # MIME type for HTML
+                    )
+
+                    result = email.send()
+                    check_here = 'Sim' if result > 0 else 'Não'
                     print('Email foi enviado: ', check_here)
+                    
                 else:
                     print('Email não enviado, devido as configurações')
                     check_here = 'Não'
@@ -5092,7 +5206,7 @@ class StViewSet(viewsets.ModelViewSet):
                             "error": f"Error ao enviar o e-mail com os dados da Pré ST, Erro: {e}"  # General error message
                         }
                 return Response(response, status=status.HTTP_208_ALREADY_REPORTED)
-                
+
             response = {
                 'msg': 'St Aberta com Successo',
                 'st_number': st_number_protheus,
