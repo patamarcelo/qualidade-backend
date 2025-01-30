@@ -146,6 +146,7 @@ from datetime import time as dateTime
 from django.core.cache import cache
 
 from django.db import transaction
+from openpyxl import load_workbook
 
 
 main_path_upload_ids = (
@@ -180,6 +181,7 @@ from django.db.models import Sum, OuterRef, Subquery
 
 import pandas as pd
 from io import BytesIO
+from openpyxl.styles import numbers
 
 
 class CachedTokenAuthentication(TokenAuthentication):
@@ -755,19 +757,19 @@ class PlantioViewSet(viewsets.ModelViewSet):
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
     # --------------------- ---------------------- UPDATE PLANTIO API FROM FARMBOX START --------------------- ----------------------#
-    @action(detail=True, methods=["GET"])
+    @action(detail=True, methods=["GET", "POST"])
     def update_plantio_from_farmBox(self, request, pk=None):
         if request.user.is_authenticated:
             try:
-                date_file = request.data["filename"]
-                print(date_file)
+                new_list = request.data
+                print('request data: ', new_list)
                 # file = request.FILES["plantio_arroz"]
                 # file_ = open(os.path.join(settings.BASE_DIR, 'filename'))
                 # date_file = "2023-09-02 07:41"
-                with open(f"static/files/dataset-{date_file}.json") as user_file:
-                    file_contents = user_file.read()
-                    parsed_json = json.loads(file_contents)
-                    new_list = parsed_json
+                # with open(f"static/files/dataset-{date_file}.json") as user_file:
+                #     file_contents = user_file.read()
+                #     parsed_json = json.loads(file_contents)
+                #     new_list = parsed_json
                 # DB CONSULT
                 talhao_list = Talhao.objects.all()
                 variedade_list = Variedade.objects.all()
@@ -1289,6 +1291,169 @@ class PlantioViewSet(viewsets.ModelViewSet):
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
     # --------------------- --------------------- END PLANTIO API --------------------- --------------------- #
+    
+    # --------------------- ---------------------- UPDATE PLANTIO API FARMTRUCK --------------------- ----------------------#
+
+    @action(detail=False, methods=["GET", "POST"])
+    def get_plantio_farmtruck(self, request):
+        if request.user.is_authenticated:
+            try:
+                safra_filter = None
+                cicle_filter = None
+                try:
+                    safra_filter = request.data["safra"]
+                    cicle_filter = request.data["ciclo"]
+                except Exception as e:
+                    print(e)
+
+                if safra_filter is None or cicle_filter is None: 
+                    print('safra ou filtro não informado')
+                    current_safra = CicloAtual.objects.filter(nome="Colheita")[0]
+                    safra_filter = current_safra.safra.safra
+                    cicle_filter = current_safra.ciclo.ciclo
+
+                safra_filter = "2024/2025" if safra_filter == None else safra_filter
+                cicle_filter = "2" if cicle_filter == None else cicle_filter
+
+                qs = (
+                    Plantio.objects.values(
+                        "safra__safra",
+                        "pk",
+                        "ciclo__ciclo",
+                        "talhao__id_talhao",
+                        "talhao__fazenda__nome",
+                        "talhao__fazenda__fazenda__nome",
+                        "variedade__cultura__cultura",
+                        "variedade__nome_fantasia",
+                        "finalizado_plantio",
+                        "finalizado_colheita",
+                        "area_colheita",
+                        "area_parcial",
+                        "data_plantio",
+                    )
+                    .order_by("talhao__fazenda__nome", "talhao__id_talhao")
+                    .filter(
+                        safra__safra=safra_filter,
+                        ciclo__ciclo=cicle_filter,
+                        finalizado_plantio=True,
+                    )
+                    # .filter(~Q(data_plantio=None))
+                )
+
+                qs_annotate = Plantio.objects.filter(
+                    safra__safra=safra_filter,
+                    ciclo__ciclo=cicle_filter,
+                    finalizado_plantio=True,
+                )
+                res1 = (
+                    qs_annotate.values(
+                        "talhao__fazenda__nome", "variedade__cultura__cultura"
+                    )
+                    .order_by("talhao__fazenda__nome")
+                    .annotate(area_total=Sum("area_colheita"))
+                )
+                res2 = (
+                    qs_annotate.values(
+                        "talhao__fazenda__nome", "talhao__fazenda__fazenda__nome"
+                    )
+                    .annotate(count=Count("talhao__fazenda__nome"))
+                    .order_by("talhao__fazenda__nome")
+                )
+
+                # ------------- ------------- START SEPARADO POR PROJETO ------------- -------------#
+                resumo = {i["talhao__fazenda__nome"]: {} for i in qs}
+
+                {
+                    resumo[i["talhao__fazenda__nome"]].update(
+                        {
+                            i["talhao__id_talhao"]: {
+                                "safra": i["safra__safra"],
+                                "ciclo": i["ciclo__ciclo"],
+                                "cultura": i["variedade__cultura__cultura"],
+                                "variedade": i["variedade__nome_fantasia"],
+                                "finalizado_colheita": i["finalizado_colheita"],
+                                "id_plantio": i["pk"],
+                            }
+                        }
+                    )
+                    for i in qs
+                }
+                # ------------- ------------- END SEPARADO POR PROJETO ------------- -------------#
+
+                # ------------- ------------- START SEPARADO POR FAZENDA > PROJETO ------------- -------------#
+                # resumo = {}
+                # for i in qs:
+                #     resumo[i["talhao__fazenda__fazenda__nome"]] = {
+                #         i["talhao__fazenda__nome"]: {}
+                #     }
+
+                # for i in qs:
+                #     resumo[i["talhao__fazenda__fazenda__nome"]].update(
+                #         {i["talhao__fazenda__nome"]: {}}
+                #     )
+                # for i in qs:
+                #     resumo[i["talhao__fazenda__fazenda__nome"]][
+                #         i["talhao__fazenda__nome"]
+                #     ].update(
+                #         {
+                #             i["talhao__id_talhao"]: {
+                #                 "safra": i["safra__safra"],
+                #                 "ciclo": i["ciclo__ciclo"],
+                #                 "cultura": i["variedade__cultura__cultura"],
+                #                 "variedade": i["variedade__nome_fantasia"],
+                #                 "finalizado_colheita": i["finalizado_colheita"],
+                #             }
+                #         }
+                #     )
+
+                # ------------- ------------- END SEPARADO POR FAZENDA > PROJETO ------------- -------------#
+
+                area_total = qs_annotate.aggregate(Sum("area_colheita"))
+                projetos = Projeto.objects.values("nome", "fazenda__nome", "id_d")
+                resumo_by_farm = []
+                for projeto in projetos:
+                    filter_array = list(
+                        filter(
+                            lambda x: x["fazenda"] == projeto["fazenda__nome"],
+                            resumo_by_farm,
+                        )
+                    )
+                    # print(filter_array)
+                    if len(filter_array) > 0:
+                        index_to_update = [
+                            i
+                            for i, _ in enumerate(resumo_by_farm)
+                            if _["fazenda"] == projeto["fazenda__nome"]
+                        ][0]
+                        resumo_by_farm[index_to_update]["projetos"].append(
+                            projeto["nome"]
+                        )
+                    else:
+                        dict_to_insert = {
+                            "fazenda": projeto["fazenda__nome"],
+                            "projetos": [projeto["nome"]],
+                        }
+                        resumo_by_farm.append(dict_to_insert)
+
+                response = {
+                    "msg": f"Consulta realizada com sucesso!!",
+                    "total_return": len(qs),
+                    "resumo_safra": res1,
+                    "fazenda_grupo_projetos": resumo_by_farm,
+                    "projetos": projetos,
+                    "resumo_safra_fazenda": res2,
+                    "Area Total dos Talhoes Plantados": area_total,
+                    "dados": resumo,
+                }
+                return Response(response, status=status.HTTP_200_OK)
+            except Exception as e:
+                response = {"message": f"Ocorreu um Erro: {e}"}
+                return Response(response, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            response = {"message": "Você precisa estar logado!!!"}
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+    # --------------------- --------------------- END PLANTIO API fARMTRUC --------------------- --------------------- #
 
     # --------------------- --------------------- START PLANTIO API DONE --------------------- --------------------- #
 
@@ -3663,13 +3828,19 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                         safra_to_save = [ x for x in safra_id if x.safra == safra_filter][0]
                                         projeto_to_save = [x for x in projetos_to_query if x.id_d == resp['projeto']][0]
                                         codigo_to_save = resp['codigo_planejamento']
-                                        new_planner = HeaderPlanejamentoAgricola(
+                                        if not HeaderPlanejamentoAgricola.objects.filter(
                                             projeto=projeto_to_save,
-                                            codigo_planejamento=codigo_to_save,
+                                            # codigo_planejamento=codigo_to_save,
                                             safra=safra_to_save,
                                             ciclo=ciclo_to_save
-                                        )
-                                        new_planner.save()
+                                        ).exists():
+                                            new_planner = HeaderPlanejamentoAgricola(
+                                                projeto=projeto_to_save,
+                                                codigo_planejamento=codigo_to_save,
+                                                safra=safra_to_save,
+                                                ciclo=ciclo_to_save
+                                            )
+                                            new_planner.save()
                                         print(f'{Fore.GREEN}Novo Planejamento incluido com sucesso!! - {Fore.BLUE} {new_planner}{Style.RESET_ALL}')
                                     except Exception as e:
                                         print(f'{Fore.LIGHTYELLOW_EX}Erro ao Salvar o Planejamento {Fore.LIGHTRED_EX}{e}{Style.RESET_ALL}')
@@ -4982,11 +5153,17 @@ class StViewSet(viewsets.ModelViewSet):
     emails_list_by_farm = [
         {
             "projetos": ["Fazenda Benção de Deus"],
-            "emails_abertura_st": ["luana.moura@diamanteagricola.com.br"],
+            "emails_abertura_st": [
+                "luana.moura@diamanteagricola.com.br",
+                "clessio.batista@diamanteagricola.com.br",
+            ],
         },
         {
             "projetos": ["Fazenda Cacique", "Fazenda Campo Guapo", "Fazenda Safira"],
-            "emails_abertura_st": ["raquel.marques@diamanteagricola.com.br"],
+            "emails_abertura_st": [
+                "estefany.fonseca@diamanteagricola.com.br",
+                "joao.neto@diamanteagricola.com.br"
+                ],
         },
         {
             "projetos": [
@@ -4996,7 +5173,13 @@ class StViewSet(viewsets.ModelViewSet):
                 "Fazenda Tucano",
                 "Fazenda Tuiuiu",
             ],
-            "emails_abertura_st": ["vinicius.costa@diamanteagricola.com.br", 'alessandro.chagas@diamanteagricola.com.br'],
+            "emails_abertura_st": [
+                "vinicius.costa@diamanteagricola.com.br",
+                "alessandro.chagas@diamanteagricola.com.br",
+                "lara.rodrigues@diamanteagricola.com.br",
+                "wagner.junior@diamanteagricola.com.br",
+                "raylla.aguiar@diamanteagricola.com.br",
+            ],
         },
         {
             "projetos": [
@@ -5004,7 +5187,10 @@ class StViewSet(viewsets.ModelViewSet):
                 "Fazenda Fazendinha",
                 "Fazenda Santa Maria",
             ],
-            "emails_abertura_st": ["raylla.aguiar@diamanteagricola.com.br"],
+            "emails_abertura_st": [
+                "raylla.aguiar@diamanteagricola.com.br",
+                "miria.carvalho@diamanteagricola.com.br",
+            ],
         },
     ]
 
@@ -5016,11 +5202,15 @@ class StViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["GET", "POST"])
     def open_st_by_protheus(self, request, pk=None):
-        # Define if should send email
-        should_send_email = False
 
         # Define if should open pre st
         generate_pre_st = True
+
+        # Define if should send email
+        if generate_pre_st:
+            should_send_email = False
+        else:
+            should_send_email = True
 
         list_emails = []
         if request.user.is_authenticated:
@@ -5128,21 +5318,90 @@ class StViewSet(viewsets.ModelViewSet):
                     'observacao': observacao,
                     'produtosGeral': produtos_geral
                 }
+
                 # send email function and logic
+                df = pd.DataFrame(produtos_geral)
+                df_prest = pd.DataFrame(produtos)
+
+                # Keep only the desired columns and rename them
+                df = df[['inputName', 'totalQuantityOpen']].rename(columns={
+                    'inputName': 'Produto',
+                    'totalQuantityOpen': 'Quantidade'
+                })
+
+                # Merge df and df_prest on inputName (renamed to Produto)
+                df_prest = df_prest.rename(columns={"insumo": "Produto"})
+                df_combined = pd.merge(df_prest, df, on="Produto", how="left")
+
+                # Fill NaN values in 'Quantidade' with 0 for non-matching rows
+                title_column = f'Pre ST {st_number_protheus}'
+
+                df_combined['quantidade'] = df_combined['quantidade'].fillna(0)
+                df_combined['Estoque'] = ''
+                df_combined = df_combined[['Produto', 'Quantidade', 'quantidade', 'Estoque']].rename(columns={
+                    "quantidade": title_column,
+                    'Quantidade': 'Necessidade Geral'
+                })
+
+                print("Columns in df_combined:", df_combined.columns)
+
+                print(df)
+                print('\n')
+                print(df_combined)
+
                 if should_send_email == True:
 
-                    df = pd.DataFrame(produtos_geral)
-                    
-                    # Keep only the desired columns and rename them
-                    df = df[['inputName', 'totalQuantityOpen']].rename(columns={
-                        'inputName': 'Produto',
-                        'totalQuantityOpen': 'Quantidade'
-                    })
+                    # Path to the pre-existing Excel file in your Django project
+                    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                    file_path = os.path.join(BASE_DIR, "diamante/files", "Produtos.xlsx")
 
-                    # Generate Excel file in memory
+                    # Load the existing Excel file
+                    workbook = load_workbook(file_path)
+                    sheet_name = "Produtos"
+
+                    # Load the target sheet or create it if it doesn't exist
+                    if sheet_name in workbook.sheetnames:
+                        sheet = workbook[sheet_name]
+                    else:
+                        sheet = workbook.create_sheet(sheet_name)
+                    if len(projetos) > 1:
+                        farms_names = " - ".join(name.split("Fazenda ")[-1] for name in projetos)
+                    else:
+                        farms_names = projetos[0].split('Fazenda ')[-1]
+                    sheet.cell(row=1, column=1, value=farms_names)
+                    sheet.cell(row=2, column=1, value="Produto")
+                    sheet.cell(row=2, column=2, value="Necessidade Geral")
+                    sheet.cell(row=2, column=3, value=title_column)
+                    sheet.cell(row=2, column=4, value="Estoque")
+                    # Write DataFrame to the sheet (starting from row 2 to keep headers)
+                    for i, row in df_combined.iterrows():
+                        sheet.cell(row=i+1 + 2, column=1, value=row["Produto"])
+                        # Write "Necessidade Geral" column as a number with thousand separator
+                        necessidade_cell = sheet.cell(row=i+1 + 2, column=2, value=row["Necessidade Geral"])
+                        necessidade_cell.number_format = numbers.FORMAT_NUMBER_COMMA_SEPARATED1
+
+                        # Write dynamic title column as a number with thousand separator
+                        dynamic_column_cell = sheet.cell(row=i+1 + 2, column=3, value=row[title_column])
+                        dynamic_column_cell.number_format = numbers.FORMAT_NUMBER_COMMA_SEPARATED1
+
+                        sheet.cell(row=i + 1 + 2, column=4, value=row["Estoque"])
+
+                    sheet_name2 = "Produtos Geral"
+                    if sheet_name2 not in workbook.sheetnames:
+                        sheet2 = workbook.create_sheet(sheet_name2)
+                    else:
+                        sheet2 = workbook[sheet_name2]
+
+                    # Write the second DataFrame to the new tab
+                    for i, row in df.iterrows():
+                        sheet2.cell(row=i + 2, column=1, value=row["Produto"])
+                        # Write the "Quantidade" column as a number with thousand separator
+                        quantity_cell = sheet2.cell(row=i + 2, column=2, value=row["Quantidade"])
+                        quantity_cell.number_format = numbers.FORMAT_NUMBER_COMMA_SEPARATED1
+
+                    # Save the updated workbook to memory
                     excel_file = BytesIO()
-                    with pd.ExcelWriter(excel_file, engine='openpyxl') as writer:
-                        df.to_excel(writer, index=False, sheet_name="Produtos")
+                    workbook.save(excel_file)
                     excel_file.seek(0)
 
                     subject = f"Pré ST Aberta: {st_number_protheus}"
@@ -5157,14 +5416,13 @@ class StViewSet(viewsets.ModelViewSet):
                         ]
                     else:
                         cc_list = ["marcelo.pata@diamanteagricola.com.br"]
-                    
 
                     template_name = "email/st_open.html"
                     convert_to_html_content =  render_to_string(
                         template_name=template_name, context=context
                     )
-                    plain_message = strip_tags(convert_to_html_content)
-                    
+
+                    # plain_message = strip_tags(convert_to_html_content)
 
                     email = EmailMultiAlternatives(
                         subject=subject,
@@ -5173,18 +5431,17 @@ class StViewSet(viewsets.ModelViewSet):
                         to=list_emails,
                         cc=cc_list or [],  # Add CC list (default to empty if not provided)
                     )
-                    
-                    
+
                     email.attach_alternative(convert_to_html_content, "text/html")  # Add HTML alternative
                     current_date = datetime.datetime.now().strftime("%d-%m-%Y")
-                    
+
                     # Attach the Excel file
                     email.attach(
-                        f"produtos_geral-{current_date}.xlsx",
+                        f"produtos_geral-{current_date}_{title_column}.xlsx",
                         excel_file.read(),
                         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     )
-                    
+
                     # Attach HTML file
                     email.attach(
                         f"resumo_solicitacao-{current_date}.html",
@@ -5195,7 +5452,7 @@ class StViewSet(viewsets.ModelViewSet):
                     result = email.send()
                     check_here = 'Sim' if result > 0 else 'Não'
                     print('Email foi enviado: ', check_here)
-                    
+
                 else:
                     print('Email não enviado, devido as configurações')
                     check_here = 'Não'

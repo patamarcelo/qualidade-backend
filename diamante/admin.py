@@ -967,12 +967,14 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         # Exclude only for autocomplete
         print("resquest_Path", request.path)
         model_request =  request.GET.get('model_name')
+        print('model request: ', model_request)
         if model_request and model_request == 'plantioextratoarea':
             queryset = queryset.filter(
                 ciclo__ciclo__in=["2", "3"],
                 safra__safra="2024/2025",
                 finalizado_colheita=False,
                 plantio_descontinuado=False,
+                programa__isnull=False,
             )
             if not queryset.exists():  # Check for empty queryset
                 return None, False 
@@ -2388,7 +2390,7 @@ class AppFarmBoxIntegrationAdmin(admin.ModelAdmin):
     def get_data(self, obj):
         if obj.criados:
             return date_format(
-                obj.criados, format="SHORT_DATE_FORMAT", use_l10n=True
+                obj.criados, format="SHORT_DATETIME_FORMAT", use_l10n=True
             )
         else:
             return " - "
@@ -2495,7 +2497,8 @@ class PlantioExtratoAreaAdmin(admin.ModelAdmin):
         "plantio__variedade__cultura__cultura",
         "plantio__talhao__fazenda__nome",
         "plantio__talhao__fazenda__fazenda__nome",
-        "plantio__talhao__id_unico"
+        "plantio__talhao__id_unico",
+        "data_plantio"
         ]
     
     def get_queryset(self, request):
@@ -2829,7 +2832,7 @@ class SentSeedsAdmin(admin.ModelAdmin):
                     ("nota_fiscal"),
                     ("origem", 'destino'),
                     ('safra', 'ciclo'),
-                    ("observacao",)
+                    # ("observacao",)
                     
                 )
             },
