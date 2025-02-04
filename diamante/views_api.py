@@ -3013,7 +3013,17 @@ class PlantioViewSet(viewsets.ModelViewSet):
             try:
                 params = request.data["data"]
                 print('Abrindo Aplicação')
-                print('Params from Farmbox: ', params)
+                # print('Params from Farmbox: ', params)
+                old_inputs = params.get('inputs')
+                print('old paramsss::', params)
+                print('\n')
+                new_inputs = [
+                    {**item, "input_id": 156297} if item.get("input_id") == 154220 else item
+                    for item in old_inputs
+                ]
+                params['inputs'] = new_inputs
+                print('using new inputs:', params)
+                
                 url = "https://farmbox.cc/api/v1/applications"
                 payload = params
                 headers = {
@@ -4622,8 +4632,8 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                         peso_bruto = i["Peso Bruto"]
                         peso_tara = i["Peso Tara"]
                         peso_liquido = i["Peso Liquido"]
-                        umidade = i["Umidade Entrada %"]
-                        impureza = i["Impureza Entrada %"]
+                        umidade = str(i["Umidade Entrada %"]).replace(',', '.')
+                        impureza = str(i["Impureza Entrada %"]).replace(',', '.')
                         safra = i["Safra"]
                         ciclo = i["Ciclo"]
                         destino = i["Destino"]
@@ -4710,6 +4720,10 @@ class ColheitaApiSave(viewsets.ModelViewSet):
 
                                     if plantio_id and deposito_id:
                                         try:
+                                            #  Check if a record with the same ticket and plantio_id already exists
+                                            if Colheita.objects.filter(ticket=final_ticket, plantio=plantio_id, romaneio=romaneio).exists():
+                                                print(f"Duplicate record: ticket={final_ticket}, plantio={plantio_id}")
+                                                raise ValueError("Carga já cadastrada para este ticket e plantio.")
                                             new_carga = Colheita(
                                                 plantio=plantio_id,
                                                 deposito=deposito_id,
@@ -4800,6 +4814,9 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                                 deposito_id = deposito_query.get(pk=destino)
                                 if plantio_id and deposito_id:
                                     try:
+                                        if Colheita.objects.filter(ticket=final_ticket, plantio=plantio_id, romaneio=romaneio).exists():
+                                            print(f"Duplicate record: ticket={final_ticket}, plantio={plantio_id}")
+                                            raise ValueError("Carga já cadastrada para este ticket e plantio.")
                                         new_carga = Colheita(
                                             plantio=plantio_id,
                                             deposito=deposito_id,
