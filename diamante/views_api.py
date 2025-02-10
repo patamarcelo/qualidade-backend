@@ -3160,7 +3160,11 @@ class PlantioViewSet(viewsets.ModelViewSet):
             }
             try:
                 cargas_query = (
-                    Colheita.objects.values(
+                    Colheita.objects.select_related(
+                        "plantio__talhao__fazenda",
+                        "plantio__talhao",
+                    )
+                    .values(
                         "plantio__talhao__id_talhao",
                         "plantio__id",
                         "plantio__talhao__fazenda__nome",
@@ -3186,7 +3190,14 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     )
                 )
                 qs = (
-                    Plantio.objects.values(
+                    Plantio.objects.select_related(
+                        "talhao__fazenda",
+                        "safra",
+                        "ciclo",
+                        "variedade",
+                        "variedade__cultura",
+                    )
+                    .values(
                         "id",
                         "talhao__id_talhao",
                         "talhao__id_unico",
@@ -3222,7 +3233,9 @@ class PlantioViewSet(viewsets.ModelViewSet):
 
                 response = {
                     "msg": "Consulta realizada com sucesso!!",
+                    "len_data": len(qs),
                     "data": qs,
+                    "len_cargas": len(cargas_query),
                     "cargas": cargas_query,
                 }
                 return Response(response, status=status.HTTP_200_OK)
