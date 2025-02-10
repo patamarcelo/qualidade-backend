@@ -3233,9 +3233,9 @@ class PlantioViewSet(viewsets.ModelViewSet):
 
                 response = {
                     "msg": "Consulta realizada com sucesso!!",
-                    "len_data": len(qs),
+                    "len_data": qs.count(),
                     "data": qs,
-                    "len_cargas": len(cargas_query),
+                    "len_cargas": cargas_query.count(),
                     "cargas": cargas_query,
                 }
                 return Response(response, status=status.HTTP_200_OK)
