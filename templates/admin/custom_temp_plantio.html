@@ -83,7 +83,7 @@
                 <tr v-for="(col,i) in filteredArray">
                     <td style="padding-bottom: 0.25rem !important; padding-top: 0.25rem!important">
                         <div class="d-flex w-75 justify-content-between">
-                            <span> [[ i.split("|")[0] ]]</span>
+                            <span> [[ i.split("|")[0].replace('Projeto', '') ]]</span>
                         </div>
                         <div class="progress" style="background-color: rgba(128,128,128,0.3); border-radius: 8px;">
                             <div :class="getClass(((col?.areaPlantada/col?.areaTotal)*100).toFixed(0))"
@@ -172,7 +172,7 @@
                     <tr v-for="(col,i) in filteredArray"
                         v-if='i.split("|")[0] === farm.split("|")[0] && farm.split("|")[1] === i.split("|")[1]'
                         style="font-weight: bold">
-                        <td>[[ i.split("|")[0] ]]</td>
+                        <td>[[ i.split("|")[0].replace('Projeto', '') ]]</td>
                         <td style="text-align: center"><img style="width: 26px; height: 26px; cursor: pointer"
                                 :src="customIcon(i.split('|')[1])" /> </td>
                         <td style="text-align: center">[[ col?.areaTotal?.toLocaleString("pt-br", {
