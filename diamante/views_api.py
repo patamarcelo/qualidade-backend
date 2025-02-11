@@ -3246,6 +3246,177 @@ class PlantioViewSet(viewsets.ModelViewSet):
         else:
             response = {"message": "Você precisa estar logado!!!"}
             return Response(response, status=status.HTTP_401_UNAUTHORIZED)
+    
+    def group_data(self, data):
+        grouped_data = []
+        data = sorted(data, key=lambda x: x["talhao__fazenda__nome"])  # Group by farm name
+        
+        for farm_name, items in groupby(data, key=lambda x: x["talhao__fazenda__nome"]):
+            items = list(items)
+            farm_group = {
+                "farm": farm_name,
+                "colheita": sum(item["area_colheita"] or 0 for item in items),
+                "parcial": sum(item["area_parcial"] or 0 for item in items),
+                "variedades": [],
+                "culturas": [],  # New key to aggregate by culture
+            }
+            
+            # Group by variety
+            variety_totals = {}
+            for item in items:
+                variety = item["variedade__nome_fantasia"]
+                if variety not in variety_totals:
+                    variety_totals[variety] = {
+                        "colheita": 0,
+                        "parcial": 0,
+                        "cultura": item["variedade__cultura__cultura"],
+                    }
+                variety_totals[variety]["colheita"] += item["area_colheita"] or 0
+                variety_totals[variety]["parcial"] += item["area_parcial"] or 0
+
+            # Add variety totals to the farm group
+            farm_group["variedades"] = [
+                {
+                    "variedade": v,
+                    "colheita": t["colheita"],
+                    "parcial": t["parcial"],
+                    "cultura": t["cultura"],
+                    "percent": round((t["parcial"] / t["colheita"] * 100), 2) if t["colheita"] > 0 else 0,
+                }
+                for v, t in variety_totals.items()
+            ]
+            
+            # Group by culture
+            cultura_totals = {}
+            for item in items:
+                cultura = item["variedade__cultura__cultura"]
+                if cultura not in cultura_totals:
+                    cultura_totals[cultura] = {"colheita": 0, "parcial": 0}
+                cultura_totals[cultura]["colheita"] += item["area_colheita"] or 0
+                cultura_totals[cultura]["parcial"] += item["area_parcial"] or 0
+
+            # Add culture totals with percentage to the farm group
+            farm_group["culturas"] = [
+                {
+                    "cultura": c,
+                    "colheita": t["colheita"],
+                    "parcial": t["parcial"],
+                    "percent": round((t["parcial"] / t["colheita"] * 100), 2) if t["colheita"] > 0 else 0,
+                }
+                for c, t in cultura_totals.items()
+            ]
+
+            grouped_data.append(farm_group)
+
+        return grouped_data
+
+
+    @action(detail=False, methods=["GET", "POST"])
+    def get_colheita_plantio_info_react_native(self, request, pk=None):
+        if request.user.is_authenticated:
+            print('pegando dados da colheira: ')
+            safra_filter = None
+            cicle_filter = None
+            try:
+                safra_filter = request.data["safra"]
+                cicle_filter = request.data["ciclo"]
+            except Exception as e:
+                print(e)
+            safra_filter = "2023/2024" if safra_filter == None else safra_filter
+            cicle_filter = "1" if cicle_filter == None else cicle_filter
+            print('safra e ciclo filtr', safra_filter, cicle_filter)
+            total_dias_plantado_acompanhamento = {
+                "arroz": 117,
+                "soja_feijao": 10
+            }
+            try:
+                cargas_query = (
+                    Colheita.objects.select_related(
+                        "plantio__talhao__fazenda",
+                        "plantio__talhao",
+                    )
+                    .values(
+                        "plantio__talhao__id_talhao",
+                        "plantio__id",
+                        "plantio__talhao__fazenda__nome",
+                    )
+                    .annotate(
+                        total_peso_liquido=Sum("peso_liquido"),
+                        total_romaneio=Count("romaneio"),
+                    )
+                    .annotate(
+                        totaldays=(
+                            datetime.datetime.now().date() - F("plantio__data_plantio")
+                        )
+                    )
+                    .filter(
+                        plantio__safra=s_dict[safra_filter],
+                        plantio__ciclo=c_dict[cicle_filter],
+                        plantio__finalizado_plantio=True,
+                        # plantio__finalizado_colheita=False,
+                        plantio__plantio_descontinuado=False,
+                        totaldays__gte=datetime.timedelta(days=total_dias_plantado_acompanhamento["soja_feijao"]),
+                        # ARROZ = 117
+                        # totaldays__gte=datetime.timedelta(days=117),
+                    )
+                )
+                qs = (
+                    Plantio.objects.select_related(
+                        "talhao__fazenda",
+                        "safra",
+                        "ciclo",
+                        "variedade",
+                        "variedade__cultura",
+                    )
+                    .values(
+                        "id",
+                        "talhao__id_talhao",
+                        "talhao__id_unico",
+                        "data_plantio",
+                        "safra__safra",
+                        "ciclo__ciclo",
+                        "talhao__fazenda__nome",
+                        "talhao__fazenda__map_centro_id",
+                        "talhao__fazenda__map_zoom",
+                        "talhao__fazenda__fazenda__nome",
+                        "variedade__nome_fantasia",
+                        "variedade__cultura__cultura",
+                        "variedade__cultura__map_color",
+                        "variedade__cultura__map_color_line",
+                        "finalizado_plantio",
+                        "finalizado_colheita",
+                        "area_colheita",
+                        "area_parcial",
+                    )
+                    .annotate(
+                        totaldays=(datetime.datetime.now().date() - F("data_plantio"))
+                    )
+                    .filter(
+                        safra=s_dict[safra_filter],
+                        ciclo=c_dict[cicle_filter],
+                        finalizado_plantio=True,
+                        # finalizado_colheita=False,
+                        plantio_descontinuado=False,
+                        totaldays__gte=datetime.timedelta(days=total_dias_plantado_acompanhamento["soja_feijao"]),
+                    )
+                    .order_by("talhao__id_unico")
+                )
+
+                grouped_data = self.group_data(qs)
+                response = {
+                    "msg": "Consulta realizada com sucesso!!",
+                    "data": qs,
+                    "grouped_data": grouped_data,
+                    "cargas": cargas_query,
+                }
+                return Response(response, status=status.HTTP_200_OK)
+            except Exception as e:
+                response = {"message": f"Ocorreu um Erro: {e}"}
+                return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+        else:
+            response = {"message": "Você precisa estar logado!!!"}
+            return Response(response, status=status.HTTP_401_UNAUTHORIZED)
         
     def create_kml(self, queryset):
         kml_header = '''<?xml version="1.0" encoding="UTF-8"?>
