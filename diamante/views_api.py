@@ -3401,13 +3401,22 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     )
                     .order_by("talhao__id_unico")
                 )
+                
+                # Iterate through the 'data' array
+                for item in qs:
+                    # Find matching 'cargas' based on the 'id' in 'data' and 'plantio__id' in 'cargas'
+                    matching_cargas = [carga for carga in cargas_query if carga["plantio__id"] == item["id"]]
+                    
+                    # If there are matching 'cargas', insert them into the 'data' object
+                    if matching_cargas:
+                        item["cargas"] = matching_cargas
+
 
                 grouped_data = self.group_data(qs)
                 response = {
                     "msg": "Consulta realizada com sucesso!!",
                     "data": qs,
                     "grouped_data": grouped_data,
-                    "cargas": cargas_query,
                 }
                 return Response(response, status=status.HTTP_200_OK)
             except Exception as e:
