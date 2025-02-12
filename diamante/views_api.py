@@ -4788,7 +4788,29 @@ class ColheitaApiSave(viewsets.ModelViewSet):
     serializer_class = ColheitaSerializer
     authentication_classes = (CachedTokenAuthentication,)
     permission_classes = (IsAuthenticated,)
+    
+    
+    
 
+    @action(detail=True, methods=["GET"])
+    def get_colheita_detail_react_native(self, request, pk=None):
+        try:
+            qs = Colheita.objects.filter(plantio__id=pk)
+            serializer = ColheitaSerializer(qs, many=True)
+            response ={
+                "msg": 'Consulta realizada com sucesso!!',
+                "data": serializer.data
+            }
+            return Response(response, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            print("Error here:", e)
+            response = {
+                "msg": "Erro ao pegar os dados",
+                "error": f"Erro ao pegar os dados, Erro: {str(e)}",
+            }
+            return Response(response, status=status.HTTP_208_ALREADY_REPORTED)
+        
+        
     @action(detail=False, methods=["GET", "POST"])
     def save_from_protheus(self, request):
         user_id = Token.objects.get(user=request.user)
