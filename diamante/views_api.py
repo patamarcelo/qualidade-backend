@@ -4789,18 +4789,31 @@ class ColheitaApiSave(viewsets.ModelViewSet):
     serializer_class = ColheitaSerializer
     authentication_classes = (CachedTokenAuthentication,)
     permission_classes = (IsAuthenticated,)
-    
-    
-    
 
     @action(detail=True, methods=["GET"])
     def get_colheita_detail_react_native(self, request, pk=None):
         try:
-            qs = Colheita.objects.filter(plantio__id=pk).select_related("plantio", "deposito").prefetch_related("plantio__variedade", "plantio__talhao")
-            serializer = ColheitaResumoSerializer(qs, many=True)
+            # qs = Colheita.objects.filter(plantio__id=pk).select_related("plantio", "deposito").prefetch_related("plantio__variedade", "plantio__talhao")
+            qs = Colheita.objects.filter(plantio__id=pk).values(
+                "data_colheita",
+                "romaneio",
+                "placa",
+                "motorista",
+                "ticket",
+                "peso_tara",
+                "peso_bruto",
+                "umidade",
+                "desconto_umidade",
+                "impureza",
+                "desconto_impureza",
+                "peso_liquido",
+                "peso_scs_liquido",
+                "id_farmtruck",
+            )
+            # serializer = ColheitaResumoSerializer(qs, many=True)
             response ={
                 "msg": 'Consulta realizada com sucesso!!',
-                "data": serializer.data
+                "data": qs
             }
             return Response(response, status=status.HTTP_201_CREATED)
         except Exception as e:
@@ -4810,8 +4823,7 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                 "error": f"Erro ao pegar os dados, Erro: {str(e)}",
             }
             return Response(response, status=status.HTTP_208_ALREADY_REPORTED)
-        
-        
+
     @action(detail=False, methods=["GET", "POST"])
     def save_from_protheus(self, request):
         user_id = Token.objects.get(user=request.user)

@@ -86,7 +86,7 @@ class ColheitaSerializer(serializers.ModelSerializer):
 class ColheitaResumoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Colheita
-        exclude = ["deposito"]  # Apenas campos essenciais
+        exclude = ["id", "plantio", "deposito"]  # Apenas campos essenciais
 
 
 class ProjetosSerializer(serializers.ModelSerializer):
