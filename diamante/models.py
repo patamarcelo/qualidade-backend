@@ -907,7 +907,7 @@ class Colheita(Base):
     )
 
     plantio = models.ForeignKey(
-        Plantio, on_delete=models.PROTECT, related_name="plantio_colheita"
+        Plantio, on_delete=models.PROTECT, related_name="plantio_colheita", db_index=True
     )
     data_colheita = models.DateField(help_text="dd/mm/aaaa", blank=True, null=True)
     romaneio = models.CharField(
@@ -1018,7 +1018,7 @@ class Colheita(Base):
     )
 
     deposito = models.ForeignKey(
-        Deposito, on_delete=models.PROTECT, related_name="deposito_colheita"
+        Deposito, on_delete=models.PROTECT, related_name="deposito_colheita", db_index=True
     )
     
     id_farmtruck = models.CharField(
@@ -1123,9 +1123,12 @@ class Colheita(Base):
         ordering = ["data_colheita"]
         verbose_name = "Colheita"
         verbose_name_plural = "Colheitas"
+        indexes = [
+            models.Index(fields=["plantio", "data_colheita"]),
+        ]
 
     def __str__(self):
-        return f"{self.romaneio} | {self.plantio.talhao.id_talhao} | {self.plantio.talhao.fazenda.nome} | {str(round(self.peso_liquido,2))}"
+        return f"{self.romaneio} | {self.plantio.talhao.id_talhao} - {self.plantio.talhao.fazenda.nome} | {str(round(self.peso_liquido,2))}"
 
 
 class PlantioDetail(Plantio):

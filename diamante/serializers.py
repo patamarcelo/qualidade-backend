@@ -83,6 +83,11 @@ class ColheitaSerializer(serializers.ModelSerializer):
         #     "deposito",
         # ]
 
+class ColheitaResumoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Colheita
+        exclude = ["deposito"]  # Apenas campos essenciais
+
 
 class ProjetosSerializer(serializers.ModelSerializer):
     def to_representation(self, value):

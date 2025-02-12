@@ -14,7 +14,8 @@ from .serializers import (
     VisitasSerializer,
     RegistroVisitasSerializer,
     StProtheusIntegrationSerializer,
-    ColheitaPlantioExtratoAreaSerializer
+    ColheitaPlantioExtratoAreaSerializer,
+    ColheitaResumoSerializer
 )
 
 from rest_framework import viewsets, status
@@ -4795,8 +4796,8 @@ class ColheitaApiSave(viewsets.ModelViewSet):
     @action(detail=True, methods=["GET"])
     def get_colheita_detail_react_native(self, request, pk=None):
         try:
-            qs = Colheita.objects.filter(plantio__id=pk)
-            serializer = ColheitaSerializer(qs, many=True)
+            qs = Colheita.objects.filter(plantio__id=pk).select_related("plantio", "deposito").prefetch_related("plantio__variedade", "plantio__talhao")
+            serializer = ColheitaResumoSerializer(qs, many=True)
             response ={
                 "msg": 'Consulta realizada com sucesso!!',
                 "data": serializer.data
