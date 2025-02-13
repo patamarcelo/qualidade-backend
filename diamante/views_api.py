@@ -3260,6 +3260,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 "parcial": sum(item["area_parcial"] or 0 for item in items),
                 "variedades": [],
                 "culturas": [],  # New key to aggregate by culture
+                "peso_liquido": sum(item['cargas'][0]['total_peso_liquido'] for item in items if item.get('cargas') or 0)
             }
             
             # Group by variety
@@ -3283,6 +3284,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "parcial": t["parcial"],
                     "cultura": t["cultura"],
                     "percent": round((t["parcial"] / t["colheita"] * 100), 2) if t["colheita"] > 0 else 0,
+                    
                 }
                 for v, t in variety_totals.items()
             ]
