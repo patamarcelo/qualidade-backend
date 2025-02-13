@@ -3383,6 +3383,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         "talhao__fazenda__map_zoom",
                         "talhao__fazenda__fazenda__nome",
                         "variedade__nome_fantasia",
+                        "variedade__dias_ciclo",
                         "variedade__cultura__cultura",
                         "variedade__cultura__map_color",
                         "variedade__cultura__map_color_line",

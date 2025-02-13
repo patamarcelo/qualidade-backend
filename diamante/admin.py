@@ -2614,6 +2614,7 @@ class ColheitaPlantioExtratoAreaAdmin(admin.ModelAdmin):
     autocomplete_fields = ["plantio"]
     raw_id_fields = ["plantio"]
     ordering = ["-data_colheita"]
+    list_filter = ["plantio__safra", "plantio__ciclo"]
     search_fields = [
         "plantio__variedade__variedade", 
         "plantio__variedade__cultura__cultura",
