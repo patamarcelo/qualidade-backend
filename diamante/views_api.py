@@ -3414,13 +3414,24 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     # If there are matching 'cargas', insert them into the 'data' object
                     if matching_cargas:
                         item["cargas"] = matching_cargas
-
-
+                
+                filter_data = {}
+                filter_data_farm = [x['talhao__fazenda__fazenda__nome'] for x in qs]
+                filter_data_proj = [x['talhao__fazenda__nome'] for x in qs]
+                filter_data_variety = [{'variety': x['variedade__nome_fantasia'] ,'culture': x['variedade__cultura__cultura'] } for x in qs]
+                
+                
+                filter_data['farm'] = list(set(filter_data_farm))
+                filter_data['proj'] = list(set(filter_data_proj))
+                filter_data['variety'] = list({tuple(d.items()): d for d in filter_data_variety}.values())
+                
                 grouped_data = self.group_data(qs)
+                
                 response = {
                     "msg": "Consulta realizada com sucesso!!",
                     "data": qs,
                     "grouped_data": grouped_data,
+                    "filter_data": filter_data
                 }
                 return Response(response, status=status.HTTP_200_OK)
             except Exception as e:
