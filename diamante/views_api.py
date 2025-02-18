@@ -3358,7 +3358,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         plantio__finalizado_plantio=True,
                         # plantio__finalizado_colheita=False,
                         plantio__plantio_descontinuado=False,
-                        totaldays__gte=datetime.timedelta(days=total_dias_plantado_acompanhamento["soja_feijao"]),
+                        # totaldays__gte=datetime.timedelta(days=total_dias_plantado_acompanhamento["soja_feijao"]),
                         # ARROZ = 117
                         # totaldays__gte=datetime.timedelta(days=117),
                     )
@@ -3401,7 +3401,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         finalizado_plantio=True,
                         # finalizado_colheita=False,
                         plantio_descontinuado=False,
-                        totaldays__gte=datetime.timedelta(days=total_dias_plantado_acompanhamento["soja_feijao"]),
+                        # totaldays__gte=datetime.timedelta(days=total_dias_plantado_acompanhamento["soja_feijao"]),
                     )
                     .order_by("talhao__id_unico")
                 )
