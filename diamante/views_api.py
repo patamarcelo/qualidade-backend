@@ -150,6 +150,25 @@ from django.db import transaction
 from openpyxl import load_workbook
 
 
+from threading import Thread
+import logging
+
+# Get a named logger
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+# Avoid adding handlers multiple times if this config runs repeatedly
+if not logger.handlers:
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.INFO)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+
+# Now you can use logger.info or logger.error
+logger.info('Logger configured successfully.')
+
+
 main_path_upload_ids = (
     "http://localhost:5050"
     if DEBUG == True
@@ -3007,9 +3026,25 @@ class PlantioViewSet(viewsets.ModelViewSet):
             response = {"message": "Você precisa estar logado!!!"}
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
+    def save_app_farmbox(self, parsed_json):
+        try:
+            app_id_farm = parsed_json["plantations"][0]['plantation']['farm_name']
+            number_app = parsed_json['code']
+            name_app_op = parsed_json['inputs'][0]['input']['name']
+            app_name = f'{number_app} - {name_app_op}'
+            nova_app = AppFarmboxIntegration(
+                app_nuumero=app_name,
+                app_fazenda=app_id_farm,
+                app=parsed_json
+            )
+            nova_app.save()
+            print("AppFarmboxIntegration saved successfully!")
+        except Exception as e:
+            print('Problem saving new Application:', e)
+
     # TODO
     @action(detail=False, methods=["GET", "POST", "PUT"])
-    def open_app_farmbox(sef, request, pk=None):
+    def open_app_farmbox(self, request, pk=None):
         if request.user.is_authenticated:
             try:
                 params = request.data["data"]
@@ -3023,7 +3058,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     for item in old_inputs
                 ]
                 params['inputs'] = new_inputs
-                print('using new inputs:', params)
+                logger.info('using new inputs:', params)
                 
                 url = "https://farmbox.cc/api/v1/applications"
                 payload = params
@@ -3032,26 +3067,17 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "Authorization": FARMBOX_ID,
                 }
                 response_farm = requests.post(url, data=json.dumps(payload), headers=headers)
-                print('responseAll from farmbox:', response_farm)
+                logger.info('responseAll from farmbox:', response_farm)
                 print('\n\n')
-                print('response:', response_farm.status_code, response_farm.text)
+                logger.info('response:', response_farm.status_code, response_farm.text)
 
                 if response_farm.status_code == 201:
                     parsed_json = json.loads(response_farm.text)
-                    try:
-                        app_id_farm = parsed_json["plantations"][0]['plantation']['farm_name']
-                        # app_fazenda = [ x['name'] for x in dictFarm if x['id'] == app_id_farm][0]
-                        number_app = parsed_json['code']
-                        name_app_op = parsed_json['inputs'][0]['input']['name']
-                        app_name = f'{number_app} - {name_app_op}'
-                        nova_app = AppFarmboxIntegration(
-                            app_nuumero=app_name,
-                            app_fazenda=app_id_farm,
-                            app=parsed_json
-                        )
-                        nova_app.save()
-                    except Exception as e:
-                        print('Problema em salvar a nova Aplicaçào: ', e)
+                    
+                    # START SAVE HERE
+                    logger.info('Start save app from  FarmBox')
+                    Thread(target=self.save_app_farmbox, args=(parsed_json,)).start()
+                    logger.info('Finish off save app from  FarmBox')
 
                     response = {
                         "msg": "APP Aberta com sucesso!!",
@@ -5413,7 +5439,7 @@ class StViewSet(viewsets.ModelViewSet):
         {
             "projetos": ["Fazenda Benção de Deus"],
             "emails_abertura_st": [
-                "luana.moura@diamanteagricola.com.br",
+                "matheus.silva@diamanteagricola.com.br",
                 "clessio.batista@diamanteagricola.com.br",
             ],
         },
@@ -5458,6 +5484,23 @@ class StViewSet(viewsets.ModelViewSet):
             if farm in entry["projetos"]:
                 return entry["emails_abertura_st"]
         return None  # Return None if the farm is not found
+    
+    
+    def save_st_from_protheus(self,st_number_protheus, projetos, req_data):
+        try:
+            print('Start saving st from protheus print')
+            logger.info('Start saving st from protheus')
+            new_st_opened = StProtheusIntegration(
+                st_numero=st_number_protheus,
+                st_fazenda=projetos[0],
+                app=req_data
+            )
+            new_st_opened.save()
+            logger.info('Nova ST salva com sucesso!!', new_st_opened)
+            print('Nova ST salva com sucesso!! print')
+        except Exception as e:
+            print('Problema em salvar a pré st do Protheus')
+            logger.error("Error in save_st_from_protheus: %s", e, exc_info=True)
 
     @action(detail=False, methods=["GET", "POST"])
     def open_st_by_protheus(self, request, pk=None):
@@ -5540,20 +5583,9 @@ class StViewSet(viewsets.ModelViewSet):
                             number_opened = parsed_json["codigo_pre_st"]
                             st_number_protheus = int(number_opened)
                             should_send_email = True
-                            try:
-                                new_st_opened = StProtheusIntegration(
-                                    st_numero=st_number_protheus,
-                                    st_fazenda=projetos[0],
-                                    app=req_data
-                                )
-                                new_st_opened.save()
-                                print('Nova ST salva com sucesso!!', new_st_opened)
-                            except Exception as e:
-                                response = {
-                                    "msg": f"Erro ao salvar a ST no banco de dados",
-                                    "error": f"Error ao salvar os dados vindos do farm, Erro: {e}"  # General error message
-                                }
-                                return Response(response, status=status.HTTP_208_ALREADY_REPORTED)
+                            
+                            # START SAVE HERE
+                            Thread(target=self.save_st_from_protheus, args=(st_number_protheus,projetos,req_data)).start()
                         else:
                             parsed_json = json.loads(response_headers.text)
                             response = {
