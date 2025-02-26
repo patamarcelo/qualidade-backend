@@ -2491,7 +2491,7 @@ class PlantioExtratoAreaAdmin(admin.ModelAdmin):
     raw_id_fields = ["plantio"]
     readonly_fields = ("criados","modificado")
     ordering = ["-data_plantio"]
-    list_filter = ['aguardando_chuva', 'ativo']
+    list_filter = ['aguardando_chuva', 'ativo','plantio__safra__safra', 'plantio__ciclo__ciclo', 'plantio__variedade__cultura']
     search_fields = [
         "plantio__variedade__variedade", 
         "plantio__variedade__cultura__cultura",
