@@ -18,7 +18,7 @@ var app = new Vue({
 		ciclos: ["1", "2", "3"],
 		selectedCiclo: url?.search?.length > 0 ? url.search.split("&")[0].split("=")[1] : "",
 		selecredSafra: url?.search?.length > 0 ? url.search.split("&")[1].split("=")[1].replace("_",'/') : "",
-		safras: ["2022/2023", "2023/2024","2024/2025"],
+		safras: ["2022/2023", "2023/2024","2024/2025", "2025/2026"],
 		plantio: plantio,
 		colheita: colheita,
 		variedades: [...new Set(filterVar)],

@@ -188,6 +188,7 @@ s_dict = {
     "2022/2023": 1,
     "2023/2024": 2,
     "2024/2025": 3,
+    "2025/2026": 4,
 }
 
 c_dict = {"1": 3, "2": 4, "3": 5}
@@ -673,31 +674,32 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         )
                     if cultura_planejada:
                         try:
-                            novo_plantio = Plantio(
-                                safra=safra,
-                                ciclo=ciclo,
-                                talhao=talhao_id,
-                                variedade=id_variedade,
-                                area_colheita=area,
-                                map_centro_id=map_centro_id_farm,
-                                map_geo_points=map_geo_points_farm,
-                                id_farmbox=id_plantio_farmbox,
-                                data_prevista_plantio=planned_date,
-                                area_planejamento_plantio=area_planejamento,
-                                # data_plantio=data_plantio,
-                            )
+                            with transaction.atomic():  # Ensu
+                                novo_plantio = Plantio(
+                                    safra=safra,
+                                    ciclo=ciclo,
+                                    talhao=talhao_id,
+                                    variedade=id_variedade,
+                                    area_colheita=area,
+                                    map_centro_id=map_centro_id_farm,
+                                    map_geo_points=map_geo_points_farm,
+                                    id_farmbox=id_plantio_farmbox,
+                                    data_prevista_plantio=planned_date,
+                                    area_planejamento_plantio=area_planejamento,
+                                    # data_plantio=data_plantio,
+                                )
 
-                            novo_plantio.save()
-                            print(
-                                f"{Fore.GREEN}Novo Plantio salvo com sucesso: {novo_plantio}{Style.RESET_ALL}"
-                            )
-                            # print(
-                            #     f"{Fore.GREEN}Safra/Ciclo: {safra}-{ciclo} - Estado: {state} - Data Plantio: {date_plantio} - Parcela: {parcela} {Style.RESET_ALL}- Fazenda: {farm_name} - Cultura Planejada: {cultura_planejada} Variedade Planejada: {variedade_planejada}|{id_variedade} - Area: {area} - Cultura_ID: {culture_id} - Variedade_planejada_id: {variedade_planejada_id} - Fazenda_ID: {fazenda_id}"
-                            # )
-                            # print(
-                            #     f"{Fore.YELLOW}Safra:{safra}-Ciclo:{ciclo} - Parcela: {talhao_id} - Variedade: {id_variedade} - area: {area}{Style.RESET_ALL}"
-                            # )
-                            print("\n")
+                                novo_plantio.save()
+                                print(
+                                    f"{Fore.GREEN}Novo Plantio salvo com sucesso: {novo_plantio}{Style.RESET_ALL}"
+                                )
+                                # print(
+                                #     f"{Fore.GREEN}Safra/Ciclo: {safra}-{ciclo} - Estado: {state} - Data Plantio: {date_plantio} - Parcela: {parcela} {Style.RESET_ALL}- Fazenda: {farm_name} - Cultura Planejada: {cultura_planejada} Variedade Planejada: {variedade_planejada}|{id_variedade} - Area: {area} - Cultura_ID: {culture_id} - Variedade_planejada_id: {variedade_planejada_id} - Fazenda_ID: {fazenda_id}"
+                                # )
+                                # print(
+                                #     f"{Fore.YELLOW}Safra:{safra}-Ciclo:{ciclo} - Parcela: {talhao_id} - Variedade: {id_variedade} - area: {area}{Style.RESET_ALL}"
+                                # )
+                                print("\n")
                         except Exception as e:
                             print(
                                 f"{Fore.RED}Problema em salvar o plantio: {id_variedade}{Style.RESET_ALL}{e}"
@@ -5446,7 +5448,7 @@ class StViewSet(viewsets.ModelViewSet):
         {
             "projetos": ["Fazenda Cacique", "Fazenda Campo Guapo", "Fazenda Safira"],
             "emails_abertura_st": [
-                "estefany.fonseca@diamanteagricola.com.br",
+                "Willian.junior@diamanteagricola.com.br",
                 "joao.neto@diamanteagricola.com.br"
                 ],
         },
@@ -5702,7 +5704,7 @@ class StViewSet(viewsets.ModelViewSet):
                         cc_list = [
                             "raylton.sousa@diamanteagricola.com.br",
                             "adriana.goncalves@diamanteagricola.com.br",
-                            "arthur.rosal@diamanteagricola.com.br",
+                            "ruan.santos@diamanteagricola.com.br",
                             "marcelo.pata@diamanteagricola.com.br",
                         ]
                     else:
