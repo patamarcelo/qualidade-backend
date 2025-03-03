@@ -2807,7 +2807,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         )
                         .filter(safra=s_dict[safra_filter], ciclo=c_dict[cicle_filter])
                         .filter(plantio_descontinuado=False)
-                        .filter(variedade__cultura__isnull=False)
+                        # .filter(variedade__cultura__isnull=False)
                     )
                     cache.set(cache_key_qs_plantio_map, qs_plantio, timeout=60*5*6)  # cache for 5 minutes
                 result = [
