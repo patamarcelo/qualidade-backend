@@ -109,6 +109,7 @@ def get_cargas_model(safra_filter, ciclo_filter, list_ids=[]):
         .filter(~Q(plantio__variedade__cultura__cultura="Milheto"))
         .filter(plantio__safra__safra=safra_filter, plantio__ciclo__ciclo=ciclo_filter)
         .filter(~Q(plantio__id_farmbox__in=list_ids))
+        .filter(plantio__acompanhamento_medias=True)
     ]
     return cargas_model
 
