@@ -246,6 +246,7 @@ class PlantioDetailAdmin(admin.ModelAdmin):
                 ciclo__ciclo=cicle_filter,
                 finalizado_plantio=True,
                 plantio_descontinuado=False,
+                acompanhamento_medias=True
             )
             .filter(~Q(variedade__cultura__cultura="Milheto"))
             .filter(~Q(variedade__cultura__cultura="Algodão"))
@@ -1041,6 +1042,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         "variedade",
         "modificado",
         "area_aferida",
+        "acompanhamento_medias"
         # "area_parcial",
     )
     list_display = (
