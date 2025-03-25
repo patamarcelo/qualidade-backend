@@ -600,6 +600,10 @@ class Plantio(Base):
         null=True,
         unique=True,
     )
+    
+    acompanhamento_medias = models.BooleanField(
+        "Acompanhamento das Médias", default=True, help_text="Acompanha as médias do Plantio / Safra?"
+    )
 
     @property
     def get_dap(self):

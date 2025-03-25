@@ -5465,7 +5465,6 @@ class StViewSet(viewsets.ModelViewSet):
                 "alessandro.chagas@diamanteagricola.com.br",
                 "lara.rodrigues@diamanteagricola.com.br",
                 "wagner.junior@diamanteagricola.com.br",
-                "raylla.aguiar@diamanteagricola.com.br",
             ],
         },
         {
@@ -5475,8 +5474,8 @@ class StViewSet(viewsets.ModelViewSet):
                 "Fazenda Santa Maria",
             ],
             "emails_abertura_st": [
-                "raylla.aguiar@diamanteagricola.com.br",
-                "miria.carvalho@diamanteagricola.com.br",
+                "marcelo.pata@diamanteagricola.com.br",
+                "juliana.silva@diamanteagricola.com.br"
             ],
         },
     ]
@@ -5704,7 +5703,6 @@ class StViewSet(viewsets.ModelViewSet):
                         cc_list = [
                             "raylton.sousa@diamanteagricola.com.br",
                             "adriana.goncalves@diamanteagricola.com.br",
-                            "ruan.santos@diamanteagricola.com.br",
                             "marcelo.pata@diamanteagricola.com.br",
                         ]
                     else:

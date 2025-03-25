@@ -579,11 +579,12 @@ def export_plantio(modeladmin, request, queryset):
             "Cargas Carregadas",
             "Carregado Kg",
             "Produtividade",
-            # "Area Parcial",
+            "Area Parcial",
             # "Area a Considerar",
             "lat",
             "long",
             "dap",
+            "Area Saldo Carregar"
         ]
     )
 
@@ -659,8 +660,15 @@ def export_plantio(modeladmin, request, queryset):
         plantio_detail.pop()
         lat = ""
         lng = ""
-        area_parcial = str(plantio_detail[15]).replace(".",",")
-        area_plantada = str(plantio_detail[12]).replace(".",",") if plantio_detail[20] == True else ' - '
+        
+        area_parcial_number = plantio_detail[16] if plantio_detail[16] else 0
+        area_parcial = str(area_parcial_number).replace(".",",") if area_parcial_number else 0
+        
+        area_plantada_number = plantio_detail[12] if plantio_detail[12] else 0
+        area_plantada = str(area_plantada_number).replace(".",",") if plantio_detail[20] == True else ' - '
+        
+        area_saldo_carregar = area_plantada_number - area_parcial_number
+        
         if isinstance(plantio_detail[17], dict):
             lat = (
                 str(plantio_detail[17]["lat"]).replace(".", ",")
@@ -689,7 +697,8 @@ def export_plantio(modeladmin, request, queryset):
         plantio_detail.append(cargas_carregadas_quantidade)
         plantio_detail.append(cargas_carregadas_kg)
         plantio_detail.append(produtividade)
-        # plantio_detail.append(str(area_parcial).replace(".", ','))
+        plantio_detail.append(str(area_parcial).replace(".", ','))
+        
         # plantio_detail.append(area_considerar)
         plantio_detail.append(lat)
         plantio_detail.append(lng)
@@ -702,6 +711,7 @@ def export_plantio(modeladmin, request, queryset):
         plantio_detail[12] = area_plantada
         print(plantio_detail)
         print(lat, lng)
+        plantio_detail.append(str(area_saldo_carregar).replace(".", ','))
         plantio = tuple(plantio_detail)
         writer.writerow(plantio)
     return response
@@ -1058,6 +1068,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         "get_description_descontinuado_plantio",
         "area_aferida",
         "area_parcial",
+        "acompanhamento_medias"
         # "check_var_on_programa_list"
         # "detail",
     )
@@ -1116,6 +1127,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
                     ("area_aferida",),
                     ("plantio_descontinuado",),
                     ("farmbox_update",),
+                    ("acompanhamento_medias",),
                     ("observacao",),
                 )
             },
