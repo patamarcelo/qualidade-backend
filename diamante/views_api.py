@@ -4887,6 +4887,9 @@ class ColheitaApiSave(viewsets.ModelViewSet):
             failed = 0
             problem = []
             success_list = []
+            
+            data_json = sorted(data_json, key=lambda x: (x["Projeto"], int(x["Ticket"])))
+            
             for i in data_json:
                 try:
                     if len(i["Placa do veiculo"]) > 0:
@@ -5034,6 +5037,7 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                                                 "parcela": parcela,
                                                 "projeto": origem,
                                                 "romaneio": romaneio,
+                                                "ticket": ticket if ticket else 'Sem Ticket',
                                                 "error": str(e),
                                                 "id_farmtruck": id_farmtruck,
                                             }
@@ -5050,6 +5054,7 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                                         "parcela": parcela,
                                         "projeto": origem,
                                         "romaneio": romaneio,
+                                        "ticket": ticket if ticket else 'Sem Ticket',
                                         "error": str(e),
                                         "id_farmtruck": id_farmtruck,
                                     }
@@ -5127,6 +5132,7 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                                             "parcela": parcelas[0],
                                             "projeto": origem,
                                             "romaneio": romaneio,
+                                            "ticket": ticket if ticket else 'Sem Ticket',
                                             "error": str(e),
                                             "id_farmtruck": id_farmtruck,
                                         }
@@ -5142,6 +5148,7 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                                     "parcela": parcelas[0],
                                     "projeto": origem,
                                     "romaneio": romaneio,
+                                    "ticket": ticket if ticket else 'Sem Ticket',
                                     "error": str(e),
                                     "id_farmtruck": id_farmtruck,
                                 }
@@ -5154,6 +5161,7 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                             "projeto": "SEM PLACA",
                             "romaneio": remove_leading_zeros(str(i["Ticket"])),
                             "error": "SEM PLACA",
+                            "ticket": "SEM TICKET",
                             "id_farmtruck": id_farmtruck,
                         }
                         problem.append(problem_load)
@@ -5708,6 +5716,7 @@ class StViewSet(viewsets.ModelViewSet):
                             "raylton.sousa@diamanteagricola.com.br",
                             "adriana.goncalves@diamanteagricola.com.br",
                             "marcelo.pata@diamanteagricola.com.br",
+                            "marim.neto@diamanteagricola.com.br"
                         ]
                     else:
                         cc_list = ["marcelo.pata@diamanteagricola.com.br"]

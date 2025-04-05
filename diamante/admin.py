@@ -982,8 +982,8 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         print('model request: ', model_request)
         if model_request and model_request == 'plantioextratoarea':
             queryset = queryset.filter(
-                ciclo__ciclo__in=["2", "3"],
-                safra__safra="2024/2025",
+                ciclo__ciclo__in=["1", "1"],
+                safra__safra="2025/2026",
                 finalizado_colheita=False,
                 plantio_descontinuado=False,
                 programa__isnull=False,
@@ -1728,7 +1728,7 @@ class ColheitaAdmin(admin.ModelAdmin):
                     msg = f"{not_includes} Cargas não incluídas"
                     failed_format = list(
                         map(
-                            lambda x: f"Romaneio: {x['romaneio']} - {x['projeto']}: {x['parcela']} <br/> {x['error']}",
+                            lambda x: f"Romaneio: {x['romaneio']} - {x['projeto']}: {x['parcela']} - Ticket: {x['ticket']} <br/> {x['error']}",
                             failed_loads,
                         )
                     )
