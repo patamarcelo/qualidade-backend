@@ -684,7 +684,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                     map_centro_id=map_centro_id_farm,
                                     map_geo_points=map_geo_points_farm,
                                     id_farmbox=id_plantio_farmbox,
-                                    data_prevista_plantio=planned_date,
+                                    # data_prevista_plantio=planned_date,
                                     area_planejamento_plantio=area_planejamento,
                                     # data_plantio=data_plantio,
                                 )
@@ -4242,6 +4242,12 @@ class PlantioViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["GET"])
     def get_plantio_planner_data(self, request, *args, **kwargs):
+        safra_filter = request.query_params.get("safra")
+        cicle_filter = request.query_params.get("ciclo")
+        
+        
+        print('safra filter', safra_filter)
+        print('cicle filter', cicle_filter)
         try:
             qs_planned = (
                 Plantio.objects.select_related(
@@ -4266,7 +4272,9 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     'variedade__dias_ciclo',
                     "variedade__cultura__cultura"
                 )
-                .filter(safra__safra="2024/2025", ciclo__ciclo="3")
+                # .filter(safra__safra="2024/2025", ciclo__ciclo="3")
+                .filter(safra__safra=safra_filter)
+                .filter(ciclo__ciclo=cicle_filter)
                 .filter(plantio_descontinuado=False)
                 .filter(variedade__variedade__isnull=False)
             )
@@ -4291,7 +4299,9 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "area_plantada",
                     "aguardando_chuva"
                 )
-                .filter(plantio__safra__safra="2024/2025", plantio__ciclo__ciclo="3")
+                # .filter(plantio__safra__safra="2024/2025", plantio__ciclo__ciclo="3")
+                .filter(plantio__safra__safra=safra_filter)
+                .filter(plantio__ciclo__ciclo=cicle_filter)
                 .filter(plantio__plantio_descontinuado=False)
                 .filter(ativo=True)
             )
@@ -4363,6 +4373,9 @@ class PlantioViewSet(viewsets.ModelViewSet):
         try:
             safra_filter = '2024/2025'
             cicle_filter = '3'
+            
+            safra_filter = request.query_params.get("safra")
+            cicle_filter = request.query_params.get("ciclo")
             
             # # GET TOTAL PLANTED
             qs_plantio = (
@@ -5488,7 +5501,7 @@ class StViewSet(viewsets.ModelViewSet):
             "emails_abertura_st": [
                 "marcelo.pata@diamanteagricola.com.br",
                 "juliana.silva@diamanteagricola.com.br",
-                "marialima.ribeiro@diamanteagricola.com.br",
+                "maria.ribeiro@diamanteagricola.com.br",
             ],
         },
     ]

@@ -84,6 +84,8 @@ from django.core.files.storage import FileSystemStorage
 from django.contrib.admin import DateFieldListFilter
 
 from .forms import PlantioExtratoAreaForm
+from django.db import connection
+
 
 
 main_path = (
@@ -946,6 +948,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         return ["data_plantio"]
 
     def get_queryset(self, request):
+        print(connection.settings_dict)
         return (
             super(PlantioAdmin, self)
             .get_queryset(request)

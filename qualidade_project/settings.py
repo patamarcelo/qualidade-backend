@@ -151,6 +151,17 @@ EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD_CONFIG")
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
 
 DATABASES = {
+    "default_neon": {
+        'ENGINE': 'django.db.backends.postgresql',
+        "NAME": env("DB_EL_NAME_NEON"),
+        "USER": env("DB_EL_USER_NEON"),
+        "PASSWORD": env("DB_EL_PASSWORD_NEON"),
+        "HOST": env("DB_EL_HOST_NEON"),
+        "PORT": env("DB_EL_PORT_NEON"),
+        'CONN_MAX_AGE': 300,  # Keep connections alive for 5 minutes
+        "CONN_HEALTH_CHECKS": True,  # check connection before using
+        'ATOMIC_REQUESTS': True,
+    },
     "default": {
         'ENGINE': 'django.db.backends.postgresql',
         "NAME": env("DB_EL_NAME"),
@@ -159,6 +170,7 @@ DATABASES = {
         "HOST": env("DB_EL_HOST"),
         "PORT": env("DB_EL_PORT"),
         # 'CONN_MAX_AGE': 10,  # Keep connections alive for 5 minutes
+        "CONN_HEALTH_CHECKS": True,  # check connection before using
         'ATOMIC_REQUESTS': True,
         'POOL_OPTIONS': {
             'POOL_SIZE': 10,        # Increase from 5
@@ -183,7 +195,7 @@ DATABASES = {
     },
 }
 
-DATABASES["default"] = DATABASES["default" if DEBUG else "default"]
+DATABASES["default"] = DATABASES["default_neon" if DEBUG else "default_neon"]
 
 
 # Password validation

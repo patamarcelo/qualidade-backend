@@ -4,6 +4,7 @@ import sys
 import time
 import threading
 
+
 today = datetime.date.today()
 
 import requests
@@ -22,6 +23,7 @@ from django.db.models.functions import Coalesce, Round
 from django.db import transaction
 import time
 
+from pathlib import Path
 
 
 
@@ -720,3 +722,39 @@ def is_older_than_7_days(date_string):
         
         # Check if the input date is older than 30 days ago
         return input_date > thirty_days_ago
+    
+    
+def load_localization_data():
+    from .models import Plantio
+    """
+    Loads and returns the localization.json data as a list of objects.
+    """
+    file_path = Path(__file__).resolve().parent / 'utils/localization-1.json'
+
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            updated = 0
+            for item in data:
+                id_farmbox = item.get("ID FarmBox")
+                date_str = item.get("prev_plantio")  # Adjust key name if different
+                fazenda = item.get('Projeto')
+                parcela = item.get('Talhao')
+                if fazenda == 'Projeto Benção de Deus':
+                    if date_str:
+                        format_date = datetime.datetime.strptime(date_str, "%m/%d/%y").date()
+                        print('Fazenda: ', fazenda, 'Talhão: ', parcela, 'Prev Plantio: ', format_date, 'idFarm: ', id_farmbox)
+                        try:
+                            plantio = Plantio.objects.get(id_farmbox=id_farmbox)
+                            plantio.data_prevista_plantio = format_date
+                            plantio.save()
+                            updated += 1
+                        except Plantio.DoesNotExist:
+                            print(f"❌ Plantio not found for idFarmbox={id_farmbox}")
+                        except Exception as e:
+                            print(f"⚠️ Error updating idFarmbox={id_farmbox}: {e}")
+            print(f"✅ Finished. {updated} records updated.")
+        return data
+    except Exception as e:
+        print(f"Error loading localization data: {e}")
+        return []
