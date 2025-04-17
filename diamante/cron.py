@@ -3,6 +3,8 @@ from .utils import get_date, get_miliseconds
 import time
 from .read_farm_data import get_applications, get_applications_pluvi
 from qualidade_project.mongo_api import generate_file_run
+from django.db import connection
+
 
 def get_hour_test():
     current_time = datetime.now()
@@ -10,6 +12,7 @@ def get_hour_test():
     
 
 def update_farmbox_mongodb_app():
+    connection.ensure_connection()
     number_of_days_before = 1
     from_date = get_date(number_of_days_before)
     last_up = get_miliseconds(from_date)

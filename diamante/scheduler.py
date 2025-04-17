@@ -78,8 +78,9 @@ def start():
                 'cron',
                 day_of_week="*",
                 hour="5-19",  # From 6 AM to 7:59 PM
-                minute="15",  # At 15, 30, 45 and 58 minutes of each hour
+                minute="58",  # At 15, 30, 45 and 58 minutes of each hour
                 id=job_id,
+                replace_existing=True,
                 misfire_grace_time=30  # segundos de tolerância para atraso
 
             )

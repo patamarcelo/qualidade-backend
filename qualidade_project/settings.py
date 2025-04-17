@@ -160,7 +160,10 @@ DATABASES = {
         "PASSWORD": env("DB_EL_PASSWORD_NEON"),
         "HOST": env("DB_EL_HOST_NEON"),
         "PORT": env("DB_EL_PORT_NEON"),
-        'CONN_MAX_AGE': 300,  # Keep connections alive for 5 minutes
+        'CONN_MAX_AGE': 600,  # 10 minutos
+        'OPTIONS': {
+            'sslmode': 'require',
+        },
         "CONN_HEALTH_CHECKS": True,  # check connection before using
         'ATOMIC_REQUESTS': True,
     },
