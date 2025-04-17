@@ -150,6 +150,8 @@ EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD_CONFIG")
 # Database
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
 
+use_db = "default_neon"
+
 DATABASES = {
     "default_neon": {
         'ENGINE': 'django.db.backends.postgresql',
@@ -195,7 +197,8 @@ DATABASES = {
     },
 }
 
-DATABASES["default"] = DATABASES["default_neon" if DEBUG else "default_neon"]
+print('utilizando o banco de dados :::', use_db, '\n')
+DATABASES["default"] = DATABASES[use_db if DEBUG else use_db]
 
 
 # Password validation
