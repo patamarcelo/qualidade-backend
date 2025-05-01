@@ -2859,7 +2859,14 @@ class SentSeedsAdmin(admin.ModelAdmin):
         # ("Observações", {"fields": (("observacao",))}),
     )
 
-    
+    def get_changeform_initial_data(self, request):
+        initial = super().get_changeform_initial_data(request)
+
+        # Replace 1 and 2 with the actual IDs you want to set as defaults
+        initial['safra'] = 4
+        initial['ciclo'] = 3
+
+        return initial
     
     def get_peso_bag(self, obj):
         return obj.peso_bag

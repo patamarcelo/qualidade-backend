@@ -2564,10 +2564,10 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 print('safra filter: ', safra_filter)
                 print('cicle filter: ',cicle_filter)
                 if device is None:
-                    safra_filter = '2024/2025'    
-                    cicle_filter = '1'
+                    safra_filter = ['2024/2025','2025/2026']    
+                    cicle_filter = ['1','2','3']
                 else:
-                    safra_filter = "2024/2025" if safra_filter == None else safra_filter
+                    safra_filter = ["2024/2025"] if safra_filter == None else [safra_filter]
                     cicle_filter = "1" if cicle_filter == None else cicle_filter
                 qs_start_time = time.time()
                 if device == 'WEB':
@@ -2616,7 +2616,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 "cronograma_programa",
                             )
                             .filter(~Q(programa_id=None))
-                            .filter(safra=s_dict[safra_filter])
+                            .filter(safra__safra__in=safra_filter)
                             .filter(ciclo=c_dict[cicle_filter])
                             .filter(data_plantio__isnull=False)
                             .filter(plantio_descontinuado=False)
@@ -2669,7 +2669,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 "cronograma_programa",
                             )
                             .filter(~Q(programa_id=None))
-                            .filter(safra=s_dict[safra_filter])
+                            .filter(safra__safra__in=safra_filter)
                             .filter(data_plantio__isnull=False)
                             .filter(plantio_descontinuado=False)
                             .filter(finalizado_colheita=False)

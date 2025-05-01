@@ -1387,7 +1387,7 @@ class BuyProducts(Base):
 
 class SentSeeds(Base):
     data_envio      = models.DateField(help_text="dd/mm/aaaa - Data Envio da Semente", blank=True, null=True)
-    variedade       = models.ForeignKey(Variedade, on_delete=models.PROTECT, blank=True, null=True)
+    variedade       = models.ForeignKey(Variedade, on_delete=models.PROTECT, blank=True, null=True, default=9)
     quantidade_bags = models.IntegerField("Quantidade de Bags Enviados", blank=True, null=True)
     peso_bag        = models.DecimalField('Peso dos Bags Enviados em Kg', max_digits=12 , decimal_places=2,default=700)
     peso_total      = models.DecimalField('Peso total da carga enviada em Kg', max_digits=12 , decimal_places=2, blank=True, null=True)
