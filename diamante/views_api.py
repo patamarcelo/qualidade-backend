@@ -2571,8 +2571,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     cicle_filter = "1" if cicle_filter == None else cicle_filter
                 qs_start_time = time.time()
                 if device == 'WEB':
-                    cache_key = f"get_plantio_operacoes_detail_json_program_qs_plantio_web_{safra_filter}_{cicle_filter}"
-                    print('cache_key:', cache_key)
+                    cache_key = f"get_plantio_operacoes_detail_json_program_qs_plantio_web_{safra_filter[0]}_{cicle_filter}"
+                    print('cache_key web:', cache_key)
                     qs_plantio = cache.get(cache_key)
                     if not qs_plantio:
                         qs_plantio = (

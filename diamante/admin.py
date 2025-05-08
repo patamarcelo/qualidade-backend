@@ -2829,7 +2829,8 @@ class SentSeedsAdmin(admin.ModelAdmin):
     search_fields = [
         "data_envio", "origem__nome", 'destino__nome', 'variedade__variedade', 'peso_total', 'nota_fiscal'
     ]
-    list_filter = ['destino', 'variedade']
+    list_filter = ['safra', 'ciclo', 'destino', 'variedade']
+    ordering = ['-data_envio']  # Descending order by date
     
     fieldsets = (
         (
@@ -2909,7 +2910,7 @@ class SentSeedsAdmin(admin.ModelAdmin):
             )
         else:
             return " - "
-    get_data_envio.short_description = "Data Pgto"
+    get_data_envio.short_description = "Data Envio"
     
     def safra_description(self, obj):
         return f"{obj.safra.safra} - {obj.ciclo.ciclo}"

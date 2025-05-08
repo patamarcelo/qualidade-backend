@@ -867,6 +867,12 @@ class PlantioExtratoArea(Base):
             else:
                 plantio.area_colheita = total_area + area_informada
             plantio.inicializado_plantio = True
+            
+            # if data plantio is NONE, ADD DATA PLANTIO AND GENERATE PROGRAM
+            if plantio.data_plantio is None:
+                print('plantio sem data até o momento ', plantio.data_plantio)
+                print('Nova data plantio: ', self.data_plantio)
+                plantio.data_plantio = self.data_plantio
             plantio.save()
         super(PlantioExtratoArea, self).save(*args, **kwargs)
 
