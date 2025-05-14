@@ -4693,7 +4693,7 @@ class DefensivoViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["GET"])
     def update_farmbox_mongodb_data(self, request, pk=None):
         
-        number_of_days_before = 3 if DEBUG == True else 1
+        number_of_days_before = 10 if DEBUG == True else 7
         from_date = get_date(number_of_days_before)
         last_up = get_miliseconds(from_date)
         print(last_up)
