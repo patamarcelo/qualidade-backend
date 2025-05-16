@@ -4352,7 +4352,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "map_geo_points",
                     "map_centro_id",
                 )
-                .filter(safra__safra="2024/2025", ciclo__ciclo="3")
+                .filter(safra__safra="2025/2026", ciclo__ciclo="1")
             )
             response = {
                 "msg": f"Aplicação Aberta com sucesso!!!!",

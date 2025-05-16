@@ -859,6 +859,7 @@ class PlantioExtratoArea(Base):
             # print('area informada: ', self.area_plantada)
             if self.finalizado_plantio:
                 plantio.area_colheita = plantio.area_planejamento_plantio
+                plantio.finalizado_plantio = True
                 if self.area_plantada:
                     pass
                 else:
