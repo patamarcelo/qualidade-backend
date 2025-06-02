@@ -163,6 +163,7 @@ DATABASES = {
         'CONN_MAX_AGE': 600,  # 10 minutos
         'OPTIONS': {
             'sslmode': 'require',
+            'connect_timeout': 10,  # Timeout after 10 seconds (adjust as needed)
         },
         "CONN_HEALTH_CHECKS": True,  # check connection before using
         'ATOMIC_REQUESTS': True,

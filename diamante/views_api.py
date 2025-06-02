@@ -5486,7 +5486,6 @@ class StViewSet(viewsets.ModelViewSet):
                 "Fazenda Tuiuiu",
             ],
             "emails_abertura_st": [
-                "vinicius.costa@diamanteagricola.com.br",
                 "lara.rodrigues@diamanteagricola.com.br",
                 "jardel.mota@diamanteagricola.com.br"
             ],
@@ -5522,8 +5521,7 @@ class StViewSet(viewsets.ModelViewSet):
                 app=req_data
             )
             new_st_opened.save()
-            logger.info('Nova ST salva com sucesso!!', new_st_opened)
-            print('Nova ST salva com sucesso!! print')
+            logger.info(f'Nova ST salva com sucesso!! {new_st_opened}')
         except Exception as e:
             print('Problema em salvar a pré st do Protheus')
             logger.error("Error in save_st_from_protheus: %s", e, exc_info=True)
