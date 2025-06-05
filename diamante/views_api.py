@@ -3351,9 +3351,15 @@ class PlantioViewSet(viewsets.ModelViewSet):
             safra_filter = None
             cicle_filter = None
             try:
+                # safra_filter = request.data["safra"]
+                # cicle_filter = request.data["ciclo"]
+                # print('safra filter: ', safra_filter)
+                # print('cicle filter: ', cicle_filter)
+                
                 safracicle_filter = CicloAtual.objects.filter(nome="Colheita")[0]
                 safra_filter = safracicle_filter.safra.safra
-                cicle_filter = safracicle_filter.ciclo.ciclo
+                cicle_filter = str(safracicle_filter.ciclo.ciclo)
+                
             except Exception as e:
                 print(e)
             safra_filter = "2023/2024" if safra_filter == None else safra_filter
