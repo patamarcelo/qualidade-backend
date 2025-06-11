@@ -1216,6 +1216,12 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
                         messages.ERROR,
                         f"Erro ao salvar os dados no Farmbox: {e}",
                     )
+            if form.initial['plantio_descontinuado'] == False and form.instance.plantio_descontinuado == True:
+                print('valor foi alterado para descontinuado')
+                PlantioExtratoArea.objects.filter(plantio=obj.pk).update(ativo=False)
+                # objs_to_update = PlantioExtratoArea.objects.filter(plantio=obj.pk)
+                # for i in objs_to_update:
+                #     print('objeto a ser atualizado: ', i)
         form.save()
 
     def get_readonly_fields(self, request, obj=None):
