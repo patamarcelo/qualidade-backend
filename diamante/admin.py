@@ -588,7 +588,9 @@ def export_plantio(modeladmin, request, queryset):
             "lat",
             "long",
             "dap",
-            "Area Saldo Carregar"
+            "Area Saldo Carregar",
+            "Area Aferida",
+            "Saldo Plantar",
         ]
     )
 
@@ -615,6 +617,7 @@ def export_plantio(modeladmin, request, queryset):
         "data_prevista_plantio",
         "inicializado_plantio",
         "variedade__dias_germinacao",
+        "area_aferida"
     )
     cargas_list = modeladmin.total_c_2
 
@@ -660,7 +663,15 @@ def export_plantio(modeladmin, request, queryset):
 
     for plantio in plantios:
         plantio_detail = list(plantio)
-        time_delta_variedade_germinacao = plantio_detail[-1]
+        time_delta_variedade_germinacao = plantio_detail[-2]
+        area_aferida = plantio_detail.pop()
+        area_aferida = "Sim" if area_aferida == True else "Não"
+        print('area_aferida', area_aferida)
+        
+        area_plantada_math = plantio_detail[12] if plantio_detail[11] > 0 and plantio_detail[12] > 0 else 0
+        area_planejada_math = plantio_detail[11] if plantio_detail[11] > 0 and plantio_detail[12] > 0 else 0
+        saldo_plantar = area_planejada_math - area_plantada_math
+        
         plantio_detail.pop()
         lat = ""
         lng = ""
@@ -716,6 +727,8 @@ def export_plantio(modeladmin, request, queryset):
         print(plantio_detail)
         print(lat, lng)
         plantio_detail.append(str(area_saldo_carregar).replace(".", ','))
+        plantio_detail.append(area_aferida)
+        plantio_detail.append(str(saldo_plantar if saldo_plantar >= 1 else 0).replace(".", ','))
         plantio = tuple(plantio_detail)
         writer.writerow(plantio)
     return response
@@ -1116,6 +1129,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
             "Plantio",
             {
                 "fields": (
+                    ("area_aferida",),
                     ("area_planejamento_plantio"),
                     (
                         "area_colheita",
@@ -1130,7 +1144,6 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
                         "data_emergencia",
                     ),
                     ("data_prevista_colheita", "data_prevista_plantio"),
-                    ("area_aferida",),
                     ("plantio_descontinuado",),
                     ("farmbox_update",),
                     ("acompanhamento_medias",),

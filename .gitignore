@@ -59,3 +59,6 @@ secrets.json
 *dataset-2023-2024.json
 
 *diamante/utils/*
+
+Dockerfile
+docker-compose.yml
