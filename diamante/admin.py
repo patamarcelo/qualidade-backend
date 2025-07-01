@@ -2523,6 +2523,33 @@ class PlantioExtratoAreaAdmin(admin.ModelAdmin):
     actions =[export_plantio_extrato]
     
     
+    def save_model(self, request, obj, form, change):
+        # Se for edição de uma instância existente
+        if obj.pk and change:
+            previous = self.model.objects.get(pk=obj.pk)
+
+            # Verifica se estava ativo e agora foi desativado
+            if previous.ativo and not obj.ativo:
+                total_area = self.model.objects.filter(
+                    plantio=obj.plantio, ativo=True
+                ).exclude(pk=obj.pk).aggregate(
+                    total_area_plantada=Sum("area_plantada")
+                )['total_area_plantada'] or 0
+
+                if total_area > obj.plantio.area_planejamento_plantio:
+                    self.message_user(
+                        request,
+                        f"⚠️ A área total já apontada ({total_area:.2f}) excede a área planejada ({obj.plantio.area_planejamento_plantio:.2f}).",
+                        level=messages.WARNING
+                    )
+
+                # Exemplo de atualização
+                obj.plantio.area_colheita = min(total_area, obj.plantio.area_planejamento_plantio)
+                obj.plantio.save()
+
+        super().save_model(request, obj, form, change)
+    
+    
     list_display = ("talhao_description", "get_data", "safra_description", "cultura_description", "variedade_description", "area_plantada","related_link", 'ativo')
     autocomplete_fields = ["plantio"]
     raw_id_fields = ["plantio"]

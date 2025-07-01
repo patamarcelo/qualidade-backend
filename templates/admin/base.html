@@ -82,7 +82,6 @@
 {% endblock %}
 <script type="text/javascript">
     document.addEventListener('DOMContentLoaded', function () {
-        // Get reference to the spinner and the main content div
         var mainContent = document.getElementById('content-main');
 
         var spinner = document.createElement('div');
@@ -90,50 +89,55 @@
         spinner.id = 'spinner';
         document.body.appendChild(spinner);
 
-        
-        // Ensure spinner is visible initially
-        if (spinner) {
-            spinner.classList.remove('hidden'); // Show spinner initially
-        }
-    
-        // Make sure the main content is hidden initially
+        // Show spinner initially
+        spinner.classList.remove('hidden');
+
+        // Hide main content initially
         if (mainContent) {
             mainContent.classList.remove('visible');
         }
-    
-        // Show spinner before the page unloads (refresh or navigation)
-        window.addEventListener('beforeunload', function () {
-            if (spinner) {
-                spinner.classList.remove('hidden'); // Show the spinner
-            }
-            if (mainContent) {
-                mainContent.classList.remove('visible'); // Ensure content is hidden
+
+        // Show spinner before page unload only for POST or real navigation
+        window.addEventListener('beforeunload', function (e) {
+            const activeEl = document.activeElement;
+            const form = activeEl?.closest('form');
+            const isPost = form?.method?.toUpperCase() === 'POST';
+            const isExport = activeEl?.getAttribute('href')?.includes('export') || form?.action?.includes('export');
+
+            if (isPost && !isExport) {
+                spinner.classList.remove('hidden');
+                if (mainContent) {
+                    mainContent.classList.remove('visible');
+                }
             }
         });
-    
-        // Hide spinner and show the main content after page has fully loaded
+
+        // Fallback: auto-hide spinner after 10s
+        setTimeout(function () {
+            spinner.classList.add('hidden');
+            if (mainContent) {
+                mainContent.classList.add('visible');
+            }
+        }, 10000);
+
+        // Hide spinner and show content after full load
         window.addEventListener('load', function () {
-            if (spinner) {
-                spinner.classList.add('hidden'); // Hide the spinner once the page has loaded
-            }
+            spinner.classList.add('hidden');
             if (mainContent) {
-                mainContent.classList.add('visible'); // Make the content visible with transition
+                mainContent.classList.add('visible');
             }
         });
-    
-        // Handle AJAX calls in Django admin (optional if you're making AJAX calls)
+
+        // Handle AJAX calls (if used)
         if (window.jQuery) {
             $(document).ajaxStart(function () {
-                
                 if (mainContent) {
-                    mainContent.classList.remove('visible');  // Hide content during AJAX load
+                    mainContent.classList.remove('visible');
                 }
             }).ajaxStop(function () {
-                if (spinner) {
-                    spinner.classList.add('hidden');  // Hide spinner once AJAX is done
-                }
+                spinner.classList.add('hidden');
                 if (mainContent) {
-                    mainContent.classList.add('visible');  // Show content after AJAX load
+                    mainContent.classList.add('visible');
                 }
             });
         }

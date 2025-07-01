@@ -3,6 +3,7 @@ from .models import PlantioExtratoArea
 from django.core.exceptions import ValidationError
 from django.db.models import Sum
 
+
 class PlantioExtratoAreaForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super(PlantioExtratoAreaForm, self).__init__(*args, **kwargs)
@@ -28,7 +29,7 @@ class PlantioExtratoAreaForm(forms.ModelForm):
         area_plantada_form = cleaned_data.get('area_plantada')
         plantio_finalizado = cleaned_data.get('finalizado_plantio')
         area_plantada_form = area_plantada_form if area_plantada_form is not None else 0
-        
+        plantio_add_ativo = cleaned_data.get('ativo')
         if plantio:
             # Access fields from the Plantio model, e.g., area_planejamento_plantio
             area_planejamento = plantio.area_planejamento_plantio
@@ -58,14 +59,29 @@ class PlantioExtratoAreaForm(forms.ModelForm):
             area_total_informada = total_area + area_plantada_form
             # print('area total informada: ', area_total_informada)
             # format_area_planejamento = 
-            if area_planejamento < area_total_informada:
-                raise ValidationError(
-                    f"Area total disponível:  {str(area_planejamento).replace('.', ',')}, Area total já informada plantada:  ({str(total_area).replace('.', ',')}), Area ainda disponível: {str((area_planejamento - total_area)).replace('.', ',')}"
-                )
-            if area_plantada_form == 0 and plantio_finalizado == False:
-                raise ValidationError(
-                    f"Area Precisa ser informada, ou Plantio Finalizado precisa ser informado"
-                )
+            if self.instance.pk and self.instance.ativo and plantio_add_ativo is False:
+                # Está desativando agora, então pode ajustar alguma lógica
+                print(f'Desativando: removendo {area_plantada_form} da área planejada.')
+
+                # Exemplo: atualizar a área disponível (se aplicável)
+                total_area = PlantioExtratoArea.objects.filter(plantio=plantio, ativo=True).exclude(pk=self.instance.pk).aggregate(
+                    total_area_plantada=Sum("area_plantada")
+                )['total_area_plantada'] or 0
+                new_area = total_area if plantio.area_planejamento_plantio >= total_area else plantio.area_planejamento_plantio
+                # if total_area > plantio.area_planejamento_plantio:
+                #     Adicionar
+                plantio.area_colheita = new_area
+                plantio.save()
+            else:
+                # pass
+                if area_planejamento < area_total_informada:
+                    raise ValidationError(
+                        f"Area total disponível:  {str(area_planejamento).replace('.', ',')}, Area total já informada plantada:  ({str(total_area).replace('.', ',')}), Area ainda disponível: {str((area_planejamento - total_area)).replace('.', ',')}"
+                    )
+                if area_plantada_form == 0 and plantio_finalizado == False:
+                    raise ValidationError(
+                        f"Area Precisa ser informada, ou Plantio Finalizado precisa ser informado"
+                    )
 
         return cleaned_data
 

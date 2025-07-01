@@ -3049,9 +3049,11 @@ class PlantioViewSet(viewsets.ModelViewSet):
     def open_app_farmbox(self, request, pk=None):
         if request.user.is_authenticated:
             try:
+                start_total = time.perf_counter()
                 params = request.data["data"]
                 print('Abrindo Aplicação')
                 # print('Params from Farmbox: ', params)
+                start_inputs = time.perf_counter()
                 old_inputs = params.get('inputs')
                 print('old paramsss::', params)
                 print('\n')
@@ -3060,7 +3062,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     for item in old_inputs
                 ]
                 params['inputs'] = new_inputs
-                logger.info('using new inputs:', params)
+                logger.info('inputs processing time: %.4fs', time.perf_counter() - start_inputs)
+                # logger.info('using new inputs:', params)
                 
                 url = "https://farmbox.cc/api/v1/applications"
                 payload = params
@@ -3068,10 +3071,13 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "content-type": "application/json",
                     "Authorization": FARMBOX_ID,
                 }
+                start_request = time.perf_counter()
                 response_farm = requests.post(url, data=json.dumps(payload), headers=headers)
-                logger.info('responseAll from farmbox:', response_farm)
+                logger.info('request time: %.4fs', time.perf_counter() - start_request)
+                
+                logger.info(f'responseAll from farmbox: {response_farm}')
                 print('\n\n')
-                logger.info('response:', response_farm.status_code, response_farm.text)
+                logger.info(f'response: {response_farm.status_code}')
 
                 if response_farm.status_code == 201:
                     parsed_json = json.loads(response_farm.text)
@@ -3080,7 +3086,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     logger.info('Start save app from  FarmBox')
                     Thread(target=self.save_app_farmbox, args=(parsed_json,)).start()
                     logger.info('Finish off save app from  FarmBox')
-
+                    logger.info('total time: %.4fs', time.perf_counter() - start_total)
                     response = {
                         "msg": "APP Aberta com sucesso!!",
                         "data": params,
@@ -4612,6 +4618,61 @@ class PlantioViewSet(viewsets.ModelViewSet):
             }
             return Response(response, status=status.HTTP_208_ALREADY_REPORTED)
 
+    @action(detail=False, methods=["GET", "POST"])
+    def get_plot_mapa_data_fetchrn_app(self, request, pk=None):
+        if request.user.is_authenticated:
+            try:
+                safra_filter = "2025/2026"
+                cicle_filter = "3"
+            
+                # 1️⃣  read – query params first, then body, finally default
+                safra_filter = (
+                    request.query_params.get("safra")
+                    or request.data.get("safra")
+                    or "2025/2026"                 # <- default
+                )
+
+                ciclo_filter = (
+                    request.query_params.get("ciclo")
+                    or request.data.get("ciclo")
+                    or "3"                         # <- default
+                )
+
+                # farm can come from ?farm=, from body, or from the URL /plots/<pk>/
+                farm_filter = (
+                    request.query_params.get("farm")
+                    or request.data.get("farm")
+                    or None                          # pk passed in the URL
+                )
+                qs = (
+                    Plantio.objects.filter(
+                        safra__safra=safra_filter,
+                        ciclo__ciclo=cicle_filter,
+                        # finalizado_plantio=True,
+                        # plantio_descontinuado=False,
+                        talhao__fazenda__id_farmbox=farm_filter
+                    )
+                    .filter(~Q(variedade__cultura__cultura="Milheto"))
+                    .values(
+                        "talhao__id_talhao",
+                        "map_geo_points",
+                        "map_centro_id"
+                        
+                    )
+                )
+                response = {
+                    "msg": "Consulta realizada com sucesso!!",
+                    "data": qs,
+                }
+                return Response(response, status=status.HTTP_200_OK)
+            except Exception as e:
+                response = {"message": f"Ocorreu um Erro: {e}"}
+                return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+        else:
+            response = {"message": "Você precisa estar logado!!!"}
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
+    
     @action(detail=False, methods=['GET'])
     def check_how_fast(self, request, *args, **kwargs):
         start_time = time.time()
@@ -5506,7 +5567,7 @@ class StViewSet(viewsets.ModelViewSet):
             "emails_abertura_st": [
                 "marcelo.pata@diamanteagricola.com.br",
                 "juliana.silva@diamanteagricola.com.br",
-                "maria.ribeiro@diamanteagricola.com.br",
+                "gisely.alencar@diamanteagricola.com.br",
             ],
         },
     ]
