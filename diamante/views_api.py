@@ -4647,7 +4647,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 qs = (
                     Plantio.objects.filter(
                         safra__safra=safra_filter,
-                        ciclo__ciclo=cicle_filter,
+                        ciclo__ciclo=ciclo_filter,
                         # finalizado_plantio=True,
                         # plantio_descontinuado=False,
                         talhao__fazenda__id_farmbox=farm_filter
