@@ -4797,6 +4797,30 @@ class DefensivoViewSet(viewsets.ModelViewSet):
             "dados": 'dados do banco',
         }
         return Response(response, status=status.HTTP_200_OK)
+    
+    @action(detail=False, methods=["GET"])
+    def get_defensivos_integration_farmbox(self, request):
+        try:
+            qs = (
+                Defensivo.objects
+                .filter(id_farmbox__isnull=False)
+                .exclude(tipo="operacao")    
+                .annotate(
+                    name        = F("produto"),          # produto ➜ name
+                    dosage_unity= F("unidade_medida"),   # unidade_medida ➜ dosage_unity
+                    input_id    = F("id_farmbox"),       # id_farmbox ➜ input_id
+                )
+                .values("name", "dosage_unity", "input_id")  # só os aliases
+            )
+            response = {
+                    "msg": f"Consulta realizada com sucesso!!",
+                    "total_return": len(qs),
+                    "dados": qs,
+                }
+            return Response(response, status=status.HTTP_200_OK)
+        except Exception as e:
+            response = {"message": f"Ocorreu um Erro em pegar os defensivos: {e}"}
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
 
 # --------------------- ---------------------- FARMBOX APPLICATIONS UPDATE API END  --------------------- ----------------------#
