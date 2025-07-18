@@ -24,6 +24,7 @@ from django.db import transaction
 import time
 
 from pathlib import Path
+from django.core.cache import cache
 
 
 
@@ -262,7 +263,18 @@ def alter_dap_programa_and_save(query, dap, current_op):
         except Exception as e:
             print("Erro ao Salvar a alteração no programa do  plantio", e)
 
+def invalidate_plantio_cache(safra, ciclo):
+    cache_key = f"get_plantio_operacoes_detail_json_program_qs_plantio_{safra}_{ciclo}"
+    print('invalidando o cache', cache_key)
+    cache_key_qs_plantio_get_plantio_operacoes_detail = f"get_plantio_operacoes_detail_qs_plantio_{safra}_{ciclo}"
+    cache_key_qs_plantio_map = f"get_plantio_map_{safra}_{ciclo}"
+    cache_key_web = f"get_plantio_operacoes_detail_json_program_qs_plantio_web_{safra}_{ciclo}"
 
+    cache.delete(cache_key)
+    cache.delete(cache_key_web)
+    cache.delete(cache_key_qs_plantio_get_plantio_operacoes_detail)
+    cache.delete(cache_key_qs_plantio_map)
+    
 def admin_form_alter_programa_and_save(
     query,
     operation,
@@ -330,6 +342,12 @@ def admin_form_alter_programa_and_save(
         print('atualizando Banco de Dados: Finalizado')
         bulk_update_time = time.time()
         print(f"Time for bulk update: {bulk_update_time - bulk_update_start_time} seconds")
+
+        # Usando safra e ciclo do primeiro objeto atualizado (assumindo que todos são do mesmo safra/ciclo)
+        safra = updated_objects[0].safra.safra
+        ciclo = updated_objects[0].ciclo.ciclo
+        invalidate_plantio_cache(safra, ciclo)
+
     end_time = time.time()
     print(f"Total time: {end_time - start_time} seconds")
 

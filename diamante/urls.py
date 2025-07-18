@@ -14,7 +14,8 @@ from .views_api import (
     PlantioDetailResumoApi,
     StViewSet,
     ColheitaPlantioExtratoAreaViewSet,
-    BackgroundTaskStatusViewSet
+    BackgroundTaskStatusViewSet,
+    task_status_view,
 )
 
 router = routers.DefaultRouter()
@@ -33,4 +34,10 @@ router.register("backgroundtask", BackgroundTaskStatusViewSet)
 
 urlpatterns = [
     path("", include(router.urls)),
+    # 👇 ROTA MANUAL ADICIONADA
+    path(
+        "backgroundtask_status/<uuid:task_id>/",
+        task_status_view,
+        name="backgroundtask-task-status",
+),
 ]

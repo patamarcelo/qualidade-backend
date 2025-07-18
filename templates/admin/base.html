@@ -81,6 +81,14 @@
 {% block sidebar %}{% endblock %}
 {% endblock %}
 <script type="text/javascript">
+    document.addEventListener("DOMContentLoaded", function () {
+    const taskId = sessionStorage.getItem("task_id");
+    if (taskId) {
+        startAdminTaskMonitor(taskId, () => {
+            sessionStorage.removeItem("task_id");
+        });
+    }
+    });
     document.addEventListener('DOMContentLoaded', function () {
         var mainContent = document.getElementById('content-main');
 

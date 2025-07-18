@@ -111,7 +111,7 @@ import math
 from django.db.models.functions import Round
 
 
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from django.db.models.functions.datetime import ExtractMonth, ExtractYear
 
 import requests
@@ -6015,10 +6015,12 @@ class BackgroundTaskStatusViewSet(viewsets.ModelViewSet):
     serializer_class = BackgroundTaskStatusSerializer
     authentication_classes = (CachedTokenAuthentication,)
     permission_classes = (IsAuthenticated,)
+    lookup_field = "task_id"  # ✅ Adicionado
+
     
-    @action(detail=True, methods=["GET"])
-    def task_status(self, request, pk=None):
-        task_id = pk
+    # @action(detail=True, methods=["GET"])
+    @action(detail=False, methods=["get"], url_path=r"(?P<task_id>[0-9a-f\-]+)/task_status")
+    def task_status(self, request, task_id=None):
         if not task_id:
             return Response({"error": "task_id é obrigatório"}, status=400)
 
@@ -6033,3 +6035,18 @@ class BackgroundTaskStatusViewSet(viewsets.ModelViewSet):
             })
         except BackgroundTaskStatus.DoesNotExist:
             return Response({"error": "Task não encontrada"}, status=404)
+
+@api_view(["GET"])
+def task_status_view(request, task_id):
+    print("🔍 Buscando status da task:", task_id)
+    try:
+        task = BackgroundTaskStatus.objects.get(task_id=task_id)
+        return Response({
+            "status": task.status,
+            "name": task.task_name,
+            "result": task.result,
+            "started_at": task.started_at,
+            "ended_at": task.ended_at
+        })
+    except BackgroundTaskStatus.DoesNotExist:
+        return Response({"error": "Task não encontrada"}, status=status.HTTP_404_NOT_FOUND)

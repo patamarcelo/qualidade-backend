@@ -86,7 +86,11 @@ from django.contrib.admin import DateFieldListFilter
 from .forms import PlantioExtratoAreaForm
 from django.db import connection
 
+import uuid
+from threading import Thread
 
+from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 main_path = (
     "http://127.0.0.1:8000"
@@ -833,6 +837,47 @@ class ProgramaAplicacaoFilter(SimpleListFilter):
     def queryset(self, request, queryset):
         if self.value():
             return queryset.filter(Q(operacao__programa_id=self.value()))
+        return queryset
+
+class DefensivoIdFarmboxFilter(admin.SimpleListFilter):
+    """
+    Filtro para verificar se o defensivo associado à aplicação
+    possui ou não um id_farmbox cadastrado.
+    """
+    # Título que aparecerá acima das opções do filtro na sidebar do admin.
+    title = 'ID Farmbox do Defensivo'
+
+    # Parâmetro que será usado na URL do admin (ex: ?id_farmbox_status=cadastrado)
+    parameter_name = 'id_farmbox_status'
+
+    def lookups(self, request, model_admin):
+        """
+        Retorna uma lista de tuplas. A primeira parte da tupla é o valor
+        que será passado na URL, e a segunda é o texto que o usuário verá.
+        """
+        return (
+            ('cadastrado', 'Com ID Farmbox'),
+            ('nao_cadastrado', 'Sem ID Farmbox'),
+        )
+
+    def queryset(self, request, queryset):
+        """
+        Aplica o filtro no queryset principal com base no valor selecionado.
+        """
+        # self.value() retorna o valor selecionado pelo usuário ('cadastrado' ou 'nao_cadastrado')
+        if self.value() == 'cadastrado':
+            # Filtra por aplicações cujo defensivo tem um id_farmbox que NÃO é nulo.
+            # Adicionamos .exclude() para o caso do campo ser um CharField e permitir strings vazias.
+            return queryset.filter(defensivo__id_farmbox__isnull=False)
+
+        if self.value() == 'nao_cadastrado':
+            # Filtra por aplicações cujo defensivo tem um id_farmbox que É nulo OU uma string vazia.
+            # Usamos Q objects para criar uma condição OR.
+            return queryset.filter(
+                Q(defensivo__id_farmbox__isnull=True)
+            )
+        
+        # Se nenhum filtro for selecionado, retorna o queryset original
         return queryset
 
 
@@ -1988,7 +2033,7 @@ class OperacaoAdmin(admin.ModelAdmin):
         css = {
             'all': ('admin/css/highlight_deleted_inlines.css',)
         }
-        js = ('admin/js/highlight_deleted_inlines.js',)
+        js = ('admin/js/highlight_deleted_inlines.js',"https://cdn.jsdelivr.net/npm/sweetalert2@11", "admin/js/task_monitor_admin.js")
     # class Media:
     #     js = ('admin/js/highlight_deleted_inlines.js',)
     def get_queryset(self, request):
@@ -2011,6 +2056,33 @@ class OperacaoAdmin(admin.ModelAdmin):
     ]
 
     inlines = [AplicacoesProgramaInline]
+    
+    @staticmethod
+    def processar_operacao_em_background(task_id, query, current_op, produtos, changed_dap, newDap, nome_estagio_alterado, estagio_alterado):
+        task = BackgroundTaskStatus.objects.get(task_id=task_id)
+        task.status = "running"
+        task.save()
+
+        try:
+            admin_form_alter_programa_and_save(
+                query, current_op, produtos, changed_dap, newDap, nome_estagio_alterado, estagio_alterado
+            )
+            task.status = "done"
+        except Exception as e:
+            task.status = "failed"
+            task.result = {"error": str(e)}
+        task.ended_at = timezone.now()
+        task.save()
+    
+    def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
+        extra_context = extra_context or {}
+
+        # Só injeta task_id se tiver vindo após salvar e executar uma task
+        if request.session.get("executou_task") and "task_id" in request.session:
+            extra_context["task_id"] = request.session.pop("task_id")
+            request.session.pop("executou_task")
+
+        return super().changeform_view(request, object_id, form_url, extra_context=extra_context)
 
     def save_model(self, request, obj, form, change):
         print(self)
@@ -2018,6 +2090,17 @@ class OperacaoAdmin(admin.ModelAdmin):
         pass  # don't actually save the parent instance
 
     def save_formset(self, request, form, formset, change):
+        programa_nome = form.instance.programa.nome
+
+        # Verifica se já existe task pendente ou rodando para esse programa
+        exists_running = BackgroundTaskStatus.objects.filter(
+            task_name=programa_nome,
+            status__in=["pending", "running"]
+        ).exists()
+
+        if exists_running:
+            raise ValidationError(f"Já existe uma tarefa em andamento para o programa '{programa_nome}'. Por favor, aguarde a finalização antes de salvar novamente.")
+
         form.instance.save()  # form.instance is the parent
         formset.save()  # this will save the children
         # print("Prazo antigo DAp: ", form.initial["prazo_dap"])
@@ -2065,9 +2148,31 @@ class OperacaoAdmin(admin.ModelAdmin):
             current_query = Plantio.objects.filter(
                 programa=current_program, finalizado_plantio=True
             )
-            admin_form_alter_programa_and_save(
-                current_query, current_op, produtos, changed_dap, newDap, nome_estagio_alterado, estagio_alterado
+            
+            # ✅ Criar task no banco
+            task_id = str(uuid.uuid4())
+            BackgroundTaskStatus.objects.create(
+                task_id=task_id,
+                task_name=programa_nome,
+                status="pending"
             )
+
+            # ✅ Iniciar thread
+            Thread(
+                target=self.processar_operacao_em_background,
+                args=(
+                    task_id, current_query, current_op, produtos,
+                    changed_dap, newDap, nome_estagio_alterado, estagio_alterado
+                )
+            ).start()
+            # admin_form_alter_programa_and_save(
+            #     current_query, current_op, produtos, changed_dap, newDap, nome_estagio_alterado, estagio_alterado
+            # )
+            request.session['task_id'] = task_id
+            # Salva no request.session
+            request.session["task_id"] = str(task_id)
+            request.session["executou_task"] = True
+
         if form.instance.ativo == False:
             print("Estagio desativado: ", form.instance)
             current_op = form.instance.estagio
@@ -2164,6 +2269,7 @@ class AplicacaoAdmin(admin.ModelAdmin):
     raw_id_fields = ["operacao"]
     list_filter = (
         ProgramaAplicacaoFilter,
+        DefensivoIdFarmboxFilter,
         "operacao__programa__ciclo__ciclo",
         "operacao__programa__safra__safra",
         "ativo",
@@ -3092,9 +3198,18 @@ class SeedConfigAdmin(admin.ModelAdmin):
     cultura_description.short_description = "Cultura"
     
 
+from datetime import timedelta
+
 @admin.register(BackgroundTaskStatus)
 class BackgroundTaskStatusAdmin(admin.ModelAdmin):
-    list_display = ['task_id', 'task_name', 'status', 'formatted_started_at', 'formatted_ended_at']
+    list_display = [
+        'task_id',
+        'task_name',
+        'status',
+        'formatted_started_at',
+        'formatted_ended_at',
+        'task_duration'
+    ]
 
     def formatted_started_at(self, obj):
         if obj.started_at:
@@ -3107,4 +3222,11 @@ class BackgroundTaskStatusAdmin(admin.ModelAdmin):
             return obj.ended_at.strftime('%d/%m/%Y %H:%M:%S')
         return "-"
     formatted_ended_at.short_description = "Fim"
-    
+
+    def task_duration(self, obj):
+        if obj.started_at and obj.ended_at:
+            duration = obj.ended_at - obj.started_at
+            # Formata como H:MM:SS
+            return str(timedelta(seconds=int(duration.total_seconds())))
+        return "-"
+    task_duration.short_description = "Duração"
