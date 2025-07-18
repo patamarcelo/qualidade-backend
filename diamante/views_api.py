@@ -153,6 +153,9 @@ from openpyxl import load_workbook
 from threading import Thread
 import logging
 
+# import threading
+
+
 # Get a named logger
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -2959,16 +2962,30 @@ class PlantioViewSet(viewsets.ModelViewSet):
             try:
                 params = request.data["data"]
                 print(params)
+                
                 id_list = [x["id"] for x in params]
                 print("list of IDS: ", id_list)
+                
                 list_updated = []
                 updated_instances = []
+                
+                plantios_dict = {
+                    p.id: p for p in Plantio.objects.select_related('talhao__fazenda').filter(id__in=id_list)
+                }
+                
                 for i in params:
                     try:
-                        update_field = Plantio.objects.get(pk=i["id"])
+                        # CASO DE ALGUM PROBLEMA, SÓ TRAZER DE VOLTA O UPDATE_FIELD COMENTADO ABAIXO E COMENTAR O DE CIMA
+                        # update_field = Plantio.objects.get(pk=i["id"])
+                        update_field = plantios_dict.get(i["id"])
+                        if not update_field:
+                            print(f"Plantio ID {i['id']} não encontrado.")
+                            continue
+                        
                         index = get_index_dict_estagio(
                             update_field.cronograma_programa, i["estagio"]
                         )
+                        
                         print(
                             f"{update_field.talhao.fazenda.nome} - {update_field.talhao.id_talhao}"
                         )
@@ -4702,6 +4719,33 @@ class DefensivoViewSet(viewsets.ModelViewSet):
     serializer_class = DefensivoSerializer
     authentication_classes = (CachedTokenAuthentication,)
     permission_classes = (IsAuthenticated,)
+    
+    def processar_em_background(self):
+        number_of_days_before = 10 if DEBUG else 7
+        from_date = get_date(number_of_days_before)
+        last_up = get_miliseconds(from_date)
+
+        number_of_days_before_pluvi = 5 if DEBUG else 4
+        from_date_pluvi = get_date(number_of_days_before_pluvi)
+        last_up_pluvi = get_miliseconds(from_date_pluvi)
+
+        data_applications = get_applications(updated_last=last_up)
+        data_applications_pluvi = get_applications_pluvi(updated_last=last_up_pluvi)
+
+        
+        print("Iniciando atualização de aplicações...")
+        generate_file_run("Aplicacoes", data_applications)
+        print("Aplicações Atualizadas.\n")
+
+        print("Iniciando atualização de pluviometria...")
+        generate_file_run("Pluvi", data_applications_pluvi)
+        print("Pluviometrias Atualizadas.\n")
+
+        # type_up_aplicacoes = "Aplicacoes"
+        # generate_file_run(type_up_aplicacoes, data_applications)
+
+        # type_up_pluvi = "Pluvi"
+        # generate_file_run(type_up_pluvi, data_applications_pluvi)
 
     @action(detail=True, methods=["POST"])
     def save_defensivo_data(self, request, pk=None):
@@ -4761,39 +4805,11 @@ class DefensivoViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["GET"])
     def update_farmbox_mongodb_data(self, request, pk=None):
         
-        number_of_days_before = 10 if DEBUG == True else 7
-        from_date = get_date(number_of_days_before)
-        last_up = get_miliseconds(from_date)
-        print(last_up)
-        
-        number_of_days_before_pluvi = 5 if DEBUG == True else 4
-        from_date_pluvi = get_date(number_of_days_before_pluvi)
-        last_up_pluvi = get_miliseconds(from_date_pluvi)
-        print(last_up_pluvi)
-        
-        
-        data_applications = get_applications(updated_last=last_up)
-        data_applications_pluvi = get_applications_pluvi(updated_last=last_up_pluvi)
-        # print(data_applications)
-        
-        for _ in range(2):
-            print(time.ctime())
-            # Prints the current time with a five second difference
-            time.sleep(1)
-        with Spinner("Atualizando Aplicacoes..."):
-            type_up_aplicacoes = 'Aplicacoes'
-            generate_file_run(type_up_aplicacoes, data_applications)
-            print("\nAplicações Atualizadas.")
-        
-        with Spinner("Atualizando Pluviometria..."):
-            type_up_pluvi = 'Pluvi'
-            generate_file_run(type_up_pluvi, data_applications_pluvi)
-            print("\nPluviometrias Atualizadas.")
-        
-        
-        
+        # inicia thread com referência ao método da instância
+        Thread(target=self.processar_em_background).start()
+
         response = {
-            "msg": f"Banco de Dados atualizado com sucesso!!",
+            "msg": f"Processamento iniciado em segundo plano!!",
             "dados": 'dados do banco',
         }
         return Response(response, status=status.HTTP_200_OK)
@@ -5559,7 +5575,8 @@ class StViewSet(viewsets.ModelViewSet):
             "projetos": ["Fazenda Benção de Deus"],
             "emails_abertura_st": [
                 "matheus.silva@diamanteagricola.com.br",
-                "clessio.batista@diamanteagricola.com.br",
+                "gisely.alencar@diamanteagricola.com.br",
+                "juliana.silva@diamanteagricola.com.br"
             ],
         },
         {

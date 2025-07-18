@@ -1983,6 +1983,14 @@ export_programa.short_description = "Export to csv"
 
 @admin.register(Operacao)
 class OperacaoAdmin(admin.ModelAdmin):
+    
+    class Media:
+        css = {
+            'all': ('admin/css/highlight_deleted_inlines.css',)
+        }
+        js = ('admin/js/highlight_deleted_inlines.js',)
+    # class Media:
+    #     js = ('admin/js/highlight_deleted_inlines.js',)
     def get_queryset(self, request):
         return (
             super(OperacaoAdmin, self)
@@ -2117,6 +2125,7 @@ class DefensivoAdmin(admin.ModelAdmin):
     search_fields = ["produto", "tipo", 'id_farmbox']
     list_filter = ("tipo",)
     show_full_result_count = False
+    exclude = ('observacao',)  # <-- aqui você informa o campo a excluir
 
 
 @admin.register(Aplicacao)

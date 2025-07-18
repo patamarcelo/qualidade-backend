@@ -69,6 +69,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django_crontab",
     "django_apscheduler",
+    "django_dbconn_retry",
     # "diamante.apps.DiamanteConfig",
     "csvexport",
     "debug_toolbar",
