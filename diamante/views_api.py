@@ -83,7 +83,8 @@ from .models import (
     PlantioExtratoArea,
     SentSeeds,
     SeedStock,
-    SeedConfig
+    SeedConfig,
+    BackgroundTaskStatus
 )
 
 from django.db.models import OuterRef, Subquery
@@ -152,8 +153,8 @@ from openpyxl import load_workbook
 
 from threading import Thread
 import logging
-
-# import threading
+import uuid
+from django.utils import timezone
 
 
 # Get a named logger
@@ -4720,32 +4721,45 @@ class DefensivoViewSet(viewsets.ModelViewSet):
     authentication_classes = (CachedTokenAuthentication,)
     permission_classes = (IsAuthenticated,)
     
-    def processar_em_background(self):
-        number_of_days_before = 10 if DEBUG else 7
-        from_date = get_date(number_of_days_before)
-        last_up = get_miliseconds(from_date)
-
-        number_of_days_before_pluvi = 5 if DEBUG else 4
-        from_date_pluvi = get_date(number_of_days_before_pluvi)
-        last_up_pluvi = get_miliseconds(from_date_pluvi)
-
-        data_applications = get_applications(updated_last=last_up)
-        data_applications_pluvi = get_applications_pluvi(updated_last=last_up_pluvi)
-
+    def processar_em_background(self, task_id):
         
-        print("Iniciando atualização de aplicações...")
-        generate_file_run("Aplicacoes", data_applications)
-        print("Aplicações Atualizadas.\n")
+        task = BackgroundTaskStatus.objects.get(task_id=task_id)
+        
+        try:
+            task.status = "running"
+            task.save()
 
-        print("Iniciando atualização de pluviometria...")
-        generate_file_run("Pluvi", data_applications_pluvi)
-        print("Pluviometrias Atualizadas.\n")
+            number_of_days_before = 10 if DEBUG else 7
+            from_date = get_date(number_of_days_before)
+            last_up = get_miliseconds(from_date)
 
-        # type_up_aplicacoes = "Aplicacoes"
-        # generate_file_run(type_up_aplicacoes, data_applications)
+            number_of_days_before_pluvi = 5 if DEBUG else 4
+            from_date_pluvi = get_date(number_of_days_before_pluvi)
+            last_up_pluvi = get_miliseconds(from_date_pluvi)
 
-        # type_up_pluvi = "Pluvi"
-        # generate_file_run(type_up_pluvi, data_applications_pluvi)
+            data_applications = get_applications(updated_last=last_up)
+            data_applications_pluvi = get_applications_pluvi(updated_last=last_up_pluvi)
+
+            print("Iniciando atualização de aplicações...")
+            generate_file_run("Aplicacoes", data_applications)
+            print("Aplicações Atualizadas.\n")
+
+            print("Iniciando atualização de pluviometria...")
+            generate_file_run("Pluvi", data_applications_pluvi)
+            print("Pluviometrias Atualizadas.\n")
+
+            task.status = "done"
+            task.ended_at = timezone.now()
+            task.result = {"message": "Atualização concluída com sucesso!"}
+            task.save()
+
+        except Exception as e:
+            task.status = "failed"
+            task.ended_at = timezone.now()
+            task.result = {"error": str(e)}
+            task.save()
+            print("Erro no processamento em segundo plano:", e)
+
 
     @action(detail=True, methods=["POST"])
     def save_defensivo_data(self, request, pk=None):
@@ -4805,11 +4819,35 @@ class DefensivoViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["GET"])
     def update_farmbox_mongodb_data(self, request, pk=None):
         
-        # inicia thread com referência ao método da instância
-        Thread(target=self.processar_em_background).start()
+        # Verifica se já existe uma task pendente ou rodando
+        exists_running = BackgroundTaskStatus.objects.filter(
+            task_name="update_farmbox",
+            status__in=["pending", "running"]
+        ).exists()
+
+        if exists_running:
+            print('Já existe um processo rodando')
+            return Response({
+                "msg": "Já existe uma tarefa 'update_farmbox' em andamento.",
+                "status": "locked"
+            }, status=status.HTTP_429_TOO_MANY_REQUESTS)
+        
+        # Gera um ID único
+        task_id = str(uuid.uuid4())
+        
+        # Cria o registro no banco
+        BackgroundTaskStatus.objects.create(
+            task_id=task_id,
+            task_name="update_farmbox",
+            status="pending"
+        )
+        
+        # Inicia a thread, passando o task_id
+        Thread(target=self.processar_em_background, args=(task_id,)).start()
 
         response = {
             "msg": f"Processamento iniciado em segundo plano!!",
+            "task_id": task_id,
             "dados": 'dados do banco',
         }
         return Response(response, status=status.HTTP_200_OK)

@@ -3090,3 +3090,21 @@ class SeedConfigAdmin(admin.ModelAdmin):
             cultura = "Não Planejado"
         return cultura
     cultura_description.short_description = "Cultura"
+    
+
+@admin.register(BackgroundTaskStatus)
+class BackgroundTaskStatusAdmin(admin.ModelAdmin):
+    list_display = ['task_id', 'task_name', 'status', 'formatted_started_at', 'formatted_ended_at']
+
+    def formatted_started_at(self, obj):
+        if obj.started_at:
+            return obj.started_at.strftime('%d/%m/%Y %H:%M:%S')
+        return "-"
+    formatted_started_at.short_description = "Início"
+
+    def formatted_ended_at(self, obj):
+        if obj.ended_at:
+            return obj.ended_at.strftime('%d/%m/%Y %H:%M:%S')
+        return "-"
+    formatted_ended_at.short_description = "Fim"
+    
