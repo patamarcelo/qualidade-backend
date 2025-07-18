@@ -10,7 +10,8 @@ from .models import (
     Visitas,
     RegistroVisitas,
     StProtheusIntegration,
-    ColheitaPlantioExtratoArea
+    ColheitaPlantioExtratoArea,
+    BackgroundTaskStatus
 )
 from rest_framework.fields import CurrentUserDefault
 
@@ -134,4 +135,10 @@ class ColheitaPlantioExtratoAreaSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = ColheitaPlantioExtratoArea
+        fields = "__all__"
+
+class BackgroundTaskStatusSerializer(serializers.ModelSerializer):
+    
+    class Meta:
+        model = BackgroundTaskStatus
         fields = "__all__"

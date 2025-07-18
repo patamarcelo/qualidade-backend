@@ -15,7 +15,8 @@ from .serializers import (
     RegistroVisitasSerializer,
     StProtheusIntegrationSerializer,
     ColheitaPlantioExtratoAreaSerializer,
-    ColheitaResumoSerializer
+    ColheitaResumoSerializer,
+    BackgroundTaskStatusSerializer
 )
 
 from rest_framework import viewsets, status
@@ -6007,3 +6008,28 @@ class ColheitaPlantioExtratoAreaViewSet(viewsets.ModelViewSet):
         else:
             response = {"message": "Você precisa estar logado!!!"}
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+
+class BackgroundTaskStatusViewSet(viewsets.ModelViewSet):
+    queryset = BackgroundTaskStatus.objects.all()
+    serializer_class = BackgroundTaskStatusSerializer
+    authentication_classes = (CachedTokenAuthentication,)
+    permission_classes = (IsAuthenticated,)
+    
+    @action(detail=True, methods=["GET"])
+    def task_status(self, request, pk=None):
+        task_id = pk
+        if not task_id:
+            return Response({"error": "task_id é obrigatório"}, status=400)
+
+        try:
+            task = BackgroundTaskStatus.objects.get(task_id=task_id)
+            return Response({
+                "status": task.status,
+                "name": task.task_name,
+                "result": task.result,
+                "started_at": task.started_at,
+                "ended_at": task.ended_at
+            })
+        except BackgroundTaskStatus.DoesNotExist:
+            return Response({"error": "Task não encontrada"}, status=404)
