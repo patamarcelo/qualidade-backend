@@ -14,16 +14,28 @@
     {% if not actions_on_top and not actions_on_bottom %}
         <style>
             #changelist table thead th:first-child {
-                width: inherit
+                width: inherit;
             }
         </style>
     {% endif %}
-    
 {% endblock %}
 
 {% block extrahead %}
     {{ block.super }}
     {{ media.js }}
+    <script src="{% static 'admin/js/task_monitor_admin.js' %}"></script>
+    {% if task_id %}
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const taskId = "{{ task_id }}";
+            console.log("⏳ Iniciando monitoramento da task após salvar:", taskId);
+
+            if (taskId && /^[0-9a-f-]{36}$/.test(taskId)) {
+                startAdminTaskMonitor(taskId);
+            }
+        });
+    </script>
+    {% endif %}
 {% endblock %}
 
 {% block bodyclass %}{{ block.super }} app-{{ opts.app_label }} model-{{ opts.model_name }} change-list{% endblock %}

@@ -1,6 +1,5 @@
-// static/admin/js/task_monitor_admin.js
-
 function startAdminTaskMonitor(taskId, onSuccess) {
+    console.log("⏳ Iniciando monitoramento da task:", taskId);
     if (!taskId) return;
 
     const interval = setInterval(async () => {
@@ -36,5 +35,5 @@ function startAdminTaskMonitor(taskId, onSuccess) {
             console.error("Erro ao verificar status da tarefa:", error);
             clearInterval(interval);
         }
-    }, 2000);
+    }, 1000);
 }

@@ -23,6 +23,7 @@ import os
 
 import dropbox
 from django.conf import settings
+from decimal import Decimal, ROUND_HALF_UP
 
 # Create your models here.
 
@@ -39,6 +40,15 @@ class Base(models.Model):
 
 # -------------  ------------- ESTRUTURA -------------  -------------#
 
+class CotacaoDolar(models.Model):
+    data  = models.DateTimeField(auto_now_add=True)
+    valor = models.DecimalField(max_digits=10, decimal_places=4)
+
+    class Meta:
+        ordering = ["-data"]
+
+    def __str__(self):
+        return f"Cotação em {self.data.strftime('%Y-%m-%d %H:%M')} - R$ {self.valor}"
 
 class Deposito(Base):
     nome = models.CharField("Nome", max_length=100, help_text="Depósito", unique=True)
@@ -461,6 +471,10 @@ class Operacao(Base):
         return self.estagio
 
 
+class MoedaChoices(models.TextChoices):
+    BRL = 'BRL', 'R$'
+    USD = 'USD', 'USD'
+
 class Aplicacao(Base):
     operacao = models.ForeignKey(
         Operacao, on_delete=models.PROTECT, related_name="programa_related_aplicacao"
@@ -473,6 +487,11 @@ class Aplicacao(Base):
         decimal_places=4,
     )
     obs = models.TextField("Observação", max_length=500, blank=True)
+    
+    preco = models.DecimalField("Preço unitário", max_digits=10, decimal_places=4, default=0, blank=True, null=True)
+    moeda = models.CharField("Moeda", max_length=3, choices=MoedaChoices.choices, default=MoedaChoices.BRL, blank=True, null=True)
+    valor_final = models.DecimalField("Valor final (R$)", max_digits=12, decimal_places=4, editable=False, default=0, blank=True, null=True)
+    valor_aplicacao = models.DecimalField("Valor total aplicado (R$)", max_digits=14, decimal_places=4, editable=False, default=0, blank=True, null=True)
 
     class Meta:
         unique_together = ("operacao", "defensivo", "ativo", "dose")
@@ -482,6 +501,28 @@ class Aplicacao(Base):
 
     def __str__(self):
         return f"{self.defensivo} - {self.dose} - {self.ativo} - {self.operacao.programa.nome_fantasia}"
+    
+    def calcular_valores(self):
+        if self.preco is None or self.dose is None:
+            self.valor_final = None
+            self.valor_aplicacao = None
+            return
+
+        if self.moeda == MoedaChoices.USD:
+            try:
+                cotacao = CotacaoDolar.objects.latest("data").valor
+            except CotacaoDolar.DoesNotExist:
+                cotacao = Decimal("0")
+            self.valor_final = (self.preco * cotacao).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+        else:
+            self.valor_final = self.preco
+
+        self.valor_aplicacao = (self.valor_final * self.dose).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+
+    def save(self, *args, **kwargs):
+        if self.preco is not None and self.dose is not None:
+            self.calcular_valores()
+        super().save(*args, **kwargs)
 
 
 #  ------------- ------------- xxxxxxxxxx -------------  -------------#

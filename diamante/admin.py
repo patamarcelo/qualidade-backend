@@ -91,6 +91,12 @@ from threading import Thread
 
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+from uuid import UUID
+
+
+from decimal import Decimal, DivisionByZero
+
+
 
 main_path = (
     "http://127.0.0.1:8000"
@@ -461,6 +467,17 @@ class AplicacoesProgramaInline(admin.TabularInline):
         }
 
 
+@admin.register(CotacaoDolar)
+class CotacaoDolarAdmin(admin.ModelAdmin):
+    list_display = ("data", "valor_formatado")
+
+    def valor_formatado(self, obj):
+        valor = obj.valor or 0
+        valor_str = f"R$ {valor:,.2f}".replace(",", "v").replace(".", ",").replace("v", ".")
+        return valor_str
+
+    valor_formatado.short_description = "Valor (R$)"
+
 @admin.register(Deposito)
 class DepositoAdmin(admin.ModelAdmin):
     list_display = ("nome", "id_d")
@@ -825,7 +842,22 @@ class ProgramaFilter(SimpleListFilter):
             return queryset.filter(Q(programa_id=self.value()))
         return queryset
 
+class PrecoPreenchidoFilter(admin.SimpleListFilter):
+    title = "Preço"
+    parameter_name = "preco_preenchido"
 
+    def lookups(self, request, model_admin):
+        return (
+            ("com_preco", "Com Preço"),
+            ("sem_preco", "Sem Preço"),
+        )
+
+    def queryset(self, request, queryset):
+        if self.value() == "com_preco":
+            return queryset.filter(preco__isnull=False).exclude(preco=0)
+        elif self.value() == "sem_preco":
+            return queryset.filter(models.Q(preco__isnull=True) | models.Q(preco=0))
+        return queryset
 class ProgramaAplicacaoFilter(SimpleListFilter):
     title = "Programas"  # or use _('country') for translated title
     parameter_name = "programas"
@@ -1974,12 +2006,18 @@ class ProgramaAdmin(admin.ModelAdmin):
 
     end_date_description.short_description = "End Plantio"
 
+def format_brl(valor):
+    """Formata um Decimal/float como R$ em estilo brasileiro."""
+    valor = valor or Decimal("0.00")
+    return f"{valor:,.2f}".replace(",", "v").replace(".", ",").replace("v", ".")
 
 def export_programa(modeladmin, request, queryset):
     response = HttpResponse(content_type="text/csv")
     response["Content-Disposition"] = 'attachment; filename="Programas.csv"'
     response.write(codecs.BOM_UTF8)
     writer = csv.writer(response, delimiter=";")
+
+    # Cabeçalhos da planilha
     writer.writerow(
         [
             "Programa",
@@ -1994,8 +2032,14 @@ def export_programa(modeladmin, request, queryset):
             "Safra",
             "Ciclo",
             "Ativo",
+            "Preço",
+            "Moeda",
+            "Valor Final",
+            "Valor Aplicação",
+            "Cotação Usada (se USD)",
         ]
     )
+
     operacoes = (
         queryset.values_list(
             "operacao__programa__nome",
@@ -2010,21 +2054,56 @@ def export_programa(modeladmin, request, queryset):
             "operacao__programa__safra__safra",
             "operacao__programa__ciclo__ciclo",
             "ativo",
+            "preco",
+            "moeda",
+            "valor_final",
+            "valor_aplicacao",
         )
         .order_by("operacao__prazo_dap", "defensivo__tipo", "defensivo__produto")
-        .filter(ativo=True)
-        .filter(operacao__ativo=True)
+        .filter(ativo=True, operacao__ativo=True)
     )
+
     for op in operacoes:
-        op_details = list(op)
-        op_details[5] = 0 if op[5] == None else str(op[5]).replace(".", ",")
-        operation = tuple(op_details)
-        writer.writerow(operation)
+        op = list(op)
+
+        # Extrair valores relevantes para cálculo
+        preco = op[12] or Decimal("0")
+        moeda = op[13]
+        valor_final = op[14] or Decimal("0")
+
+        # Dose como string com vírgula
+        op[5] = "0" if op[5] is None else str(op[5]).replace(".", ",")
+
+        # Formatar valores
+        op[12] = format_brl(preco)
+        op[14] = format_brl(valor_final)
+        op[15] = format_brl(op[15])  # valor_aplicacao
+
+        # Calcular cotação usada
+        if moeda == "USD" and preco:
+            try:
+                cotacao = valor_final / preco
+                cotacao_formatado = f"{cotacao:.4f}".replace(".", ",")
+            except DivisionByZero:
+                cotacao_formatado = ""
+        else:
+            cotacao_formatado = ""
+
+        op.append(cotacao_formatado)
+
+        writer.writerow(op)
+
     return response
 
 
-export_programa.short_description = "Export to csv"
+export_programa.short_description = "Exportar para CSV"
 
+def is_valid_uuid(val):
+    try:
+        UUID(str(val))
+        return True
+    except ValueError:
+        return False
 
 @admin.register(Operacao)
 class OperacaoAdmin(admin.ModelAdmin):
@@ -2074,15 +2153,18 @@ class OperacaoAdmin(admin.ModelAdmin):
         task.ended_at = timezone.now()
         task.save()
     
-    def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
+    def changelist_view(self, request, extra_context=None):
         extra_context = extra_context or {}
 
-        # Só injeta task_id se tiver vindo após salvar e executar uma task
+        print('formulário salvo, vamos começar o monitoramento')
         if request.session.get("executou_task") and "task_id" in request.session:
-            extra_context["task_id"] = request.session.pop("task_id")
-            request.session.pop("executou_task")
+            task_id = request.session.pop("task_id", None)
+            print('aqui::::', task_id)
+            extra_context["task_id"] = task_id
+            request.session.pop("executou_task", None)
+            request.session.modified = True
 
-        return super().changeform_view(request, object_id, form_url, extra_context=extra_context)
+        return super().changelist_view(request, extra_context=extra_context)
 
     def save_model(self, request, obj, form, change):
         print(self)
@@ -2168,10 +2250,10 @@ class OperacaoAdmin(admin.ModelAdmin):
             # admin_form_alter_programa_and_save(
             #     current_query, current_op, produtos, changed_dap, newDap, nome_estagio_alterado, estagio_alterado
             # )
-            request.session['task_id'] = task_id
-            # Salva no request.session
+
             request.session["task_id"] = str(task_id)
             request.session["executou_task"] = True
+            request.session.modified = True
 
         if form.instance.ativo == False:
             print("Estagio desativado: ", form.instance)
@@ -2255,6 +2337,10 @@ class AplicacaoAdmin(admin.ModelAdmin):
         "defensivo__unidade_medida",
         "defensivo__id_farmbox",
         "dose",
+        "preco_formatado",
+        "moeda",
+        "valor_final_formatado",
+        "valor_aplicacao_formatado",
         "get_operacao_prazo_dap",
         "related_link",
         "ativo",
@@ -2268,6 +2354,7 @@ class AplicacaoAdmin(admin.ModelAdmin):
     ]
     raw_id_fields = ["operacao"]
     list_filter = (
+        PrecoPreenchidoFilter,
         ProgramaAplicacaoFilter,
         DefensivoIdFarmboxFilter,
         "operacao__programa__ciclo__ciclo",
@@ -2282,6 +2369,19 @@ class AplicacaoAdmin(admin.ModelAdmin):
         "criados",
         "modificado",
     )
+    
+    def preco_formatado(self, obj):
+        return format_brl(obj.preco)
+    preco_formatado.short_description = "Preço"
+
+    def valor_final_formatado(self, obj):
+        return format_brl(obj.valor_final)
+    valor_final_formatado.short_description = "Valor Final"
+
+    def valor_aplicacao_formatado(self, obj):
+        return format_brl(obj.valor_aplicacao)
+    valor_aplicacao_formatado.short_description = "Valor Aplicação"
+
     
     def related_link(self, obj):
             if obj.operacao:
