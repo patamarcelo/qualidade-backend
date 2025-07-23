@@ -2007,6 +2007,8 @@ class ProgramaAdmin(admin.ModelAdmin):
     end_date_description.short_description = "End Plantio"
 
 def format_brl(valor):
+    if not valor:
+        return ' - '
     """Formata um Decimal/float como R$ em estilo brasileiro."""
     valor = valor or Decimal("0.00")
     return f"{valor:,.2f}".replace(",", "v").replace(".", ",").replace("v", ".")
@@ -2330,9 +2332,9 @@ class AplicacaoAdmin(admin.ModelAdmin):
     show_full_result_count = False
 
     list_display = (
+        "defensivo",
         "operacao",
         "programa",
-        "defensivo",
         "defensivo__formulacao",
         "defensivo__unidade_medida",
         "defensivo__id_farmbox",
@@ -2368,6 +2370,40 @@ class AplicacaoAdmin(admin.ModelAdmin):
     readonly_fields = (
         "criados",
         "modificado",
+        "valor_final", 
+        "valor_aplicacao"
+    )
+    
+    fieldsets = (
+        (
+            "Dados Gerais",
+            {
+                "fields": (
+                    ("ativo",),
+                    ("criados", "modificado"),
+                )
+            },
+        ),
+        (
+            "Operação e Produto",
+            {
+                "fields": (
+                    ("operacao",),
+                    ("defensivo",),
+                    ("dose",),
+                    ("obs",),
+                )
+            },
+        ),
+        (
+            "Preço e Cálculo",
+            {
+                "fields": (
+                    ("preco", "moeda"),
+                    ("valor_final", "valor_aplicacao"),
+                )
+            },
+        ),
     )
     
     def preco_formatado(self, obj):
@@ -2375,10 +2411,14 @@ class AplicacaoAdmin(admin.ModelAdmin):
     preco_formatado.short_description = "Preço"
 
     def valor_final_formatado(self, obj):
-        return format_brl(obj.valor_final)
+        if not obj.valor_final:
+            return " - "
+        return "R$ " + format_brl(obj.valor_final)
     valor_final_formatado.short_description = "Valor Final"
 
     def valor_aplicacao_formatado(self, obj):
+        if not obj.valor_aplicacao:
+            return " - "
         return format_brl(obj.valor_aplicacao)
     valor_aplicacao_formatado.short_description = "Valor Aplicação"
 

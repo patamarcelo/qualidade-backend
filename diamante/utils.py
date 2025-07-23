@@ -25,6 +25,8 @@ import time
 
 from pathlib import Path
 from django.core.cache import cache
+from decimal import Decimal
+
 
 
 
@@ -776,3 +778,66 @@ def load_localization_data():
     except Exception as e:
         print(f"Error loading localization data: {e}")
         return []
+
+def save_program_cost():
+    from .models import Aplicacao
+    pr_arroz = Aplicacao.objects.filter(operacao__programa__safra__safra="2025/2026",operacao__programa__ciclo__ciclo="3").filter(Q(preco__isnull=True) | Q(preco=0))
+    print('arroz total: ', len(pr_arroz))
+    print('prArroz: ', pr_arroz[0])
+    file_path = Path(__file__).resolve().parent / 'utils/custos-programas.json'
+    with open(file_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            updated = 0
+            for item in data:
+                defensivo = item.get('Defensivo')
+                preco = item.get('Preço')
+                moeda = item.get('Moeda')
+                print('Defensivo: ', defensivo, 'Preço :', preco, 'Moeda: ', moeda)
+                
+def save_program_cost():
+    from .models import Aplicacao, MoedaChoices
+    pr_arroz = Aplicacao.objects.filter(
+        operacao__programa__safra__safra="2025/2026",
+        operacao__programa__ciclo__ciclo="3"
+    ).filter(Q(preco__isnull=True) | Q(preco=0))
+
+    print('Total de aplicações sem preço:', pr_arroz.count())
+
+    file_path = Path(__file__).resolve().parent / 'utils/custos-programas.json'
+
+    with open(file_path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+
+    updated = 0
+
+    for item in data:
+        nome_defensivo = item.get("Defensivo", "").strip().lower()
+        preco_raw = item.get("Preço")
+        moeda_raw = item.get("Moeda", "").strip().upper()
+
+        # Validação mínima
+        if not nome_defensivo or not preco_raw:
+            continue
+
+        try:
+            preco = Decimal(str(preco_raw).replace(",", "."))
+        except Exception as e:
+            print(f"❌ Erro ao converter preço de {nome_defensivo}: {e}")
+            continue
+
+        moeda = MoedaChoices.BRL if "R$" in moeda_raw else MoedaChoices.USD
+
+        # Busca por defensivos com nome correspondente (case-insensitive)
+        matched = pr_arroz.filter(defensivo__produto__iexact=nome_defensivo)
+
+        if matched.exists():
+            for app in matched:
+                app.preco = preco
+                app.moeda = moeda
+                app.save()
+                updated += 1
+                print(f"✅ Atualizado: {app.defensivo} → Preço: {preco} | Moeda: {moeda}")
+        else:
+            print(f"⚠️ Não encontrado: '{nome_defensivo}' entre as aplicações sem preço")
+
+    print(f"✅ Total atualizados: {updated}")
