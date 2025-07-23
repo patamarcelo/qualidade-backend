@@ -160,7 +160,7 @@ from django.db import DatabaseError
 
 
 
-from datetime import datetime
+from datetime import datetime as dateTimeTask
 
 
 
@@ -3102,12 +3102,12 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     post_save.send(sender=Plantio, instance=instance, created=False)
 
             task.status = 'done'
-            task.ended_at = datetime.now()
+            task.ended_at = dateTimeTask.now()
             task.result = {"updated": list_updated}
             task.save()
         except Exception as e:
             task.status = 'failed'
-            task.ended_at = datetime.now()
+            task.ended_at = dateTimeTask.now()
             task.result = {"error": str(e)}
             task.save()
     
