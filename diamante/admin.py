@@ -458,6 +458,7 @@ class EstagiosProgramaInline(admin.TabularInline):
 class AplicacoesProgramaInline(admin.TabularInline):
     model = Aplicacao
     extra = 0
+    # fields = ["defensivo", "dose", "ativo", 'preco']
     fields = ["defensivo", "dose", "ativo"]
     autocomplete_fields = ["defensivo"]
     

@@ -3009,6 +3009,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "talhao__fazenda__map_centro_id",
                     "talhao__fazenda__map_zoom",
                     "talhao__fazenda__fazenda__nome",
+                    "talhao__fazenda__id_farmbox",
+                    "id_farmbox",
                     "variedade__nome_fantasia",
                     "variedade__cultura__cultura",
                     "variedade__cultura__map_color",
@@ -3803,7 +3805,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 ciclo__ciclo=ciclo_filter,
                 # finalizado_plantio=True,
                 # programa__isnull=False,
-                talhao__fazenda__id_farmbox=projeto_filter,
+                talhao__fazenda__id_farmbox__in=projeto_filter,
             ).order_by('data_prevista_plantio')
             
             if parcelas_filter:
