@@ -3345,6 +3345,7 @@ from datetime import timedelta
 class BackgroundTaskStatusAdmin(admin.ModelAdmin):
     list_display = [
         'task_id',
+        'formated_created',
         'task_name',
         'status',
         'formatted_started_at',
@@ -3371,3 +3372,9 @@ class BackgroundTaskStatusAdmin(admin.ModelAdmin):
             return str(timedelta(seconds=int(duration.total_seconds())))
         return "-"
     task_duration.short_description = "Duração"
+    
+    def formated_created(self, obj):
+        if obj.criados:
+            return obj.criados.strftime('%d/%m/%Y %H:%M:%S')
+        return "-"
+    formated_created.short_description = "Data"
