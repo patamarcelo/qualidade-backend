@@ -852,7 +852,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                             area_planejamento_plantio=area_planejamento if cultura_planejada else None,
                         )
                         novo_plantio.save()
-                        print(f"✔️ Plantio salvo: {novo_plantio}")
+                        print(f"✅ Plantio salvo: {novo_plantio}")
 
                     # Atualiza totais
                     if cultura_planejada:

@@ -678,11 +678,11 @@ class Plantio(Base):
                 )
                 produtos = []
                 if data_plantio:
+                    prazo = i.prazo_dap if i.prazo_dap is not None else 0
                     etapa = {
                         "Estagio": i.estagio,
                         "dap": i.prazo_dap,
-                        "Data Prevista": data_plantio
-                        + datetime.timedelta(days=i.prazo_dap),
+                        "Data Prevista": data_plantio + datetime.timedelta(days=prazo),
                         "produtos": produtos,
                     }
                     cronograma.append(etapa)
