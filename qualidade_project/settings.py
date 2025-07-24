@@ -154,21 +154,21 @@ EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD_CONFIG")
 use_db = "default"
 
 DATABASES = {
-    "default_neon": {
-        'ENGINE': 'django.db.backends.postgresql',
-        "NAME": env("DB_EL_NAME_NEON"),
-        "USER": env("DB_EL_USER_NEON"),
-        "PASSWORD": env("DB_EL_PASSWORD_NEON"),
-        "HOST": env("DB_EL_HOST_NEON"),
-        "PORT": env("DB_EL_PORT_NEON"),
-        'CONN_MAX_AGE': 600,  # 10 minutos
-        'OPTIONS': {
-            'sslmode': 'require',
-            'connect_timeout': 10,  # Timeout after 10 seconds (adjust as needed)
-        },
-        "CONN_HEALTH_CHECKS": True,  # check connection before using
-        'ATOMIC_REQUESTS': True,
-    },
+    # "default_neon": {
+    #     'ENGINE': 'django.db.backends.postgresql',
+    #     "NAME": env("DB_EL_NAME_NEON"),
+    #     "USER": env("DB_EL_USER_NEON"),
+    #     "PASSWORD": env("DB_EL_PASSWORD_NEON"),
+    #     "HOST": env("DB_EL_HOST_NEON"),
+    #     "PORT": env("DB_EL_PORT_NEON"),
+    #     'CONN_MAX_AGE': 600,  # 10 minutos
+    #     'OPTIONS': {
+    #         'sslmode': 'require',
+    #         'connect_timeout': 10,  # Timeout after 10 seconds (adjust as needed)
+    #     },
+    #     "CONN_HEALTH_CHECKS": True,  # check connection before using
+    #     'ATOMIC_REQUESTS': True,
+    # },
     "default": {
         'ENGINE': 'django.db.backends.postgresql',
         "NAME": env("DB_EL_NAME"),
