@@ -151,7 +151,7 @@ EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD_CONFIG")
 # Database
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
 
-use_db = "default_neon"
+use_db = "default"
 
 DATABASES = {
     "default_neon": {
