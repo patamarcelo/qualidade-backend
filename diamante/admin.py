@@ -399,7 +399,7 @@ class PlantioDetailPlantioAdmin(admin.ModelAdmin):
                 safra__safra=safra_filter,
                 ciclo__ciclo=cicle_filter,
                 plantio_descontinuado=False,
-                programa__isnull=False
+                # programa__isnull=False
             )
             .filter(~Q(variedade__cultura__cultura="Milheto"))
             .filter(~Q(variedade__cultura__cultura="Algodão"))
