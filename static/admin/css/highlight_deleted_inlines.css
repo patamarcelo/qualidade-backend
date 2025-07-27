@@ -1,3 +1,6 @@
+.form-row{
+  border: none
+}
 /* admin_inline_highlight.css */
 .inline-row-deleted td {
   background-color: rgba(255, 0, 0, 0.08);
@@ -84,3 +87,4 @@ tr#programa_related_aplicacao-empty {
 .inline-group .tabular tr.has_original td {
     padding-top: 8px !important;
 }
+

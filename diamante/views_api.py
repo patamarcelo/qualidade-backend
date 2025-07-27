@@ -3869,10 +3869,11 @@ class PlantioViewSet(viewsets.ModelViewSet):
         start_time = time.time()
         print(start_time)
         try:
+            # AJUSTAR MAPA DEGRADE AQUI
             if planejamento_plantio == True:
-                safra_filter = "2024/2025"
+                safra_filter = "2025/2026"
                 ciclo_filter = '3'
-                filter_farm_id= "6"
+                filter_farm_id= "4" #bencao de deus (4)
 
                 plantio_map = Plantio.objects.values(
                     "map_geo_points", "map_centro_id", "talhao__id_talhao", "id_farmbox"

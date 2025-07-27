@@ -1,5 +1,20 @@
 {% extends "admin/base.html" %}
 
+{% block extrahead %}
+    {{ block.super }}
+    <style>
+    input[type="submit"]:focus,
+    input[type="submit"]:focus-visible {
+        border: 2px solid blue !important;
+    }
+
+    a.btn:focus,
+    a.btn:focus-visible {
+        border: 2px solid blue !important;
+    }
+    </style>
+
+{% endblock %}
 
 {% block title %}{{ title }} | {{ site_title|default:_('Django site admin') }}{% endblock %}
 
