@@ -88,3 +88,7 @@ tr#programa_related_aplicacao-empty {
     padding-top: 8px !important;
 }
 
+.form-row:focus-within {
+  border: 2px solid #007bff !important; /* azul Bootstrap */
+  border-radius: 4px;
+}
