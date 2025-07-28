@@ -5115,6 +5115,7 @@ class ProgramasDetails(viewsets.ModelViewSet):
                     "operacao__prazo_dap",
                     "operacao__programa__nome",
                     "valor_aplicacao",
+                    "valor_final",
                     # "operacao__programa__nome_fantasia",
                     "operacao__programa__cultura__cultura",
                     "operacao__programa__safra__safra",
