@@ -689,9 +689,16 @@ def export_plantio(modeladmin, request, queryset):
         area_aferida = plantio_detail.pop()
         area_aferida = "Sim" if area_aferida == True else "Não"
         print('area_aferida', area_aferida)
+        val_11 = plantio_detail[11]
+        val_12 = plantio_detail[12]
         
-        area_plantada_math = plantio_detail[12] if plantio_detail[11] > 0 and plantio_detail[12] > 0 else 0
-        area_planejada_math = plantio_detail[11] if plantio_detail[11] > 0 and plantio_detail[12] > 0 else 0
+        area_plantada_math = val_12 if val_11 is not None and val_12 is not None and val_11 > 0 and val_12 > 0 else 0
+        print('\n')
+        print('plantio_detail[12]: ', plantio_detail[12])
+        print('plantio_detail[11]: ', plantio_detail[11])
+        print('\n')
+        
+        area_planejada_math = val_11 if val_11 is not None and val_12 is not None and val_11 > 0 and val_12 > 0 else 0
         saldo_plantar = area_planejada_math - area_plantada_math
         
         plantio_detail.pop()
@@ -765,6 +772,23 @@ def get_cargas_colheita():
     ]
     return total_c_2
 
+
+class ExcludeOperacaoFilter(SimpleListFilter):
+    title = 'Tipo de Defensivo'
+    parameter_name = 'tipo_defensivo'
+
+    def lookups(self, request, model_admin):
+        return [
+            ('sem_operacao', 'Todos exceto "Operação"'),
+            ('so_operacao', 'Somente "Operação"'),
+        ]
+
+    def queryset(self, request, queryset):
+        if self.value() == 'sem_operacao':
+            return queryset.exclude(defensivo__tipo='operacao')
+        elif self.value() == 'so_operacao':
+            return queryset.filter(defensivo__tipo='operacao')
+        return queryset
 
 class ColheitaFilter(SimpleListFilter):
     title = "Cargas"  # or use _('country') for translated title
@@ -2360,6 +2384,7 @@ class AplicacaoAdmin(admin.ModelAdmin):
         PrecoPreenchidoFilter,
         ProgramaAplicacaoFilter,
         DefensivoIdFarmboxFilter,
+        ExcludeOperacaoFilter,
         "operacao__programa__ciclo__ciclo",
         "operacao__programa__safra__safra",
         "ativo",

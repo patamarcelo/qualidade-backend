@@ -3873,7 +3873,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             if planejamento_plantio == True:
                 safra_filter = "2025/2026"
                 ciclo_filter = '3'
-                filter_farm_id= "4" #bencao de deus (4)
+                projeto_get = Projeto.objects.filter(id_farmbox=projeto_filter)[0]
 
                 plantio_map = Plantio.objects.values(
                     "map_geo_points", "map_centro_id", "talhao__id_talhao", "id_farmbox"
@@ -3882,7 +3882,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     ciclo__ciclo=ciclo_filter,
                     # finalizado_plantio=True,
                     # programa__isnull=False,
-                    talhao__fazenda__fazenda__id_d=filter_farm_id,
+                    talhao__fazenda__fazenda=projeto_get.fazenda,
                 ).order_by('data_prevista_plantio')
 
                 plantio_ids = Plantio.objects.values(
@@ -3891,12 +3891,12 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     safra__safra=safra_filter,
                     # finalizado_plantio=True,
                     # programa__isnull=False,
-                    talhao__fazenda__fazenda__id_d=filter_farm_id,
+                    talhao__fazenda__fazenda=projeto_get.fazenda,
                 ).order_by('data_prevista_plantio')
 
                 gp_date = ( 
                         Plantio.objects.filter(safra__safra=safra_filter, ciclo__ciclo=ciclo_filter, programa__isnull=False)
-                                        .filter(talhao__fazenda__fazenda__id_d=filter_farm_id)
+                                        .filter(talhao__fazenda__fazenda=projeto_get.fazenda)
                                         .annotate(date_only=TruncDate('data_prevista_plantio'))
                                         .values('date_only', 'id_farmbox')
                                         .order_by('date_only')

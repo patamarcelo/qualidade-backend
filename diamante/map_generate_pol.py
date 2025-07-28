@@ -28,13 +28,54 @@ colos_map = {
 	'16':	"#000215"
 }
 
+colors_map = {
+    '1': "#81c784",   # verde médio
+    '2': "#4caf50",   # verde
+    '3': "#388e3c",   # verde escuro
+    '4': "#1b5e20",   # verde mais escurow
+
+    '5': "#fdd835",   # amarelo vivo
+    '6': "#fbc02d",   # amarelo escuro
+    '7': "#f9a825",   # dourado queimado
+    '8': "#f57f17",   # amarelo-âmbar escuro
+
+    '9': "#fb8c00",   # laranja médio
+    '10': "#f57c00",  # laranja mais escuro
+    '11': "#ef6c00",  # quase ferrugem
+    '12': "#e65100",  # laranja queimado escuro
+
+    '13': "#e57373",  # vermelho médio
+    '14': "#ef5350",  # vermelho forte
+    '15': "#e53935",  # vermelho mais forte
+    '16': "#b71c1c"   # vermelho escuro
+}
+
+
+colors_map = {
+    '1':  "#fffde7",  # amarelo bem claro
+    '2':  "#fff9c4",
+    '3':  "#fff59d",
+    '4':  "#fff176",
+    '5':  "#ffee58",
+    '6':  "#ffeb3b",  # amarelo padrão
+    '7':  "#fdd835",
+    '8':  "#fbc02d",
+    '9':  "#f9a825",
+    '10': "#f57f17",
+    '11': "#d9a400",
+    '12': "#bf9100",
+    '13': "#a57e00",
+    '14': "#8c6b00",
+    '15': "#735800",
+    '16': "#594500",  # amarelo queimado / dourado escuro
+}
 def draw_cartoon_map(
     polygons,
     labels,
     centerid,
     ids_farmbox,
     filled_polygon_index=[],
-    filled_color="blue",
+    filled_color="white",
     fontsize=10,
     edge_linewidth=0.5,
     planejamento_plantio=False,
@@ -55,7 +96,7 @@ def draw_cartoon_map(
             )
             print(index_value)
             print(planner_id_farmbox)
-            filled_color = colos_map.get(str(index_value))
+            filled_color = colors_map.get(str(index_value), "white")
             print('filled new color: ', filled_color)
             ax.add_patch(
                     Polygon(
