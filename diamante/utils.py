@@ -848,7 +848,7 @@ def save_program_cost():
 
 def atualizar_datas_previstas_plantio():
     from .models import Plantio
-    caminho_arquivo_excel = os.path.join(os.path.dirname(__file__), "utils", "datas_plantio-ciclo2.xlsx")
+    caminho_arquivo_excel = os.path.join(os.path.dirname(__file__), "utils", "datas_plantio-2.xlsx")
 
     """
     Atualiza o campo data_prevista_plantio do modelo Plantio

@@ -1,0 +1,257 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+{% load l10n %} {# <-- importante para usar unlocalize #}
+{% block extrahead %}
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">📦 Abrir Aplicação no Farmbox - <strong>{{projeto_nome}}</strong></h2>
+
+    <div class="mb-3">
+        <label class="form-label"><strong>Área total selecionada:</strong></label>
+        <strong>
+            <input type="text" class="form-control" id="total-area-display" value="{{ total_area|floatformat:'2' }} ha"
+                readonly>
+        </strong>
+    </div>
+
+    <div class="mb-4">
+        <h5>Plantios Selecionados:</h5>
+        {% for p in plantios %}
+        <div class="plantio-wrapper mb-2" data-plantation-id="{{ p.id_farmbox }}">
+            <div class="card p-3">
+                <input type="hidden" name="plantation_id" value="{{ p.id_farmbox|stringformat:'d' }}">
+                <div class="d-flex align-items-center flex-wrap gap-3 justify-content-between">
+                    <div class="d-flex align-items-center flex-wrap gap-3">
+                        <div>
+                            {% with cultura=p.variedade.cultura.cultura %}
+                            {% if cultura == "Soja" %}
+                            <img src="{% static 'images/icons/soy.png' %}" alt="Soja"
+                                style="width: 20px; height: 20px;" />
+                            {% elif cultura == "Feijão" %}
+                            <img src="{% static 'images/icons/beans2.png' %}" alt="Feijão"
+                                style="width: 20px; height: 20px;" />
+                            {% elif cultura == "Arroz" %}
+                            <img src="{% static 'images/icons/rice.png' %}" alt="Arroz"
+                                style="width: 20px; height: 20px;" />
+                            {% else %}
+                            <span>Sem ícone</span>
+                            {% endif %}
+                            {% endwith %}
+                        </div>
+                        <div><strong>Talhão:</strong> {{ p.talhao.id_talhao }}</div>
+                        <div><strong>Variedade:</strong> {{ p.variedade }}</div>
+                        <div><strong></strong> {{ p.safra }} - {{ p.ciclo }}</div>
+                        <div class="d-flex align-items-center gap-2">
+                            <label for="area-{{ forloop.counter }}" class="form-label me-1 mb-0">
+                                <strong>Área (ha):</strong>
+                            </label>
+                            <input type="number" step="any" class="form-control form-control-sm area-input"
+                                name="sought_area"
+                                value="{% with p.area_colheita|stringformat:'f' as area_float %}{{ area_float|slice:':-4' }}{% endwith %}"
+                                data-plantation-id="{{ p.id_farmbox }}" style="max-width: 90px;">
+                        </div>
+                    </div>
+
+                    <!-- Botão remover -->
+                    <button type="button" class="btn btn-sm btn-outline-danger"
+                        onclick="this.closest('.plantio-wrapper').remove(); calcularAreaTotal();"
+                        >
+                        Remover
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <hr />
+
+    <h5>Adicionar Defensivos</h5>
+    <div id="defensivos-container" class="mb-3">
+        <div class="defensivo-group d-flex align-items-center gap-2 mb-2">
+            <select name="input_id" class="form-select form-select-sm w-auto" style="min-width: 220px;" required>
+                <option value="">-- Selecione um defensivo --</option>
+                {% for d in defensivos %}
+                <option value="{{ d.id_farmbox_str|stringformat:'d' }}" data-unidade="{{ d.unidade_medida }}">
+                    {{ d.produto }} {{d.id_farmbox_str|stringformat:'d'}}</option>
+                {% endfor %}
+            </select>
+
+            <input type="number" step="0.01" name="dosage_value" class="form-control form-control-sm w-auto"
+                placeholder="Dose (ex: 0.2)" style="width: 100px;" required>
+
+            <button type="button" class="btn btn-outline-primary btn-sm" onclick="duplicarLinha(this)">+</button>
+            <button type="button" class="btn btn-outline-danger btn-sm" onclick="removerLinha(this)">−</button>
+        </div>
+    </div>
+
+    <button type="button" class="btn btn-success" id="btn-submit" onclick="enviarAplicacao()">✅ Confirmar
+        Aplicação</button>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('click', function (e) {
+        if (e.target && e.target.classList.contains('remove-plantio-btn')) {
+            const plantioCard = e.target.closest('.plantio-wrapper');
+            if (plantioCard) {
+                plantioCard.remove();
+                calcularAreaTotal(); // atualiza a área total também
+            }
+        }
+    });
+    
+    function removerPlantio(botao) {
+        const wrapper = botao.closest('.plantio-wrapper');
+        if (wrapper) {
+            wrapper.remove();
+            calcularAreaTotal();
+        }
+    }
+
+    function duplicarLinha(botao) {
+        const container = document.getElementById("defensivos-container");
+        const linhaAtual = botao.closest(".defensivo-group");
+        const novaLinha = linhaAtual.cloneNode(true);
+
+        novaLinha.querySelector("select").selectedIndex = 0;
+        novaLinha.querySelector("input[name='dosage_value']").value = "";
+
+        container.appendChild(novaLinha);
+    }
+
+    function removerLinha(botao) {
+        const container = document.getElementById("defensivos-container");
+        const linha = botao.closest(".defensivo-group");
+
+        if (container.children.length > 1) {
+            container.removeChild(linha);
+        } else {
+            alert("Você deve manter pelo menos um defensivo.");
+        }
+    }
+
+    function calcularAreaTotal() {
+        const areas = document.querySelectorAll(".area-input");
+        let total = 0;
+        areas.forEach(input => {
+            const val = parseFloat(input.value);
+            if (!isNaN(val)) {
+                total += val;
+            }
+        });
+        document.getElementById("total-area-display").value = total.toFixed(2) + " ha";
+        return total;
+    }
+
+    document.querySelectorAll(".area-input").forEach(input => {
+        input.addEventListener("input", calcularAreaTotal);
+    });
+
+    function enviarAplicacao() {
+        const btn = document.getElementById("btn-submit");
+        const originalText = btn.innerHTML;
+
+        // Ativa spinner
+        btn.disabled = true;
+        btn.innerHTML =
+            `<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Enviando...`;
+
+        const inputs = [];
+        const defensivoGroups = document.querySelectorAll(".defensivo-group");
+        const areaInputs = document.querySelectorAll("input[name='sought_area']");
+        const plantations = [];
+        let totalArea = 0;
+
+        areaInputs.forEach(input => {
+            // pegar o id da plantação do dataset (que deve estar limpo)
+            const plantation_id = parseInt(input.dataset.plantationId.replace(/\./g, ''), 10);
+            const sought_area = parseFloat(input.value);
+            if (!isNaN(sought_area)) {
+                plantations.push({
+                    plantation_id: plantation_id,
+                    sought_area: sought_area
+                });
+                totalArea += sought_area;
+            }
+        });
+
+        defensivoGroups.forEach(group => {
+            const defensivoId = group.querySelector("select[name='input_id']").value;
+            const dose = group.querySelector("input[name='dosage_value']").value;
+
+            if (defensivoId && dose) {
+                const selectedOption = group.querySelector("select[name='input_id']").selectedOptions[0];
+                const unidade = selectedOption.dataset.unidade;
+                const parsedDose = parseFloat(dose);
+
+                inputs.push({
+                    input_id: parseInt(defensivoId.replace(/\./g, ''), 10),
+                    dosage_value: parsedDose,
+                    dosage_unity: unidade || null,
+                });
+            }
+        });
+
+        const B_HARVEST_ID = "{{ HARVEST_ID }}"; // vindo como string para evitar separador de milhar
+        const B_FARM_ID = "{{ FARM_ID }}";
+        const B_RESPONSE_ID = "{{ RESPONSE_ID }}";
+        const B_CHARGE_ID = "{{ CHARGE_ID }}";
+
+        const payload = {
+            date: new Date().toISOString().slice(0, 10),
+            end_date: new Date(Date.now() + 6 * 86400000).toISOString().slice(0, 10),
+            harvest_id: parseInt(B_HARVEST_ID.replace(/\./g, '')),
+            farm_id: parseInt(B_FARM_ID.replace(/\./g, '')),
+            responsible_id: parseInt(B_RESPONSE_ID.replace(/\./g, '')),
+            charge_id: parseInt(B_CHARGE_ID.replace(/\./g, '')),
+            plantations: plantations,
+            inputs: inputs,
+            observations: "Aplicação Aberta via Admin"
+        };
+
+        fetch("/diamante/plantio/open_app_farmbox/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": "Token {{ YOUR_TOKEN }}"
+                },
+                body: JSON.stringify({
+                    data: payload
+                })
+            })
+            .then(async response => {
+                const data = await response.json();
+                console.log('data return here: ', data)
+                if (!response.ok) {
+                    throw new Error(data ? .msg || "Erro desconhecido ao enviar aplicação.");
+                }
+
+                Swal.fire({
+                    icon: "success",
+                    title: "Aplicação criada!",
+                    text: data.msg || "Aplicação aberta com sucesso.",
+                    confirmButtonText: "OK"
+                }).then(() => {
+                    window.location.href = document.referrer;
+                });
+            })
+            .catch(err => {
+                Swal.fire({
+                    icon: "error",
+                    title: "Erro!",
+                    text: err.message || "Erro ao enviar aplicação."
+                });
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            });
+    }
+</script>
+{% endblock %}

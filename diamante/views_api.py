@@ -162,7 +162,7 @@ from django.db import DatabaseError
 
 from datetime import datetime as dateTimeTask
 
-
+from types import SimpleNamespace
 
 # Get a named logger
 logger = logging.getLogger(__name__)
@@ -3288,6 +3288,10 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "Authorization": FARMBOX_ID,
                 }
                 start_request = time.perf_counter()
+                
+                # para testes
+                # response_farm = SimpleNamespace(status_code=201, text="Mocked success")
+                
                 response_farm = requests.post(url, data=json.dumps(payload), headers=headers)
                 logger.info('request time: %.4fs', time.perf_counter() - start_request)
                 

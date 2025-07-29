@@ -95,6 +95,9 @@ from uuid import UUID
 
 
 from decimal import Decimal, DivisionByZero
+from django.shortcuts import render
+from types import SimpleNamespace
+
 
 
 
@@ -969,10 +972,61 @@ def area_aferida(modeladdmin, request, queryset):
             f"{count_false} Áreas informadas como NÃO aferidas: {ha_negativo} hectares",
         )
 
+@admin.action(description="Abrir Aplicação no Farmbox")
+def abrir_aplicacao_farmbox(self, request, queryset):
+    # Otimização do queryset
+    queryset = queryset.select_related(
+        'safra',
+        'ciclo',
+        'talhao__fazenda__fazenda',  # acessa: p.talhao.fazenda.fazenda
+        'variedade__cultura'         # acessa: p.variedade.cultura
+    )
+
+    # Token do usuário autenticado
+    user_token = Token.objects.get(user=request.user)
+
+    defensivos = (
+        Defensivo.objects
+        .filter(id_farmbox__isnull=False, unidade_medida__isnull=False)
+        .annotate(id_farmbox_str=F("id_farmbox"))
+        .values("id_farmbox_str", "produto", "unidade_medida")
+    )
+    # Área total e dados dos plantios
+    total_area = sum(p.area_colheita for p in queryset)
+    plantios_data = [
+        {"sought_area": float(p.area_colheita), "plantation_id": p.id_farmbox}
+        for p in queryset
+    ]
+
+    # Dados do primeiro plantio (todos devem ter os mesmos dados de fazenda/safra nesse contexto)
+    first = queryset[0]
+    projeto_nome = first.talhao.fazenda.nome
+    charge_id = first.talhao.fazenda.fazenda.id_encarregado_farmbox
+    response_id = first.talhao.fazenda.fazenda.id_responsavel_farmbox
+    farm_id_farmbox = first.talhao.fazenda.id_farmbox
+    harvest_id_farm = first.safra.id_farmbox
+
+    # Contexto para renderização
+    context = dict(
+        **self.admin_site.each_context(request),
+        plantios=queryset,
+        plantios_json=json.dumps(plantios_data),
+        projeto_nome=projeto_nome,
+        defensivos=defensivos,
+        total_area=total_area,
+        action='abrir_aplicacao_farmbox',
+        YOUR_TOKEN=user_token,
+        CHARGE_ID=int(charge_id),
+        RESPONSE_ID=int(response_id),
+        FARM_ID=int(farm_id_farmbox),
+        HARVEST_ID=int(harvest_id_farm),
+    )
+
+    return render(request, 'admin/abrir_aplicacao_farmbox.html', context)
 
 @admin.register(Plantio)
 class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
-    actions = [export_plantio, area_aferida]
+    actions = [export_plantio, area_aferida, abrir_aplicacao_farmbox]
     show_full_result_count = False
     autocomplete_fields = ["talhao", "programa", "variedade"]
 
