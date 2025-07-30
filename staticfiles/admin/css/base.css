@@ -17,20 +17,24 @@
     background: #fff;
 }
 
-.module p, .module ul, .module h3, .module h4, .module dl, .module pre {
+
+
+.module p,
+.module ul,
+.module h3,
+.module h4,
+.module dl,
+.module pre {
     padding-left: 10px;
     padding-right: 10px;
 }
-.field-talhao {
-    white-space: nowrap !important;
-}
-  
 
 .module blockquote {
     margin-left: 12px;
 }
 
-.module ul, .module ol {
+.module ul,
+.module ol {
     margin-left: 1.5em;
 }
 
@@ -38,7 +42,9 @@
     margin-top: .6em;
 }
 
-.module h2, .module caption, .inline-group h2 {
+.module h2,
+.module caption,
+.inline-group h2 {
     margin: 0;
     padding: 8px;
     font-weight: 400;
@@ -137,15 +143,19 @@ td ul.errorlist li {
     border-bottom: 1px solid #eee;
     background: none;
 }
-.form-row.errors ul.errorlist  {
+
+.form-row.errors ul.errorlist {
     margin-left: 0;
     padding-right: 10px;
 }
+
 .form-row.errors ul.errorlist li {
     padding-left: 0;
 }
 
-.errors input, .errors select, .errors textarea {
+.errors input,
+.errors select,
+.errors textarea {
     border: 1px solid #ba2121;
 }
 
@@ -183,13 +193,15 @@ div.breadcrumbs a {
     color: #fff;
 }
 
-div.breadcrumbs a:focus, div.breadcrumbs a:hover {
+div.breadcrumbs a:focus,
+div.breadcrumbs a:hover {
     color: #c4dce8;
 }
 
 /* ACTION ICONS */
 
-.viewlink, .inlineviewlink {
+.viewlink,
+.inlineviewlink {
     padding-left: 16px;
     background: url(../img/icon-viewlink.svg) 0 1px no-repeat;
 }
@@ -199,7 +211,8 @@ div.breadcrumbs a:focus, div.breadcrumbs a:hover {
     background: url(../img/icon-addlink.svg) 0 1px no-repeat;
 }
 
-.changelink, .inlinechangelink {
+.changelink,
+.inlinechangelink {
     padding-left: 16px;
     background: url(../img/icon-changelink.svg) 0 1px no-repeat;
 }
@@ -209,11 +222,13 @@ div.breadcrumbs a:focus, div.breadcrumbs a:hover {
     background: url(../img/icon-deletelink.svg) 0 1px no-repeat;
 }
 
-a.deletelink:link, a.deletelink:visited {
+a.deletelink:link,
+a.deletelink:visited {
     color: #CC3434;
 }
 
-a.deletelink:focus, a.deletelink:hover {
+a.deletelink:focus,
+a.deletelink:hover {
     color: #993333;
     text-decoration: none;
 }
@@ -248,7 +263,8 @@ a.deletelink:focus, a.deletelink:hover {
     border-radius: 15px;
 }
 
-.object-tools a:link, .object-tools a:visited {
+.object-tools a:link,
+.object-tools a:visited {
     display: block;
     float: left;
     padding: 3px 12px;
@@ -260,21 +276,25 @@ a.deletelink:focus, a.deletelink:hover {
     color: #fff;
 }
 
-.object-tools a:focus, .object-tools a:hover {
+.object-tools a:focus,
+.object-tools a:hover {
     background-color: #007bff;
 }
 
-.object-tools a:focus{
+.object-tools a:focus {
     text-decoration: none;
 }
 
-.object-tools a.viewsitelink, .object-tools a.golink,.object-tools a.addlink {
+.object-tools a.viewsitelink,
+.object-tools a.golink,
+.object-tools a.addlink {
     background-repeat: no-repeat;
     background-position: right 7px center;
     padding-right: 26px;
 }
 
-.object-tools a.viewsitelink, .object-tools a.golink {
+.object-tools a.viewsitelink,
+.object-tools a.golink {
     background-image: url(../img/tooltag-arrowright.svg);
 }
 
@@ -364,11 +384,13 @@ table#change-history tbody th {
     overflow: hidden;
 }
 
-#header a:link, #header a:visited {
+#header a:link,
+#header a:visited {
     color: #fff;
 }
 
-#header a:focus , #header a:hover {
+#header a:focus,
+#header a:hover {
     text-decoration: underline;
 }
 
@@ -384,7 +406,9 @@ table#change-history tbody th {
     color: #f5dd5d;
 }
 
-#branding h1, #branding h1 a:link, #branding h1 a:visited {
+#branding h1,
+#branding h1 a:link,
+#branding h1 a:visited {
     color: #f5dd5d;
 }
 
@@ -415,7 +439,8 @@ table#change-history tbody th {
     border-bottom: 1px solid rgba(255, 255, 255, 0.25);
 }
 
-#user-tools a:focus, #user-tools a:hover {
+#user-tools a:focus,
+#user-tools a:hover {
     text-decoration: none;
     border-bottom-color: #343a40;
     color: #343a40;
@@ -509,4 +534,13 @@ table#change-history tbody th {
 
 .popup #header {
     padding: 10px 20px;
+}
+
+
+
+.dose-result {
+    font-weight: bold !important;
+    margin-left: 15px !important;
+    text-align: right !important;
+    min-width: 150px !important;
 }
