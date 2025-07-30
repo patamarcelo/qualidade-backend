@@ -1034,6 +1034,8 @@ def ver_cronograma_programa(self, request, queryset):
     cronograma_raw = plantio.cronograma_programa or []
     cultura_nome = plantio.variedade.cultura.cultura
     variedade_nome = plantio.variedade.variedade
+    referer = request.META.get("HTTP_REFERER", "/admin/")  # fallback pro admin
+
 
     # Transformar e ordenar cronograma
     cronograma = []
@@ -1063,6 +1065,7 @@ def ver_cronograma_programa(self, request, queryset):
         variedade_nome=variedade_nome,
         cronograma=cronograma,
         title=f"{plantio.talhao}",
+        voltar_url=referer
     )
 
     return render(request, "admin/view_cronograma.html", context)
