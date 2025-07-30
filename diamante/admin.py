@@ -95,9 +95,8 @@ from uuid import UUID
 
 
 from decimal import Decimal, DivisionByZero
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from types import SimpleNamespace
-
 
 
 
@@ -1025,53 +1024,17 @@ def abrir_aplicacao_farmbox(self, request, queryset):
     return render(request, 'admin/abrir_aplicacao_farmbox.html', context)
 
 @admin.action(description="📅 Visualizar cronograma do programa")
-def ver_cronograma_programa(self, request, queryset):
+def acao_ver_cronograma_programa(self, request, queryset):
     if queryset.count() != 1:
         self.message_user(request, "Selecione apenas um item.", level='error')
         return
 
-    plantio = queryset.first()
-    cronograma_raw = plantio.cronograma_programa or []
-    cultura_nome = plantio.variedade.cultura.cultura
-    variedade_nome = plantio.variedade.variedade
-    referer = request.META.get("HTTP_REFERER", "/admin/")  # fallback pro admin
+    obj = queryset.first()
+    return redirect('admin:view_cronograma_programa', obj_id=obj.id)
 
-
-    # Transformar e ordenar cronograma
-    cronograma = []
-
-    for etapa in cronograma_raw:
-        # Renomear chave
-        etapa["data_prevista"] = etapa.pop("data prevista", None)
-
-        # Calcular quantidade_aplicar = dose * área_colheita
-        for p in etapa.get("produtos", []):
-            p["quantidade_aplicar"] = ""
-            try:
-                dose = float(p.get("dose", 0))
-                p["quantidade_aplicar"] = round(float(plantio.area_colheita) * dose, 3)
-            except Exception:
-                pass  # Se dose ou area forem inválidos
-
-        cronograma.append(etapa)
-
-    # Ordenar por DAP (colocando -9999 se não tiver dap)
-    cronograma.sort(key=lambda x: x.get("dap", -9999))
-
-    context = dict(
-        **self.admin_site.each_context(request),
-        object=plantio,
-        cultura_nome=cultura_nome,
-        variedade_nome=variedade_nome,
-        cronograma=cronograma,
-        title=f"{plantio.talhao}",
-        voltar_url=referer
-    )
-
-    return render(request, "admin/view_cronograma.html", context)
 @admin.register(Plantio)
 class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
-    actions = [export_plantio, area_aferida, abrir_aplicacao_farmbox, ver_cronograma_programa]
+    actions = [export_plantio, area_aferida, abrir_aplicacao_farmbox]
     show_full_result_count = False
     autocomplete_fields = ["talhao", "programa", "variedade"]
 
@@ -1083,6 +1046,95 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
                 "plantio__id", "peso_scs_limpo_e_seco", "data_colheita"
             )
         ]
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path(
+                'cronograma/<int:obj_id>/',
+                self.admin_site.admin_view(self.view_cronograma_programa),
+                name='view_cronograma_programa',
+            ),
+        ]
+        return custom_urls + urls
+    
+    
+
+    # def view_cronograma_programa(self, request, queryset):
+    #     if queryset.count() != 1:
+    #         self.message_user(request, "Selecione apenas um item.", level='error')
+    #         return
+
+    #     plantio = queryset.first()
+    #     cronograma_raw = plantio.cronograma_programa or []
+    #     cultura_nome = plantio.variedade.cultura.cultura
+    #     variedade_nome = plantio.variedade.variedade
+    #     referer = request.META.get("HTTP_REFERER", "/admin/")  # fallback pro admin
+
+
+    #     # Transformar e ordenar cronograma
+    #     cronograma = []
+
+    #     for etapa in cronograma_raw:
+    #         # Renomear chave
+    #         etapa["data_prevista"] = etapa.pop("data prevista", None)
+
+    #         # Calcular quantidade_aplicar = dose * área_colheita
+    #         for p in etapa.get("produtos", []):
+    #             p["quantidade_aplicar"] = ""
+    #             try:
+    #                 dose = float(p.get("dose", 0))
+    #                 p["quantidade_aplicar"] = round(float(plantio.area_colheita) * dose, 3)
+    #             except Exception:
+    #                 pass  # Se dose ou area forem inválidos
+
+    #         cronograma.append(etapa)
+
+    #     # Ordenar por DAP (colocando -9999 se não tiver dap)
+    #     cronograma.sort(key=lambda x: x.get("dap", -9999))
+
+    #     context = dict(
+    #         **self.admin_site.each_context(request),
+    #         object=plantio,
+    #         cultura_nome=cultura_nome,
+    #         variedade_nome=variedade_nome,
+    #         cronograma=cronograma,
+    #         title=f"{plantio.talhao}",
+    #         voltar_url=referer
+    #     )
+
+    #     return render(request, "admin/view_cronograma.html", context)
+    def view_cronograma_programa(self, request, obj_id):
+        plantio = get_object_or_404(Plantio, id=obj_id)
+        cronograma_raw = plantio.cronograma_programa or []
+        cultura_nome = plantio.variedade.cultura.cultura
+        variedade_nome = plantio.variedade.variedade
+        referer = request.META.get("HTTP_REFERER", "/admin/")
+
+        cronograma = []
+        for etapa in cronograma_raw:
+            etapa["data_prevista"] = etapa.pop("data prevista", None)
+            for p in etapa.get("produtos", []):
+                p["quantidade_aplicar"] = ""
+                try:
+                    dose = float(p.get("dose", 0))
+                    p["quantidade_aplicar"] = round(float(plantio.area_colheita) * dose, 3)
+                except Exception:
+                    pass
+            cronograma.append(etapa)
+
+        cronograma.sort(key=lambda x: x.get("dap", -9999))
+
+        context = dict(
+            **self.admin_site.each_context(request),
+            object=plantio,
+            cultura_nome=cultura_nome,
+            variedade_nome=variedade_nome,
+            cronograma=cronograma,
+            title=f"{plantio.talhao}",
+            voltar_url=referer
+        )
+        return render(request, "admin/view_cronograma.html", context)
 
     # @confirm_action
     @admin.action(description="Colher o Plantio")
@@ -1265,6 +1317,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
     )
     list_display = (
         "talhao",
+        "cronograma_link",
         "cultura_description",
         "variedade_description",
         "safra_description",
@@ -1366,6 +1419,16 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         "id_farmbox",
     )
 
+    @admin.display(description="🗓️")
+    def cronograma_link(self, obj):
+        url = reverse('admin:view_cronograma_programa', args=[obj.id])
+        return format_html(
+            '<a href="{}" title="Ver Cronograma">'
+            '🗓️'
+            '</a>',
+            url
+        )
+    
     def save_model(self, request, obj, form, change):
         print(obj)
         print(self)
