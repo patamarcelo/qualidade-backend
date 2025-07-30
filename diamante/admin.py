@@ -2866,6 +2866,9 @@ class AppFarmBoxIntegrationAdmin(admin.ModelAdmin):
     
     list_display = ("get_data", "app_nuumero", "app_fazenda")
     search_fields=("app_nuumero","criados",'app_fazenda')
+    list_filter = (
+        ("criados", DateFieldListFilter),  # Filters by the 'criados' date field
+    )
 
     def get_data(self, obj):
         if obj.criados:
@@ -2887,6 +2890,7 @@ class AppFarmBoxIntegrationAdmin(admin.ModelAdmin):
 class StProtheusIntegrationAdmin(admin.ModelAdmin):
     
     list_display = ("get_data", "st_numero", "st_fazenda")
+    search_fields = ("criados", 'st_numero', 'st_fazenda')
     list_filter = (
         ("criados", DateFieldListFilter),  # Filters by the 'criados' date field
     )
