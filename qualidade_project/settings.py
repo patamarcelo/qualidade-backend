@@ -152,22 +152,22 @@ EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD_CONFIG")
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
 
 use_db = "default"
-# use_db_dev = "dev"
+use_db_dev = "dev"
 
 DATABASES = {
     "dev": {
         'ENGINE': 'django.db.backends.postgresql',
-        "NAME": env("DB_EL_NAME_NEON"),
-        "USER": env("DB_EL_USER_NEON"),
-        "PASSWORD": env("DB_EL_PASSWORD_NEON"),
-        "HOST": env("DB_EL_HOST_NEON"),
-        "PORT": env("DB_EL_PORT_NEON"),
-        'CONN_MAX_AGE': 600,  # 10 minutos
+        "NAME": env("DB_EL_NAME_NEON", default="default_db_name"),
+        "USER": env("DB_EL_USER_NEON", default="default_user"),
+        "PASSWORD": env("DB_EL_PASSWORD_NEON", default="default_password"),
+        "HOST": env("DB_EL_HOST_NEON", default="localhost"),
+        "PORT": env("DB_EL_PORT_NEON", default="5432"),
+        'CONN_MAX_AGE': 600,
         'OPTIONS': {
             'sslmode': 'require',
-            'connect_timeout': 10,  # Timeout after 10 seconds (adjust as needed)
+            'connect_timeout': 10,
         },
-        "CONN_HEALTH_CHECKS": True,  # check connection before using
+        "CONN_HEALTH_CHECKS": True,
         'ATOMIC_REQUESTS': True,
     },
     "default": {
@@ -203,9 +203,7 @@ DATABASES = {
     # },
 }
 
-
-DATABASES["default"] = DATABASES[use_db]
-
+DATABASES["default"] = DATABASES[use_db_dev if DEBUG else use_db]
 
 
 # Password validation
