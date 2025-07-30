@@ -73,31 +73,31 @@ def start():
             #     )
             # else:
             print('job not exists yet, registering....', job_id)
-            scheduler.add_job(
-                func,
-                'cron',
-                day_of_week="*",
-                hour="5-19",  # From 6 AM to 7:59 PM
-                minute="58",  # At 15, 30, 45 and 58 minutes of each hour
-                id=job_id,
-                replace_existing=True,
-                misfire_grace_time=30  # segundos de tolerância para atraso
+            if settings.ENABLE_CRON_REGISTER:
+                scheduler.add_job(
+                    func,
+                    'cron',
+                    day_of_week="*",
+                    hour="5-19",  # From 6 AM to 7:59 PM
+                    minute="58",  # At 15, 30, 45 and 58 minutes of each hour
+                    id=job_id,
+                    replace_existing=True,
+                    misfire_grace_time=30  # segundos de tolerância para atraso
 
-            )
+                )
+                scheduler.add_job(
+                    delete_old_job_executions,
+                    trigger='interval',
+                    days=7,
+                    id='delete_old_job_executions',
+                    max_instances=1,
+                    replace_existing=True,
+                )
+                logger.info("Added job: 'delete_old_job_executions'.")
+                
             register_events(scheduler)
             scheduler.start()
             logger.info("Scheduler started!")
-
-            # Cleanup old job executions
-            scheduler.add_job(
-                delete_old_job_executions,
-                trigger='interval',
-                days=7,
-                id='delete_old_job_executions',
-                max_instances=1,
-                replace_existing=True,
-            )
-            logger.info("Added job: 'delete_old_job_executions'.")
         else:
             print('funcionando, vai rodar somente no servidor')
     except Exception as e:
