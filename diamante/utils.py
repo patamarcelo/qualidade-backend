@@ -401,7 +401,7 @@ def duplicate_existing_operations_program(old_program, new_program, operacao_mod
 
 
 def duplicate_existing_operations_program_and_applications(
-    old_program, new_program, operacao_model, aplicacao_model
+    old_program, new_program, operacao_model, aplicacao_model, keep_price = False
 ):
 
     # THIS TRY BLOCK NOT TESTED YET
@@ -427,6 +427,12 @@ def duplicate_existing_operations_program_and_applications(
                     new_op._state.adding = True
                     new_op.operacao = op
                     new_op.operacao.programa = new_program
+                    if keep_price == False:
+                        print('nao deve manter os preços antigos')
+                        new_op.preco = None
+                        new_op.valor_final = 0
+                        new_op.valor_aplicacao = 0
+                        new_op.moeda = None
                     new_op.save()
                     print(f"Aplicação: {ap} e Operação: {op} duplicadas com sucesso!!")
     except Exception as e:

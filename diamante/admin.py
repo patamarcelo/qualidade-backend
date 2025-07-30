@@ -61,6 +61,7 @@ from .utils import (
     admin_form_alter_programa_and_save,
     admin_form_remove_index,
     close_plantation_and_productivity,
+    duplicate_existing_operations_program_and_applications
 )
 
 import requests
@@ -83,7 +84,7 @@ from django.core.files.storage import FileSystemStorage
 
 from django.contrib.admin import DateFieldListFilter
 
-from .forms import PlantioExtratoAreaForm
+from .forms import PlantioExtratoAreaForm, ProgramaAdminForm
 from django.db import connection
 
 import uuid
@@ -2123,6 +2124,30 @@ class ColheitaAdmin(admin.ModelAdmin):
 
 @admin.register(Programa)
 class ProgramaAdmin(admin.ModelAdmin):
+    
+    form = ProgramaAdminForm
+    
+                    
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        if not change:
+            # Só executa na criação
+            duplicar = form.cleaned_data.get("duplicar")
+            keep_price = form.cleaned_data.get("keep_price")
+            print('keep price', keep_price)
+            old_program = form.cleaned_data.get("programa_base")
+
+            if duplicar and old_program:
+                print("Programa base:", old_program)
+                print("Novo programa (obj):", obj)
+                # Aqui você chama sua função de duplicar passando os modelos
+                try:
+                    print('aqui vamos tentar Duplicar o Prgorama')
+                    duplicate_existing_operations_program_and_applications(old_program, obj, Operacao, Aplicacao , keep_price)
+                    self.message_user(request, "Programa duplicado com sucesso.", messages.SUCCESS)
+                except Exception as e:
+                    self.message_user(request, f"Erro ao duplicar programa: {e}", messages.ERROR)
+                    
     def get_queryset(self, request):
         return (
             super(ProgramaAdmin, self)
@@ -2134,6 +2159,24 @@ class ProgramaAdmin(admin.ModelAdmin):
     readonly_fields = ["modificado"]
     filter_horizontal = ('variedade',)  # Field name
 
+    def get_fieldsets(self, request, obj=None):
+        fieldsets = list(super().get_fieldsets(request, obj))
+        if obj:  # Está editando, não criando
+            # Remove a seção que tem 'duplicar'
+            fieldsets = [
+                fs for fs in fieldsets if 'duplicar' not in str(fs)
+            ]
+        return fieldsets
+
+    def get_readonly_fields(self, request, obj=None):
+        readonly = list(super().get_readonly_fields(request, obj))
+        if obj:
+            # Nunca incluir campos que só existem na criação
+            if 'duplicar' in readonly:
+                readonly.remove('duplicar')
+            if 'programa_base' in readonly:
+                readonly.remove('programa_base')
+        return readonly
     inlines = [EstagiosProgramaInline]
     list_display = (
         "nome",
@@ -2154,6 +2197,14 @@ class ProgramaAdmin(admin.ModelAdmin):
 
     fieldsets = [
         (
+            "Duplicando o Programa",
+            {
+                "fields": (
+                    ("duplicar", "programa_base", 'keep_price'),  
+                )
+            },
+        ),
+        (
             "Dados",
             {
                 "fields": (
@@ -2169,6 +2220,20 @@ class ProgramaAdmin(admin.ModelAdmin):
             },
         )
     ]
+    
+    class Media:
+        js = [
+            "admin/js/vendor/jquery/jquery.js",
+            "admin/js/vendor/select2/select2.full.js",
+            "admin/js/core.js",
+        ]
+        css = {
+            "all": [
+                "admin/css/switch_toggle.css",
+                "admin/css/vendor/select2/select2.css",
+                "admin/css/widgets.css",
+            ]
+        }
 
     def safra_description(self, obj):
         return f"{obj.safra.safra} - {obj.ciclo.ciclo}"

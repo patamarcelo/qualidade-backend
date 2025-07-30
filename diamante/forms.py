@@ -1,9 +1,21 @@
 from django import forms
-from .models import PlantioExtratoArea
+from .models import PlantioExtratoArea, Programa
 from django.core.exceptions import ValidationError
 from django.db.models import Sum
+from django.utils.safestring import mark_safe
 
 
+class ProgramaAdminForm(forms.ModelForm):
+    duplicar = forms.BooleanField(required=False, label="Duplicar de outro programa?")
+    keep_price = forms.BooleanField(required=False, label="Manter o Custo?")
+    programa_base = forms.ModelChoiceField(
+        queryset=Programa.objects.filter(ativo=True),
+        required=False,
+        label="Programa base para duplicação"
+    )
+    class Meta:
+        model = Programa
+        fields = "__all__"
 class PlantioExtratoAreaForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super(PlantioExtratoAreaForm, self).__init__(*args, **kwargs)
