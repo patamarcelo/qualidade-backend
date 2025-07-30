@@ -28,6 +28,9 @@
     </h5>
 </div>
 <a class="button" href="{{ voltar_url }}">⬅ Voltar</a>
+<div style="margin: 10px 0;">
+    <button class="toggle-button" onclick="alternarFiltro()" id="filtro-btn">🔍 Mostrar apenas em aberto</button>
+</div>
 
 <style>
     .estagio-card {
@@ -96,6 +99,7 @@
     }
     .header-container{
         display: flex;
+        flex-direction: column;
         justify-content: space-between;
     }
 </style>
@@ -109,10 +113,40 @@
         btn.textContent = isVisible ? '👁 Ver produtos' : '❌ Ocultar produtos';
     }
 </script>
+<script>
+    let mostrandoApenasAbertos = false;
+
+    function alternarFiltro() {
+        const etapas = document.querySelectorAll(".estagio-card");
+        const botao = document.getElementById("filtro-btn");
+
+        mostrandoApenasAbertos = !mostrandoApenasAbertos;
+
+        etapas.forEach(card => {
+            const aplicado = card.dataset.aplicado === "True";
+            if (mostrandoApenasAbertos) {
+                if (aplicado) {
+                    card.style.display = "none";
+                } else {
+                    card.style.display = "block";
+                }
+            } else {
+                card.style.display = "block";
+            }
+        });
+
+        // Atualiza o texto do botão
+        if (mostrandoApenasAbertos) {
+            botao.textContent = "📋 Mostrar todos";
+        } else {
+            botao.textContent = "🔍 Mostrar apenas em aberto";
+        }
+    }
+</script>
 
 {% for etapa in cronograma %}
 {% if etapa.estagio %}
-<div class="estagio-card">
+<div class="estagio-card" id="etapa-{{ forloop.counter }}" data-aplicado="{{ etapa.aplicado }}">
     <div class="estagio-header">
         <div>
             {{ etapa.estagio }}

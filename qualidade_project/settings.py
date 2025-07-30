@@ -152,23 +152,24 @@ EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD_CONFIG")
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
 
 use_db = "default"
+use_db_dev = "dev"
 
 DATABASES = {
-    # "default_neon": {
-    #     'ENGINE': 'django.db.backends.postgresql',
-    #     "NAME": env("DB_EL_NAME_NEON"),
-    #     "USER": env("DB_EL_USER_NEON"),
-    #     "PASSWORD": env("DB_EL_PASSWORD_NEON"),
-    #     "HOST": env("DB_EL_HOST_NEON"),
-    #     "PORT": env("DB_EL_PORT_NEON"),
-    #     'CONN_MAX_AGE': 600,  # 10 minutos
-    #     'OPTIONS': {
-    #         'sslmode': 'require',
-    #         'connect_timeout': 10,  # Timeout after 10 seconds (adjust as needed)
-    #     },
-    #     "CONN_HEALTH_CHECKS": True,  # check connection before using
-    #     'ATOMIC_REQUESTS': True,
-    # },
+    "dev": {
+        'ENGINE': 'django.db.backends.postgresql',
+        "NAME": env("DB_EL_NAME_NEON"),
+        "USER": env("DB_EL_USER_NEON"),
+        "PASSWORD": env("DB_EL_PASSWORD_NEON"),
+        "HOST": env("DB_EL_HOST_NEON"),
+        "PORT": env("DB_EL_PORT_NEON"),
+        'CONN_MAX_AGE': 600,  # 10 minutos
+        'OPTIONS': {
+            'sslmode': 'require',
+            'connect_timeout': 10,  # Timeout after 10 seconds (adjust as needed)
+        },
+        "CONN_HEALTH_CHECKS": True,  # check connection before using
+        'ATOMIC_REQUESTS': True,
+    },
     "default": {
         'ENGINE': 'django.db.backends.postgresql',
         "NAME": env("DB_EL_NAME"),
@@ -186,24 +187,25 @@ DATABASES = {
             'PRE_PING': True,
         }
     },
-    "dev": {
-        'ENGINE': 'dj_db_conn_pool.backends.postgresql',
-        "NAME": env("DB_EL_NAME_LOCAL"),
-        "USER": env("DB_EL_USER_LOCAL"),
-        "PASSWORD": env("DB_EL_PASSWORD_LOCAL"),
-        "HOST": env("DB_EL_HOST_LOCAL"),
-        "PORT": env("DB_EL_PORT_LOCAL"),
-        'POOL_OPTIONS': {
-            'POOL_SIZE': 20,            # Number of connections in the pool
-            'MAX_OVERFLOW': 10,         # Extra connections beyond the pool size
-            'RECYCLE': 1800,            # Recycle connections after a certain time to avoid stale connections
-            'PRE_PING': True,           # Check connections before using them to avoid using a broken connection
-        }
-    },
+    # "dev": {
+    #     'ENGINE': 'dj_db_conn_pool.backends.postgresql',
+    #     "NAME": env("DB_EL_NAME_LOCAL"),
+    #     "USER": env("DB_EL_USER_LOCAL"),
+    #     "PASSWORD": env("DB_EL_PASSWORD_LOCAL"),
+    #     "HOST": env("DB_EL_HOST_LOCAL"),
+    #     "PORT": env("DB_EL_PORT_LOCAL"),
+    #     'POOL_OPTIONS': {
+    #         'POOL_SIZE': 20,            # Number of connections in the pool
+    #         'MAX_OVERFLOW': 10,         # Extra connections beyond the pool size
+    #         'RECYCLE': 1800,            # Recycle connections after a certain time to avoid stale connections
+    #         'PRE_PING': True,           # Check connections before using them to avoid using a broken connection
+    #     }
+    # },
 }
 
 print('utilizando o banco de dados :::', use_db, '\n')
-DATABASES["default"] = DATABASES[use_db if DEBUG else use_db]
+DATABASES["default"] = DATABASES[use_db_dev if DEBUG else use_db]
+print('dbDegault', DATABASES[use_db_dev if DEBUG else use_db])
 
 
 # Password validation
