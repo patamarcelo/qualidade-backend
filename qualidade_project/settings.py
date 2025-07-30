@@ -152,7 +152,7 @@ EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD_CONFIG")
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
 
 use_db = "default"
-use_db_dev = "dev"
+# use_db_dev = "dev"
 
 DATABASES = {
     "dev": {
@@ -203,9 +203,9 @@ DATABASES = {
     # },
 }
 
-print('utilizando o banco de dados :::', use_db, '\n')
-DATABASES["default"] = DATABASES[use_db_dev if DEBUG else use_db]
-print('dbDegault', DATABASES[use_db_dev if DEBUG else use_db])
+
+DATABASES["default"] = DATABASES[use_db]
+
 
 
 # Password validation
