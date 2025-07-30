@@ -8,27 +8,45 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    function obterAreaTotal() {
-        const inputTotal = document.getElementById("total-area-display");
-        if (!inputTotal) return 0;
-        let val = inputTotal.value.replace(' ha', '').replace(/\./g, '').replace(',', '.');
-        let numero = parseFloat(val);
-        return isNaN(numero) ? 0 : numero;
-    }
+    // function obterAreaTotal() {
+    //     const inputTotal = document.getElementById("total-area-display");
+    //     if (!inputTotal) return 0;
+    //     let val = inputTotal.value.replace(' ha', '').replace(/\./g, '').replace(',', '.');
+    //     let numero = parseFloat(val);
+    //     return isNaN(numero) ? 0 : numero;
+    // }
 
-    function calcularAreaTotal() {
-        const areas = document.querySelectorAll(".area-input");
+    function obterAreaTotal() {
         let total = 0;
-        areas.forEach(input => {
-            const val = parseFloat(input.value);
+        document.querySelectorAll(".area-input").forEach(input => {
+            const val = parseFloat(input.value.replace(',', '.'));
             if (!isNaN(val)) {
                 total += val;
             }
         });
+        return total;
+    }
+
+    function calcularAreaTotal() {
+        const total = obterAreaTotal(); // usar mesma lógica
         const inputTotal = document.getElementById("total-area-display");
         if (inputTotal) inputTotal.value = formatarNumeroBR(total) + " Há";
         return total;
     }
+
+    // function calcularAreaTotal() {
+    //     const areas = document.querySelectorAll(".area-input");
+    //     let total = 0;
+    //     areas.forEach(input => {
+    //         const val = parseFloat(input.value);
+    //         if (!isNaN(val)) {
+    //             total += val;
+    //         }
+    //     });
+    //     const inputTotal = document.getElementById("total-area-display");
+    //     if (inputTotal) inputTotal.value = formatarNumeroBR(total) + " Há";
+    //     return total;
+    // }
 
     function getUnidadeFormatada(unidadeRaw) {
         if (!unidadeRaw) return "";
@@ -109,6 +127,7 @@ document.addEventListener('DOMContentLoaded', function () {
             wrapper.remove();
             calcularAreaTotal();
             atualizarEstadoBotoesRemoverPlantio();
+            atualizarDoseResultados();  // ← adicione aqui
         }
     }
 
@@ -245,7 +264,7 @@ document.addEventListener('DOMContentLoaded', function () {
             charge_id: parseInt(appData.dataset.chargeId),
             plantations: plantations,
             inputs: inputs,
-            observations: "Aplicação Aberta via Admin"
+            observations: "Aplicação Aberta via Django-Admin"
         };
 
         console.log('payload: ', payload)
@@ -264,10 +283,21 @@ document.addEventListener('DOMContentLoaded', function () {
                     throw new Error(data?.msg || "Erro desconhecido ao enviar aplicação.");
                 }
 
+                let code = "";
+                if (data?.result) {
+                    try {
+                        const parsed = JSON.parse(data.result);
+                        code = parsed.code || "";
+                    } catch (err) {
+                        console.warn("Erro ao parsear result:", err);
+                    }
+                }
                 Swal.fire({
                     icon: "success",
                     title: "Aplicação criada!",
-                    text: data.msg || "Aplicação aberta com sucesso.",
+                    html: data.msg
+                        ? `${data.msg}<br><b>${code}</b>`
+                        : `Aplicação aberta com sucesso.<br><b>${code}</b>`,
                     confirmButtonText: "OK"
                 }).then(() => {
                     window.location.href = document.referrer;
