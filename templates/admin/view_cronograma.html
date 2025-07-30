@@ -1,0 +1,169 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+{% load formatar_numero %}
+
+
+{% block content %}
+<style>
+.title-container {
+    display: flex;
+    justify-content: space-between;
+}
+</style>
+
+<div class="title-container">
+    <h3>
+        {% if cultura_nome == "Soja" %}
+        <img src="{% static 'images/icons/soy.png' %}" alt="Soja" style="width: 40px; height: 40px; vertical-align: middle;" />
+        {% elif cultura_nome == "Feijão" %}
+        <img src="{% static 'images/icons/beans2.png' %}" alt="Feijão" style="width: 40px; height: 40px; vertical-align: middle;" />
+        {% elif cultura_nome == "Arroz" %}
+        <img src="{% static 'images/icons/rice.png' %}" alt="Arroz" style="width: 40px; height: 40px; vertical-align: middle;" />
+        {% else %}
+        {% endif %}
+        {{ title }}
+    </h3>
+    <h5>
+        {{variedade_nome}}
+    </h5>
+</div>
+<a class="button" href="../../">⬅ Voltar</a>
+
+<style>
+    .estagio-card {
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        padding: 15px;
+        background-color: #f9f9f9;
+    }
+
+    .estagio-header {
+        font-weight: bold;
+        font-size: 18px;
+        margin-bottom: 5px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .badge {
+        background-color: #2e7d32;
+        color: white;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 12px;
+    }
+
+    .badge-yellow {
+        background-color: #fbc02d;
+        color: #333;
+    }
+
+    table.produtos {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+    }
+
+    table.produtos th,
+    table.produtos td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        font-size: 14px;
+    }
+
+    table.produtos th {
+        background-color: #efefef;
+    }
+
+    .toggle-button {
+        font-size: 13px;
+        padding: 3px 8px;
+        background-color: #0073aa;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+    .toggle-button:hover {
+        background-color: #005f8a;
+    }
+
+    .produtos-container {
+        display: none;
+    }
+    .header-container{
+        display: flex;
+        justify-content: space-between;
+    }
+</style>
+
+<script>
+    function toggleProdutos(id) {
+        const container = document.getElementById('produtos-' + id);
+        const btn = document.getElementById('btn-' + id);
+        const isVisible = container.style.display === 'block';
+        container.style.display = isVisible ? 'none' : 'block';
+        btn.textContent = isVisible ? '👁 Ver produtos' : '❌ Ocultar produtos';
+    }
+</script>
+
+{% for etapa in cronograma %}
+{% if etapa.estagio %}
+<div class="estagio-card">
+    <div class="estagio-header">
+        <div>
+            {{ etapa.estagio }}
+            {% if etapa.aplicado %}
+                <span class="badge">Aplicado</span>
+            {% else %}
+                <span class="badge badge-yellow">Em aberto</span>
+            {% endif %}
+        </div>
+        <button class="toggle-button" onclick="toggleProdutos({{ forloop.counter }})" id="btn-{{ forloop.counter }}">
+            👁 Ver produtos
+        </button>
+    </div>
+
+    <div class="header-container">
+        <div>
+            <strong>DAP:</strong> {{ etapa.dap }}
+        </div>
+        <div>
+            <strong>Data Prevista:</strong> {{ etapa.data_prevista|formatar_data_brasileira }}
+        </div>
+    </div>
+
+    <div class="produtos-container" id="produtos-{{ forloop.counter }}">
+        <table class="produtos">
+            <thead>
+                <tr>
+                    <th>Produto</th>
+                    <th>Tipo</th>
+                    <th>Dose</th>
+                    <th>Formulação</th>
+                    <th>Qtd. Aplicar</th>
+                    <th>ID Farmbox</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in etapa.produtos %}
+                <tr>
+                    <td>{{ p.produto }}</td>
+                    <td>{{ p.tipo }}</td>
+                    <td>{{ p.dose }}</td>
+                    <td>{{ p.formulacao }}</td>
+                    <td>{{ p.quantidade_aplicar }}</td>
+                    <td>{{ p.id_farmbox }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endfor %}
+
+{% endblock %}

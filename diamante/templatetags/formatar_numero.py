@@ -1,4 +1,6 @@
 from django import template
+from datetime import datetime
+
 
 register = template.Library()
 
@@ -17,3 +19,17 @@ def formatar_numero_br(value, decimal_places=2):
     numero_formatado = f"{inteiro_formatado},{decimal}"
     print('numero formatado: ', numero_formatado)
     return numero_formatado
+
+@register.filter
+def formatar_data_brasileira(data_str):
+    """
+    Recebe uma string no formato ISO 'YYYY-MM-DD' e retorna no formato brasileiro 'DD/MM/YYYY'.
+    Se a entrada for None ou inválida, retorna uma string vazia.
+    """
+    if not data_str:
+        return ""
+    try:
+        data_obj = datetime.strptime(data_str, "%Y-%m-%d")
+        return data_obj.strftime("%d/%m/%Y")
+    except ValueError:
+        return ""
