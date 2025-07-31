@@ -258,10 +258,10 @@ document.addEventListener('DOMContentLoaded', function () {
         const payload = {
             date: new Date().toISOString().slice(0, 10),
             end_date: new Date(Date.now() + 6 * 86400000).toISOString().slice(0, 10),
-            harvest_id: parseInt(appData.dataset.harvestId),
-            farm_id: parseInt(appData.dataset.farmId),
-            responsible_id: parseInt(appData.dataset.responseId),
-            charge_id: parseInt(appData.dataset.chargeId),
+            harvest_id: parseInt(String(appData.dataset.harvestId).replace('.', '')),
+            farm_id: parseInt(String(appData.dataset.farmId).replace('.', '')),
+            responsible_id: parseInt(String(appData.dataset.responseId).replace('.', '')),
+            charge_id: parseInt(String(appData.dataset.chargeId).replace('.', '')),
             plantations: plantations,
             inputs: inputs,
             observations: "Aplicação Aberta via Django-Admin"
@@ -280,6 +280,7 @@ document.addEventListener('DOMContentLoaded', function () {
             .then(async response => {
                 const data = await response.json();
                 if (!response.ok) {
+                    console.log('data error: ', data)
                     throw new Error(data?.msg || "Erro desconhecido ao enviar aplicação.");
                 }
 
@@ -297,7 +298,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     title: "Aplicação criada!",
                     html: data.msg
                         ? `${data.msg}<br><b>${code}</b>`
-                        : `Aplicação aberta com sucesso.<br><b>${code}</b>`,
+                        : `<b>${code}</b>`,
                     confirmButtonText: "OK"
                 }).then(() => {
                     window.location.href = document.referrer;
