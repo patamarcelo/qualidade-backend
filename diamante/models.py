@@ -1507,3 +1507,10 @@ class BackgroundTaskStatus(Base):
         
     def __str__(self) -> str:
         return f'{self.task_id} - {self.task_name} - {self.status}'
+    
+class EmailAberturaST(Base):
+    email = models.EmailField(unique=True)
+    projetos = models.ManyToManyField("Projeto", related_name="emails_abertura_st")
+
+    def __str__(self):
+        return self.email

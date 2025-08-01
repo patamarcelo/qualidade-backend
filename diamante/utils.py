@@ -28,7 +28,7 @@ from django.core.cache import cache
 from decimal import Decimal
 
 import pandas as pd
-
+from collections import defaultdict
 
 
 # pr_mungo = Programa.objects.all()[2]
@@ -266,18 +266,24 @@ def alter_dap_programa_and_save(query, dap, current_op):
         except Exception as e:
             print("Erro ao Salvar a alteração no programa do  plantio", e)
 
+
 def invalidate_plantio_cache(safra, ciclo):
     cache_key = f"get_plantio_operacoes_detail_json_program_qs_plantio_{safra}_{ciclo}"
-    print('invalidando o cache', cache_key)
-    cache_key_qs_plantio_get_plantio_operacoes_detail = f"get_plantio_operacoes_detail_qs_plantio_{safra}_{ciclo}"
+    print("invalidando o cache", cache_key)
+    cache_key_qs_plantio_get_plantio_operacoes_detail = (
+        f"get_plantio_operacoes_detail_qs_plantio_{safra}_{ciclo}"
+    )
     cache_key_qs_plantio_map = f"get_plantio_map_{safra}_{ciclo}"
-    cache_key_web = f"get_plantio_operacoes_detail_json_program_qs_plantio_web_{safra}_{ciclo}"
+    cache_key_web = (
+        f"get_plantio_operacoes_detail_json_program_qs_plantio_web_{safra}_{ciclo}"
+    )
 
     cache.delete(cache_key)
     cache.delete(cache_key_web)
     cache.delete(cache_key_qs_plantio_get_plantio_operacoes_detail)
     cache.delete(cache_key_qs_plantio_map)
-    
+
+
 def admin_form_alter_programa_and_save(
     query,
     operation,
@@ -290,8 +296,9 @@ def admin_form_alter_programa_and_save(
     start_time = time.time()
     print(f"Start time: {start_time}")
     from diamante.models import Plantio
+
     updated_objects = []
-    
+
     fetch_time = time.time()
     print(f"Time after fetching objects: {fetch_time - start_time} seconds")
     for i in query:
@@ -318,7 +325,9 @@ def admin_form_alter_programa_and_save(
                     # i.save()
                     print(f"Alteração de programa salva com sucesso: {i}")
                 update_time = time.time()
-                print(f"Time to update cronograma_programa: {update_time - get_index_time} seconds")
+                print(
+                    f"Time to update cronograma_programa: {update_time - get_index_time} seconds"
+                )
             else:
                 operation_to_add = {
                     "dap": newDap,
@@ -336,15 +345,17 @@ def admin_form_alter_programa_and_save(
                 print(f"Estágio incluído com sucesso: {i}")
         except Exception as e:
             print("Erro ao Salvar a alteração no programa do  plantio", e)
-    
+
     if updated_objects:
-        print('atualizando Banco de Dados')
+        print("atualizando Banco de Dados")
         bulk_update_start_time = time.time()
         with transaction.atomic():
-            Plantio.objects.bulk_update(updated_objects, ['cronograma_programa'])
-        print('atualizando Banco de Dados: Finalizado')
+            Plantio.objects.bulk_update(updated_objects, ["cronograma_programa"])
+        print("atualizando Banco de Dados: Finalizado")
         bulk_update_time = time.time()
-        print(f"Time for bulk update: {bulk_update_time - bulk_update_start_time} seconds")
+        print(
+            f"Time for bulk update: {bulk_update_time - bulk_update_start_time} seconds"
+        )
 
         # Usando safra e ciclo do primeiro objeto atualizado (assumindo que todos são do mesmo safra/ciclo)
         safra = updated_objects[0].safra.safra
@@ -401,7 +412,7 @@ def duplicate_existing_operations_program(old_program, new_program, operacao_mod
 
 
 def duplicate_existing_operations_program_and_applications(
-    old_program, new_program, operacao_model, aplicacao_model, keep_price = False
+    old_program, new_program, operacao_model, aplicacao_model, keep_price=False
 ):
 
     # THIS TRY BLOCK NOT TESTED YET
@@ -428,7 +439,7 @@ def duplicate_existing_operations_program_and_applications(
                     new_op.operacao = op
                     new_op.operacao.programa = new_program
                     if keep_price == False:
-                        print('nao deve manter os preços antigos')
+                        print("nao deve manter os preços antigos")
                         new_op.preco = None
                         new_op.valor_final = 0
                         new_op.valor_aplicacao = 0
@@ -667,14 +678,24 @@ dictFarm = [
     {"id": 11940, "name": "Fazenda Tuiuiu", "fazenda": "Diamante", "protId": "0202"},
     {"id": 11941, "name": "Fazenda Cervo", "fazenda": "Diamante", "protId": "0202"},
     {"id": 11942, "name": "Fazenda Lago Verde", "fazenda": "Lago Verde", "protId": ""},
-    {"id": 11943, "name": "Fazenda Praia Alta", "fazenda": "Diamante", "protId": "0202"},
+    {
+        "id": 11943,
+        "name": "Fazenda Praia Alta",
+        "fazenda": "Diamante",
+        "protId": "0202",
+    },
     {
         "id": 11944,
         "name": "Fazenda Campo Guapo",
         "fazenda": "Campo Guapo",
         "protId": "0208",
     },
-    {"id": 11945, "name": "Fazenda Cacique", "fazenda": "Campo Guapo", "protId": "0208"},
+    {
+        "id": 11945,
+        "name": "Fazenda Cacique",
+        "fazenda": "Campo Guapo",
+        "protId": "0208",
+    },
     {
         "id": 11946,
         "name": "Fazenda Benção de Deus",
@@ -694,11 +715,13 @@ dictFarm = [
 
 # FOR FARMBOX API INTEGRATION
 
-def get_date(days_before):
-        today = datetime.datetime.now() - datetime.timedelta(days=days_before)
 
-        format_date = datetime.datetime.strftime(today, "%Y-%m-%d %H:%M")
-        return format_date
+def get_date(days_before):
+    today = datetime.datetime.now() - datetime.timedelta(days=days_before)
+
+    format_date = datetime.datetime.strftime(today, "%Y-%m-%d %H:%M")
+    return format_date
+
 
 def get_miliseconds(date_from):
     # dt_obj = datetime.strptime("18.04.2023", "%d.%m.%Y %H:%M:%S,%f")
@@ -708,13 +731,11 @@ def get_miliseconds(date_from):
     return millisec
 
 
-
-
 class Spinner:
     def __init__(self, message="Processing"):
         self.message = message
         self.done = False
-        self.spinner_cycle = ['-', '\\', '|', '/']
+        self.spinner_cycle = ["-", "\\", "|", "/"]
 
     def spinner_task(self):
         while not self.done:
@@ -735,42 +756,52 @@ class Spinner:
         sys.stdout.flush()
 
 
-
-
 def is_older_than_7_days(date_string):
-        # Define the date format to match the input date string
-        date_format = '%Y-%m-%d'
-        
-        # Convert the date string to a datetime object
-        input_date = datetime.datetime.strptime(date_string, date_format)
-        
-        # Calculate the date 30 days ago from today
-        thirty_days_ago = datetime.datetime.today() - datetime.timedelta(days=7)
-        
-        # Check if the input date is older than 30 days ago
-        return input_date > thirty_days_ago
-    
-    
+    # Define the date format to match the input date string
+    date_format = "%Y-%m-%d"
+
+    # Convert the date string to a datetime object
+    input_date = datetime.datetime.strptime(date_string, date_format)
+
+    # Calculate the date 30 days ago from today
+    thirty_days_ago = datetime.datetime.today() - datetime.timedelta(days=7)
+
+    # Check if the input date is older than 30 days ago
+    return input_date > thirty_days_ago
+
+
 def load_localization_data():
     from .models import Plantio
+
     """
     Loads and returns the localization.json data as a list of objects.
     """
-    file_path = Path(__file__).resolve().parent / 'utils/localization-1.json'
+    file_path = Path(__file__).resolve().parent / "utils/localization-1.json"
 
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             data = json.load(f)
             updated = 0
             for item in data:
                 id_farmbox = item.get("ID FarmBox")
                 date_str = item.get("prev_plantio")  # Adjust key name if different
-                fazenda = item.get('Projeto')
-                parcela = item.get('Talhao')
-                if fazenda == 'Projeto Benção de Deus':
+                fazenda = item.get("Projeto")
+                parcela = item.get("Talhao")
+                if fazenda == "Projeto Benção de Deus":
                     if date_str:
-                        format_date = datetime.datetime.strptime(date_str, "%m/%d/%y").date()
-                        print('Fazenda: ', fazenda, 'Talhão: ', parcela, 'Prev Plantio: ', format_date, 'idFarm: ', id_farmbox)
+                        format_date = datetime.datetime.strptime(
+                            date_str, "%m/%d/%y"
+                        ).date()
+                        print(
+                            "Fazenda: ",
+                            fazenda,
+                            "Talhão: ",
+                            parcela,
+                            "Prev Plantio: ",
+                            format_date,
+                            "idFarm: ",
+                            id_farmbox,
+                        )
                         try:
                             plantio = Plantio.objects.get(id_farmbox=id_farmbox)
                             plantio.data_prevista_plantio = format_date
@@ -786,33 +817,40 @@ def load_localization_data():
         print(f"Error loading localization data: {e}")
         return []
 
+
 def save_program_cost():
     from .models import Aplicacao
-    pr_arroz = Aplicacao.objects.filter(operacao__programa__safra__safra="2025/2026",operacao__programa__ciclo__ciclo="3").filter(Q(preco__isnull=True) | Q(preco=0))
-    print('arroz total: ', len(pr_arroz))
-    print('prArroz: ', pr_arroz[0])
-    file_path = Path(__file__).resolve().parent / 'utils/custos-programas.json'
-    with open(file_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            updated = 0
-            for item in data:
-                defensivo = item.get('Defensivo')
-                preco = item.get('Preço')
-                moeda = item.get('Moeda')
-                print('Defensivo: ', defensivo, 'Preço :', preco, 'Moeda: ', moeda)
-                
-def save_program_cost():
-    from .models import Aplicacao, MoedaChoices
+
     pr_arroz = Aplicacao.objects.filter(
         operacao__programa__safra__safra="2025/2026",
-        operacao__programa__ciclo__ciclo="3"
+        operacao__programa__ciclo__ciclo="3",
+    ).filter(Q(preco__isnull=True) | Q(preco=0))
+    print("arroz total: ", len(pr_arroz))
+    print("prArroz: ", pr_arroz[0])
+    file_path = Path(__file__).resolve().parent / "utils/custos-programas.json"
+    with open(file_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+        updated = 0
+        for item in data:
+            defensivo = item.get("Defensivo")
+            preco = item.get("Preço")
+            moeda = item.get("Moeda")
+            print("Defensivo: ", defensivo, "Preço :", preco, "Moeda: ", moeda)
+
+
+def save_program_cost():
+    from .models import Aplicacao, MoedaChoices
+
+    pr_arroz = Aplicacao.objects.filter(
+        operacao__programa__safra__safra="2025/2026",
+        operacao__programa__ciclo__ciclo="3",
     ).filter(Q(preco__isnull=True) | Q(preco=0))
 
-    print('Total de aplicações sem preço:', pr_arroz.count())
+    print("Total de aplicações sem preço:", pr_arroz.count())
 
-    file_path = Path(__file__).resolve().parent / 'utils/custos-programas.json'
+    file_path = Path(__file__).resolve().parent / "utils/custos-programas.json"
 
-    with open(file_path, 'r', encoding='utf-8') as f:
+    with open(file_path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
     updated = 0
@@ -843,18 +881,21 @@ def save_program_cost():
                 app.moeda = moeda
                 app.save()
                 updated += 1
-                print(f"✅ Atualizado: {app.defensivo} → Preço: {preco} | Moeda: {moeda}")
+                print(
+                    f"✅ Atualizado: {app.defensivo} → Preço: {preco} | Moeda: {moeda}"
+                )
         else:
             print(f"⚠️ Não encontrado: '{nome_defensivo}' entre as aplicações sem preço")
 
     print(f"✅ Total atualizados: {updated}")
-    
-    
-    
+
 
 def atualizar_datas_previstas_plantio():
     from .models import Plantio
-    caminho_arquivo_excel = os.path.join(os.path.dirname(__file__), "utils", "datas_plantio-2.xlsx")
+
+    caminho_arquivo_excel = os.path.join(
+        os.path.dirname(__file__), "utils", "datas_plantio-2.xlsx"
+    )
 
     """
     Atualiza o campo data_prevista_plantio do modelo Plantio
@@ -864,13 +905,16 @@ def atualizar_datas_previstas_plantio():
         df = pd.read_excel(caminho_arquivo_excel, sheet_name="Plantio")
 
         # Remove nulos, converte para inteiro (para remover o .0) e depois para string
-        df["ID FarmBox"] = df["ID FarmBox"].apply(lambda x: str(int(x)).strip() if pd.notna(x) else None)
+        df["ID FarmBox"] = df["ID FarmBox"].apply(
+            lambda x: str(int(x)).strip() if pd.notna(x) else None
+        )
 
         # Coleta os IDs únicos válidos
         ids_farmbox = df["ID FarmBox"].dropna().unique().tolist()
         # Filtra apenas os Plantios necessários
         plantios_dict = {
-            str(p.id_farmbox).strip(): p for p in Plantio.objects.filter(id_farmbox__in=ids_farmbox)
+            str(p.id_farmbox).strip(): p
+            for p in Plantio.objects.filter(id_farmbox__in=ids_farmbox)
         }
 
         atualizados = 0
@@ -881,8 +925,8 @@ def atualizar_datas_previstas_plantio():
         for _, row in df.iterrows():
             id_farmbox = str(row.get("ID FarmBox", "")).strip()
             data_prevista = row.get("Data Prevista Plantio")
-            print('data prevista: ', data_prevista)
-            print('id Farmbox: ', id_farmbox)
+            print("data prevista: ", data_prevista)
+            print("id Farmbox: ", id_farmbox)
 
             if pd.isna(id_farmbox) or pd.isna(data_prevista):
                 continue
@@ -890,7 +934,9 @@ def atualizar_datas_previstas_plantio():
             try:
                 # Converte a data se necessário
                 if isinstance(data_prevista, str):
-                    data_formatada = datetime.datetime.strptime(data_prevista, "%d/%m/%Y").date()
+                    data_formatada = datetime.datetime.strptime(
+                        data_prevista, "%d/%m/%Y"
+                    ).date()
                 elif isinstance(data_prevista, datetime.datetime):
                     data_formatada = data_prevista.date()
                 else:
@@ -900,7 +946,7 @@ def atualizar_datas_previstas_plantio():
 
             plantio = plantios_dict.get(id_farmbox)
             if plantio:
-                print('✅ plantio encontrado e data formatada: ', data_formatada)
+                print("✅ plantio encontrado e data formatada: ", data_formatada)
                 plantio.data_prevista_plantio = data_formatada
                 objetos_para_salvar.append(plantio)
                 atualizados += 1
@@ -909,7 +955,9 @@ def atualizar_datas_previstas_plantio():
 
         with transaction.atomic():
             if objetos_para_salvar:
-                Plantio.objects.bulk_update(objetos_para_salvar, ["data_prevista_plantio"])
+                Plantio.objects.bulk_update(
+                    objetos_para_salvar, ["data_prevista_plantio"]
+                )
 
         print(f"✅ {atualizados} registros atualizados com sucesso.")
         if nao_encontrados:
@@ -917,10 +965,11 @@ def atualizar_datas_previstas_plantio():
 
     except Exception as e:
         print(f"❌ Erro ao atualizar dados: {str(e)}")
-        
-        
+
+
 def set_variety_plantations():
     from .models import Plantio, Variedade
+
     data_limite = datetime.date(2025, 11, 4)
 
     # Filtro principal
@@ -929,7 +978,7 @@ def set_variety_plantations():
         ciclo__ciclo="3",
         variedade__cultura__cultura="Arroz",
         data_prevista_plantio__isnull=False,
-        id_farmbox__isnull=False
+        id_farmbox__isnull=False,
     )
 
     # Variedades alvo
@@ -947,7 +996,7 @@ def set_variety_plantations():
         # Monta payload para a API
         payload = {
             "planned_variety_id": nova_variedade.id_farmbox,
-            "planned_date": data.strftime("%Y-%m-%d")
+            "planned_date": data.strftime("%Y-%m-%d"),
         }
 
         # Envia PUT para Farmbox
@@ -959,7 +1008,115 @@ def set_variety_plantations():
 
         try:
             response = requests.put(url, data=json.dumps(payload), headers=headers)
-            print(f"✅ Plantio {plantio} (Farmbox ID: {plantio.id_farmbox}) atualizado para variedade {nova_variedade.variedade} - {nova_variedade.id_farmbox}")
+            print(
+                f"✅ Plantio {plantio} (Farmbox ID: {plantio.id_farmbox}) atualizado para variedade {nova_variedade.variedade} - {nova_variedade.id_farmbox}"
+            )
             print(f"   ▶️ Status {response.status_code}: {response.text}")
         except Exception as e:
             print(f"❌ Erro ao atualizar plantio {plantio}: {e}")
+
+
+emails_list_by_farm = [
+    {
+        "projetos": ["Fazenda Benção de Deus"],
+        "emails_abertura_st": [
+            "matheus.silva@diamanteagricola.com.br",
+            "gisely.alencar@diamanteagricola.com.br",
+            "juliana.silva@diamanteagricola.com.br",
+        ],
+    },
+    {
+        "projetos": ["Fazenda Cacique", "Fazenda Campo Guapo", "Fazenda Safira"],
+        "emails_abertura_st": [
+            "Willian.junior@diamanteagricola.com.br",
+            "joao.neto@diamanteagricola.com.br",
+        ],
+    },
+    {
+        "projetos": [
+            "Fazenda Capivara",
+            "Fazenda Cervo",
+            "Fazenda Jacaré",
+            "Fazenda Tucano",
+            "Fazenda Tuiuiu",
+        ],
+        "emails_abertura_st": [
+            "lara.rodrigues@diamanteagricola.com.br",
+            "jordana.souza@diamanteagricola.com.br",
+        ],
+    },
+    {
+        "projetos": [
+            "Fazenda Lago Verde",
+            "Fazenda Fazendinha",
+            "Fazenda Santa Maria",
+        ],
+        "emails_abertura_st": [
+            "marcelo.pata@diamanteagricola.com.br",
+            "juliana.silva@diamanteagricola.com.br",
+            "gisely.alencar@diamanteagricola.com.br",
+        ],
+    },
+]
+
+
+
+def create_emails():
+    from .models import Projeto, EmailAberturaST
+
+    for entry in emails_list_by_farm:
+        for nome_projeto in entry["projetos"]:
+            # Ajuste de nome conforme regra antiga
+            new_name = nome_projeto.replace("Fazenda", "Projeto").replace(
+                "Cacique", "Cacíque"
+            )
+            print("new Name", new_name)
+            try:
+                projeto = Projeto.objects.get(nome=new_name)
+            except Projeto.DoesNotExist:
+                print(f"[ERRO] Projeto não encontrado: {new_name}")
+                continue
+
+            for email in entry["emails_abertura_st"]:
+                email_obj, created = EmailAberturaST.objects.get_or_create(email=email)
+                email_obj.projetos.add(projeto)  # associa o projeto ao email
+
+
+def gerar_emails_list_by_farm():
+    from .models import EmailAberturaST
+
+    emails_dict = defaultdict(list)
+
+    emails = EmailAberturaST.objects.prefetch_related("projetos").all()
+
+    for email_obj in emails:
+        projetos_nomes = sorted(
+            [
+                p.nome.replace("Projeto", "Fazenda").replace("Cacíque", "Cacique")
+                for p in email_obj.projetos.all()
+            ]
+        )
+        projetos_key = tuple(projetos_nomes)
+        emails_dict[projetos_key].append(email_obj.email)
+
+    emails_list_by_farm = []
+    for projetos_key, emails in emails_dict.items():
+        emails_list_by_farm.append(
+            {
+                "projetos": list(projetos_key),
+                "emails_abertura_st": sorted(emails),
+            }
+        )
+
+    return emails_list_by_farm
+
+
+def get_emails_por_projeto(projeto):
+    dados = gerar_emails_list_by_farm()
+    emails = set()
+
+    for item in dados:
+        if projeto in item["projetos"]:
+            emails.update(item["emails_abertura_st"])
+
+    return sorted(list(emails))

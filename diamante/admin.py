@@ -500,9 +500,13 @@ class FazendaAdmin(admin.ModelAdmin):
 
     get_plantio_dia.short_description = "Plantio / Dia"
 
+class EmailInline(admin.TabularInline):
+    model = EmailAberturaST.projetos.through
+    extra = 1
 
 @admin.register(Projeto)
 class ProjetoAdmin(admin.ModelAdmin):
+    inlines = [EmailInline]
     def get_queryset(self, request):
         return (
             super(ProjetoAdmin, self)
@@ -3634,3 +3638,20 @@ class BackgroundTaskStatusAdmin(admin.ModelAdmin):
             return obj.criados.strftime('%d/%m/%Y %H:%M:%S')
         return "-"
     formated_created.short_description = "Data"
+    
+    
+
+@admin.register(EmailAberturaST)
+class EmailAberturaSTAdmin(admin.ModelAdmin):
+    list_display = ["email", "get_projetos"]
+    filter_horizontal = ["projetos"]
+
+    def get_projetos(self, obj):
+        return ", ".join([p.nome.replace('Projeto ', '') for p in obj.projetos.all()])
+
+    get_projetos.short_description = "Projetos"
+    
+    
+    
+    
+# list_display = ("criados", "projeto", "email", 'ativo')

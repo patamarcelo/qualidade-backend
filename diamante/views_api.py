@@ -53,6 +53,7 @@ from .utils import (
     get_miliseconds,
     Spinner,
     is_older_than_7_days,
+    get_emails_por_projeto
 )
 
 from qualidade_project.mongo_api import generate_file_run
@@ -5813,54 +5814,54 @@ class StViewSet(viewsets.ModelViewSet):
     authentication_classes = (CachedTokenAuthentication,)
     permission_classes = (IsAuthenticated,)
 
-    emails_list_by_farm = [
-        {
-            "projetos": ["Fazenda Benção de Deus"],
-            "emails_abertura_st": [
-                "matheus.silva@diamanteagricola.com.br",
-                "gisely.alencar@diamanteagricola.com.br",
-                "juliana.silva@diamanteagricola.com.br"
-            ],
-        },
-        {
-            "projetos": ["Fazenda Cacique", "Fazenda Campo Guapo", "Fazenda Safira"],
-            "emails_abertura_st": [
-                "Willian.junior@diamanteagricola.com.br",
-                "joao.neto@diamanteagricola.com.br"
-                ],
-        },
-        {
-            "projetos": [
-                "Fazenda Capivara",
-                "Fazenda Cervo",
-                "Fazenda Jacaré",
-                "Fazenda Tucano",
-                "Fazenda Tuiuiu",
-            ],
-            "emails_abertura_st": [
-                "lara.rodrigues@diamanteagricola.com.br",
-                "jordana.souza@diamanteagricola.com.br"
-            ],
-        },
-        {
-            "projetos": [
-                "Fazenda Lago Verde",
-                "Fazenda Fazendinha",
-                "Fazenda Santa Maria",
-            ],
-            "emails_abertura_st": [
-                "marcelo.pata@diamanteagricola.com.br",
-                "juliana.silva@diamanteagricola.com.br",
-                "gisely.alencar@diamanteagricola.com.br",
-            ],
-        },
-    ]
+    # emails_list_by_farm = [
+    #     {
+    #         "projetos": ["Fazenda Benção de Deus"],
+    #         "emails_abertura_st": [
+    #             "matheus.silva@diamanteagricola.com.br",
+    #             "gisely.alencar@diamanteagricola.com.br",
+    #             "juliana.silva@diamanteagricola.com.br"
+    #         ],
+    #     },
+    #     {
+    #         "projetos": ["Fazenda Cacique", "Fazenda Campo Guapo", "Fazenda Safira"],
+    #         "emails_abertura_st": [
+    #             "Willian.junior@diamanteagricola.com.br",
+    #             "joao.neto@diamanteagricola.com.br"
+    #             ],
+    #     },
+    #     {
+    #         "projetos": [
+    #             "Fazenda Capivara",
+    #             "Fazenda Cervo",
+    #             "Fazenda Jacaré",
+    #             "Fazenda Tucano",
+    #             "Fazenda Tuiuiu",
+    #         ],
+    #         "emails_abertura_st": [
+    #             "lara.rodrigues@diamanteagricola.com.br",
+    #             "jordana.souza@diamanteagricola.com.br"
+    #         ],
+    #     },
+    #     {
+    #         "projetos": [
+    #             "Fazenda Lago Verde",
+    #             "Fazenda Fazendinha",
+    #             "Fazenda Santa Maria",
+    #         ],
+    #         "emails_abertura_st": [
+    #             "marcelo.pata@diamanteagricola.com.br",
+    #             "juliana.silva@diamanteagricola.com.br",
+    #             "gisely.alencar@diamanteagricola.com.br",
+    #         ],
+    #     },
+    # ]
 
-    def find_emails_by_farm(self, farm, emails_list_by_farm):
-        for entry in emails_list_by_farm:
-            if farm in entry["projetos"]:
-                return entry["emails_abertura_st"]
-        return None  # Return None if the farm is not found
+    # def find_emails_by_farm(self, farm, emails_list_by_farm):
+    #     for entry in emails_list_by_farm:
+    #         if farm in entry["projetos"]:
+    #             return entry["emails_abertura_st"]
+    #     return None  # Return None if the farm is not found
     
     
     def save_st_from_protheus(self,st_number_protheus, projetos, req_data):
@@ -5914,7 +5915,7 @@ class StViewSet(viewsets.ModelViewSet):
                 projetos = req_data.get("Projeto")
                 if projetos:
                     if generate_pre_st:
-                        list_emails = self.find_emails_by_farm(projetos[0], self.emails_list_by_farm)
+                        list_emails = get_emails_por_projeto(projetos[0])
                     else:
                         list_emails = ["mtpata@icloud.com"]
                 print('\n')
