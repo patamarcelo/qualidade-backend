@@ -5839,7 +5839,7 @@ class StViewSet(viewsets.ModelViewSet):
             ],
             "emails_abertura_st": [
                 "lara.rodrigues@diamanteagricola.com.br",
-                "jardel.mota@diamanteagricola.com.br"
+                "jordana.souza@diamanteagricola.com.br"
             ],
         },
         {

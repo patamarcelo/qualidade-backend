@@ -917,3 +917,49 @@ def atualizar_datas_previstas_plantio():
 
     except Exception as e:
         print(f"❌ Erro ao atualizar dados: {str(e)}")
+        
+        
+def set_variety_plantations():
+    from .models import Plantio, Variedade
+    data_limite = datetime.date(2025, 11, 4)
+
+    # Filtro principal
+    plantios = Plantio.objects.filter(
+        safra__safra="2025/2026",
+        ciclo__ciclo="3",
+        variedade__cultura__cultura="Arroz",
+        data_prevista_plantio__isnull=False,
+        id_farmbox__isnull=False
+    )
+
+    # Variedades alvo
+    variedade_antes = Variedade.objects.get(id=61)
+    variedade_depois = Variedade.objects.get(id=62)
+
+    for plantio in plantios:
+        data = plantio.data_prevista_plantio
+        nova_variedade = variedade_antes if data < data_limite else variedade_depois
+
+        # Atualiza o campo no banco
+        plantio.variedade = nova_variedade
+        plantio.save(update_fields=["variedade"])
+
+        # Monta payload para a API
+        payload = {
+            "planned_variety_id": nova_variedade.id_farmbox,
+            "planned_date": data.strftime("%Y-%m-%d")
+        }
+
+        # Envia PUT para Farmbox
+        url = f"https://farmbox.cc/api/v1/plantations/{plantio.id_farmbox}"
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": FARMBOX_ID,
+        }
+
+        try:
+            response = requests.put(url, data=json.dumps(payload), headers=headers)
+            print(f"✅ Plantio {plantio} (Farmbox ID: {plantio.id_farmbox}) atualizado para variedade {nova_variedade.variedade} - {nova_variedade.id_farmbox}")
+            print(f"   ▶️ Status {response.status_code}: {response.text}")
+        except Exception as e:
+            print(f"❌ Erro ao atualizar plantio {plantio}: {e}")
