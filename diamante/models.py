@@ -681,6 +681,7 @@ class Plantio(Base):
                     prazo = i.prazo_dap if i.prazo_dap is not None else 0
                     etapa = {
                         "Estagio": i.estagio,
+                        "estagio_id": i.pk,
                         "dap": i.prazo_dap,
                         "Data Prevista": data_plantio + datetime.timedelta(days=prazo),
                         "produtos": produtos,
@@ -728,6 +729,7 @@ class Plantio(Base):
                 if data_plantio:
                     etapa = {
                         "Estagio": i.estagio,
+                        "estagio_id": i.pk,
                         "dap": i.prazo_dap,
                         "Data Prevista": data_plantio
                         + datetime.timedelta(days=i.prazo_dap),
@@ -787,6 +789,7 @@ class Plantio(Base):
                     )
                     etapa = {
                         "estagio": i.estagio,
+                        "estagio_id": i.pk,
                         "aplicado": True if i.prazo_dap <= 0 else False,
                         "dap": i.prazo_dap,
                         "enviado_farmbox": False,

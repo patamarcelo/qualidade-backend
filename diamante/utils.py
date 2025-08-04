@@ -233,6 +233,11 @@ def get_index_dict_estagio(lista_programa, find_estagio):
             i
             for i, d in enumerate(lista_programa)
             if "estagio" in d and d["estagio"] == find_estagio
+            # if (
+            #     ("estagio_id" in d and d["estagio_id"] == find_estagio)  # busca por ID
+            #     or
+            #     ("estagio" in d and d["estagio"] == find_estagio)        # fallback por nome
+            # )
         ),
         None,
     )
