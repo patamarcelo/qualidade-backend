@@ -1084,9 +1084,26 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                         field_to_update.map_geo_points = map_geo_points_farm
                                     field_to_update.save()
                                     
+                            except IndexError as e:
+                                print(f"{Fore.RED}❌ IndexError: {e}{Style.RESET_ALL}: Trying to save this now...")
+                                with transaction.atomic():
+                                    novo_plantio = Plantio(
+                                        safra=safra,
+                                        ciclo=ciclo,
+                                        talhao=talhao_id,
+                                        variedade=id_variedade if cultura_planejada else None,
+                                        area_colheita=area,
+                                        map_centro_id=map_centro_id_farm,
+                                        map_geo_points=map_geo_points_farm,
+                                        id_farmbox=id_plantio_farmbox,
+                                        area_planejamento_plantio=area_planejamento if cultura_planejada else None,
+                                    )
+                                    novo_plantio.save()
+                                    print(f"✅ Plantio salvo: {novo_plantio} \n")
+                                
                             except Exception as e:
                                 print(
-                                    f"{Fore.RED}Problema em salvar o plantio Não Planejado: {talhao_id} - {safra} - {ciclo}{Style.RESET_ALL}{e}"
+                                    f"{Fore.RED}❌ Problema em salvar o plantio Não Planejado: {talhao_id} - {safra} - {ciclo}{Style.RESET_ALL}{e}"
                                 )
                 else:
                     print('dev mode')
@@ -4586,6 +4603,10 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "id_farmbox",
                     "map_geo_points",
                     "map_centro_id",
+                    "variedade__nome_fantasia",
+                    "variedade__cultura__cultura",
+                    "variedade__cultura__map_color",
+                    "variedade__cultura__map_color_line",
                 )
                 .filter(safra__safra="2025/2026", ciclo__ciclo="1")
             )

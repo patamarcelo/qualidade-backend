@@ -899,7 +899,7 @@ def atualizar_datas_previstas_plantio():
     from .models import Plantio
 
     caminho_arquivo_excel = os.path.join(
-        os.path.dirname(__file__), "utils", "datas_plantio-2.xlsx"
+        os.path.dirname(__file__), "utils", "Eldorado.xlsx"
     )
 
     """
@@ -957,6 +957,28 @@ def atualizar_datas_previstas_plantio():
                 atualizados += 1
             else:
                 nao_encontrados.append(id_farmbox)
+            
+            
+            # Monta payload para a API
+            payload = {
+                "planned_date": data_formatada.strftime("%Y-%m-%d"),
+            }
+
+            # Envia PUT para Farmbox
+            url = f"https://farmbox.cc/api/v1/plantations/{plantio.id_farmbox}"
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": FARMBOX_ID,
+            }
+
+            try:
+                response = requests.put(url, data=json.dumps(payload), headers=headers)
+                print(
+                    f"✅ Plantio {plantio} (Farmbox ID: {plantio.id_farmbox}) atualizado para Data Prevista: {data_formatada}"
+                )
+                print(f"   ▶️ Status {response.status_code}: {response.text}")
+            except Exception as e:
+                print(f"❌ Erro ao atualizar plantio {plantio}: {e}")
 
         with transaction.atomic():
             if objetos_para_salvar:
