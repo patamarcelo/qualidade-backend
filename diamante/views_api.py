@@ -1361,6 +1361,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 "variedade": i["variedade__nome_fantasia"],
                                 "finalizado_colheita": i["finalizado_colheita"],
                                 "id_plantio": i["pk"],
+                                "plantio_descontinuado": i["plantio_descontinuado"],
                             }
                         }
                     )
