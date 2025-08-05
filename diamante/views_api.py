@@ -1317,6 +1317,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         "area_colheita",
                         "area_parcial",
                         "data_plantio",
+                        "plantio_descontinuado"
                     )
                     .order_by("talhao__fazenda__nome", "talhao__id_talhao")
                     .filter(
