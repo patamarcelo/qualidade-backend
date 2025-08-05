@@ -4607,6 +4607,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "variedade__cultura__cultura",
                     "variedade__cultura__map_color",
                     "variedade__cultura__map_color_line",
+                    "plantio_descontinuado",
                 )
                 .filter(safra__safra="2025/2026", ciclo__ciclo="1")
             )
