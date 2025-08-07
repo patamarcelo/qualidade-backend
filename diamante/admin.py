@@ -2002,12 +2002,21 @@ class ColheitaAdmin(admin.ModelAdmin):
                 }
                 request_start = time.time()
                 print('startTime: ', request_start)
-                response = requests.post(
-                    f"{main_path}/diamante/colheita/save_from_protheus/",
-                    headers=headers,
-                    json=data_json,
-                )
-                resp = json.loads(response.text)
+                
+                try:
+                    response = requests.post(
+                        f"{main_path}/diamante/colheita/save_from_protheus/",
+                        headers=headers,
+                        json=data_json,
+                        timeout=30,
+                    )
+                    print("Status code:", response.status_code)
+                    print("Response headers:", response.headers)
+                    print("Response content (first 500 chars):", response.content[:500])
+                    resp = response.json()  # isso pode lançar erro se a resposta não for JSON
+                    print("Parsed JSON response:", resp)
+                except Exception as e:
+                    print("Erro na requisição:", e)
                 request_end = time.time()
                 print(f"Tempo da requisição: {round(request_end - request_start, 2)} segundos")
                 includes = resp["data"]["includes"]
