@@ -102,6 +102,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from types import SimpleNamespace
 
 import time
+from .views_api import save_from_protheus_logic
 
 
 main_path = (
@@ -1995,28 +1996,11 @@ class ColheitaAdmin(admin.ModelAdmin):
             if form.is_valid():
                 data_file = request.FILES["csv_file"]
                 data_json = json.load(data_file)
-
-                headers = {
-                    "Content-Type": "application/json",
-                    "Authorization": f"Token {user_id}",
-                }
                 request_start = time.time()
+                
                 print('startTime: ', request_start)
                 
-                try:
-                    response = requests.post(
-                        f"{main_path}/diamante/colheita/save_from_protheus/",
-                        headers=headers,
-                        json=data_json,
-                        timeout=30,
-                    )
-                    print("Status code:", response.status_code)
-                    print("Response headers:", response.headers)
-                    print("Response content (first 500 chars):", response.content[:500])
-                    resp = response.json()  # isso pode lançar erro se a resposta não for JSON
-                    print("Parsed JSON response:", resp)
-                except Exception as e:
-                    print("Erro na requisição:", e)
+                resp = save_from_protheus_logic(data_json, user_id)
                 request_end = time.time()
                 print(f"Tempo da requisição: {round(request_end - request_start, 2)} segundos")
                 includes = resp["data"]["includes"]

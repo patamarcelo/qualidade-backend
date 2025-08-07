@@ -5223,55 +5223,8 @@ def adjust_percent_parcelas(percent):
         return ""
 
 
-class ColheitaApiSave(viewsets.ModelViewSet):
-    queryset = Colheita.objects.all()
-    serializer_class = ColheitaSerializer
-    authentication_classes = (CachedTokenAuthentication,)
-    permission_classes = (IsAuthenticated,)
-
-    @action(detail=True, methods=["GET"])
-    def get_colheita_detail_react_native(self, request, pk=None):
-        try:
-            # qs = Colheita.objects.filter(plantio__id=pk).select_related("plantio", "deposito").prefetch_related("plantio__variedade", "plantio__talhao")
-            qs = Colheita.objects.filter(plantio__id=pk).values(
-                "data_colheita",
-                "romaneio",
-                "placa",
-                "motorista",
-                "ticket",
-                "peso_tara",
-                "peso_bruto",
-                "umidade",
-                "desconto_umidade",
-                "impureza",
-                "desconto_impureza",
-                "peso_liquido",
-                "peso_scs_liquido",
-                "id_farmtruck",
-            )
-            # serializer = ColheitaResumoSerializer(qs, many=True)
-            response ={
-                "msg": 'Consulta realizada com sucesso!!',
-                "data": qs
-            }
-            return Response(response, status=status.HTTP_201_CREATED)
-        except Exception as e:
-            print("Error here:", e)
-            response = {
-                "msg": "Erro ao pegar os dados",
-                "error": f"Erro ao pegar os dados, Erro: {str(e)}",
-            }
-            return Response(response, status=status.HTTP_208_ALREADY_REPORTED)
-
-    @action(detail=False, methods=["GET", "POST"])
-    def save_from_protheus(self, request):
-        start_time = time.time()
-        print('startTime: ', start_time)
-        user_id = Token.objects.get(user=request.user)
-        try:
-            if request.user.is_authenticated:
-                data_json = request.data
-                # date_file = request.data["plantio"]
+def save_from_protheus_logic(data_json, user_id):
+    # date_file = request.data["plantio"]
                 # data_json = json.load(date_file)
                 # plantio_query = Plantio.objects.all().filter(
                 #     finalizado_plantio=True,
@@ -5650,8 +5603,7 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                         print(f"erro ao enviar os Ids para o servidor: {e}")
                 request_end = time.time()  
                 print(f"Tempo da requisição: {round(request_end - request_start, 2)} segundos")
-                try:
-                    response = {
+                response = {
                         "msg": f"Cadastro das Cargas efetuado com sucesso!!!",
                         # "quantidade": len(serializer.data),
                         "data": {"includes": succes, "notincludes": failed},
@@ -5659,7 +5611,59 @@ class ColheitaApiSave(viewsets.ModelViewSet):
                         "success_load": success_list,
                         # "data": serializer.data,
                     }
-                    return Response(response, status=status.HTTP_200_OK)
+                return response
+class ColheitaApiSave(viewsets.ModelViewSet):
+    queryset = Colheita.objects.all()
+    serializer_class = ColheitaSerializer
+    authentication_classes = (CachedTokenAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    @action(detail=True, methods=["GET"])
+    def get_colheita_detail_react_native(self, request, pk=None):
+        try:
+            # qs = Colheita.objects.filter(plantio__id=pk).select_related("plantio", "deposito").prefetch_related("plantio__variedade", "plantio__talhao")
+            qs = Colheita.objects.filter(plantio__id=pk).values(
+                "data_colheita",
+                "romaneio",
+                "placa",
+                "motorista",
+                "ticket",
+                "peso_tara",
+                "peso_bruto",
+                "umidade",
+                "desconto_umidade",
+                "impureza",
+                "desconto_impureza",
+                "peso_liquido",
+                "peso_scs_liquido",
+                "id_farmtruck",
+            )
+            # serializer = ColheitaResumoSerializer(qs, many=True)
+            response ={
+                "msg": 'Consulta realizada com sucesso!!',
+                "data": qs
+            }
+            return Response(response, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            print("Error here:", e)
+            response = {
+                "msg": "Erro ao pegar os dados",
+                "error": f"Erro ao pegar os dados, Erro: {str(e)}",
+            }
+            return Response(response, status=status.HTTP_208_ALREADY_REPORTED)
+
+    @action(detail=False, methods=["GET", "POST"])
+    def save_from_protheus(self, request):
+        start_time = time.time()
+        print('startTime: ', start_time)
+        user_id = Token.objects.get(user=request.user)
+        try:
+            if request.user.is_authenticated:
+                data_json = request.data
+                result = save_from_protheus_logic(data_json, user_id)
+                try:
+                    
+                    return Response(result, status=status.HTTP_200_OK)
                 except Exception as e:
                     response = {"message": f"Ocorreu um Erro: {e}"}
                     return Response(response, status=status.HTTP_400_BAD_REQUEST)
