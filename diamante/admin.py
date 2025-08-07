@@ -53,6 +53,8 @@ from admin_extra_buttons.api import (
     view,
 )
 from admin_extra_buttons.utils import HttpResponseRedirectToReferrer
+from django.http import HttpResponseRedirect
+
 from django.http import HttpResponse, JsonResponse
 from django.contrib import admin
 from django.views.decorators.clickjacking import xframe_options_sameorigin
@@ -2043,7 +2045,7 @@ class ColheitaAdmin(admin.ModelAdmin):
             total_time = end_time - start_time
             print(f"Tempo total: {total_time:.2f} segundos")
             
-        return HttpResponseRedirectToReferrer(request)
+        return HttpResponseRedirect(request.META.get('HTTP_REFERER', '/admin/'))
 
     # def changelist_view(self, *args, **kwargs):
     #     view = super().changelist_view(*args, **kwargs)
