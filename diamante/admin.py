@@ -99,6 +99,7 @@ from decimal import Decimal, DivisionByZero
 from django.shortcuts import render, redirect, get_object_or_404
 from types import SimpleNamespace
 
+import time
 
 
 main_path = (
@@ -985,7 +986,11 @@ def abrir_aplicacao_farmbox(self, request, queryset):
         'talhao__fazenda__fazenda',  # acessa: p.talhao.fazenda.fazenda
         'variedade__cultura'         # acessa: p.variedade.cultura
     )
-
+    
+    ids_in_order = request.POST.getlist('_selected_action')
+    id_to_obj = {str(obj.pk): obj for obj in queryset}
+    ordered_queryset = [id_to_obj[pk] for pk in ids_in_order if pk in id_to_obj]
+    
     # Token do usuário autenticado
     user_token = Token.objects.get(user=request.user)
 
@@ -999,7 +1004,7 @@ def abrir_aplicacao_farmbox(self, request, queryset):
     total_area = sum(p.area_colheita for p in queryset)
     plantios_data = [
         {"sought_area": float(p.area_colheita), "plantation_id": p.id_farmbox}
-        for p in queryset
+        for p in ordered_queryset
     ]
 
     # Dados do primeiro plantio (todos devem ter os mesmos dados de fazenda/safra nesse contexto)
@@ -1013,7 +1018,7 @@ def abrir_aplicacao_farmbox(self, request, queryset):
     # Contexto para renderização
     context = dict(
         **self.admin_site.each_context(request),
-        plantios=queryset,
+        plantios=ordered_queryset,
         plantios_json=json.dumps(plantios_data),
         projeto_nome=projeto_nome,
         defensivos=defensivos,
@@ -1982,6 +1987,7 @@ class ColheitaAdmin(admin.ModelAdmin):
 
     def upload_csv(self, request):
         if request.method == "POST":
+            start_time = time.time()
             user_id = Token.objects.get(user=request.user)
             form = SomeModelForm(request.POST, request.FILES)
             if form.is_valid():
@@ -1992,12 +1998,16 @@ class ColheitaAdmin(admin.ModelAdmin):
                     "Content-Type": "application/json",
                     "Authorization": f"Token {user_id}",
                 }
+                request_start = time.time()
+                print('startTime: ', request_start)
                 response = requests.post(
                     f"{main_path}/diamante/colheita/save_from_protheus/",
                     headers=headers,
                     json=data_json,
                 )
                 resp = json.loads(response.text)
+                request_end = time.time()
+                print(f"Tempo da requisição: {round(request_end - request_start, 2)} segundos")
                 includes = resp["data"]["includes"]
                 not_includes = resp["data"]["notincludes"]
                 failed_loads = resp["failed_load"]
@@ -2026,7 +2036,13 @@ class ColheitaAdmin(admin.ModelAdmin):
                     messages.add_message(request, messages.WARNING, msg)
                     for failed in failed_format:
                         messages.add_message(request, messages.ERROR, mark_safe(failed))
+            # Fim da contagem de tempo
+            end_time = time.time()
 
+            # Tempo total em segundos
+            total_time = end_time - start_time
+            print(f"Tempo total: {total_time:.2f} segundos")
+            
         return HttpResponseRedirectToReferrer(request)
 
     # def changelist_view(self, *args, **kwargs):
