@@ -3,7 +3,7 @@
 
 {% block extra_head %}
 {{ block.super }}
-<style>
+<!-- <style>
     /* Spinner and content CSS */
     .spinner {
         border: 16px solid #f3f3f3;
@@ -35,7 +35,7 @@
         opacity: 1;
         visibility: visible;
     }
-</style>
+</style> -->
 
 {% if LANGUAGE_BIDI %}
 <link rel="stylesheet" type="text/css"
@@ -80,7 +80,7 @@
 {{ content }}
 {% block sidebar %}{% endblock %}
 {% endblock %}
-<script type="text/javascript">
+<!-- <script type="text/javascript">
 
     document.addEventListener('DOMContentLoaded', function () {
         var mainContent = document.getElementById('content-main');
@@ -144,7 +144,7 @@
         }
     });
 </script>
-
+ -->
 
 
 {% endblock %}
