@@ -5449,8 +5449,12 @@ def save_from_protheus_logic(data_json, user_id):
                                                 }
 
                                                 problem.append(problem_load)
-                                        print(f"{Fore.BLUE}{deposito_id}{Style.RESET_ALL}")
-                                        print(f"{Fore.BLUE}{plantio_id}{Style.RESET_ALL}")
+                                            print(f"{Fore.BLUE}{deposito_id}{Style.RESET_ALL}")
+                                            print(f"{Fore.BLUE}{plantio_id}{Style.RESET_ALL}")
+                                        else:
+                                            print('plantio id: ', plantio_id)
+                                            print('data to Find: ', str(safra), int(ciclo), int(origem_id), str(parcela))
+                                            print('deposito id: ', deposito_id)
                                     except Exception as e:
                                         print(
                                             f"plantio não encontrado - {Fore.LIGHTRED_EX}Origem: {origem} | Parcela: {parcela} | Erro: {e}{Style.RESET_ALL}"
@@ -5497,7 +5501,7 @@ def save_from_protheus_logic(data_json, user_id):
                                     #     talhao__id_talhao=parcelas[0],
                                     # )
                                     # plantio_id = plantio_objs.get((safra, ciclo, origem_id, parcela))
-                                    plantio_id = plantio_ids_cache.get((safra, ciclo, origem_id, parcela))
+                                    plantio_id = plantio_ids_cache.get((str(safra), int(ciclo), int(origem_id), str(parcelas[0])))
                                     deposito_id = deposito_objs.get(destino)
                                     if plantio_id and deposito_id:
                                         try:
@@ -5546,8 +5550,12 @@ def save_from_protheus_logic(data_json, user_id):
                                                 "id_farmtruck": id_farmtruck,
                                             }
                                             problem.append(problem_load)
-                                    print(f"{Fore.BLUE}{deposito_id}{Style.RESET_ALL}")
-                                    print(f"{Fore.BLUE}{plantio_id}{Style.RESET_ALL}")
+                                        print(f"{Fore.BLUE}{deposito_id}{Style.RESET_ALL}")
+                                        print(f"{Fore.BLUE}{plantio_id}{Style.RESET_ALL}")
+                                    else:
+                                        print('plantio id: ', plantio_id)
+                                        print('data to Find: ', str(safra), int(ciclo), int(origem_id), str(parcelas[0]))
+                                        print('deposito id: ', deposito_id)
                                 except Exception as e:
                                     print(
                                         f"plantio não encontrado - {Fore.LIGHTRED_EX}Origem: {origem} | Parcela: {parcelas[0]} | Erro: {e}{Style.RESET_ALL}"
