@@ -4303,7 +4303,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "Accept": "application/json",
                     "Content-Type": "application/json",
                     "Authorization": f'Basic ${PROTHEUS_TOKEN}',
-                    "Access-Control-Allow-Origin": "*"
+                    "Access-Control-Allow-Origin": "*",
+                    "tenantid": "02"
                 }
                 url = "https://api.diamanteagricola.com.br:8089/rest/planejamento/cabecalho"
 
@@ -6041,7 +6042,8 @@ class StViewSet(viewsets.ModelViewSet):
                     "Accept": "application/json",
                     "Content-Type": "application/json",
                     "Authorization": f'Basic ${PROTHEUS_TOKEN}',
-                    "Access-Control-Allow-Origin": "*"
+                    "Access-Control-Allow-Origin": "*",
+                    "tenantid": "02"
                 }
 
                 url = "https://api.diamanteagricola.com.br:8089/rest/apisolicitacao/new"
