@@ -4,6 +4,7 @@ from django.core.exceptions import ValidationError
 from django.db.models import Sum
 from django.utils.safestring import mark_safe
 
+from django.contrib.admin.widgets import AdminDateWidget
 
 class ProgramaAdminForm(forms.ModelForm):
     duplicar = forms.BooleanField(required=False, label="Duplicar de outro programa?")
@@ -121,4 +122,9 @@ class PlantioExtratoAreaForm(forms.ModelForm):
             # }),
         }
         
-    
+
+class UpdateDataPrevistaPlantioForm(forms.Form):
+    data_prevista_plantio = forms.DateField(
+        widget=forms.TextInput(attrs={'class': 'flatpickr'}),
+        input_formats=['%d/%m/%Y']
+    )

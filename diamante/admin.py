@@ -86,7 +86,7 @@ from django.core.files.storage import FileSystemStorage
 
 from django.contrib.admin import DateFieldListFilter
 
-from .forms import PlantioExtratoAreaForm, ProgramaAdminForm
+from .forms import PlantioExtratoAreaForm, ProgramaAdminForm, UpdateDataPrevistaPlantioForm
 from django.db import connection
 
 import uuid
@@ -103,6 +103,8 @@ from types import SimpleNamespace
 
 import time
 from .views_api import save_from_protheus_logic
+from django.utils.http import urlencode
+
 
 
 main_path = (
@@ -1044,10 +1046,9 @@ def acao_ver_cronograma_programa(self, request, queryset):
 
     obj = queryset.first()
     return redirect('admin:view_cronograma_programa', obj_id=obj.id)
-
 @admin.register(Plantio)
 class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
-    actions = [export_plantio, area_aferida, abrir_aplicacao_farmbox]
+    actions = [export_plantio, area_aferida, abrir_aplicacao_farmbox, 'update_data_prevista_plantio']
     show_full_result_count = False
     autocomplete_fields = ["talhao", "programa", "variedade"]
 
@@ -1059,6 +1060,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
                 "plantio__id", "peso_scs_limpo_e_seco", "data_colheita"
             )
         ]
+    
 
     def get_urls(self):
         urls = super().get_urls()
@@ -1068,11 +1070,48 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
                 self.admin_site.admin_view(self.view_cronograma_programa),
                 name='view_cronograma_programa',
             ),
+            path('update-data-prevista/', self.admin_site.admin_view(self.update_data_prevista_view), name='update_data_prevista'),
         ]
         return custom_urls + urls
     
     
+    def update_data_prevista_plantio(self, request, queryset):
+        selected = queryset.values_list('pk', flat=True)
+        url = reverse('admin:update_data_prevista')
+        # URL atual do changelist (sem path extra)
+        current_url = request.get_full_path()
+        query = urlencode({
+            'ids': ','.join(str(pk) for pk in selected),
+            'next': current_url
+        })
+        return redirect(f"{url}?{query}")
+    update_data_prevista_plantio.short_description = "Atualizar Data Prevista de Plantio"
 
+    def update_data_prevista_view(self, request):
+        print("Entrou na view custom de update")
+        next_url = request.GET.get('next', '..')  # URL para redirecionar depois
+        ids = request.GET.get('ids', '')
+        pks = ids.split(',')
+        queryset = self.model.objects.filter(pk__in=pks)
+
+        if request.method == 'POST':
+            form = UpdateDataPrevistaPlantioForm(request.POST)
+            if form.is_valid():
+                nova_data = form.cleaned_data['data_prevista_plantio']
+                queryset.update(data_prevista_plantio=nova_data)
+                self.message_user(request, f'{queryset.count()} registros atualizados com sucesso.')
+                return redirect(next_url)
+        else:
+            form = UpdateDataPrevistaPlantioForm()
+
+        context = dict(
+            self.admin_site.each_context(request),
+            form=form,
+            queryset=queryset,
+            title='Atualizar Data Prevista de Plantio',
+            next_url=next_url,
+        )
+        return render(request, 'admin/update_data_prevista.html', context)
     # def view_cronograma_programa(self, request, queryset):
     #     if queryset.count() != 1:
     #         self.message_user(request, "Selecione apenas um item.", level='error')

@@ -1,0 +1,141 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+
+{% block extrastyle %}
+{{ block.super }}
+<link href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" rel="stylesheet" />
+<style>
+    /* Estilo moderno para a tabela */
+    .modern-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 1.5rem;
+        font-family: Arial, sans-serif;
+    }
+
+    .modern-table th,
+    .modern-table td {
+        border: 1px solid #ddd;
+        padding: 12px 15px;
+        text-align: left;
+    }
+
+    .modern-table th {
+        background-color: #007acc;
+        color: white;
+    }
+
+    .modern-table tbody tr:nth-child(even) {
+        background-color: #f3f7fb;
+    }
+
+    .modern-table tbody tr:hover {
+        background-color: #e6f0fa;
+    }
+
+    .btn {
+        display: inline-block;
+        padding: 8px 16px;
+        margin-right: 10px;
+        font-size: 1rem;
+        cursor: pointer;
+        border: none;
+        border-radius: 4px;
+        text-decoration: none;
+        color: white;
+    }
+
+    .btn-save {
+        background-color: #28a745;
+    }
+
+    .btn-save:hover {
+        background-color: #218838;
+    }
+
+    .btn-cancel {
+        background-color: #6c757d;
+    }
+
+    .btn-cancel:hover {
+        background-color: #5a6268;
+    }
+</style>
+{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
+{% endblock %}
+
+{% block content %}
+<h1 style="margin-bottom: 1rem;">{{ title }}</h1>
+
+<p><strong>Itens selecionados:</strong> {{ queryset.count }}</p>
+
+<table class="modern-table" role="grid" aria-readonly="true">
+    <thead>
+        <tr>
+            <th scope="col">ID</th>
+            <th scope="col">Descrição</th>
+            <th scope="col">Data Prevista Plantio Atual</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for obj in queryset %}
+        <tr>
+            <td>{{ obj.pk }}</td>
+            <td>{{ obj }}</td>
+            <td>{{ obj.data_prevista_plantio|date:"d/m/Y" }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="3" style="text-align: center;">Nenhum item selecionado.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<form method="post" style="max-width: 350px;">
+    {% csrf_token %}
+    {{ form.data_prevista_plantio.label_tag }}<br>
+    {{ form.data_prevista_plantio }}<br><br>
+    <button type="submit" class="btn btn-save" id="submit-btn">Salvar</button>
+    <span id="spinner" style="display:none; margin-left:10px;">⏳ Carregando...</span>
+    <a href=".." class="btn btn-cancel">Cancelar</a>
+</form>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        flatpickr("input[name='data_prevista_plantio']", {
+            locale: 'pt',
+            dateFormat: "d/m/Y",
+            allowInput: true,
+            onReady: function (selectedDates, dateStr, instance) {
+                instance.input.addEventListener('focus', function () {
+                    instance.open();
+                });
+            }
+        });
+
+        const form = document.querySelector('form');
+        const submitBtn = document.getElementById('submit-btn');
+        const spinner = document.getElementById('spinner');
+
+        if (form && submitBtn && spinner) {
+            form.addEventListener('submit', function (event) {
+                event.preventDefault();
+
+                submitBtn.disabled = true;
+                spinner.style.display = 'inline-block';
+
+                setTimeout(() => {
+                    form.submit();
+                }, 100); // 100ms é suficiente para garantir que o browser renderize a mudança visual
+            });
+        }
+    });
+</script>
+{% endblock %}
