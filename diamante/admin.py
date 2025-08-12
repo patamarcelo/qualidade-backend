@@ -1939,8 +1939,8 @@ class ColheitaAdmin(admin.ModelAdmin):
         "peso_bruto",
         "peso_tara",
         "get_peso_liquido",
-        "umidade",
-        "desconto_umidade",
+        "get_umidade",
+        "get_desconto_umidade",
         "impureza",
         "desconto_impureza",
         # "peso_scs_limpo_e_seco",
@@ -2046,6 +2046,20 @@ class ColheitaAdmin(admin.ModelAdmin):
     #     # view.context_data["submit_csv_form"] = SomeModelForm
     #     return view
 
+    def get_umidade(self, obj):
+        if obj.umidade and obj.umidade > 0 :
+            return obj.umidade
+        else:
+            return " - "
+    get_umidade.short_description = "Umidade"
+    
+    def get_desconto_umidade(self, obj):
+        if obj.umidade and obj.umidade > 0 :
+            return obj.desconto_umidade
+        else:
+            return " - "
+    get_desconto_umidade.short_description = "Desc. Umidade"
+    
     def get_peso_liquido(self, obj):
         if obj.peso_bruto is not None and obj.peso_tara is not None:
             return obj.peso_bruto - obj.peso_tara

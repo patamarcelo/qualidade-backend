@@ -899,7 +899,7 @@ def atualizar_datas_previstas_plantio():
     from .models import Plantio
 
     caminho_arquivo_excel = os.path.join(
-        os.path.dirname(__file__), "utils", "Eldorado.xlsx"
+        os.path.dirname(__file__), "utils", "datas_plantio_bencao_jacare.xlsx"
     )
 
     """
