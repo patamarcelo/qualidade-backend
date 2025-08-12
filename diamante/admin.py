@@ -1898,6 +1898,9 @@ class SomeModelForm(forms.Form):
 class ColheitaAdmin(admin.ModelAdmin):
     autocomplete_fields = ["plantio"]
     change_list_template = "admin/change_list_colheita.html"
+    
+    class Media:
+        js = ('admin/js/colapsar-observacao.js',)
 
     def get_urls(self):
         urls = super().get_urls()
@@ -1961,7 +1964,10 @@ class ColheitaAdmin(admin.ModelAdmin):
                 )
             },
         ),
-        ("Observações", {"fields": (("observacao",))}),
+        ("Observações", {
+            "fields": (("observacao",)),
+            "classes": ["collapse"],  # Força lista
+            }),
     )
 
     list_display = (

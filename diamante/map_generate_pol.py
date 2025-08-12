@@ -76,7 +76,7 @@ def draw_cartoon_map(
     ids_farmbox,
     filled_polygon_index=[],
     filled_color="white",
-    fontsize=10,
+    fontsize=14,
     edge_linewidth=0.5,
     planejamento_plantio=False,
     grouped_by_date=[],
@@ -124,6 +124,7 @@ def draw_cartoon_map(
             ha="center",
             va="center",
             fontsize=fontsize,
+            fontweight='bold',  # deixa em negrito
             rotation=270,
         )
     ax.autoscale()

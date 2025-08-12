@@ -1,0 +1,10 @@
+/* Ensure <tr> elements inside Django admin forms behave as table rows */
+tr.form-row {
+    display: table-row !important;
+}
+
+/* Ensure <td> elements are treated as table cells */
+tr.form-row td {
+    display: table-cell !important;
+    vertical-align: middle;
+}

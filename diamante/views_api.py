@@ -3873,7 +3873,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
         # get id_farmbox
         projeto_filter = request.data["projeto"]
         parcelas_filter = request.data["parcelas"]
-        safra_filter = "2024/2025"
+        safra_filter = "2025/2026"
         ciclo_filter = "3"
         planejamento_plantio = False
 
