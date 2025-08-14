@@ -33,3 +33,10 @@ def formatar_data_brasileira(data_str):
         return data_obj.strftime("%d/%m/%Y")
     except ValueError:
         return ""
+
+@register.filter
+def format_farm_name(farm):
+    """Remove a palavra 'Fazenda' de um nome de fazenda"""
+    if farm:
+        return farm.replace('Fazenda', '').strip()
+    return ''

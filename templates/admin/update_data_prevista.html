@@ -1,5 +1,6 @@
 {% extends "admin/base_site.html" %}
 {% load static %}
+{% load formatar_numero %}
 
 
 {% block extrastyle %}
@@ -76,19 +77,29 @@
 
 <p><strong>Itens selecionados:</strong> {{ queryset.count }}</p>
 
-<table class="modern-table" role="grid" aria-readonly="true">
+<table class="modern-table table-striped" role="grid" aria-readonly="true">
     <thead>
         <tr>
-            <th scope="col">ID</th>
-            <th scope="col">Descrição</th>
+            <th scope="col">⬇️</th>
+            <th scope="col">Projeto</th>
+            <th scope="col">Parcela</th>
+            <th scope="col">Safra / Ciclo</th>
+            <th scope="col">Área</th>
+            <th scope="col">Variedade</th>
+            <th scope="col">Programa</th>
             <th scope="col">Data Prevista Plantio Atual</th>
         </tr>
     </thead>
     <tbody>
         {% for obj in queryset %}
         <tr>
-            <td>{{ obj.pk }}</td>
-            <td>{{ obj }} - {{ obj.programa.nome }}</td>
+            <td>{{ forloop.counter }}</td>
+            <td>{{ obj.talhao.fazenda.fazenda.nome|format_farm_name  }}</td>
+            <td>{{ obj.talhao.id_talhao }}</td>
+            <td>{{ obj.safra }} / {{ obj.ciclo }}</td>
+            <td>{{ obj.area_colheita }}</td>
+            <td>{{ obj.variedade.variedade }}</td>
+            <td>{{ obj.programa.nome }}</td>
             <td>{{ obj.data_prevista_plantio|date:"d/m/Y" }}</td>
         </tr>
         {% empty %}

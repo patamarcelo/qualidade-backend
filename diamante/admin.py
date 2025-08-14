@@ -1087,14 +1087,28 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
             'next': current_url
         })
         return redirect(f"{url}?{query}")
-    update_data_prevista_plantio.short_description = "Atualizar Data Prevista de Plantio"
+    update_data_prevista_plantio.short_description = "Atualizar Dados em Lote"
 
     def update_data_prevista_view(self, request):
         print("Entrou na view custom de update")
         next_url = request.GET.get('next', '..')
         ids = request.GET.get('ids', '')
         pks = ids.split(',')
-        queryset = self.model.objects.filter(pk__in=pks).select_related('programa', 'variedade')
+        queryset = self.model.objects.filter(pk__in=pks).select_related(
+                'programa',
+                'variedade',
+                'talhao',
+                'talhao__fazenda',
+            ).only(
+                'programa__nome',
+                'variedade__variedade',
+                'talhao__id_talhao',
+                'talhao__fazenda__nome',
+                'safra',
+                'ciclo',
+                'area_colheita',
+                'data_prevista_plantio'
+            )
 
         if request.method == 'POST':
             form = UpdateDataPrevistaPlantioForm(request.POST)
