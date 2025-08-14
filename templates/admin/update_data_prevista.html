@@ -4,6 +4,7 @@
 
 {% block extrastyle %}
 {{ block.super }}
+{{ form.media }}
 <link href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" rel="stylesheet" />
 <style>
     /* Estilo moderno para a tabela */
@@ -87,7 +88,7 @@
         {% for obj in queryset %}
         <tr>
             <td>{{ obj.pk }}</td>
-            <td>{{ obj }}</td>
+            <td>{{ obj }} - {{ obj.programa.nome }}</td>
             <td>{{ obj.data_prevista_plantio|date:"d/m/Y" }}</td>
         </tr>
         {% empty %}
@@ -98,13 +99,41 @@
     </tbody>
 </table>
 
-<form method="post" style="max-width: 350px;">
+<!-- <form method="post" style="max-width: 350px;">
     {% csrf_token %}
     {{ form.data_prevista_plantio.label_tag }}<br>
     {{ form.data_prevista_plantio }}<br><br>
     <button type="submit" class="btn btn-save" id="submit-btn">Salvar</button>
     <span id="spinner" style="display:none; margin-left:10px;">⏳ Carregando...</span>
     <a href=".." class="btn btn-cancel">Cancelar</a>
+</form> -->
+<form method="post" style="max-width: 1200px; margin-bottom: 50px;">
+    {% csrf_token %}
+    <div class="d-flex flex-row mb-3 align-items-start" style="gap: 40px;">
+        
+        <div class="field-group d-flex flex-column">
+            {{ form.data_prevista_plantio.label_tag }}
+            {{ form.data_prevista_plantio }}
+        </div>
+
+        <div class="field-group d-flex flex-column">
+            {{ form.programa.label_tag }}
+            {{ form.programa }}
+        </div>
+
+        <div class="field-group d-flex flex-column">
+            {{ form.variedade.label_tag }}
+            {{ form.variedade }}
+        </div>
+
+    
+
+    </div>
+        <div class="form-actions d-flex flex-row gap-10" style="justify-content:flex-start;">
+            <button type="submit" class="btn btn-save" id="submit-btn">Salvar</button>
+            <span id="spinner" style="display:none; margin-left:10px;">⏳ Carregando...</span>
+            <a href="{{ next_url }}" class="btn btn-cancel" style="margin-left:10px;">Cancelar</a>
+        </div>
 </form>
 
 <script>

@@ -1061,6 +1061,8 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
             )
         ]
     
+    class Media:
+        js = ('admin/js/colapsar-mapdetails.js',)
 
     def get_urls(self):
         urls = super().get_urls()
@@ -1089,17 +1091,32 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
 
     def update_data_prevista_view(self, request):
         print("Entrou na view custom de update")
-        next_url = request.GET.get('next', '..')  # URL para redirecionar depois
+        next_url = request.GET.get('next', '..')
         ids = request.GET.get('ids', '')
         pks = ids.split(',')
-        queryset = self.model.objects.filter(pk__in=pks)
+        queryset = self.model.objects.filter(pk__in=pks).select_related('programa', 'variedade')
 
         if request.method == 'POST':
             form = UpdateDataPrevistaPlantioForm(request.POST)
             if form.is_valid():
-                nova_data = form.cleaned_data['data_prevista_plantio']
-                queryset.update(data_prevista_plantio=nova_data)
-                self.message_user(request, f'{queryset.count()} registros atualizados com sucesso.')
+                nova_data = form.cleaned_data.get('data_prevista_plantio')
+                novo_programa = form.cleaned_data.get('programa')
+                nova_variedade = form.cleaned_data.get('variedade')
+
+                updated_count = 0
+
+                for instance in queryset:
+                    # Atualiza somente se houver valor
+                    if nova_data:
+                        instance.data_prevista_plantio = nova_data
+                    if novo_programa:
+                        instance.programa = novo_programa
+                    if nova_variedade:
+                        instance.variedade = nova_variedade
+                    instance.save()
+                    updated_count += 1
+
+                self.message_user(request, f'{updated_count} registros atualizados com sucesso.')
                 return redirect(next_url)
         else:
             form = UpdateDataPrevistaPlantioForm()
@@ -1112,6 +1129,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
             next_url=next_url,
         )
         return render(request, 'admin/update_data_prevista.html', context)
+
     # def view_cronograma_programa(self, request, queryset):
     #     if queryset.count() != 1:
     #         self.message_user(request, "Selecione apenas um item.", level='error')

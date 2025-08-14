@@ -1,10 +1,12 @@
 from django import forms
-from .models import PlantioExtratoArea, Programa
+from .models import PlantioExtratoArea, Programa, Variedade, Plantio
 from django.core.exceptions import ValidationError
 from django.db.models import Sum
 from django.utils.safestring import mark_safe
 
 from django.contrib.admin.widgets import AdminDateWidget
+from django.contrib.admin.widgets import AutocompleteSelect
+from django.contrib import admin
 
 class ProgramaAdminForm(forms.ModelForm):
     duplicar = forms.BooleanField(required=False, label="Duplicar de outro programa?")
@@ -122,9 +124,19 @@ class PlantioExtratoAreaForm(forms.ModelForm):
             # }),
         }
         
-
 class UpdateDataPrevistaPlantioForm(forms.Form):
     data_prevista_plantio = forms.DateField(
-        widget=forms.TextInput(attrs={'class': 'flatpickr'}),
-        input_formats=['%d/%m/%Y']
+        widget=forms.TextInput(attrs={'class': 'form-control flatpickr'}),
+        input_formats=['%d/%m/%Y'],
+        required=False
+    )
+    programa = forms.ModelChoiceField(
+        queryset=Programa.objects.filter(ativo=True).order_by('-safra__safra', '-ciclo__ciclo'),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-control'})
+    )
+    variedade = forms.ModelChoiceField(
+        queryset=Variedade.objects.all(),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-control'})
     )
