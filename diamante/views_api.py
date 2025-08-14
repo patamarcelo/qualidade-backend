@@ -1052,6 +1052,22 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                     if map_geo_points_farm:
                                         field_to_update.map_geo_points = map_geo_points_farm
                                     field_to_update.save()
+                            except IndexError as e:
+                                print(f"{Fore.RED}❌ IndexError: {e}{Style.RESET_ALL}: Trying to save this now...")
+                                with transaction.atomic():
+                                    novo_plantio = Plantio(
+                                        safra=safra,
+                                        ciclo=ciclo,
+                                        talhao=talhao_id,
+                                        variedade=id_variedade if cultura_planejada else None,
+                                        area_colheita=area,
+                                        map_centro_id=map_centro_id_farm,
+                                        map_geo_points=map_geo_points_farm,
+                                        id_farmbox=id_plantio_farmbox,
+                                        area_planejamento_plantio=area_planejamento if cultura_planejada else None,
+                                    )
+                                    novo_plantio.save()
+                                    print(f"✅ Plantio salvo com cultura e variedade planejada: {novo_plantio} \n")
                             except Exception as e:
                                 print(
                                     f"{Fore.RED}Problema em salvar o plantio: {talhao_id} - {safra} - {ciclo}{Style.RESET_ALL}{e}"
@@ -1099,7 +1115,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                         area_planejamento_plantio=area_planejamento if cultura_planejada else None,
                                     )
                                     novo_plantio.save()
-                                    print(f"✅ Plantio salvo: {novo_plantio} \n")
+                                    print(f"✅ Plantio salvo sem cultura e variedade planejada: {novo_plantio} \n")
                                 
                             except Exception as e:
                                 print(
