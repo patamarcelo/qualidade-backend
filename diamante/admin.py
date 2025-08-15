@@ -1930,18 +1930,62 @@ class SomeModelForm(forms.Form):
 class ColheitaAdmin(admin.ModelAdmin):
     autocomplete_fields = ["plantio"]
     change_list_template = "admin/change_list_colheita.html"
-    
+    actions = [export_cargas,'duplicar_registro']
     class Media:
         js = ('admin/js/colapsar-observacao.js',)
 
     def get_urls(self):
         urls = super().get_urls()
         # my_urls = [path(r"^upload_csv/$", self.upload_csv, name="upload_csv")]
-        my_urls = [path("upload_csv/", self.upload_csv, name="upload_csv")]
+        my_urls = [
+            path("upload_csv/", self.upload_csv, name="upload_csv"),
+            path('<pk>/duplicate/', self.admin_site.admin_view(self.duplicate_view), name='colheita_duplicate'),
+            ]
 
         return my_urls + urls
 
     urls = property(get_urls)
+    
+    def duplicar_registro(self, request, queryset):
+        # só permite duplicar 1 por vez, mas pode adaptar pra múltiplos
+        obj = queryset.first()
+        return redirect(f'./{obj.pk}/duplicate/')
+
+    duplicar_registro.short_description = "Duplicar registro selecionado"
+
+    def duplicate_view(self, request, pk):
+        obj = self.get_object(request, pk)
+        initial_pairs = []
+
+        for field in obj._meta.fields:
+            # campos que NÃO queremos copiar
+            if field.name in ['id', 'pk', 'plantio']:
+                continue
+            if getattr(field, 'auto_now', False) or getattr(field, 'auto_now_add', False):
+                continue
+
+            # ForeignKey precisa usar o <field>_id
+            if isinstance(field, models.ForeignKey):
+                value = getattr(obj, f"{field.name}_id")
+                if value:
+                    initial_pairs.append(f"{field.name}={value}")
+                continue
+            
+            # DateField
+            if isinstance(field, models.DateField):
+                value = getattr(obj, field.name)
+                if value:
+                    formatted = value.strftime('%d/%m/%Y')
+                    initial_pairs.append(f"{field.name}={formatted}")
+                continue  # << já tratou, pula pro próximo campo
+
+            # Qualquer outro campo
+            value = getattr(obj, field.name)
+            if value is not None:
+                initial_pairs.append(f"{field.name}={value}")
+
+        initial_data = "&".join(initial_pairs)
+        return redirect(f"../../add/?{initial_data}")
 
     def get_queryset(self, request):
         return (
@@ -1959,9 +2003,7 @@ class ColheitaAdmin(admin.ModelAdmin):
             )
         )
 
-    actions = [
-        export_cargas,
-    ]
+
     fieldsets = (
         (
             "Dados",
