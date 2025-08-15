@@ -303,7 +303,7 @@ CRONJOBS = [
     ('* * * * *', 'diamante.cron.get_hour_test')
 ]
 
-ENABLE_CRON_REGISTER = False
+ENABLE_CRON_REGISTER = True
 
 
 # LOGGING = {

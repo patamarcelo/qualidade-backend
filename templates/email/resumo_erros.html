@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>{{ data_email }} - Erros ao Encerrar Parcelas</title>
+    <style>
+        body { font-family: Arial, sans-serif; color: #333; padding: 20px; }
+        h2 { color: #C0392B; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid #dddddd; padding: 8px 12px; text-align: left; }
+        th { background-color: #C0392B; color: white; }
+        tbody tr:nth-child(even) { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <h2>Erros ao Encerrar Parcelas no FarmBox</h2>
+    <p>Segue a lista de parcelas que não puderam ser encerradas:</p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>ID Parcela</th>
+                <th>Projeto</th>
+                <th>Fazenda</th>
+                <th>Erro</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for parcela, erro in erros %}
+            <tr>
+                <td>{{ parcela.talhao.id_talhao }}</td>
+                <td>{{ parcela.talhao.fazenda.nome }}</td>
+                <td>{{ parcela.talhao.fazenda.fazenda.nome }}</td>
+                <td>{{ erro }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

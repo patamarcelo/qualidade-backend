@@ -38,5 +38,5 @@ def formatar_data_brasileira(data_str):
 def format_farm_name(farm):
     """Remove a palavra 'Fazenda' de um nome de fazenda"""
     if farm:
-        return farm.replace('Fazenda', '').strip()
+        return farm.replace('Fazenda', '').replace('Projeto ', '').strip()
     return ''

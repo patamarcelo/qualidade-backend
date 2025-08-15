@@ -30,6 +30,11 @@ from decimal import Decimal
 import pandas as pd
 from collections import defaultdict
 
+from django.utils import timezone
+from django.core.mail import EmailMessage
+from django.template.loader import render_to_string
+
+
 
 # pr_mungo = Programa.objects.all()[2]
 # pr_caupi = Programa.objects.all()[1]
@@ -1147,3 +1152,140 @@ def get_emails_por_projeto(projeto):
             emails.update(item["emails_abertura_st"])
 
     return sorted(list(emails))
+
+
+def finalizar_parcelas_encerradas():
+    from diamante.models import Plantio, Colheita
+    """
+    Finaliza automaticamente parcelas cuja area_colheita já atingiu area_parcial
+    e que foram modificadas há mais de 7 dias.
+    """
+
+    hoje = timezone.now()
+    data_formatada = hoje.strftime("%d/%m/%Y")  # exemplo: 15/08/2025
+
+    # 1) Busca todas não finalizadas
+    queryset = Plantio.objects.filter(
+        safra__safra="2025/2026",
+        ciclo__ciclo="1",
+        finalizado_plantio=True,
+        plantio_descontinuado=False,
+        finalizado_colheita=False,
+    )
+
+    # 2) Filtra as que têm area_colheita == area_parcial diretamente no banco
+    queryset = queryset.filter(area_colheita=F("area_parcial"))
+    
+    # Busca apenas colheitas das parcelas filtradas
+    plantio_ids = queryset.values_list('id', flat=True)
+    total_c_2 = list(
+        Colheita.objects.filter(plantio__id__in=plantio_ids)
+        .values_list("plantio__id", "peso_scs_limpo_e_seco", "data_colheita")
+    )
+    
+    lista_finalizadas = []
+    lista_erros = []
+
+    # 3) Faz a verificação dos 7 dias
+    for parcela in queryset:
+        # se já passou mais de 7 dias desde a última modificação
+        dias_passados = (hoje - parcela.modificado).days
+        dias_faltando = max(0, 7 - dias_passados)
+
+        print(f"[INFO] Plantio: {parcela} | Projeto: {parcela.talhao.fazenda.nome} | Área: {parcela.area_colheita}")
+
+        # teste = True
+        # if teste:
+        if dias_passados >= 5:        
+            # parcela.finalizado_colheita = True
+            # parcela.save(update_fields=["finalizado_colheita"])
+            print(f"[INFO] Plantio: {parcela.pk} | Projeto: {parcela.talhao.fazenda.nome} | Área: {parcela.area_colheita}")
+            print('parcela para ser finalizada: ', parcela, '\n')
+            filtered_list = [x for x in total_c_2 if x[0] == parcela.id]
+            sorted_list = sorted([x[2] for x in filtered_list])
+            
+            # Data de fechamento: pega a primeira data de colheita se houver, senão hoje
+            closed_date = str(sorted_list[0]) if sorted_list else str(hoje.date())
+
+            # Cálculo de produtividade
+            total_filt_list = sum([(x[1] * 60) for x in filtered_list])
+            try:
+                prod_scs = total_filt_list / parcela.area_colheita
+                value = round(prod_scs / 60, 2)
+            except ZeroDivisionError:
+                value = None
+                
+            # Atualiza FarmBox
+            try:
+                response = close_plantation_and_productivity(
+                    parcela.id_farmbox,
+                    closed_date,
+                    value
+                )
+                resp_obj = json.loads(response.text)
+                resp_code = response.status_code
+
+                if int(resp_code) < 300:
+                    print(f"Parcel {parcela} fechada no FarmBox. Status: {resp_code}")
+                    lista_finalizadas.append((parcela, closed_date, value))
+                elif 400 <= int(resp_code) < 500:
+                    str_resp = f"Erro ao Alterar no FarmBox - {resp_code} - {response.text}"
+                    print(str_resp)
+                    lista_erros.append((parcela, str_resp))
+                else:
+                    str_resp = f"Erro inesperado no FarmBox - {resp_code} - {response.text}"
+                    print(str_resp)
+                    lista_erros.append((parcela, str_resp))
+
+            except Exception as e:
+                str_resp = f"Exceção ao fechar parcela {parcela}: {e}"
+                print(str_resp)
+                lista_erros.append((parcela, str_resp))
+        else:
+            print(f"Faltam {dias_faltando} dias para poder finalizar esta parcela\n")
+    
+    if lista_finalizadas:
+        parcelas_encerradas = [
+            {
+                "fazenda": parcela.talhao.fazenda.fazenda.nome,
+                "projeto": parcela.talhao.fazenda.nome,
+                "id": parcela.talhao.id_talhao,
+                "area": parcela.area_colheita,
+                "variedade": parcela.variedade.variedade,
+                "cultura": parcela.variedade.cultura.cultura,
+                "closed_date": closed_date,
+                "produtividade": value,
+            }
+            for parcela, closed_date, value in lista_finalizadas
+        ]
+
+        # Ordena: fazenda -> projeto -> id da parcela
+        parcelas_encerradas = sorted(
+            parcelas_encerradas,
+            key=lambda x: (x["fazenda"], x["projeto"], x['cultura'], x["variedade"], x["id"])
+        )
+        html_content = render_to_string("email/resumo_parcelas.html", {"parcelas": parcelas_encerradas, "data_email": data_formatada})
+
+        email = EmailMessage(
+            subject="Resumo das Parcelas Encerradas",
+            body=html_content,
+            from_email="patamarcelo@gmail.com",
+            to=["patamarcelo@gmail.com"],
+        )
+        email.content_subtype = "html"
+        email.send()
+    
+    if lista_erros:
+        html_content = render_to_string("email/resumo_erros.html", {"erros": lista_erros, "data_email": data_formatada})
+
+        email = EmailMessage(
+            subject="Erros ao Encerrar Parcelas no FarmBox",
+            body=html_content,
+            from_email="patamarcelo@gmail.com",
+            to=["patamarcelo@gmail.com"],
+        )
+        email.content_subtype = "html"
+        email.send()
+
+
+    return f"{queryset.count()} parcelas avaliadas para finalização"

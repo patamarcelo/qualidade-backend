@@ -5,6 +5,7 @@ from django_apscheduler.jobstores import DjangoJobStore, register_events
 from django_apscheduler.models import DjangoJobExecution
 import logging
 from diamante.cron import get_hour_test
+from diamante.utils import finalizar_parcelas_encerradas
 
 from datetime import datetime
 
@@ -74,26 +75,37 @@ def start():
             # else:
             print('job not exists yet, registering....', job_id)
             if settings.ENABLE_CRON_REGISTER:
+                # Novo job: Finalizar parcelas encerradas (rodar 1 vez por dia, às 06:00 por exemplo)
                 scheduler.add_job(
-                    func,
+                    finalizar_parcelas_encerradas,
                     'cron',
                     day_of_week="*",
-                    hour="5-19",  # From 6 AM to 7:59 PM
-                    minute="58",  # At 15, 30, 45 and 58 minutes of each hour
-                    id=job_id,
+                    hour="5",
+                    minute="30",
+                    id="finalizar_parcelas_diario",
                     replace_existing=True,
-                    misfire_grace_time=30  # segundos de tolerância para atraso
+                    misfire_grace_time=3600  # tolerância de 1 hora caso haja atraso
+                )
+                # scheduler.add_job(
+                #     func,
+                #     'cron',
+                #     day_of_week="*",
+                #     hour="5-19",  # From 6 AM to 7:59 PM
+                #     minute="58",  # At 15, 30, 45 and 58 minutes of each hour
+                #     id=job_id,
+                #     replace_existing=True,
+                #     misfire_grace_time=30  # segundos de tolerância para atraso
 
-                )
-                scheduler.add_job(
-                    delete_old_job_executions,
-                    trigger='interval',
-                    days=7,
-                    id='delete_old_job_executions',
-                    max_instances=1,
-                    replace_existing=True,
-                )
-                logger.info("Added job: 'delete_old_job_executions'.")
+                # )
+                # scheduler.add_job(
+                #     delete_old_job_executions,
+                #     trigger='interval',
+                #     days=7,
+                #     id='delete_old_job_executions',
+                #     max_instances=1,
+                #     replace_existing=True,
+                # )
+                # logger.info("Added job: 'delete_old_job_executions'.")
                 
             register_events(scheduler)
             scheduler.start()

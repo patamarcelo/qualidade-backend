@@ -1,0 +1,116 @@
+{% load formatar_numero %}
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Resumo de Parcelas Encerradas</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            color: #333333;
+            background-color: #f9f9f9;
+            padding: 20px;
+        }
+
+        h2 {
+            color: #2E86C1;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        th,
+        td {
+            border: 1px solid #dddddd;
+            padding: 8px 12px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #2E86C1;
+            color: white;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+
+        .footer {
+            margin-top: 20px;
+            font-size: 0.9em;
+            color: #555555;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            border: 1px solid #dddddd;
+            padding: 8px 12px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #2E86C1;
+            color: white;
+        }
+
+        tbody tr:nth-child(even) {
+            background-color: #f2f2f2;
+            /* cor das linhas pares */
+        }
+
+        tbody tr:nth-child(odd) {
+            background-color: #ffffff;
+            /* cor das linhas ímpares */
+        }
+    </style>
+</head>
+
+<body>
+    <h2>{{ data_email }} - Resumo das Parcelas Encerradas</h2>
+    <p>Segue o resumo das parcelas que foram finalizadas hoje:</p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Projeto</th>
+                <th>Parcela</th>
+                <th>Cultura</th>
+                <th>Variedade</th>
+                <th>Área (ha)</th>
+                <th>Data de Fechamento</th>
+                <th>Produtividade (scs/ha)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for parcela in parcelas %}
+            <tr style="background-color: {% if forloop.counter0|divisibleby:2 %}#ffffff{% else %}#f2f2f2{% endif %};">
+                <td>{{ parcela.projeto|format_farm_name }}</td>
+                <td>{{ parcela.id }}</td>
+                <td>{{ parcela.cultura }}</td>
+                <td>{{ parcela.variedade }}</td>
+                <td>{{ parcela.area }}</td>
+                <td>{{ parcela.closed_date|formatar_data_brasileira }}</td>
+                <td>{{ parcela.produtividade }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="footer" style="margin-top: 20px; font-size: 0.85em; color: #555555;">
+        As parcelas são encerradas automaticamente após 5 dias sem atualização de colheitas.
+        Este e-mail serve apenas para informar o encerramento das parcelas.
+        <br>
+        <em>Por favor, não responda a esta mensagem.</em>
+    </div>
+</body>
+
+</html>
