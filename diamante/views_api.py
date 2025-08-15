@@ -3889,8 +3889,9 @@ class PlantioViewSet(viewsets.ModelViewSet):
         # get id_farmbox
         projeto_filter = request.data["projeto"]
         parcelas_filter = request.data["parcelas"]
-        safra_filter = "2025/2026"
-        ciclo_filter = "3"
+        safra_request = request.data["safra"]
+        safra_filter = safra_request.get('safra', '2025/2026') if safra_request else '2025/2026'
+        ciclo_filter = safra_request.get('ciclo', '3') if safra_request else '3'
         planejamento_plantio = False
 
         try:
