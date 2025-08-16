@@ -1211,8 +1211,12 @@ def finalizar_parcelas_encerradas():
             total_filt_list = sum([(x[1] * 60) for x in filtered_list])
             try:
                 prod_scs = total_filt_list / parcela.area_colheita
-                value = round(prod_scs / 60, 2)
+                # Calcula o valor e o formata como uma string com 2 casas decimais
+                value_decimal = round(prod_scs / 60, 2)
+                value = str(value_decimal)
             except ZeroDivisionError:
+                value = None
+            except TypeError: # Boa prática adicionar isso caso value_decimal seja None
                 value = None
                 
             # Atualiza FarmBox
@@ -1228,6 +1232,8 @@ def finalizar_parcelas_encerradas():
                 if int(resp_code) < 300:
                     print(f"Parcel {parcela} fechada no FarmBox. Status: {resp_code}")
                     lista_finalizadas.append((parcela, closed_date, value))
+                    parcela.finalizado_colheita = True
+                    parcela.save()
                 elif 400 <= int(resp_code) < 500:
                     str_resp = f"Erro ao Alterar no FarmBox - {resp_code} - {response.text}"
                     print(str_resp)
