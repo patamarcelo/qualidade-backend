@@ -40,3 +40,14 @@ def format_farm_name(farm):
     if farm:
         return farm.replace('Fazenda', '').replace('Projeto ', '').strip()
     return ''
+
+@register.filter
+def br_float(value):
+    """
+    Formata um número float no formato brasileiro (2 casas decimais, vírgula como separador).
+    """
+    try:
+        num = float(value)
+        return f"{num:.2f}".replace(".", ",")
+    except (ValueError, TypeError):
+        return value

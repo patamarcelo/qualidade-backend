@@ -2,18 +2,45 @@
 
 <!DOCTYPE html>
 <html>
+
 <head>
     <meta charset="UTF-8">
     <title>{{ data_email }} - Próximas Parcelas a serem Encerradas</title>
     <style>
-        body { font-family: Arial, sans-serif; color: #333; padding: 20px; }
-        h2 { color: #a7c02b; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { border: 1px solid #dddddd; padding: 8px 12px; text-align: left; }
-        th { background-color: #a7c02b; color: white; }
-        tbody tr:nth-child(even) { background-color: #f2f2f2; }
+        body {
+            font-family: Arial, sans-serif;
+            color: #333;
+            padding: 20px;
+        }
+
+        h2 {
+            color: #a7c02b;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        th,
+        td {
+            border: 1px solid #dddddd;
+            padding: 8px 12px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #a7c02b;
+            color: white;
+        }
+
+        tbody tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
     </style>
 </head>
+
 <body>
     <h2>{{ data_email }} - Próximas Parcelas a serem Encerradas</h2>
     <p>Segue a lista das próximas parcelas a serem encerradas:</p>
@@ -23,20 +50,50 @@
             <tr>
                 <th>Projeto</th>
                 <th>Parcela</th>
+                <th>Cultura</th>
                 <th>Variedade</th>
+                <th>Área (ha)</th>
+                <th>Data de Fechamento</th>
+                <th>Produtividade (scs/ha)</th>
                 <th>Dias Faltando para finalizar</th>
             </tr>
         </thead>
         <tbody>
-            {% for parcela, dias_faltando in parcelas %}
-            <tr>
+            {% for parcela, dias_faltando, value, closed_date in parcelas %}
+
+            {% with value|br_float as prod %}
+            <tr style="
+                background-color:
+                    {% if prod == '0,00' %}
+                        #ffeaea
+                    {% else %}
+                        {% if forloop.counter0|divisibleby:2 %}
+                            #ffffff
+                        {% else %}
+                            #f2f2f2
+                        {% endif %}
+                    {% endif %}
+            ;">
                 <td>{{ parcela.talhao.fazenda.nome|format_farm_name }}</td>
                 <td>{{ parcela.talhao.id_talhao }}</td>
+                <td>{{ parcela.variedade.cultura.cultura }}</td>
                 <td>{{ parcela.variedade.variedade }}</td>
+                <td>{{ parcela.area_colheita }}</td>
+                <td>{{ closed_date|formatar_data_brasileira }}</td>
+                <td>
+                    {% if prod == "0,00" %}
+                    <span style="color:red; font-weight:bold;">{{ prod }}</span>
+                    {% else %}
+                    {{ prod }}
+                    {% endif %}
+                </td>
                 <td>{{ dias_faltando }}</td>
             </tr>
+            {% endwith %}
+
             {% endfor %}
         </tbody>
     </table>
 </body>
+
 </html>

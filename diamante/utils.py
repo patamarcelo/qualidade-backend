@@ -1194,7 +1194,23 @@ def finalizar_parcelas_encerradas():
         dias_faltando = max(0, 7 - dias_passados)
 
         print(f"[INFO] Plantio: {parcela} | Projeto: {parcela.talhao.fazenda.nome} | Área: {parcela.area_colheita}")
+        filtered_list = [x for x in total_c_2 if x[0] == parcela.id]
+        sorted_list = sorted([x[2] for x in filtered_list])
+        
+        # Data de fechamento: pega a primeira data de colheita se houver, senão hoje
+        closed_date = str(sorted_list[0]) if sorted_list else str(hoje.date())
 
+        # Cálculo de produtividade
+        total_filt_list = sum([(x[1] * 60) for x in filtered_list])
+        try:
+            prod_scs = total_filt_list / parcela.area_colheita
+            # Calcula o valor e o formata como uma string com 2 casas decimais
+            value_decimal = round(prod_scs / 60, 2)
+            value = str(value_decimal)
+        except ZeroDivisionError:
+            value = None
+        except TypeError: # Boa prática adicionar isso caso value_decimal seja None
+            value = None
         # teste = True
         # if teste:
         if dias_passados >= 4:        
@@ -1202,23 +1218,6 @@ def finalizar_parcelas_encerradas():
             # parcela.save(update_fields=["finalizado_colheita"])
             print(f"[INFO] Plantio: {parcela.pk} | Projeto: {parcela.talhao.fazenda.nome} | Área: {parcela.area_colheita}")
             print('parcela para ser finalizada: ', parcela, '\n')
-            filtered_list = [x for x in total_c_2 if x[0] == parcela.id]
-            sorted_list = sorted([x[2] for x in filtered_list])
-            
-            # Data de fechamento: pega a primeira data de colheita se houver, senão hoje
-            closed_date = str(sorted_list[0]) if sorted_list else str(hoje.date())
-
-            # Cálculo de produtividade
-            total_filt_list = sum([(x[1] * 60) for x in filtered_list])
-            try:
-                prod_scs = total_filt_list / parcela.area_colheita
-                # Calcula o valor e o formata como uma string com 2 casas decimais
-                value_decimal = round(prod_scs / 60, 2)
-                value = str(value_decimal)
-            except ZeroDivisionError:
-                value = None
-            except TypeError: # Boa prática adicionar isso caso value_decimal seja None
-                value = None
                 
             # Atualiza FarmBox
             try:
@@ -1250,7 +1249,7 @@ def finalizar_parcelas_encerradas():
                 lista_erros.append((parcela, str_resp))
         else:
             print(f"Faltam {dias_faltando} dias para poder finalizar esta parcela\n")
-            lista_proximas.append((parcela, dias_faltando))
+            lista_proximas.append((parcela, dias_faltando, value, closed_date))
     
     if lista_finalizadas:
         parcelas_encerradas = [
