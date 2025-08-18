@@ -1374,7 +1374,7 @@ def atualizar_datas_previstas_colheita_real():
             plantio = plantios_dict.get(id_farmbox)
             if plantio:
                 print("✅ plantio encontrado e data formatada: ", data_formatada)
-                plantio.data_prevista_plantio = data_formatada
+                plantio.data_prevista_colheita_real = data_formatada
                 objetos_para_salvar.append(plantio)
                 atualizados += 1
             else:
@@ -1383,7 +1383,7 @@ def atualizar_datas_previstas_colheita_real():
         with transaction.atomic():
             if objetos_para_salvar:
                 Plantio.objects.bulk_update(
-                    objetos_para_salvar, ["data_prevista_plantio"]
+                    objetos_para_salvar, ["data_prevista_colheita_real"]
                 )
 
         print(f"✅ {atualizados} registros atualizados com sucesso.")

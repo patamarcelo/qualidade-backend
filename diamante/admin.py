@@ -626,6 +626,7 @@ def export_plantio(modeladmin, request, queryset):
             "Area Saldo Carregar",
             "Area Aferida",
             "Saldo Plantar",
+            "Data Prevista Colheita Real"
         ]
     )
 
@@ -652,7 +653,8 @@ def export_plantio(modeladmin, request, queryset):
         "data_prevista_plantio",
         "inicializado_plantio",
         "variedade__dias_germinacao",
-        "area_aferida"
+        "area_aferida",
+        "data_prevista_colheita_real"
     )
     cargas_list = modeladmin.total_c_2
 
@@ -698,6 +700,7 @@ def export_plantio(modeladmin, request, queryset):
 
     for plantio in plantios:
         plantio_detail = list(plantio)
+        data_prevista_colheita_real = plantio_detail.pop()
         time_delta_variedade_germinacao = plantio_detail[-2]
         area_aferida = plantio_detail.pop()
         area_aferida = "Sim" if area_aferida == True else "Não"
@@ -771,6 +774,7 @@ def export_plantio(modeladmin, request, queryset):
         plantio_detail.append(str(area_saldo_carregar).replace(".", ','))
         plantio_detail.append(area_aferida)
         plantio_detail.append(str(saldo_plantar if saldo_plantar >= 1 else 0).replace(".", ','))
+        plantio_detail.append(data_prevista_colheita_real)
         plantio = tuple(plantio_detail)
         writer.writerow(plantio)
     return response
