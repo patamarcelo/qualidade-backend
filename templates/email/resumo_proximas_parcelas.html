@@ -1,37 +1,39 @@
+{% load formatar_numero %}
+
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>{{ data_email }} - Erros ao Encerrar Parcelas</title>
+    <title>{{ data_email }} - Próximas Parcelas a serem Encerradas</title>
     <style>
         body { font-family: Arial, sans-serif; color: #333; padding: 20px; }
-        h2 { color: #C0392B; }
+        h2 { color: #a7c02b; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; }
         th, td { border: 1px solid #dddddd; padding: 8px 12px; text-align: left; }
-        th { background-color: #C0392B; color: white; }
+        th { background-color: #a7c02b; color: white; }
         tbody tr:nth-child(even) { background-color: #f2f2f2; }
     </style>
 </head>
 <body>
-    <h2>{{ data_email }} - Erros ao Encerrar Parcelas no FarmBox</h2>
-    <p>Segue a lista de parcelas que não puderam ser encerradas:</p>
+    <h2>{{ data_email }} - Próximas Parcelas a serem Encerradas</h2>
+    <p>Segue a lista das próximas parcelas a serem encerradas:</p>
 
     <table>
         <thead>
             <tr>
-                <th>ID Parcela</th>
                 <th>Projeto</th>
-                <th>Fazenda</th>
-                <th>Erro</th>
+                <th>Parcela</th>
+                <th>Variedade</th>
+                <th>Dias Faltando para finalizar</th>
             </tr>
         </thead>
         <tbody>
-            {% for parcela, erro in erros %}
+            {% for parcela, dias_faltando in parcelas %}
             <tr>
+                <td>{{ parcela.talhao.fazenda.nome|format_farm_name }}</td>
                 <td>{{ parcela.talhao.id_talhao }}</td>
-                <td>{{ parcela.talhao.fazenda.nome }}</td>
-                <td>{{ parcela.talhao.fazenda.fazenda.nome }}</td>
-                <td>{{ erro }}</td>
+                <td>{{ parcela.variedade.variedade }}</td>
+                <td>{{ dias_faltando }}</td>
             </tr>
             {% endfor %}
         </tbody>

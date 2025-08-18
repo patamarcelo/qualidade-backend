@@ -1185,6 +1185,7 @@ def finalizar_parcelas_encerradas():
     
     lista_finalizadas = []
     lista_erros = []
+    lista_proximas = []
 
     # 3) Faz a verificação dos 7 dias
     for parcela in queryset:
@@ -1196,7 +1197,7 @@ def finalizar_parcelas_encerradas():
 
         # teste = True
         # if teste:
-        if dias_passados >= 5:        
+        if dias_passados >= 4:        
             # parcela.finalizado_colheita = True
             # parcela.save(update_fields=["finalizado_colheita"])
             print(f"[INFO] Plantio: {parcela.pk} | Projeto: {parcela.talhao.fazenda.nome} | Área: {parcela.area_colheita}")
@@ -1249,6 +1250,7 @@ def finalizar_parcelas_encerradas():
                 lista_erros.append((parcela, str_resp))
         else:
             print(f"Faltam {dias_faltando} dias para poder finalizar esta parcela\n")
+            lista_proximas.append((parcela, dias_faltando))
     
     if lista_finalizadas:
         parcelas_encerradas = [
@@ -1286,6 +1288,26 @@ def finalizar_parcelas_encerradas():
 
         email = EmailMessage(
             subject="Erros ao Encerrar Parcelas no FarmBox",
+            body=html_content,
+            from_email="patamarcelo@gmail.com",
+            to=["patamarcelo@gmail.com"],
+        )
+        email.content_subtype = "html"
+        email.send()
+    if lista_proximas:
+        lista_proximas = sorted(
+            lista_proximas,
+            key=lambda x: (
+                x[0].talhao.fazenda.fazenda.nome,
+                x[0].talhao.fazenda.nome,
+                x[0].variedade.variedade,
+                x[0].talhao.id_talhao
+            )
+        )
+        html_content = render_to_string("email/resumo_proximas_parcelas.html", {"parcelas": lista_proximas, "data_email": data_formatada})
+
+        email = EmailMessage(
+            subject="Próximas parcelas a serem finalizadas",
             body=html_content,
             from_email="patamarcelo@gmail.com",
             to=["patamarcelo@gmail.com"],
