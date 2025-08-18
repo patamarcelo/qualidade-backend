@@ -1316,3 +1316,79 @@ def finalizar_parcelas_encerradas():
 
 
     return f"{queryset.count()} parcelas avaliadas para finalização"
+
+def atualizar_datas_previstas_colheita_real():
+    from .models import Plantio
+
+    caminho_arquivo_excel = os.path.join(
+        os.path.dirname(__file__), "utils", "cronograma_colheita.xlsx"
+    )
+
+    """
+    Atualiza o campo data_prevista_plantio do modelo Plantio
+    com base no ID FarmBox presente na aba "Plantio" do arquivo Excel.
+    """
+    try:
+        df = pd.read_excel(caminho_arquivo_excel, sheet_name="Plantio")
+
+        # Remove nulos, converte para inteiro (para remover o .0) e depois para string
+        df["ID FarmBox"] = df["ID FarmBox"].apply(
+            lambda x: str(int(x)).strip() if pd.notna(x) else None
+        )
+
+        # Coleta os IDs únicos válidos
+        ids_farmbox = df["ID FarmBox"].dropna().unique().tolist()
+        # Filtra apenas os Plantios necessários
+        plantios_dict = {
+            str(p.id_farmbox).strip(): p
+            for p in Plantio.objects.filter(id_farmbox__in=ids_farmbox)
+        }
+
+        atualizados = 0
+        nao_encontrados = []
+        objetos_para_salvar = []
+
+        # for _, row in df.head(65).iterrows():
+        for _, row in df.iterrows():
+            id_farmbox = str(row.get("ID FarmBox", "")).strip()
+            data_prevista = row.get("Data Prev Colheita")
+            print("data prevista: ", data_prevista)
+            print("id Farmbox: ", id_farmbox)
+
+            if pd.isna(id_farmbox) or pd.isna(data_prevista):
+                continue
+
+            try:
+                # Converte a data se necessário
+                if isinstance(data_prevista, str):
+                    data_formatada = datetime.datetime.strptime(
+                        data_prevista, "%d/%m/%Y"
+                    ).date()
+                elif isinstance(data_prevista, datetime.datetime):
+                    data_formatada = data_prevista.date()
+                else:
+                    continue
+            except Exception:
+                continue
+
+            plantio = plantios_dict.get(id_farmbox)
+            if plantio:
+                print("✅ plantio encontrado e data formatada: ", data_formatada)
+                plantio.data_prevista_plantio = data_formatada
+                objetos_para_salvar.append(plantio)
+                atualizados += 1
+            else:
+                nao_encontrados.append(id_farmbox)
+
+        with transaction.atomic():
+            if objetos_para_salvar:
+                Plantio.objects.bulk_update(
+                    objetos_para_salvar, ["data_prevista_plantio"]
+                )
+
+        print(f"✅ {atualizados} registros atualizados com sucesso.")
+        if nao_encontrados:
+            print(f"⚠️ IDs não encontrados: {', '.join(nao_encontrados)}")
+
+    except Exception as e:
+        print(f"❌ Erro ao atualizar dados: {str(e)}")

@@ -1413,6 +1413,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         "get_description_inicializado_plantio",
         "get_description_finalizado_plantio",
         "get_data_prev_col",
+        "get_data_prev_col_real",
         "get_description_finalizado_colheita",
         # "get_area_parcial",
         "get_total_colheita_cargas_kg",
@@ -1481,7 +1482,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
                         "data_plantio",
                         "data_emergencia",
                     ),
-                    ("data_prevista_colheita", "data_prevista_plantio"),
+                    ("data_prevista_colheita", "data_prevista_plantio", 'data_prevista_colheita_real'),
                     ("plantio_descontinuado",),
                     ("farmbox_update",),
                     ("acompanhamento_medias",),
@@ -1762,6 +1763,16 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
             return " - "
 
     get_data_prev_col.short_description = "Data Prev. Col."
+    
+    def get_data_prev_col_real(self, obj):
+        if obj.data_prevista_colheita_real:
+            return date_format(
+                obj.data_prevista_colheita_real, format="SHORT_DATE_FORMAT", use_l10n=True
+            )
+        else:
+            return " - "
+
+    get_data_prev_col_real.short_description = "Data Prev. Col. Real"
     
     def get_data_prev_plantio(self, obj):
         if obj.data_prevista_plantio and obj.variedade:

@@ -596,6 +596,12 @@ class Plantio(Base):
         blank=True,
         null=True,
     )
+    
+    data_prevista_colheita_real = models.DateField(
+        help_text="dd/mm/aaaa - Data Real prevista para a Colheita",
+        blank=True,
+        null=True,
+    )
 
     data_emergencia = models.DateField(
         help_text="dd/mm/aaaa - Data Emergencia Talhao ", blank=True, null=True
