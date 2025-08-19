@@ -1186,12 +1186,13 @@ def finalizar_parcelas_encerradas():
     lista_finalizadas = []
     lista_erros = []
     lista_proximas = []
-
+    dias_para_verificar_encerramento = 4
+    
     # 3) Faz a verificação dos 7 dias
     for parcela in queryset:
         # se já passou mais de 7 dias desde a última modificação
         dias_passados = (hoje - parcela.modificado).days
-        dias_faltando = max(0, 7 - dias_passados)
+        dias_faltando = max(0, dias_para_verificar_encerramento - dias_passados)
 
         print(f"[INFO] Plantio: {parcela} | Projeto: {parcela.talhao.fazenda.nome} | Área: {parcela.area_colheita}")
         filtered_list = [x for x in total_c_2 if x[0] == parcela.id]
@@ -1213,7 +1214,7 @@ def finalizar_parcelas_encerradas():
             value = None
         # teste = True
         # if teste:
-        if dias_passados >= 4:        
+        if dias_passados >= dias_para_verificar_encerramento:        
             # parcela.finalizado_colheita = True
             # parcela.save(update_fields=["finalizado_colheita"])
             print(f"[INFO] Plantio: {parcela.pk} | Projeto: {parcela.talhao.fazenda.nome} | Área: {parcela.area_colheita}")
