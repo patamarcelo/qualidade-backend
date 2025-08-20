@@ -64,7 +64,9 @@
             {% with value|br_float as prod %}
             <tr style="
                 background-color:
-                    {% if prod == '0,00' %}
+                {% if dias_faltando == 1 %}
+                        #fff8c4    
+                    {% elif prod == '0,00' %}
                         #ffeaea
                     {% else %}
                         {% if forloop.counter0|divisibleby:2 %}

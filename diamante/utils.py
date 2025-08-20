@@ -1155,7 +1155,7 @@ def get_emails_por_projeto(projeto):
 
 
 def finalizar_parcelas_encerradas():
-    from diamante.models import Plantio, Colheita
+    from diamante.models import Plantio, Colheita, CicloAtual, EmailAberturaST
     """
     Finaliza automaticamente parcelas cuja area_colheita já atingiu area_parcial
     e que foram modificadas há mais de 7 dias.
@@ -1165,9 +1165,13 @@ def finalizar_parcelas_encerradas():
     data_formatada = hoje.strftime("%d/%m/%Y")  # exemplo: 15/08/2025
 
     # 1) Busca todas não finalizadas
+    safracicle_filter = CicloAtual.objects.filter(nome="Colheita")[0]
+    safra_filter = safracicle_filter.safra.safra
+    cicle_filter = str(safracicle_filter.ciclo.ciclo)
+    
     queryset = Plantio.objects.filter(
-        safra__safra="2025/2026",
-        ciclo__ciclo="1",
+        safra__safra=safra_filter,
+        ciclo__ciclo=cicle_filter,
         finalizado_plantio=True,
         plantio_descontinuado=False,
         finalizado_colheita=False,
@@ -1273,12 +1277,13 @@ def finalizar_parcelas_encerradas():
             key=lambda x: (x["fazenda"], x["projeto"], x['cultura'], x["variedade"], x["id"])
         )
         html_content = render_to_string("email/resumo_parcelas.html", {"parcelas": parcelas_encerradas, "data_email": data_formatada})
-
+        
+        emails_to_send = EmailAberturaST.objects.filter(atividade__tipo='Fechamento Colheita').values_list('email', flat=True)
         email = EmailMessage(
             subject="Resumo das Parcelas Encerradas",
             body=html_content,
             from_email="patamarcelo@gmail.com",
-            to=["patamarcelo@gmail.com"],
+            to=emails_to_send,
         )
         email.content_subtype = "html"
         email.send()
@@ -1306,11 +1311,12 @@ def finalizar_parcelas_encerradas():
         )
         html_content = render_to_string("email/resumo_proximas_parcelas.html", {"parcelas": lista_proximas, "data_email": data_formatada})
 
+        emails_to_send = EmailAberturaST.objects.filter(atividade__tipo='Fechamento Colheita').filter(atividade__tipo="Erros").values_list('email', flat=True)
         email = EmailMessage(
             subject="Próximas parcelas a serem finalizadas",
             body=html_content,
             from_email="patamarcelo@gmail.com",
-            to=["patamarcelo@gmail.com"],
+            to=emails_to_send,
         )
         email.content_subtype = "html"
         email.send()

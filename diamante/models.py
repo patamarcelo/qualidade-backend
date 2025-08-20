@@ -1517,9 +1517,16 @@ class BackgroundTaskStatus(Base):
     def __str__(self) -> str:
         return f'{self.task_id} - {self.task_name} - {self.status}'
     
+
+class TiposAtividadeEmails(Base):
+    tipo = models.CharField(max_length=200, unique=True)
+    
+    def __str__(self):
+        return self.tipo
 class EmailAberturaST(Base):
-    email = models.EmailField(unique=True)
-    projetos = models.ManyToManyField("Projeto", related_name="emails_abertura_st")
+    email     = models.EmailField(unique=True)
+    projetos  = models.ManyToManyField("Projeto", related_name="emails_abertura_st")
+    atividade = models.ManyToManyField("TiposAtividadeEmails", related_name="atividades_emails_abertura_st", blank=True)
 
     def __str__(self):
         return self.email

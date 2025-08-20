@@ -3802,15 +3802,22 @@ class BackgroundTaskStatusAdmin(admin.ModelAdmin):
 
 @admin.register(EmailAberturaST)
 class EmailAberturaSTAdmin(admin.ModelAdmin):
-    list_display = ["email", "get_projetos"]
-    filter_horizontal = ["projetos"]
+    list_display = ["email", "get_projetos", 'get_tipos']
+    filter_horizontal = ["projetos", 'atividade']
 
     def get_projetos(self, obj):
         return ", ".join([p.nome.replace('Projeto ', '') for p in obj.projetos.all()])
 
     get_projetos.short_description = "Projetos"
     
+    def get_tipos(self, obj):
+        return ", ".join([p.tipo for p in obj.atividade.all()])
+
+    get_tipos.short_description = "Atividades"
     
     
+@admin.register(TiposAtividadeEmails)
+class TiposAtividadesEmailsAdmin(admin.ModelAdmin):
+    list_display = ['tipo']
     
 # list_display = ("criados", "projeto", "email", 'ativo')
