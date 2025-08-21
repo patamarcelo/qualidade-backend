@@ -9,7 +9,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="container mt-4">
+<div class="container mt-4 mb-4">
     <div id="app-data" data-harvest-id="{{ HARVEST_ID }}" data-farm-id="{{ FARM_ID }}"
         data-response-id="{{ RESPONSE_ID }}" data-charge-id="{{ CHARGE_ID }}" data-token="{{ YOUR_TOKEN }}">
     </div>
@@ -46,7 +46,8 @@
                             <img src="{% static 'images/icons/rice.png' %}" alt="Arroz"
                                 style="width: 20px; height: 20px;" />
                             {% else %}
-                            <span>Sem ícone</span>
+                            <img src="{% static 'images/icons/question.png' %}" alt="Arroz"
+                                style="width: 20px; height: 20px;" />
                             {% endif %}
                             {% endwith %}
                         </div>
