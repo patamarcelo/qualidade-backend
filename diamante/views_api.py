@@ -6377,12 +6377,15 @@ class BackgroundTaskStatusViewSet(viewsets.ModelViewSet):
                 recipient_list=["patamarcelo@gmail.com"],  # coloque aqui o destino
                 fail_silently=False,
             )
-            response = {
-                'msg': 'Email Enviado Com Sucesso!!'
-            }
-            return Response(response, status=status.HTTP_200_OK)
+            return Response(
+                {"msg": "E-mail enviado com sucesso 🎉"},
+                status=status.HTTP_200_OK
+            )
         except Exception as e:
-            return f"Falha ao enviar e-mail: {e}"
+            return Response(
+                {"msg": "Falha ao enviar e-mail", "erro": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 @api_view(["GET"])
 def task_status_view(request, task_id):
