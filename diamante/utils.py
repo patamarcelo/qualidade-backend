@@ -31,8 +31,8 @@ import pandas as pd
 from collections import defaultdict
 
 from django.utils import timezone
-from django.core.mail import EmailMessage
 from django.template.loader import render_to_string
+from diamante.gmail.gmail_api import send_mail
 
 
 
@@ -1279,30 +1279,28 @@ def finalizar_parcelas_encerradas():
         html_content = render_to_string("email/resumo_parcelas.html", {"parcelas": parcelas_encerradas, "data_email": data_formatada})
         
         emails_to_send = EmailAberturaST.objects.filter(atividade__tipo='Fechamento Colheita').values_list('email', flat=True)
-        email = EmailMessage(
-            subject="Resumo das Parcelas Encerradas",
-            body=html_content,
-            from_email="patamarcelo@gmail.com",
-            to=emails_to_send,
-        )
-        email.content_subtype = "html"
         try:
-            email.send()
+            send_mail(
+                subject="Resumo das Parcelas Encerradas",
+                message=html_content,
+                from_email="patamarcelo@gmail.com",
+                recipient_list=emails_to_send,
+                fail_silently=False
+            )
         except Exception as e:
             print('Erro em enviar o email: ', e)
     
     if lista_erros:
         html_content = render_to_string("email/resumo_erros.html", {"erros": lista_erros, "data_email": data_formatada})
 
-        email = EmailMessage(
-            subject="Erros ao Encerrar Parcelas no FarmBox",
-            body=html_content,
-            from_email="patamarcelo@gmail.com",
-            to=["patamarcelo@gmail.com"],
-        )
-        email.content_subtype = "html"
         try:
-            email.send()
+            send_mail(
+                    subject="Erros ao Encerrar Parcelas no FarmBox",
+                    message=html_content,
+                    from_email="patamarcelo@gmail.com",
+                    recipient_list=["patamarcelo@gmail.com"],
+                    fail_silently=False
+                )
         except Exception as e:
             print('Erro em enviar o email: ', e)
     if lista_proximas:
@@ -1318,15 +1316,14 @@ def finalizar_parcelas_encerradas():
         html_content = render_to_string("email/resumo_proximas_parcelas.html", {"parcelas": lista_proximas, "data_email": data_formatada})
 
         emails_to_send = EmailAberturaST.objects.filter(atividade__tipo='Fechamento Colheita').filter(atividade__tipo="Erros").values_list('email', flat=True)
-        email = EmailMessage(
-            subject="Próximas parcelas a serem finalizadas",
-            body=html_content,
-            from_email="patamarcelo@gmail.com",
-            to=emails_to_send,
-        )
-        email.content_subtype = "html"
         try:
-            email.send()
+            send_mail(
+                    subject="Próximas parcelas a serem finalizadas",
+                    message=html_content,
+                    from_email="patamarcelo@gmail.com",
+                    recipient_list=emails_to_send,
+                    fail_silently=False
+                )
         except Exception as e:
             print('Erro em enviar o email: ', e)
 

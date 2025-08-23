@@ -46,7 +46,7 @@ def send_mail(subject, message, from_email, recipient_list, fail_silently=False)
             recipient_list = [recipient_list]
 
         # Monta a mensagem MIME
-        mime_message = MIMEText(message)
+        mime_message = MIMEText(message, "html")
         mime_message['to'] = ', '.join(recipient_list)
         mime_message['from'] = from_email
         mime_message['subject'] = subject
