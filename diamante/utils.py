@@ -1286,7 +1286,10 @@ def finalizar_parcelas_encerradas():
             to=emails_to_send,
         )
         email.content_subtype = "html"
-        email.send()
+        try:
+            email.send()
+        except Exception as e:
+            print('Erro em enviar o email: ', e)
     
     if lista_erros:
         html_content = render_to_string("email/resumo_erros.html", {"erros": lista_erros, "data_email": data_formatada})
@@ -1298,7 +1301,10 @@ def finalizar_parcelas_encerradas():
             to=["patamarcelo@gmail.com"],
         )
         email.content_subtype = "html"
-        email.send()
+        try:
+            email.send()
+        except Exception as e:
+            print('Erro em enviar o email: ', e)
     if lista_proximas:
         lista_proximas = sorted(
             lista_proximas,
@@ -1319,7 +1325,10 @@ def finalizar_parcelas_encerradas():
             to=emails_to_send,
         )
         email.content_subtype = "html"
-        email.send()
+        try:
+            email.send()
+        except Exception as e:
+            print('Erro em enviar o email: ', e)
 
 
     return f"{queryset.count()} parcelas avaliadas para finalização"
