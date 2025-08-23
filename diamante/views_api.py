@@ -53,7 +53,7 @@ from .utils import (
     get_miliseconds,
     Spinner,
     is_older_than_7_days,
-    get_emails_por_projeto
+    get_emails_por_projeto, finalizar_parcelas_encerradas
 )
 
 from qualidade_project.mongo_api import generate_file_run
@@ -6379,6 +6379,21 @@ class BackgroundTaskStatusViewSet(viewsets.ModelViewSet):
             )
             return Response(
                 {"msg": "E-mail enviado com sucesso 🎉"},
+                status=status.HTTP_200_OK
+            )
+        except Exception as e:
+            return Response(
+                {"msg": "Falha ao enviar e-mail", "erro": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=False, methods=["GET"])
+    def finalizar_parcelas_encerradas(self, request):
+        try:
+            # roda em background para não travar a resposta
+            Thread(target=finalizar_parcelas_encerradas).start()
+            return Response(
+                {"msg": "Parcelas serão processadas em background 🎉"},
                 status=status.HTTP_200_OK
             )
         except Exception as e:
