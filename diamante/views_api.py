@@ -134,7 +134,8 @@ from collections import defaultdict
 
 from diamante.read_farm_data import get_applications, get_applications_pluvi
 
-from django.core.mail import send_mail
+# from django.core.mail import send_mail
+from diamante.gmail.gmail_api import send_mail
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags

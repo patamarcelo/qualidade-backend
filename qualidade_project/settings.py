@@ -141,7 +141,7 @@ WSGI_APPLICATION = "qualidade_project.wsgi.application"
 
 # EMAIL CONFIG
 
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 # EMAIL_BACKEND = "anymail.backends.sendinblue.EmailBackend"
 
 # Chave da API MailerSend
@@ -149,13 +149,14 @@ EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 #     "SENDINBLUE_API_KEY": env("SENDINBLUE_API_KEY"),
 # }
 
-EMAIL_HOST = 'smtp.gmail.com'
+# EMAIL_HOST = 'smtp.gmail.com'
 # EMAIL_HOST = 'smtp-relay.sendinblue.com'
-EMAIL_PORT = 465
-EMAIL_USE_TLS = False
-EMAIL_USE_SSL = True
-EMAIL_HOST_USER = 'marcelo@gdourado.com.br'
-EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD_CONFIG")
+# EMAIL_PORT = 465
+# EMAIL_USE_TLS = False
+# EMAIL_USE_SSL = True
+# EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD_CONFIG")
+
+EMAIL_HOST_USER = 'patamarcelo@gmail.com'
 
 
 # Database
