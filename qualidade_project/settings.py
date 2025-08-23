@@ -84,6 +84,7 @@ INSTALLED_APPS = [
     "crispy_bootstrap4",
     "storages",
     "aviacao",
+    "anymail"
 ]
 
 MIDDLEWARE = [
@@ -140,11 +141,19 @@ WSGI_APPLICATION = "qualidade_project.wsgi.application"
 
 # EMAIL CONFIG
 
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 465
-EMAIL_USE_TLS = False
-EMAIL_USE_SSL = True
+# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_BACKEND = "anymail.backends.sendinblue.EmailBackend"
+
+# Chave da API MailerSend
+ANYMAIL = {
+    "SENDINBLUE_API_KEY": env("SENDINBLUE_API_KEY"),
+}
+
+# EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_HOST = 'smtp-relay.sendinblue.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+# EMAIL_USE_SSL = True
 EMAIL_HOST_USER = 'patamarcelo@gmail.com'
 EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD_CONFIG")
 
