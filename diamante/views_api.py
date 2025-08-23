@@ -6366,6 +6366,23 @@ class BackgroundTaskStatusViewSet(viewsets.ModelViewSet):
             })
         except BackgroundTaskStatus.DoesNotExist:
             return Response({"error": "Task não encontrada"}, status=404)
+    
+    @action(detail=False, methods=["GET"])
+    def enviar_email_teste(self, request):
+        try:
+            send_mail(
+                subject="Teste de envio Django",
+                message="Se você recebeu este e-mail, o SMTP está funcionando 🎉",
+                from_email=settings.EMAIL_HOST_USER,
+                recipient_list=["patamarcelo@gmail.com"],  # coloque aqui o destino
+                fail_silently=False,
+            )
+            response = {
+                'msg': 'Email Enviado Com Sucesso!!'
+            }
+            return Response(response, status=status.HTTP_200_OK)
+        except Exception as e:
+            return f"Falha ao enviar e-mail: {e}"
 
 @api_view(["GET"])
 def task_status_view(request, task_id):
