@@ -7,6 +7,10 @@ from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.oauth2.credentials import Credentials
 
+from email.mime.multipart import MIMEMultipart
+from email.mime.application import MIMEApplication
+
+
 
 SCOPES = ['https://www.googleapis.com/auth/gmail.send']
 
@@ -55,6 +59,76 @@ def send_mail(subject, message, from_email, recipient_list, fail_silently=False)
         raw_message = {'raw': base64.urlsafe_b64encode(mime_message.as_bytes()).decode()}
 
         # Envia a mensagem
+        result = service.users().messages().send(userId='me', body=raw_message).execute()
+        return result
+
+    except Exception as e:
+        if not fail_silently:
+            raise e
+
+def get_gmail_service():
+    """
+    Retorna o service do Gmail usando refresh token e env vars.
+    """
+    creds = Credentials(
+        token=None,  # será renovado automaticamente
+        refresh_token=os.environ.get("GOOGLE_REFRESH_TOKEN"),
+        client_id=os.environ.get("GOOGLE_CLIENT_ID"),
+        client_secret=os.environ.get("GOOGLE_CLIENT_SECRET"),
+        token_uri="https://oauth2.googleapis.com/token"
+    )
+    service = build('gmail', 'v1', credentials=creds)
+    return service
+
+def send_mail_gmail_api(
+    subject: str,
+    body_html: str,
+    from_email: str,
+    to_emails: list,
+    cc_emails: list = None,
+    attachments: list = None,
+    fail_silently: bool = False
+):
+    """
+    Envia e-mail via Gmail API.
+    
+    :param subject: Assunto do e-mail
+    :param body_html: Corpo em HTML
+    :param from_email: Remetente
+    :param to_emails: Lista de destinatários
+    :param cc_emails: Lista de CC (opcional)
+    :param attachments: Lista de tuplas (filename, bytes, mime_type) (opcional)
+    :param fail_silently: Se True, não levanta exceção
+    """
+    try:
+        if isinstance(to_emails, str):
+            to_emails = [to_emails]
+        if cc_emails is None:
+            cc_emails = []
+        if attachments is None:
+            attachments = []
+
+        # Cria a mensagem multipart
+        message = MIMEMultipart()
+        message['to'] = ', '.join(to_emails)
+        message['cc'] = ', '.join(cc_emails)
+        message['from'] = from_email
+        message['subject'] = subject
+
+        # Corpo HTML
+        message.attach(MIMEText(body_html, 'html'))
+
+        # Anexos
+        for filename, file_bytes, mime_type in attachments:
+            part = MIMEApplication(file_bytes, _subtype=mime_type.split('/')[-1])
+            part.add_header('Content-Disposition', f'attachment; filename="{filename}"')
+            message.attach(part)
+
+        # Codifica para enviar via Gmail API
+        raw_message = {'raw': base64.urlsafe_b64encode(message.as_bytes()).decode()}
+
+        # Envia
+        service = get_gmail_service()
         result = service.users().messages().send(userId='me', body=raw_message).execute()
         return result
 

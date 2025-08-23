@@ -135,7 +135,7 @@ from collections import defaultdict
 from diamante.read_farm_data import get_applications, get_applications_pluvi
 
 # from django.core.mail import send_mail
-from diamante.gmail.gmail_api import send_mail
+from diamante.gmail.gmail_api import send_mail, send_mail_gmail_api
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
@@ -6219,34 +6219,62 @@ class StViewSet(viewsets.ModelViewSet):
 
                     # plain_message = strip_tags(convert_to_html_content)
 
-                    email = EmailMultiAlternatives(
-                        subject=subject,
-                        body=convert_to_html_content,  # Set plain text version
-                        from_email=from_email,
-                        to=list_emails,
-                        cc=cc_list or [],  # Add CC list (default to empty if not provided)
-                    )
+                    # email = EmailMultiAlternatives(
+                    #     subject=subject,
+                    #     body=convert_to_html_content,  # Set plain text version
+                    #     from_email=from_email,
+                    #     to=list_emails,
+                    #     cc=cc_list or [],  # Add CC list (default to empty if not provided)
+                    # )
 
-                    email.attach_alternative(convert_to_html_content, "text/html")  # Add HTML alternative
+                    # email.attach_alternative(convert_to_html_content, "text/html")  # Add HTML alternative
                     current_date = datetime.datetime.now().strftime("%d-%m-%Y")
 
-                    # Attach the Excel file
-                    email.attach(
-                        f"produtos_geral-{current_date}_{title_column}.xlsx",
+                    # # Attach the Excel file
+                    # email.attach(
+                    #     f"produtos_geral-{current_date}_{title_column}.xlsx",
+                    #     excel_file.read(),
+                    #     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    # )
+
+                    # # Attach HTML file
+                    # email.attach(
+                    #     f"resumo_solicitacao-{current_date}.html",
+                    #     convert_to_html_content,
+                    #     "text/html"  # MIME type for HTML
+                    # )
+
+                    # result = email.send()
+                    # check_here = 'Sim' if result > 0 else 'Não'
+                    # print('Email foi enviado: ', check_here)
+                    
+                    
+                    
+                    # ------------------------ nova formula de email ------------------------ #
+                    # Monta a lista de anexos
+                    attachments = [
+                        (f"produtos_geral-{current_date}_{title_column}.xlsx",
                         excel_file.read(),
-                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+                        (f"resumo_solicitacao-{current_date}.html",
+                        convert_to_html_content.encode('utf-8'),
+                        "text/html")
+                    ]
+
+                    # Envia usando Gmail API
+                    result = send_mail_gmail_api(
+                        subject=subject,
+                        body_html=convert_to_html_content,
+                        from_email=from_email,
+                        to_emails=list_emails,
+                        cc_emails=cc_list or [],
+                        attachments=attachments
                     )
 
-                    # Attach HTML file
-                    email.attach(
-                        f"resumo_solicitacao-{current_date}.html",
-                        convert_to_html_content,
-                        "text/html"  # MIME type for HTML
-                    )
-
-                    result = email.send()
-                    check_here = 'Sim' if result > 0 else 'Não'
-                    print('Email foi enviado: ', check_here)
+                    check_here = 'Sim' if result.get('id') else 'Não'
+                    print("E-mail enviado?", check_here)
+                    
+                    
 
                 else:
                     print('Email não enviado, devido as configurações')
