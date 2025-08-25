@@ -2163,8 +2163,12 @@ class ColheitaAdmin(admin.ModelAdmin):
                         )
                     )
                     messages.add_message(request, messages.WARNING, msg)
-                    for failed in failed_format:
-                        messages.add_message(request, messages.ERROR, mark_safe(failed))
+                    for failed, item in zip(failed_format, failed_loads):
+                        if item['error'] == "ID NAO ENCONTRADO":
+                            print('estamos entrando aqui')
+                            messages.add_message(request, messages.WARNING, mark_safe(failed))  # amarelo
+                        else:
+                            messages.add_message(request, messages.ERROR, mark_safe(failed))  # vermelho
             # Fim da contagem de tempo
             end_time = time.time()
 
@@ -3117,7 +3121,7 @@ class AppFarmBoxIntegrationAdmin(admin.ModelAdmin):
 @admin.register(StProtheusIntegration)
 class StProtheusIntegrationAdmin(admin.ModelAdmin):
     
-    list_display = ("get_data", "st_numero", "st_fazenda")
+    list_display = ("st_numero", "get_data", "st_fazenda")
     search_fields = ("criados", 'st_numero', 'st_fazenda')
     list_filter = (
         ("criados", DateFieldListFilter),  # Filters by the 'criados' date field
@@ -3147,11 +3151,8 @@ class StProtheusIntegrationAdmin(admin.ModelAdmin):
     
     def get_data(self, obj):
         if obj.criados:
-            return date_format(
-                obj.criados, format="SHORT_DATE_FORMAT", use_l10n=True
-            )
-        else:
-            return " - "
+            return date_format(obj.criados, format="DATETIME_FORMAT", use_l10n=True)
+        return " - "
 
     get_data.short_description = "Data Abertura"
     
@@ -3802,11 +3803,11 @@ class BackgroundTaskStatusAdmin(admin.ModelAdmin):
 
 @admin.register(EmailAberturaST)
 class EmailAberturaSTAdmin(admin.ModelAdmin):
-    list_display = ["email", "get_projetos", 'get_tipos']
+    list_display = ["email", "get_projetos", 'get_tipos', 'ativo']
     filter_horizontal = ["projetos", 'atividade']
 
     def get_projetos(self, obj):
-        return ", ".join([p.nome.replace('Projeto ', '') for p in obj.projetos.all()])
+        return ", ".join([p.nome.replace('Projeto ', '').split()[0] for p in obj.projetos.all()])
 
     get_projetos.short_description = "Projetos"
     

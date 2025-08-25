@@ -544,3 +544,10 @@ table#change-history tbody th {
     text-align: right !important;
     min-width: 150px !important;
 }
+
+
+.alert-yellow {
+    background-color: #fff3cd; /* amarelo clarinho */
+    border: 1px solid #ffeeba;
+    color: #856404;
+}

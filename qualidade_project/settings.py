@@ -14,6 +14,7 @@ from pathlib import Path
 import environ
 import os
 import certifi, os
+from django.contrib.messages import constants as messages
 
 # from .mongo_api import conect_mongo_db
 
@@ -332,3 +333,15 @@ ENABLE_CRON_REGISTER = True
 #         },
 #     },
 # }
+
+
+
+
+
+MESSAGE_TAGS = {
+    messages.DEBUG: 'debug',
+    messages.INFO: 'info',
+    messages.SUCCESS: 'success',
+    messages.WARNING: 'warning',  # garante que WARNING = alert-warning
+    messages.ERROR: 'danger',      # bootstrap usa "danger" em vez de "error"
+}

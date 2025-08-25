@@ -5354,6 +5354,21 @@ def save_from_protheus_logic(data_json, user_id):
                                     plantio_id = plantio_ids_cache.get((str(safra), int(ciclo), int(origem_id), str(parcela)))
                                     if not plantio_id:
                                         print('plantio id nao encontrado')
+                                        get_proj = Projeto.objects.get(id_d=int(origem_id))
+                                        print('plantio id: ', plantio_id)
+                                        print('Projeto: ', get_proj.nome)
+                                        print('data to Find: ', str(safra), int(ciclo), int(origem_id), str(parcela))
+                                        print('deposito id: ', deposito_id)
+                                        failed += 1
+                                        problem_load = {
+                                            "parcela": parcela,
+                                            "projeto": get_proj.nome,
+                                            "romaneio": romaneio,
+                                            "ticket": ticket if ticket else 'Sem Ticket',
+                                            "error": 'ID NAO ENCONTRADO',
+                                            "id_farmtruck": id_farmtruck,
+                                        }
+                                        problem.append(problem_load)
                                         continue  # plantio não encontrado, já foi avisado
 
                                     if len(percent_parcelas) > 0:
@@ -5473,6 +5488,18 @@ def save_from_protheus_logic(data_json, user_id):
                                             print('plantio id: ', plantio_id)
                                             print('data to Find: ', str(safra), int(ciclo), int(origem_id), str(parcela))
                                             print('deposito id: ', deposito_id)
+                                            print('Projeto: ', get_proj.nome)
+                                            get_proj = Projeto.objects.get(id_d=int(origem_id))
+                                            failed += 1
+                                            problem_load = {
+                                                "parcela": parcela,
+                                                "projeto": get_proj.nome,
+                                                "romaneio": romaneio,
+                                                "ticket": ticket if ticket else 'Sem Ticket',
+                                                "error": 'ID NAO ENCONTRADO',
+                                                "id_farmtruck": id_farmtruck,
+                                            }
+                                            problem.append(problem_load)
                                     except Exception as e:
                                         print(
                                             f"plantio não encontrado - {Fore.LIGHTRED_EX}Origem: {origem} | Parcela: {parcela} | Erro: {e}{Style.RESET_ALL}"
@@ -5571,9 +5598,21 @@ def save_from_protheus_logic(data_json, user_id):
                                         print(f"{Fore.BLUE}{deposito_id}{Style.RESET_ALL}")
                                         print(f"{Fore.BLUE}{plantio_id}{Style.RESET_ALL}")
                                     else:
+                                        get_proj = Projeto.objects.get(id_d=int(origem_id))
                                         print('plantio id: ', plantio_id)
+                                        print('Projeto: ', get_proj.nome)
                                         print('data to Find: ', str(safra), int(ciclo), int(origem_id), str(parcelas[0]))
                                         print('deposito id: ', deposito_id)
+                                        failed += 1
+                                        problem_load = {
+                                            "parcela": parcelas[0],
+                                            "projeto": get_proj.nome,
+                                            "romaneio": romaneio,
+                                            "ticket": ticket if ticket else 'Sem Ticket',
+                                            "error": 'ID NAO ENCONTRADO',
+                                            "id_farmtruck": id_farmtruck,
+                                        }
+                                        problem.append(problem_load)
                                 except Exception as e:
                                     print(
                                         f"plantio não encontrado - {Fore.LIGHTRED_EX}Origem: {origem} | Parcela: {parcelas[0]} | Erro: {e}{Style.RESET_ALL}"
