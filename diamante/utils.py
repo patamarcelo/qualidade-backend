@@ -1315,7 +1315,7 @@ def finalizar_parcelas_encerradas():
         )
         html_content = render_to_string("email/resumo_proximas_parcelas.html", {"parcelas": lista_proximas, "data_email": data_formatada})
 
-        emails_to_send = EmailAberturaST.objects.filter(atividade__tipo='Fechamento Colheita', ativo=True).filter(atividade__tipo="Erros").values_list('email', flat=True)
+        emails_to_send = EmailAberturaST.objects.filter(atividade__tipo='Fechamento Colheita', ativo=True).values_list('email', flat=True)
         try:
             send_mail(
                     subject="Próximas parcelas a serem finalizadas",
