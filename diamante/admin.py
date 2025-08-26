@@ -1459,6 +1459,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
                         "get_dap_description",
                         "get_talhao__id_unico",
                         "id_farmbox",
+                        "pk"
                     ),
                     (
                         "talhao",
@@ -1506,6 +1507,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         "get_data_plantio",
         "get_talhao__id_unico",
         "id_farmbox",
+        "pk"
     )
 
     @admin.display(description="🗓️")
