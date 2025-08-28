@@ -1119,7 +1119,7 @@ def gerar_emails_list_by_farm():
 
     emails_dict = defaultdict(list)
 
-    emails = EmailAberturaST.objects.prefetch_related("projetos").all()
+    emails = EmailAberturaST.objects.filter(atividade__tipo='Abertura St', ativo=True).prefetch_related("projetos")
 
     for email_obj in emails:
         projetos_nomes = sorted(

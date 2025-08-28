@@ -4322,7 +4322,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "Content-Type": "application/json",
                     "Authorization": f'Basic ${PROTHEUS_TOKEN}',
                     "Access-Control-Allow-Origin": "*",
-                    "tenantid": "02"
+                    "tenantId": "02"
                 }
                 url = "https://api.diamanteagricola.com.br:8089/rest/planejamento/cabecalho"
 
@@ -4356,7 +4356,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                             # codigo_planejamento=codigo_to_save,
                                             safra=safra_to_save,
                                             ciclo=ciclo_to_save
-                                        ).exists():
+                                            ).exists():
                                             new_planner = HeaderPlanejamentoAgricola(
                                                 projeto=projeto_to_save,
                                                 codigo_planejamento=codigo_to_save,
@@ -4364,7 +4364,9 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                                 ciclo=ciclo_to_save
                                             )
                                             new_planner.save()
-                                        print(f'{Fore.GREEN}Novo Planejamento incluido com sucesso!! - {Fore.BLUE} {new_planner}{Style.RESET_ALL}')
+                                            print(f'{Fore.GREEN}Novo Planejamento incluido com sucesso!! - {Fore.BLUE} {new_planner}{Style.RESET_ALL}')
+                                        else:
+                                            print(f'{Fore.GREEN}Header de Planejamento já existe!! - {Fore.YELLOW} {projeto_to_save} - {safra_to_save}/{ciclo_to_save} - {Style.RESET_ALL}')
                                     except Exception as e:
                                         print(f'{Fore.LIGHTYELLOW_EX}Erro ao Salvar o Planejamento {Fore.LIGHTRED_EX}{e}{Style.RESET_ALL}')
                                 else:
@@ -4380,7 +4382,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 }
 
                 print('Talhos a enviar: \n')
-                print(format_data_to_send)
+                print(format_data_to_send[0])
 
                 if len(format_data_to_send) > 0:
                     try:
