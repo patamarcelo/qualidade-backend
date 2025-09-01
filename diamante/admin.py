@@ -1339,7 +1339,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         print('model request: ', model_request)
         if model_request and model_request == 'plantioextratoarea':
             queryset = queryset.filter(
-                ciclo__ciclo__in=["1", "1"],
+                ciclo__ciclo__in=["1", "2"],
                 safra__safra="2025/2026",
                 finalizado_colheita=False,
                 plantio_descontinuado=False,
