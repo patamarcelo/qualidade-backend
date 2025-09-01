@@ -3965,6 +3965,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     # finalizado_plantio=True,
                     # programa__isnull=False,
                     talhao__fazenda__id_farmbox=projeto_filter,
+                    plantio_descontinuado=False
                 ).order_by('data_prevista_plantio')
 
                 plantio_ids = Plantio.objects.values(
@@ -4076,6 +4077,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 ciclo__ciclo="3",
                 finalizado_plantio=True,
                 talhao__fazenda__nome=projeto_filter,
+                plantio_descontinuado=False
             )
 
             print("depois de fazer a query")
