@@ -6247,10 +6247,7 @@ class StViewSet(viewsets.ModelViewSet):
 
                     if generate_pre_st:
                         cc_list = [
-                            "raylton.sousa@diamanteagricola.com.br",
-                            "adriana.goncalves@diamanteagricola.com.br",
                             "marcelo.pata@diamanteagricola.com.br",
-                            "marim.neto@diamanteagricola.com.br"
                         ]
                     else:
                         cc_list = ["marcelo.pata@diamanteagricola.com.br"]
