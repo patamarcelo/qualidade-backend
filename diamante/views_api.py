@@ -3062,7 +3062,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     safra=s_dict[safra_filter],
                     ciclo=c_dict[cicle_filter],
                     plantio_descontinuado=False,
-                ).filter(variedade__cultura__isnull=False)
+                )
+                # .filter(variedade__cultura__isnull=False)
 
                 result = [x for x in qs_plantio]
                 for i in qs_colheita:
