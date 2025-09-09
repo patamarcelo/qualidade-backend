@@ -5,6 +5,10 @@ from .read_farm_data import get_applications, get_applications_pluvi
 from qualidade_project.mongo_api import generate_file_run
 from django.db import connection
 
+from diamante.gmail.gmail_api import send_mail
+from django.conf import settings
+from django.template.loader import render_to_string
+
 
 def get_hour_test():
     current_time = datetime.now()
@@ -37,4 +41,20 @@ def update_farmbox_mongodb_app():
     type_pluvi = 'Pluvi'
     generate_file_run(type_pluvi, data_applications_pluvi)
     print("\nPluviometrias Atualizadas.")
-        
+    
+def enviar_email_diario():
+    """
+    Função chamada pelo cron para enviar um e-mail diário às 6:30.
+    """
+    try:
+        html_content = render_to_string("email/email_reuniao.html")
+        send_mail(
+            subject="Reunião Diária",
+            message=html_content,
+            from_email=settings.EMAIL_HOST_USER,
+            recipient_list=["patamarcelo@gmail.com", "mtpata@icloud.com"],  # sua lista aqui
+            fail_silently=False,
+        )
+        print('[feito] - Email enviado com sucesso')
+    except Exception as e:
+        print('[Problema] - Falha em enviar o email: ', e)

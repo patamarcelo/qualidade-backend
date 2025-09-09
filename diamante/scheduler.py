@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 from importlib import import_module
 from django.conf import settings
 
-
+from diamante.cron import enviar_email_diario
 
 def get_formatted_datetime():
     now = datetime.now()
@@ -86,26 +86,17 @@ def start():
                     replace_existing=True,
                     misfire_grace_time=3600  # tolerância de 1 hora caso haja atraso
                 )
-                # scheduler.add_job(
-                #     func,
-                #     'cron',
-                #     day_of_week="*",
-                #     hour="5-19",  # From 6 AM to 7:59 PM
-                #     minute="58",  # At 15, 30, 45 and 58 minutes of each hour
-                #     id=job_id,
-                #     replace_existing=True,
-                #     misfire_grace_time=30  # segundos de tolerância para atraso
-
-                # )
-                # scheduler.add_job(
-                #     delete_old_job_executions,
-                #     trigger='interval',
-                #     days=7,
-                #     id='delete_old_job_executions',
-                #     max_instances=1,
-                #     replace_existing=True,
-                # )
-                # logger.info("Added job: 'delete_old_job_executions'.")
+                
+                scheduler.add_job(
+                    enviar_email_diario,
+                    'cron',
+                    day_of_week="mon-sat",  # Segunda a sábado
+                    hour="17",
+                    minute="56",
+                    id="enviar_email_diario_0630",
+                    replace_existing=True,
+                    misfire_grace_time=3600  # tolerância de 1 hora caso haja atraso
+                )
                 
             register_events(scheduler)
             scheduler.start()
