@@ -43,16 +43,18 @@ def update_farmbox_mongodb_app():
     print("\nPluviometrias Atualizadas.")
     
 def enviar_email_diario():
+    from diamante.models import EmailAberturaST
     """
     Função chamada pelo cron para enviar um e-mail diário às 6:30.
     """
     try:
         html_content = render_to_string("email/email_reuniao.html")
+        emails_to_send = EmailAberturaST.objects.filter(atividade__tipo='Reuniao Diaria 0630', ativo=True).values_list('email', flat=True)
         send_mail(
             subject="Reunião Diária",
             message=html_content,
             from_email=settings.EMAIL_HOST_USER,
-            recipient_list=["patamarcelo@gmail.com", "mtpata@icloud.com"],  # sua lista aqui
+            recipient_list=emails_to_send,
             fail_silently=False,
         )
         print('[feito] - Email enviado com sucesso')

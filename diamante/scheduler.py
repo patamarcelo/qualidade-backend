@@ -91,8 +91,8 @@ def start():
                     enviar_email_diario,
                     'cron',
                     day_of_week="mon-sat",  # Segunda a sábado
-                    hour="17",
-                    minute="56",
+                    hour="20",
+                    minute="40",
                     id="enviar_email_diario_0630",
                     replace_existing=True,
                     misfire_grace_time=3600  # tolerância de 1 hora caso haja atraso
