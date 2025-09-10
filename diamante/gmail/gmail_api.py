@@ -52,7 +52,7 @@ def send_mail(subject, message, from_email, recipient_list, fail_silently=False)
         # Monta a mensagem MIME
         mime_message = MIMEText(message, "html")
         mime_message['to'] = ', '.join(recipient_list)
-        mime_message['from'] = from_email
+        # mime_message['from'] = from_email
         mime_message['subject'] = subject
 
         # Codifica em base64
@@ -112,7 +112,7 @@ def send_mail_gmail_api(
         message = MIMEMultipart()
         message['to'] = ', '.join(to_emails)
         message['cc'] = ', '.join(cc_emails)
-        message['from'] = from_email
+        # message['from'] = from_email
         message['subject'] = subject
 
         # Corpo HTML
