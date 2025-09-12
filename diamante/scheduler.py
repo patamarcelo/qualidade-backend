@@ -92,7 +92,7 @@ def start():
                     'cron',
                     day_of_week="mon-sat",  # Segunda a sábado
                     hour="6",
-                    minute="28",
+                    minute="20",
                     id="enviar_email_diario_0630",
                     replace_existing=True,
                     misfire_grace_time=3600  # tolerância de 1 hora caso haja atraso
