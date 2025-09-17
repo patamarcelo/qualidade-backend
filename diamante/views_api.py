@@ -6444,7 +6444,7 @@ class BackgroundTaskStatusViewSet(viewsets.ModelViewSet):
                 subject="Teste de envio Django",
                 message="Se você recebeu este e-mail, o SMTP está funcionando 🎉",
                 from_email=settings.EMAIL_HOST_USER,
-                recipient_list=["patamarcelo@gmail.com"],  # coloque aqui o destino
+                recipient_list=["matheus.carvalho@diamanteagricola.com.br"],  # coloque aqui o destino
                 fail_silently=False,
             )
             return Response(
