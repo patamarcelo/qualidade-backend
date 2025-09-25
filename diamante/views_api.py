@@ -3892,6 +3892,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
         projeto_filter = request.data["projeto"]
         parcelas_filter = request.data["parcelas"]
         safra_request = request.data["safra"]
+        color_array = request.data.get("colorArray", [])
+        print('color Arr: ', color_array)
         safra_filter = safra_request.get('safra', '2025/2026') if safra_request else '2025/2026'
         ciclo_filter = safra_request.get('ciclo', '3') if safra_request else '3'
         planejamento_plantio = False
@@ -4026,6 +4028,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 planejamento_plantio=planejamento_plantio,
                 grouped_by_date=grouped_by_date,
                 ids_farmbox_planner=ids_farmbox,
+                color_array=color_array
             )
 
             data_img = base64.b64encode(img_buffer.getvalue()).decode()
@@ -6444,7 +6447,7 @@ class BackgroundTaskStatusViewSet(viewsets.ModelViewSet):
                 subject="Teste de envio Django",
                 message="Se você recebeu este e-mail, o SMTP está funcionando 🎉",
                 from_email=settings.EMAIL_HOST_USER,
-                recipient_list=["patamarcelo@gmail.com"],  # coloque aqui o destino
+                recipient_list=["matheus.carvalho@diamanteagricola.com.br"],  # coloque aqui o destino
                 fail_silently=False,
             )
             return Response(

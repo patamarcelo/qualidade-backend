@@ -42,6 +42,7 @@ ipython_config.py
 
 # Environments
 *env
+*env-qual
 local_settings.py
 
 # Media and Static directories
