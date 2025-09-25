@@ -94,7 +94,7 @@
         {% for obj in queryset %}
         <tr>
             <td>{{ forloop.counter }}</td>
-            <td>{{ obj.talhao.fazenda.fazenda.nome|format_farm_name  }}</td>
+            <td>{{ obj.talhao.fazenda.nome|format_farm_name  }}</td>
             <td>{{ obj.talhao.id_talhao }}</td>
             <td>{{ obj.safra }} / {{ obj.ciclo }}</td>
             <td>{{ obj.area_colheita }}</td>
