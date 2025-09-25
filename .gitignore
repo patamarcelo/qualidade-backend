@@ -62,3 +62,6 @@ secrets.json
 
 Dockerfile
 docker-compose.yml
+
+# env local
+env-qual

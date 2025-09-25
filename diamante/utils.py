@@ -1046,6 +1046,33 @@ def set_variety_plantations():
             print(f"   ▶️ Status {response.status_code}: {response.text}")
         except Exception as e:
             print(f"❌ Erro ao atualizar plantio {plantio}: {e}")
+            
+
+def update_farmbox_data(id_farmbox, new_prev_date, variety, culture ):
+    # Monta payload para a API
+    payload = {
+        "planned_variety_id": variety,
+        "planned_date": new_prev_date if new_prev_date else "",
+        "planned_culture_id": culture
+    }
+
+    # Envia PUT para Farmbox
+    url = f"https://farmbox.cc/api/v1/plantations/{id_farmbox}"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": FARMBOX_ID,
+    }
+
+    try:
+        response = requests.put(url, data=json.dumps(payload), headers=headers)
+        print(
+            f"✅ Plantio atualizado :  (Farmbox ID: {id_farmbox}) atualizado para variedade e cultura"
+        )
+        print(f"   ▶️ Status {response.status_code}: {response.text}")
+        return True
+    except Exception as e:
+        print(f"❌ Erro ao atualizar plantio {id_farmbox}: {e}")
+    return False
 
 
 emails_list_by_farm = [
