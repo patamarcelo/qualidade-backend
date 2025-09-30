@@ -107,6 +107,7 @@ def draw_cartoon_map(
         else:
             if id_farm in filled_polygon_index:
                 
+                new_filled_color = filled_color
                 if color_array:
                     get_color = [item["color_selected"] 
                                 for item in color_array 
