@@ -1125,13 +1125,15 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
                 updated_count = 0
 
                 for instance in queryset:
-                    print('id Farm: ', instance.id_farmbox, 'nova Data: ', nova_data, 'planned_variety_id', nova_variedade.id_farmbox, 'planned_culture_id', nova_variedade.cultura.id_farmbox ) 
+                    print('id Farm: ', instance.id_farmbox) 
                     # Atualiza somente se houver valor
                     if nova_data:
+                        print('nova Data: ', nova_data ) 
                         instance.data_prevista_plantio = nova_data
                     if novo_programa:
                         instance.programa = novo_programa
                     if nova_variedade:
+                        print('id Farm: ', instance.id_farmbox, 'planned_variety_id', nova_variedade.id_farmbox, 'planned_culture_id', nova_variedade.cultura.id_farmbox ) 
                         instance.variedade = nova_variedade
                     instance.save()
                     updated_count += 1
