@@ -3745,7 +3745,18 @@ class PlantioViewSet(viewsets.ModelViewSet):
             response = {"message": "Você precisa estar logado!!!"}
             return Response(response, status=status.HTTP_401_UNAUTHORIZED)
         
-    def create_kml(self, queryset):
+    def hex_to_kml_color(self, hex_rgb: str, alpha: int = 180) -> str:
+        # KML usa aabbggrr (alpha, blue, green, red)
+        if not hex_rgb:
+            hex_rgb = "#cccccc"
+        s = hex_rgb.lstrip("#")
+        if len(s) != 6:
+            s = "cccccc"
+        r, g, b = s[0:2], s[2:4], s[4:6]
+        return f"{alpha:02x}{b}{g}{r}".lower()
+    
+    
+    def create_kml(self, queryset, should_use_color):
         kml_header = '''<?xml version="1.0" encoding="UTF-8"?>
                     <kml xmlns="http://www.opengis.net/kml/2.2">
                         <Document>
@@ -3780,8 +3791,14 @@ class PlantioViewSet(viewsets.ModelViewSet):
             # Calculate the center of the polygon for the label
             center_lat = sum(float(point['latitude']) for point in item['map_geo_points']) / len(item['map_geo_points'])
             center_lng = sum(float(point['longitude']) for point in item['map_geo_points']) / len(item['map_geo_points'])
+            if should_use_color:
+                variedade_color = item.get("variedade__cultura__map_color", "#cccccc")
             
-            
+                kml_fill = self.hex_to_kml_color(variedade_color, alpha=180)  # cor de preenchimento
+                kml_line = self.hex_to_kml_color(variedade_color, alpha=255)  # cor da borda
+            else:
+                kml_fill = self.hex_to_kml_color("#cccccc", alpha=180)  # cor de preenchimento
+                kml_line = self.hex_to_kml_color("#cccccc", alpha=255)  # cor da borda
             # Create a placemark for each item with additional details
             # Create a placemark for the polygon
             polygon_placemark = f'''
@@ -3789,6 +3806,17 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 <name>{item['talhao__id_talhao']}</name> <!-- This is the polygon name -->
                 <description>Farmbox ID: {item['id_farmbox']}</description>
                 <styleUrl>#style1</styleUrl>
+                <Style>
+                    <LineStyle>
+                    <color>{kml_line}</color>
+                    <width>2</width>
+                    </LineStyle>
+                    <PolyStyle>
+                    <color>{kml_fill}</color>
+                    <fill>1</fill>
+                    <outline>1</outline>
+                    </PolyStyle>
+                </Style>
                 <Polygon>
                     <outerBoundaryIs>
                         <LinearRing>
@@ -3825,6 +3853,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
         parcelas_filter = request.data["parcelas"]
         safra_filter = "2024/2025"
         ciclo_filter = "1"
+        should_use_color = request.data["shouldUsecolor"]
         try:
             filter_safra_and_ciclo = parcelas_filter[0]
             refer_plantio = Plantio.objects.get(id_farmbox=filter_safra_and_ciclo)
@@ -3841,7 +3870,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
         print(start_time)
         try:
             plantio_map = Plantio.objects.values(
-                "map_geo_points", "map_centro_id", "talhao__id_talhao", "id_farmbox"
+                "map_geo_points", "map_centro_id", "talhao__id_talhao", "id_farmbox", 'variedade__cultura__map_color'
             ).filter(
                 safra__safra=safra_filter,
                 ciclo__ciclo=ciclo_filter,
@@ -3852,9 +3881,9 @@ class PlantioViewSet(viewsets.ModelViewSet):
             
             if parcelas_filter:
                 poligons_to_export = plantio_map.filter(id_farmbox__in=parcelas_filter)
-                print('poligons to exportL ', poligons_to_export)
+                print('poligons to exportL ', poligons_to_export[0])
                 try:
-                    kml_content = self.create_kml(poligons_to_export)
+                    kml_content = self.create_kml(poligons_to_export, should_use_color)
                 except Exception as e:
                     print('erro ao gerar o KML: ', e)
 
