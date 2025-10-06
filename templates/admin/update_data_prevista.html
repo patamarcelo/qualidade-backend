@@ -2,13 +2,11 @@
 {% load static %}
 {% load formatar_numero %}
 
-
 {% block extrastyle %}
 {{ block.super }}
 {{ form.media }}
 <link href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" rel="stylesheet" />
 <style>
-    /* Estilo moderno para a tabela */
     .modern-table {
         width: 100%;
         border-collapse: collapse;
@@ -63,6 +61,71 @@
     .btn-cancel:hover {
         background-color: #5a6268;
     }
+
+    /* Switch */
+    .switch {
+        position: relative;
+        display: inline-block;
+        width: 54px;
+        height: 30px;
+    }
+
+    .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .switch .slider {
+        position: absolute;
+        cursor: pointer;
+        inset: 0;
+        background: #c9ced6;
+        transition: .2s;
+        border-radius: 999px;
+        box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .08);
+    }
+
+    .switch .slider:before {
+        position: absolute;
+        content: "";
+        height: 22px;
+        width: 22px;
+        left: 4px;
+        top: 4px;
+        background: #fff;
+        transition: .2s;
+        border-radius: 50%;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, .2);
+    }
+
+    .switch input:checked+.slider {
+        background: #28a745;
+    }
+
+    .switch input:checked+.slider:before {
+        transform: translateX(24px);
+    }
+
+    .switch-wrap {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .switch-text {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .switch-text .title {
+        font-weight: 600;
+    }
+
+    .switch-text .hint {
+        font-size: .875rem;
+        color: #6c757d;
+    }
 </style>
 {% endblock %}
 
@@ -94,7 +157,7 @@
         {% for obj in queryset %}
         <tr>
             <td>{{ forloop.counter }}</td>
-            <td>{{ obj.talhao.fazenda.nome|format_farm_name  }}</td>
+            <td>{{ obj.talhao.fazenda.nome|format_farm_name }}</td>
             <td>{{ obj.talhao.id_talhao }}</td>
             <td>{{ obj.safra }} / {{ obj.ciclo }}</td>
             <td>{{ obj.area_colheita }}</td>
@@ -104,24 +167,36 @@
         </tr>
         {% empty %}
         <tr>
-            <td colspan="3" style="text-align: center;">Nenhum item selecionado.</td>
+            <td colspan="8" style="text-align:center;">Nenhum item selecionado.</td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
 
-<!-- <form method="post" style="max-width: 350px;">
+<form id="update-form" method="post" style="max-width: 1200px; margin-bottom: 50px;">
     {% csrf_token %}
-    {{ form.data_prevista_plantio.label_tag }}<br>
-    {{ form.data_prevista_plantio }}<br><br>
-    <button type="submit" class="btn btn-save" id="submit-btn">Salvar</button>
-    <span id="spinner" style="display:none; margin-left:10px;">⏳ Carregando...</span>
-    <a href=".." class="btn btn-cancel">Cancelar</a>
-</form> -->
-<form method="post" style="max-width: 1200px; margin-bottom: 50px;">
-    {% csrf_token %}
+
+    <!-- Hidden do Form Django (TypedChoiceField com HiddenInput) -->
+    {{ form.should_update_on_farm }}
+
+    <!-- UI do switch (sem name) -->
+    <div class="field-group" style="margin-bottom:18px;">
+        <div class="switch-wrap">
+            <label class="switch" for="should_update_on_farm_toggle">
+                <input type="checkbox" id="should_update_on_farm_toggle" aria-label="Atualizar também no Farmbox">
+                <span class="slider"></span>
+            </label>
+            <div class="switch-text">
+                <span class="title">Atualizar também no Farmbox</span>
+                <span class="hint">Se ligado, envia a atualização para o Farmbox após salvar.</span>
+            </div>
+        </div>
+        {% if form.should_update_on_farm.errors %}
+        <div style="color:#dc3545; margin-top:6px;">{{ form.should_update_on_farm.errors|striptags }}</div>
+        {% endif %}
+    </div>
+
     <div class="d-flex flex-row mb-3 align-items-start" style="gap: 40px;">
-        
         <div class="field-group d-flex flex-column">
             {{ form.data_prevista_plantio.label_tag }}
             {{ form.data_prevista_plantio }}
@@ -136,15 +211,15 @@
             {{ form.variedade.label_tag }}
             {{ form.variedade }}
         </div>
-
-    
-
     </div>
-        <div class="form-actions d-flex flex-row gap-10" style="justify-content:flex-start;">
-            <button type="submit" class="btn btn-save" id="submit-btn">Salvar</button>
-            <span id="spinner" style="display:none; margin-left:10px;">⏳ Carregando...</span>
-            <a href="{{ next_url }}" class="btn btn-cancel" style="margin-left:10px;">Cancelar</a>
-        </div>
+
+    <div class="form-actions d-flex flex-row gap-10" style="justify-content:flex-start;">
+        <button type="submit" class="btn btn-save" id="submit-btn">Salvar</button>
+        <a href="{{ next_url }}" class="btn btn-cancel" style="margin-left:10px;">Cancelar</a>
+    </div>
+    <div>
+        <span id="spinner" style="display:none; margin: 10px;">⏳ Carregando...</span>
+    </div>
 </form>
 
 <script>
@@ -160,20 +235,36 @@
             }
         });
 
-        const form = document.querySelector('form');
+        const form = document.getElementById('update-form');
         const submitBtn = document.getElementById('submit-btn');
         const spinner = document.getElementById('spinner');
 
+        // Hidden GERADO pelo Form Django (id padrão: id_should_update_on_farm)
+        const hidden = form.querySelector('input[name="should_update_on_farm"]');
+        // UI do switch
+        const toggle = document.getElementById('should_update_on_farm_toggle');
+
+        // Estado inicial sempre "false"
+        if (hidden) hidden.value = 'false';
+        if (toggle) toggle.checked = false;
+
+        function syncSwitch() {
+            if (hidden && toggle) {
+                hidden.value = toggle.checked ? 'true' : 'false';
+            }
+        }
+
+        if (toggle) toggle.addEventListener('change', syncSwitch);
+
         if (form && submitBtn && spinner) {
-            form.addEventListener('submit', function (event) {
-                event.preventDefault();
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+                syncSwitch(); // garante valor atualizado antes de enviar
 
                 submitBtn.disabled = true;
                 spinner.style.display = 'inline-block';
 
-                setTimeout(() => {
-                    form.submit();
-                }, 100); // 100ms é suficiente para garantir que o browser renderize a mudança visual
+                setTimeout(() => form.submit(), 50);
             });
         }
     });

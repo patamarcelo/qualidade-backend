@@ -108,6 +108,11 @@ from django.utils.http import urlencode
 
 
 
+from django.db import transaction
+import logging
+logger = logging.getLogger(__name__)
+
+
 main_path = (
     "http://127.0.0.1:8000"
     if DEBUG == True
@@ -1093,6 +1098,21 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         })
         return redirect(f"{url}?{query}")
     update_data_prevista_plantio.short_description = "Atualizar Dados em Lote"
+    
+    def _enqueue_farmbox_call(self, id_farmbox, data_str, variedade_id, cultura_id):
+        # dispara em uma thread daemon, sem bloquear a request
+        t = Thread(
+            target=self._safe_update_farmbox_data,
+            args=(id_farmbox, data_str, variedade_id, cultura_id),
+            daemon=True
+        )
+        t.start()
+
+    def _safe_update_farmbox_data(self, id_farmbox, data_str, variedade_id, cultura_id):
+        try:
+            update_farmbox_data(id_farmbox, data_str, variedade_id, cultura_id)
+        except Exception:
+            logger.exception("Falha no update_farmbox_data (id_farmbox=%s)", id_farmbox)
 
     def update_data_prevista_view(self, request):
         print("Entrou na view custom de update")
@@ -1121,7 +1141,9 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
                 nova_data = form.cleaned_data.get('data_prevista_plantio')
                 novo_programa = form.cleaned_data.get('programa')
                 nova_variedade = form.cleaned_data.get('variedade')
+                should_update_on_farm = form.cleaned_data.get('should_update_on_farm')
 
+                # print('formCleanedDAta: ', form.cleaned_data)
                 updated_count = 0
 
                 for instance in queryset:
@@ -1137,8 +1159,15 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
                         instance.variedade = nova_variedade
                     instance.save()
                     updated_count += 1
-                    # reponse = update_farmbox_data(instance.id_farmbox, str(nova_data),instance.variedade.id_farmbox, instance.variedade.cultura.id_farmbox )
-                    # print('response: ', reponse)
+                    
+                    if should_update_on_farm:
+                        # agenda a chamada só após o commit da transação
+                        transaction.on_commit(lambda i=instance: self._enqueue_farmbox_call(
+                            i.id_farmbox,
+                            str(i.data_prevista_plantio) if i.data_prevista_plantio else None,
+                            i.variedade.id_farmbox if i.variedade else None,
+                            i.variedade.cultura.id_farmbox if (i.variedade and i.variedade.cultura) else None,
+                        ))
 
                 self.message_user(request, f'{updated_count} registros atualizados com sucesso.')
                 return redirect(next_url)

@@ -140,3 +140,11 @@ class UpdateDataPrevistaPlantioForm(forms.Form):
         required=False,
         widget=forms.Select(attrs={'class': 'form-control'})
     )
+    
+    should_update_on_farm = forms.TypedChoiceField(
+        choices=[('false', 'false'), ('true', 'true')],
+        coerce=lambda v: v == 'true',
+        required=False,
+        initial='false',
+        widget=forms.HiddenInput  # não gera outro checkbox, só o hidden que o JS atualiza
+    )
