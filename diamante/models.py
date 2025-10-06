@@ -984,8 +984,9 @@ class Colheita(Base):
         "Nome Motorista", max_length=40, help_text="Nome do Motorista"
     )
 
-    ticket = models.CharField("Ticket", max_length=20, blank=True, null=True)
-    op = models.CharField("OP", max_length=20, blank=True, null=True, unique=True)
+    ticket      = models.CharField("Ticket", max_length=20, blank=True, null=True)
+    op          = models.CharField("OP", max_length=20, blank=True, null=True, unique=True)
+    nota_fiscal = models.CharField("Nota Fiscal", max_length=50, blank=True, null=True)
 
     peso_tara = models.PositiveIntegerField(
         "Peso Tara",

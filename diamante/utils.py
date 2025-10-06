@@ -1432,3 +1432,36 @@ def atualizar_datas_previstas_colheita_real():
 
     except Exception as e:
         print(f"❌ Erro ao atualizar dados: {str(e)}")
+        
+        
+def atualizar_op_json(testar=True):
+    from .models import Colheita
+    caminho_arquivo_json = os.path.join(
+        os.path.dirname(__file__), "utils", "colheita.json"
+    )
+    data = json.load(open(caminho_arquivo_json, encoding="utf-8"))
+
+    base = Colheita.objects.filter(plantio__safra__safra="2025/2026",
+                                plantio__ciclo__ciclo="1")
+    
+    for r in data:
+        op = str(r.get("OP") or "").strip()
+        if not op: 
+            continue
+        placa = (r.get("Placa") or "").replace("-", "").strip().upper()
+        qs = base.filter(
+            placa__iexact=placa,
+            romaneio=str(r.get("Romaneio") or "").strip(),
+            ticket__endswith=str(r.get("Ticket") or "").strip(),
+        )
+        
+        if not qs.exists():
+            print("❌ Não encontrado:", r)
+            continue
+        
+        if testar:
+            print("→ Atualizaria", qs.count(), "registro(s) com nota_fiscal =", op)
+        else:
+            with transaction.atomic():
+                qs.update(nota_fiscal=op)
+                print("✅ Atualizado", qs.count(), "registro(s) com nota_fiscal =", op)

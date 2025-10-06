@@ -1889,6 +1889,8 @@ def export_cargas(modeladmin, request, queryset):
             "Desc. Bandinha",
             "Peso Liquido",
             "Peso Líquido Scs",
+            "Nota Fiscal",
+            "id FarmTruck"
         ]
     )
     cargas = queryset.values_list(
@@ -1916,6 +1918,9 @@ def export_cargas(modeladmin, request, queryset):
         "bandinha",
         "desconto_bandinha",
         "peso_liquido",
+        "nota_fiscal",
+        "id_farmtruck"
+        
     )
     for carga in cargas:
         cargas_detail = list(carga)
@@ -2044,7 +2049,7 @@ class ColheitaAdmin(admin.ModelAdmin):
                     ("plantio", "deposito"),
                     ("data_colheita", "romaneio"),
                     ("placa", "motorista"),
-                    ("ticket", "op"),
+                    ("ticket", "op", 'nota_fiscal'),
                     ("peso_tara", "peso_bruto"),
                     ("get_peso_liquido", 'peso_scs_liquido'),
                     ("peso_liquido", "peso_scs_limpo_e_seco"),
@@ -2090,6 +2095,7 @@ class ColheitaAdmin(admin.ModelAdmin):
         # "desconto_bandinha",
         "peso_liquido",
         "peso_scs_liquido",
+        "nota_fiscal"
     )
 
     # raw_id_fields = ["plantio"]
@@ -2111,6 +2117,7 @@ class ColheitaAdmin(admin.ModelAdmin):
         "romaneio",
         "placa",
         "ticket",
+        "nota_fiscal",
         "motorista",
         "deposito__nome_fantasia",
         "plantio__talhao__id_unico",
