@@ -992,6 +992,48 @@ def area_aferida(modeladdmin, request, queryset):
             f"{count_false} Áreas informadas como NÃO aferidas: {ha_negativo} hectares",
         )
 
+@admin.action(description="Gerar Formulário Plantio")
+def gerar_formulario_plantio(self, request, queryset):
+    # Otimização do queryset
+    queryset = queryset.select_related(
+        'safra',
+        'ciclo',
+        'talhao__fazenda__fazenda',  # acessa: p.talhao.fazenda.fazenda
+        'variedade__cultura'         # acessa: p.variedade.cultura
+    )
+    
+    ids_in_order = request.POST.getlist('_selected_action')
+    id_to_obj = {str(obj.pk): obj for obj in queryset}
+    ordered_queryset = [id_to_obj[pk] for pk in ids_in_order if pk in id_to_obj]
+    
+    # Token do usuário autenticado
+    user_token = Token.objects.get(user=request.user)
+
+    # Área total e dados dos plantios
+    total_area = sum(p.area_colheita for p in queryset)
+    plantios_data = [
+        {"sought_area": float(p.area_colheita), "plantation_id": p.id_farmbox}
+        for p in ordered_queryset
+    ]
+
+    # Dados do primeiro plantio (todos devem ter os mesmos dados de fazenda/safra nesse contexto)
+    first = queryset[0]
+    projeto_nome = first.talhao.fazenda.nome
+    
+
+    # Contexto para renderização
+    context = dict(
+        **self.admin_site.each_context(request),
+        plantios=ordered_queryset,
+        plantios_json=json.dumps(plantios_data),
+        projeto_nome=projeto_nome.replace('Projeto', ''),
+        total_area=total_area,
+        action='abrir_aplicacao_farmbox',
+        YOUR_TOKEN=user_token,
+    )
+
+    return render(request, 'admin/gerar_formulario_plantio.html', context)
+
 @admin.action(description="Abrir Aplicação no Farmbox")
 def abrir_aplicacao_farmbox(self, request, queryset):
     # Otimização do queryset
@@ -1058,7 +1100,7 @@ def acao_ver_cronograma_programa(self, request, queryset):
     return redirect('admin:view_cronograma_programa', obj_id=obj.id)
 @admin.register(Plantio)
 class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
-    actions = [export_plantio, area_aferida, abrir_aplicacao_farmbox, 'update_data_prevista_plantio']
+    actions = [export_plantio, area_aferida, abrir_aplicacao_farmbox, gerar_formulario_plantio, 'update_data_prevista_plantio']
     show_full_result_count = False
     autocomplete_fields = ["talhao", "programa", "variedade"]
 

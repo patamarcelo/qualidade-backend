@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Controle de Plantio</title>
+    <style>
+        :root {
+            --border: #d8d8d8;
+            --muted: #f6f6f6;
+            --text: #333;
+            --zebra: #fafafa;
+            /* cinza clarinho */
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            height: 100%;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            margin: 28px;
+            color: var(--text);
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 14px;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 8px;
+        }
+
+        header p {
+            margin: 0;
+            font-size: 20px;
+            color: #444;
+            /* cinza mais forte */
+        }
+
+        header .strong {
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        header .date {
+            margin-top: 4px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .table-wrap {
+            width: 100%;
+            overflow-x: auto;
+            /* segurança em telas muito estreitas */
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+            /* impede expansão por conteúdo */
+            font-size: 12px;
+        }
+
+        thead th {
+            background: #555;
+            color: whitesmoke;
+            text-align: left;
+            border: 1px solid var(--border);
+            padding: 8px;
+            font-weight: 600;
+        }
+
+        tbody td {
+            border: 1px solid var(--border);
+            padding: 6px;
+            vertical-align: top;
+            word-wrap: break-word;
+            overflow-wrap: anywhere;
+        }
+
+        /* Listrado MUITO sutil */
+        tbody tr:nth-child(even) {
+            background: var(--zebra);
+        }
+
+        /* Colunas levemente compactas e estáveis */
+        colgroup col:nth-child(1) {
+            width: 24%;
+        }
+
+        colgroup col:nth-child(2) {
+            width: 25%;
+        }
+
+        colgroup col:nth-child(3) {
+            width: 25%;
+        }
+
+        colgroup col:nth-child(4) {
+            width: 26%;
+        }
+
+        textarea {
+            display: block;
+            width: 100%;
+            max-width: 100%;
+            min-height: 54px;
+            resize: vertical;
+            border: 1px solid #bdbdbd;
+            border-radius: 4px;
+            padding: 6px;
+            font-size: 12px;
+            line-height: 1.35;
+            background: #fff;
+        }
+
+        footer {
+            display: flex;
+            justify-content: space-between;
+            /* justify-content-between */
+            margin-top: 110px;
+            gap: 24px;
+        }
+
+        .signature {
+            width: 46%;
+            text-align: center;
+        }
+
+        .signature .line {
+            margin-top: 42px;
+            border-top: 1px solid #000;
+            padding-top: 6px;
+            font-size: 12px;
+        }
+
+        .actions {
+            margin-top: 18px;
+        }
+
+        .export {
+            border: 1px solid var(--border);
+            background: #fff;
+            padding: 8px 12px;
+            font-size: 13px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        button.export.info {
+            background: #17a2b8;
+            /* azul */
+            color: #fff;
+            border: none;
+            padding: 8px 14px;
+            font-size: 13px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        button.export.info:hover {
+            background: #117a8b;
+            /* azul mais escuro */
+        }
+
+        .parcelaField{
+            font-size: 16px;
+        }
+
+        /* Impressão / PDF */
+        @media print {
+            .actions {
+                display: none !important;
+            }
+
+            /* botão some no PDF */
+            body {
+                margin: 0;
+            }
+
+            header {
+                margin: 0 0 8px 0;
+                padding: 6px 12px;
+            }
+
+            table {
+                page-break-inside: auto;
+            }
+
+            tr {
+                page-break-inside: avoid;
+                page-break-after: auto;
+            }
+
+            textarea {
+                border: none;
+                /* visual mais limpo no papel */
+                resize: none;
+                background: transparent;
+                padding: 0;
+                min-height: 48px;
+                /* ainda reserva espaço para escrita */
+            }
+        }
+    </style>
+</head>
+
+<body>
+    {% now "d/m/Y" as today_str %}
+
+    <div id="print-area">
+        <header>
+            <div class="left">
+                <p class="strong" style="font-size: 20px;">Projeto: </p>
+                <p class="date" style="font: 14px;">Data: {{ today_str }}</p>
+            </div>
+            <div class="right">
+                <p class="strong" style="font-size: 20px;">Controle de Plantio</p>
+            </div>
+        </header>
+
+        <div class="table-wrap">
+            <table>
+                <colgroup>
+                    <col />
+                    <col />
+                    <col />
+                    <col />
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th>Parcela</th>
+                        <th>Preparo de Solo</th>
+                        <th>Ervas Daninhas</th>
+                        <th>Condições Gerais</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in plantios %}
+                    <tr>
+                        <td class="parcelaField">
+                            Parcela: 
+                        </td>
+                        <td><textarea name="preparo_{{ p.id }}" placeholder=""></textarea></td>
+                        <td><textarea name="ervas_{{ p.id }}" placeholder=""></textarea></td>
+                        <td><textarea name="condicoes_{{ p.id }}" placeholder=""></textarea></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <footer>
+            <div class="signature">
+                <div class="line" style="font-size: 20px;">Gerente do Projeto</div>
+            </div>
+            <div class="signature">
+                <div class="line" style="font-size: 20px;">Gerente de Qualidade</div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Botão (visível só na tela) -->
+    <div class="actions">
+        <button class="export info" id="btnExportPDF" type="button">Exportar PDF (A4)</button>
+    </div>
+
+    <!-- JS de exportação -->
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script>
+        document.getElementById('btnExportPDF').addEventListener('click', async () => {
+            const {
+                jsPDF
+            } = window.jspdf;
+
+            const node = document.getElementById('print-area');
+            const canvas = await html2canvas(node, {
+                scale: 2,
+                useCORS: true,
+                windowWidth: document.documentElement.scrollWidth
+            });
+
+            const pdf = new jsPDF({
+                orientation: 'p',
+                unit: 'mm',
+                format: 'a4'
+            });
+            const pageW = pdf.internal.pageSize.getWidth();
+            const pageH = pdf.internal.pageSize.getHeight();
+            const margin = 10;
+            const imgW = pageW - margin * 2;
+            const imgH = canvas.height * imgW / canvas.width;
+
+            if (imgH <= pageH - margin * 2) {
+                pdf.addImage(canvas.toDataURL('image/png'), 'PNG', margin, margin, imgW, imgH, '', 'FAST');
+            } else {
+                // quebra em múltiplas páginas (vertical)
+                const imgData = canvas.toDataURL('image/png');
+                const pxPerMm = canvas.height / imgH;
+                const pageInnerH = pageH - margin * 2;
+                const sliceHeightPx = pageInnerH * pxPerMm;
+
+                let offset = 0,
+                    page = 0;
+                while (offset < canvas.height) {
+                    if (page > 0) pdf.addPage();
+                    const sliceHeight = Math.min(sliceHeightPx, canvas.height - offset);
+
+                    const c = document.createElement('canvas');
+                    c.width = canvas.width;
+                    c.height = sliceHeight;
+                    const ctx = c.getContext('2d');
+                    ctx.drawImage(canvas, 0, offset, canvas.width, sliceHeight, 0, 0, canvas.width,
+                        sliceHeight);
+
+                    const partHmm = (sliceHeight / pxPerMm);
+                    pdf.addImage(c.toDataURL('image/png'), 'PNG', margin, margin, imgW, partHmm, '',
+                        'FAST');
+
+                    offset += sliceHeightPx;
+                    page++;
+                }
+            }
+
+            pdf.save(`formulario-plantio-{{ today_str|default:"data" }}.pdf`);
+        });
+    </script>
+</body>
+
+</html>
