@@ -1464,4 +1464,63 @@ def atualizar_op_json(testar=True):
         else:
             with transaction.atomic():
                 qs.update(nota_fiscal=op)
-                print("✅ Atualizado", qs.count(), "registro(s) com nota_fiscal =", op)
+                print("✅ - Atualizado", qs.count(), "registro(s) com nota_fiscal =", op)
+                
+def atualizar_datas_previstas():
+    from .models import Plantio
+    caminho_arquivo_json = os.path.join(
+        os.path.dirname(__file__), "utils", "bencao-colheita.json"
+    )
+    with open(caminho_arquivo_json, encoding="utf-8") as f:
+        data = json.load(f)
+
+    print(f"[INFO] Registros encontrados no JSON: {len(data)}")
+
+    objs = []
+    for r in data:
+        nova_data = r.get("Nova Data")
+        id_farmbox = r.get("ID FarmBox")
+        if not nova_data:
+            continue
+        try:
+            parsed = datetime.datetime.strptime(nova_data, "%d/%m/%Y").date()
+        except ValueError:
+            continue
+
+        plantio = Plantio.objects.filter(id_farmbox=r.get("ID FarmBox")).first()
+        # print('plantio: ', plantio)
+        if plantio:
+            print(f"✅ - [{r}] Atualizando ID {id_farmbox}: {parsed}\n")
+            plantio.data_prevista_plantio = parsed
+            objs.append(plantio)
+        else:
+            print(' [💢] Plantio não encontrado', id_farmbox=r.get("ID FarmBox"))
+
+    if objs:
+        print(f"✅ [INFO] Atualizando {len(objs)} registros no banco...")
+        with transaction.atomic():
+            Plantio.objects.bulk_update(objs, ["data_prevista_plantio"])
+        print("✅ - [INFO] Atualização concluída com sucesso!")
+
+
+colors_plantio_map = {
+    '10/2025' : "#D2CB5B",
+    '11/2025': "#55D45F",
+    '12/2025': "#55A9D5",
+    "01/2026" : "#C955D4"
+}
+
+
+def get_color_for_date(date_obj):
+    """
+    date_obj vem no formato datetime.date(YYYY, M, D).
+    Retorna a cor correspondente no dicionário ou uma cor padrão.
+    """
+    if not date_obj:
+        return "#FFF"  # fallback
+
+    try:
+        key = f"{date_obj.month:02d}/{date_obj.year}"
+        return colors_plantio_map.get(key, "#ffff")
+    except Exception:
+        return "#FFF"

@@ -53,7 +53,8 @@ from .utils import (
     get_miliseconds,
     Spinner,
     is_older_than_7_days,
-    get_emails_por_projeto, finalizar_parcelas_encerradas
+    get_emails_por_projeto, finalizar_parcelas_encerradas, 
+    get_color_for_date
 )
 
 from qualidade_project.mongo_api import generate_file_run
@@ -3950,7 +3951,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 projeto_get = Projeto.objects.filter(id_farmbox=projeto_filter)[0]
 
                 plantio_map = Plantio.objects.values(
-                    "map_geo_points", "map_centro_id", "talhao__id_talhao", "id_farmbox"
+                    "map_geo_points", "map_centro_id", "talhao__id_talhao", "id_farmbox", "data_prevista_plantio"
                 ).filter(
                     safra__safra=safra_filter,
                     ciclo__ciclo=ciclo_filter,
@@ -3990,7 +3991,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             else:
                 grouped_by_date=[]
                 plantio_map = Plantio.objects.values(
-                    "map_geo_points", "map_centro_id", "talhao__id_talhao", "id_farmbox"
+                    "map_geo_points", "map_centro_id", "talhao__id_talhao", "id_farmbox", "data_prevista_plantio", 'variedade'
                 ).filter(
                     safra__safra=safra_filter,
                     ciclo__ciclo=ciclo_filter,
@@ -4016,6 +4017,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             labels = []
             farm_ids = []
             ids_farmbox= []
+            planned_date = []
             print("entrando no loop")
             print(time.time() - start_time)
             for i in plantio_map:
@@ -4034,6 +4036,10 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 labels.append(i["talhao__id_talhao"])
                 farm_ids.append(i["talhao__id_talhao"])
                 ids_farmbox.append(i["id_farmbox"])
+                # print(i["talhao__id_talhao"], ' - ', i["data_prevista_plantio"], ' - ', safra_filter, ' - ', ciclo_filter, 'variedade: ', i["variedade"])
+                should_pass_color = i["data_prevista_plantio"] if i["variedade"] else None
+                new_color = get_color_for_date(should_pass_color)
+                planned_date.append(new_color)
 
             print("saindo do loop")
             print(time.time() - start_time)
@@ -4044,7 +4050,6 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 if x["id_farmbox"] in parcelas_filter
             ]
             print('parcelas filter', parcelas_filter)
-
             img_buffer = draw_cartoon_map(
                 polygons=polygons,
                 labels=labels,
@@ -4057,7 +4062,9 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 planejamento_plantio=planejamento_plantio,
                 grouped_by_date=grouped_by_date,
                 ids_farmbox_planner=ids_farmbox,
-                color_array=color_array
+                color_array=color_array,
+                planned_date=planned_date,
+                print_for_planned_date=False
             )
 
             data_img = base64.b64encode(img_buffer.getvalue()).decode()
@@ -4671,7 +4678,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "ciclo__ciclo",
                     "finalizado_colheita"
                 )
-                .filter(safra__safra="2025/2026", ciclo__ciclo="1")
+                .filter(safra__safra="2025/2026", ciclo__ciclo="2")
             )
             response = {
                 "msg": f"Aplicação Aberta com sucesso!!!!",

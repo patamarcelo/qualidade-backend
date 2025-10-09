@@ -9,6 +9,8 @@ from PIL import Image
 
 matplotlib.use("Agg")
 
+import datetime
+
 colos_map = {
 	'1':    "#e0f7fa",
 	'2':	"#b3e5fc",
@@ -69,6 +71,8 @@ colors_map = {
     '15': "#735800",
     '16': "#594500",  # amarelo queimado / dourado escuro
 }
+
+
 def draw_cartoon_map(
     polygons,
     labels,
@@ -81,14 +85,16 @@ def draw_cartoon_map(
     planejamento_plantio=False,
     grouped_by_date=[],
     ids_farmbox_planner=[],
-    color_array=[]
+    color_array=[],
+    planned_date=[],
+    print_for_planned_date=True
 ):
     fig, ax = plt.subplots(
         edgecolor="none"
     )  # Set edge color of the entire figure to none
     fig.subplots_adjust(left=0, right=1, top=1, bottom=0)
-    for i, (polygon, label, centeri, id_farm, planner_id_farmbox) in enumerate(
-        zip(polygons, labels, centerid, ids_farmbox, ids_farmbox_planner)
+    for i, (polygon, label, centeri, id_farm, planner_id_farmbox, planned_date_color) in enumerate(
+        zip(polygons, labels, centerid, ids_farmbox, ids_farmbox_planner, planned_date)
     ):
         if planejamento_plantio == True:
             index_value = next(
@@ -103,6 +109,10 @@ def draw_cartoon_map(
                     Polygon(
                         polygon, edgecolor="black", facecolor=filled_color, linewidth=edge_linewidth
                     )
+                )
+        if print_for_planned_date:
+            ax.add_patch(
+                    Polygon(polygon, edgecolor="black", facecolor=planned_date_color, linewidth=edge_linewidth)
                 )
         else:
             if id_farm in filled_polygon_index:
