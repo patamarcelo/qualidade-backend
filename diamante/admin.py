@@ -1028,7 +1028,7 @@ def gerar_formulario_plantio(self, request, queryset):
         plantios_json=json.dumps(plantios_data),
         projeto_nome=projeto_nome.replace('Projeto', ''),
         total_area=total_area,
-        action='abrir_aplicacao_farmbox',
+        action='gerar_formulario_plantio',
         YOUR_TOKEN=user_token,
     )
 
@@ -1053,7 +1053,7 @@ def abrir_aplicacao_farmbox(self, request, queryset):
 
     defensivos = (
         Defensivo.objects
-        .filter(id_farmbox__isnull=False, unidade_medida__isnull=False)
+        .filter(id_farmbox__isnull=False, unidade_medida__isnull=False,ativo=True)
         .annotate(id_farmbox_str=F("id_farmbox"))
         .values("id_farmbox_str", "produto", "unidade_medida")
     )
