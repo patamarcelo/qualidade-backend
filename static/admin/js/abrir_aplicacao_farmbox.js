@@ -152,6 +152,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
         verificaDefensivosSelecionados();
         atualizarDoseResultados();
+
+        const novoBtnRemover = novaLinha.querySelector('.remove-defensivo-btn');
+        novoBtnRemover.disabled = false;     // o clone herda "disabled"; reabilite aqui
+        novoBtnRemover.title = "";           // limpa o tooltip
+
+        atualizarEstadoBotoesRemoverDefensivo(); // reavalia estado após adicionar linha
     }
 
     function removerLinha(botao) {
