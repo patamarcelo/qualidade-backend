@@ -3312,7 +3312,7 @@ class PlantioExtratoAreaAdmin(admin.ModelAdmin):
         super().save_model(request, obj, form, change)
     
     
-    list_display = ("talhao_description", "get_data", "safra_description", "cultura_description", "variedade_description", "area_plantada","related_link", 'ativo')
+    list_display = ("talhao_description", "get_data", "safra_description", "cultura_description", "variedade_description", "area_plantada","related_link", 'get_finalizado_plantio', 'ativo')
     autocomplete_fields = ["plantio"]
     raw_id_fields = ["plantio"]
     readonly_fields = ("criados","modificado")
@@ -3364,6 +3364,14 @@ class PlantioExtratoAreaAdmin(admin.ModelAdmin):
             }
         ),
     )
+    
+    def get_finalizado_plantio(self, obj):
+        if obj.finalizado_plantio:
+            return True
+        return False
+
+    get_finalizado_plantio.boolean = True
+    get_finalizado_plantio.short_description = "Plantio Fin."
     
     def talhao_description(self, obj):
         return obj.plantio.talhao
