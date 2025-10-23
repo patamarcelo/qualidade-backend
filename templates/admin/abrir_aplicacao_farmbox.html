@@ -84,11 +84,14 @@
             <select name="input_id" class="form-select form-select-sm w-auto" style="min-width: 220px;" required>
                 <option value="">-- Selecione um defensivo --</option>
                 {% for d in defensivos %}
-                <option value="{{ d.id_farmbox_str|stringformat:'d' }}" data-unidade="{{ d.unidade_medida }}">
+                <option value="{{ d.id_farmbox_str|stringformat:'d' }}" data-unidade="{{ d.unidade_medida }}" data-tipo="{{ d.tipo_display}}" data-formulacao="{{d.formulacao}}">
                     {{ d.produto }}
                 </option>
                 {% endfor %}
             </select>
+
+            <input type="text" name="tipo_defensivo" class="form-control form-control-sm w-auto" 
+                placeholder=" - " style="width: 100px;" disabled>
 
             <input type="number" step="0.01" name="dosage_value" class="form-control form-control-sm w-auto"
                 placeholder="Dose (ex: 0.2)" style="width: 100px;" required>

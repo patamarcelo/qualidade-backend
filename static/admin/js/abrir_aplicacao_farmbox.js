@@ -1,6 +1,53 @@
 document.addEventListener('DOMContentLoaded', function () {
     const appData = document.getElementById("app-data");
 
+    const colorDict = [
+        { tipo: "Acaricida", color: "rgba(221,129,83)" },
+        { tipo: "Inseticida", color: "rgb(218,78,75)" },
+        { tipo: "Herbicida", color: "rgb(166,166,54)" },
+        { tipo: "Adjuvante", color: "rgb(136,171,172)" },
+        { tipo: "Óleo", color: "rgb(120,161,144)" },
+        { tipo: "Óleo Mineral/Vegetal", color: "rgb(120,161,144)" },
+        { tipo: "Micronutrientes", color: "rgb(118,192,226)" },
+        { tipo: "Fungicida", color: "rgb(238,165,56)" },
+        { tipo: "Fertilizante", color: "rgb(76,180,211)" },
+        { tipo: "Nutrição", color: "rgb(87,77,109)" },
+        { tipo: "Biológico", color: "rgb(69,133,255)" },
+        { tipo: "Operacão", color: "grey" }
+    ];
+
+    function normalizeText(str) {
+        return (str || "")
+            .normalize("NFD")                   // separa letras e acentos
+            .replace(/[\u0300-\u036f]/g, "")    // remove acentos
+            .toLowerCase()
+            .trim();
+    }
+
+    function getColorByTipo(tipo) {
+        const normalizedTipo = normalizeText(tipo);
+        const found = colorDict.find(c => normalizeText(c.tipo) === normalizedTipo);
+        return found ? found.color : "rgb(200,200,200)"; // cor padrão caso não encontre
+    }
+
+    // versão aprimorada da função atualizarTipo
+    function atualizarTipo(selectEl) {
+        const unidade = selectEl.selectedOptions[0]?.getAttribute("data-tipo") || "";
+        const inputTipo = selectEl.parentElement.querySelector('input[name="tipo_defensivo"]');
+
+        if (inputTipo) {
+            inputTipo.value = unidade;
+
+            // aplica cor dinâmica
+            const cor = getColorByTipo(unidade);
+            inputTipo.style.backgroundColor = cor;
+            inputTipo.style.color = "white"; // melhora contraste
+            inputTipo.style.fontWeight = "600";
+            inputTipo.style.textAlign = "center";
+        }
+    }
+
+
     function formatarNumeroBR(valor) {
         return valor.toLocaleString('pt-BR', {
             minimumFractionDigits: 2,
@@ -139,10 +186,13 @@ document.addEventListener('DOMContentLoaded', function () {
         const novoSelect = novaLinha.querySelector("select");
         const novoInputDose = novaLinha.querySelector("input[name='dosage_value']");
         const divResultado = novaLinha.querySelector(".dose-result");
+        const inputTipo = novaLinha.querySelector("input[name='tipo_defensivo']"); // ← novo
+
 
         // Limpa os campos
         novoSelect.selectedIndex = 0;
         novoInputDose.value = "";
+        if (inputTipo) inputTipo.value = "";      // ← limpa o “Tipo”
         if (divResultado) divResultado.textContent = "0,00";
 
         container.appendChild(novaLinha);
@@ -196,6 +246,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // Evento para selects defensivo
     document.getElementById("defensivos-container").addEventListener("change", function (event) {
         if (event.target.matches("select[name='input_id']")) {
+            atualizarTipo(event.target);
             verificaDefensivosSelecionados();
         }
     });

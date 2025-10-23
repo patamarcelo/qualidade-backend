@@ -27,7 +27,7 @@ import csv
 from django.http import HttpResponse
 import codecs
 
-from django.db.models import Q, Sum, F, Exists
+from django.db.models import Q, Sum, F, Exists, CharField
 
 from django.db.models import Subquery, OuterRef
 from django.utils.formats import localize
@@ -1050,12 +1050,18 @@ def abrir_aplicacao_farmbox(self, request, queryset):
     
     # Token do usuário autenticado
     user_token = Token.objects.get(user=request.user)
+    
+    choices_tipo = dict(TIPO_CHOICES)
+    whens_tipo = [When(tipo=key, then=Value(val)) for key, val in TIPO_CHOICES]
 
     defensivos = (
         Defensivo.objects
         .filter(id_farmbox__isnull=False, unidade_medida__isnull=False,ativo=True)
-        .annotate(id_farmbox_str=F("id_farmbox"))
-        .values("id_farmbox_str", "produto", "unidade_medida")
+        .annotate(
+            id_farmbox_str=F("id_farmbox"),
+            tipo_display=Case(*whens_tipo, output_field=CharField()),
+            )
+        .values("id_farmbox_str", "produto", "unidade_medida", 'formulacao', 'tipo_display')
     )
     # Área total e dados dos plantios
     total_area = sum(p.area_colheita for p in queryset)
