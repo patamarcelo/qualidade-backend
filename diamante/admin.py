@@ -1185,10 +1185,19 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
 
         if request.method == 'POST':
             form = UpdateDataPrevistaPlantioForm(request.POST)
+            if not form.is_valid():
+                print("FORM ERRORS:", form.errors)  # ← vai aparecer no terminal
             if form.is_valid():
                 nova_data = form.cleaned_data.get('data_prevista_plantio')
-                novo_programa = form.cleaned_data.get('programa')
-                nova_variedade = form.cleaned_data.get('variedade')
+                novo_programa = form.cleaned_data.get('programa')     # objeto ou None
+                nova_variedade = form.cleaned_data.get('variedade')   # objeto ou None
+
+                clear_prog = form.cleaned_data.get('_clear_programa')
+                sent_prog  = form.cleaned_data.get('_sent_programa')   # usuário escolheu algo no select?
+
+                clear_var  = form.cleaned_data.get('_clear_variedade')
+                sent_var   = form.cleaned_data.get('_sent_variedade')
+    
                 should_update_on_farm = form.cleaned_data.get('should_update_on_farm')
 
                 # print('formCleanedDAta: ', form.cleaned_data)
@@ -1197,14 +1206,27 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
                 for instance in queryset:
                     print('id Farm: ', instance.id_farmbox) 
                     # Atualiza somente se houver valor
+                    
+                    
+
+                    
                     if nova_data:
                         print('nova Data: ', nova_data ) 
                         instance.data_prevista_plantio = nova_data
-                    if novo_programa:
+                    
+                    # PROGRAMa
+                    if clear_prog:                      # escolheu "⛔ Limpar Programa"
+                        instance.programa = None
+                    elif sent_prog and novo_programa:   # escolheu algum programa válido
                         instance.programa = novo_programa
-                    if nova_variedade:
+                    
+                    
+                    if clear_var:
+                        instance.variedade = None
+                    elif sent_var and nova_variedade:
                         print('id Farm: ', instance.id_farmbox, 'planned_variety_id', nova_variedade.id_farmbox, 'planned_culture_id', nova_variedade.cultura.id_farmbox ) 
                         instance.variedade = nova_variedade
+                    
                     instance.save()
                     updated_count += 1
                     

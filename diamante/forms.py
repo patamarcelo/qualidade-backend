@@ -124,27 +124,75 @@ class PlantioExtratoAreaForm(forms.ModelForm):
             # }),
         }
         
+CLEAR_TOKEN = "__clear__"
+
+class ClearableModelChoiceField(forms.ModelChoiceField):
+    """Aceita um token especial para 'limpar' o FK (setar None) sem estourar ValidationError."""
+    def clean(self, value):
+        # empty_label ('' ou None) continua sendo "sem alteração" → retorna None
+        if value in (None, ''):
+            return None
+        # se veio o token de limpar → retorna None também (mas vamos marcar flag no form)
+        if value == CLEAR_TOKEN:
+            return None
+        # pk normal → valida como sempre
+        return super().clean(value)
+
+
 class UpdateDataPrevistaPlantioForm(forms.Form):
     data_prevista_plantio = forms.DateField(
         widget=forms.TextInput(attrs={'class': 'form-control flatpickr'}),
         input_formats=['%d/%m/%Y'],
         required=False
     )
-    programa = forms.ModelChoiceField(
+
+    # ⬇️ troque para ClearableModelChoiceField
+    programa = ClearableModelChoiceField(
         queryset=Programa.objects.filter(ativo=True).order_by('-safra__safra', '-ciclo__ciclo'),
         required=False,
-        widget=forms.Select(attrs={'class': 'form-control'})
+        widget=forms.Select(attrs={'class': 'form-control'}),
+        empty_label="--- (sem alteração) ---"
     )
-    variedade = forms.ModelChoiceField(
+    variedade = ClearableModelChoiceField(
         queryset=Variedade.objects.all(),
         required=False,
-        widget=forms.Select(attrs={'class': 'form-control'})
+        widget=forms.Select(attrs={'class': 'form-control'}),
+        empty_label="--- (sem alteração) ---"
     )
-    
+
     should_update_on_farm = forms.TypedChoiceField(
         choices=[('false', 'false'), ('true', 'true')],
         coerce=lambda v: v == 'true',
         required=False,
         initial='false',
-        widget=forms.HiddenInput  # não gera outro checkbox, só o hidden que o JS atualiza
+        widget=forms.HiddenInput
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Insere a opção "Limpar" logo após o empty_label
+        prog_choices = list(self.fields['programa'].choices)  # [( '', '--- (sem alteração) ---'), (pk, label), ...]
+        var_choices  = list(self.fields['variedade'].choices)
+
+        prog_choices[1:1] = [(CLEAR_TOKEN, "⛔ Limpar Programa")]
+        var_choices[1:1]  = [(CLEAR_TOKEN, "⛔ Limpar Variedade")]
+
+        self.fields['programa'].choices = prog_choices
+        self.fields['variedade'].choices = var_choices
+
+    def clean(self):
+        """Marca flags para distinguir 'sem alteração' (vazio) de 'limpar' (CLEAR_TOKEN)."""
+        cleaned = super().clean()
+        # O valor bruto do POST:
+        raw_prog = self.data.get('programa')
+        raw_var  = self.data.get('variedade')
+
+        # flags opcionais para usar na view (se quiser semântica 'não alterar' vs 'limpar')
+        cleaned['_clear_programa'] = (raw_prog == CLEAR_TOKEN)
+        cleaned['_sent_programa']  = (raw_prog not in (None, ''))  # algo foi escolhido
+
+        cleaned['_clear_variedade'] = (raw_var == CLEAR_TOKEN)
+        cleaned['_sent_variedade']  = (raw_var not in (None, ''))
+
+        return cleaned

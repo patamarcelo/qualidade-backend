@@ -834,6 +834,9 @@ class Plantio(Base):
             and self.cronograma_programa is not None
         ):
             self.cronograma_programa = None
+        if (self.area_planejamento_plantio is None and self.area_colheita is not None):
+            self.area_planejamento_plantio = self.area_colheita
+            
         super(Plantio, self).save(*args, **kwargs)
 
     class Meta:
