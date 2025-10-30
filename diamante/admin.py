@@ -1164,7 +1164,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
 
             kml_content = create_kml(values_qs, should_use_color)
 
-            filename = f"kml-aviacao-{timezone.now().strftime('%Y%m%d-%H%M%S')}.kml"
+            filename = f"kml-{timezone.now().strftime('%Y%m%d-%H%M%S')}.kml"
             resp = HttpResponse(
                 kml_content,
                 content_type="application/vnd.google-earth.kml+xml",
