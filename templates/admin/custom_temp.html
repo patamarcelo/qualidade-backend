@@ -57,7 +57,7 @@
             <br />
             <div style="margin-top: 5px; width: 234px">
                 <span>
-                    <select name="opcoes" multiple v-model="excludeFarm" class="form-control">
+                    <select name="opcoes" multiple v-model="excludeFarm" class="form-control" :size="onlyFarmWhitoutVariedade.length">
                         <option v-for="farm in onlyFarmWhitoutVariedade" :value="farm">[[ farm.replace('Projeto', '') ]]
                         </option>
                     </select>
