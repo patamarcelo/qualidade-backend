@@ -112,6 +112,10 @@ from django.db import transaction
 import logging
 logger = logging.getLogger(__name__)
 
+from .services.generate_kml import create_kml
+from django.contrib.admin.helpers import ActionForm as AdminActionForm
+
+
 
 main_path = (
     "http://127.0.0.1:8000"
@@ -1104,11 +1108,21 @@ def acao_ver_cronograma_programa(self, request, queryset):
 
     obj = queryset.first()
     return redirect('admin:view_cronograma_programa', obj_id=obj.id)
+
+class GerarKMLForm(AdminActionForm):  
+    should_use_color = forms.BooleanField(
+        required=False,
+        label="Cor KML",
+    )
+
+
 @admin.register(Plantio)
 class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
-    actions = [export_plantio, area_aferida, abrir_aplicacao_farmbox, gerar_formulario_plantio, 'update_data_prevista_plantio']
+    actions = [export_plantio, area_aferida, abrir_aplicacao_farmbox, gerar_formulario_plantio, 'update_data_prevista_plantio', 'gerar_kml_aviacao']
     show_full_result_count = False
     autocomplete_fields = ["talhao", "programa", "variedade"]
+    action_form = GerarKMLForm
+
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -1134,6 +1148,32 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         ]
         return custom_urls + urls
     
+    
+    @admin.action(description="Gerar KML")
+    def gerar_kml_aviacao(self, request, queryset):
+        try:
+            should_use_color = bool(request.POST.get("should_use_color"))
+
+            # Valores mínimos necessários p/ KML (idêntico ao usado na API)
+            values_qs = queryset.values(
+                "map_geo_points",
+                "talhao__id_talhao",
+                "id_farmbox",
+                "variedade__cultura__map_color",
+            )
+
+            kml_content = create_kml(values_qs, should_use_color)
+
+            filename = f"kml-aviacao-{timezone.now().strftime('%Y%m%d-%H%M%S')}.kml"
+            resp = HttpResponse(
+                kml_content,
+                content_type="application/vnd.google-earth.kml+xml",
+            )
+            resp["Content-Disposition"] = f'attachment; filename="{filename}"'
+            return resp
+
+        except Exception as e:
+            self.message_user(request, f"Erro ao gerar KML: {e}", level=messages.ERROR)
     
     def update_data_prevista_plantio(self, request, queryset):
         selected = queryset.values_list('pk', flat=True)
