@@ -3860,7 +3860,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
         parcelas_filter = request.data["parcelas"]
         safra_filter = "2024/2025"
         ciclo_filter = "1"
-        should_use_color = request.data["shouldUsecolor"]
+        should_use_color = request.data.get("shouldUsecolor" , False)
         try:
             filter_safra_and_ciclo = parcelas_filter[0]
             refer_plantio = Plantio.objects.get(id_farmbox=filter_safra_and_ciclo)

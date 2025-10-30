@@ -16,10 +16,7 @@
             box-sizing: border-box;
         }
 
-        html,
-        body {
-            height: 100%;
-        }
+        
 
         body {
             font-family: Arial, sans-serif;
@@ -270,22 +267,23 @@
                 </thead>
                 <tbody>
                     {% for p in plantios %}
+                        {% for i in "12345" %}
                     <tr>
                         <td class="parcelaField">Parcela:<div class="swrite-line"></div>
                         </td>
 
                         <td class="checkcelsl">
                             <div class="section-title-container">
-                                <div class="option"><span class="box"></span><span>Grade Total</span></div>
+                                <!-- <div class="option"><span class="box"></span><span>Grade Total</span></div>
                                 <div class="option"><span class="box"></span><span>Rastro</span></div>
-                                <div class="option"><span class="box"></span><span>Cabeceira</span></div>
+                                <div class="option"><span class="box"></span><span>Cabeceira</span></div> -->
                             </div>
                         </td>
                         <td class="checkcelsl">
                             <div class="section-title-container">
-                                <div class="option"><span class="box"></span><span>Aplicação</span></div>
+                                <!-- <div class="option"><span class="box"></span><span>Aplicação</span></div>
                                 <div class="option"><span class="box"></span><span>Grade</span></div>
-                                <div class="option"><span class="box"></span><span>2º Corte</span></div>
+                                <div class="option"><span class="box"></span><span>2º Corte</span></div> -->
                             </div>
                         </td>
                         <td>
@@ -294,6 +292,7 @@
 
                     </tr>
                     {% endfor %}
+                {% endfor %}
                 </tbody>
             </table>
         </div>
