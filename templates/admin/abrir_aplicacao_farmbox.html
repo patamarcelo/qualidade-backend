@@ -78,6 +78,37 @@
 
     <hr />
 
+    <!-- Guarda o JSON dos programas -->
+    <script id="programas-json" type="application/json">{{ programa_data_json|safe }}</script>
+
+    <div class="row g-3 mb-3">
+    <div class="col-md-6">
+        <small class="text-muted d-block" id="programa-meta"></small>
+        <label class="form-label"><strong>Programa</strong></label>
+        <select id="select-programa" class="form-select">
+        <option value="">-- Selecione um programa --</option>
+        <!-- opções montadas via JS -->
+        </select>
+    </div>
+
+   <div class="col-md-6 d-flex align-items-end gap-2">
+  <div class="flex-grow-1">
+    <label class="form-label"><strong>Estágio</strong></label>
+    <select id="select-estagio" class="form-select" disabled>
+      <option value="">-- Selecione um estágio --</option>
+    </select>
+  </div>
+
+  <!-- Botão Lixeira -->
+  <button type="button" id="btn-reset-programa" class="btn btn-outline-danger" title="Limpar programa/estágio/itens">
+    <span class="me-1">Limpar</span> 🗑️
+  </button>
+</div>
+    
+    </div>
+
+    <hr />
+
     <h5>Adicionar Defensivos</h5>
     <div id="defensivos-container" class="mb-3">
         <div class="defensivo-group d-flex align-items-center gap-2 mb-2">

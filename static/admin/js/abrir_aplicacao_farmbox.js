@@ -125,7 +125,8 @@ document.addEventListener('DOMContentLoaded', function () {
             const unidadeRaw = selectedOption?.dataset?.unidade;
             const unidadeFormatada = getUnidadeFormatada(unidadeRaw);
 
-            let dose = parseFloat(inputDose.value);
+            let dose = parseFloat(String(inputDose.value).replace(',', '.'));
+
             if (isNaN(dose) || dose <= 0 || areaTotal <= 0) {
                 divResultado.textContent = "0,00";
             } else {
@@ -271,6 +272,222 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
+
+    // =========== PARTE NOVA: Programa → Estágio → Itens ===========
+    const programasRaw = document.getElementById('programas-json')?.textContent || '[]';
+    /** @type {{id:number,nome:string,safra?:string,ciclo?:string,cultura?:string,estagios:{nome:string,itens:{produto:string,tipo:string,id_farmbox:number,dose:number|null}[]}[]}[]} */
+    const PROGRAMAS = JSON.parse(programasRaw);
+
+    const selPrograma = document.getElementById('select-programa');
+    const selEstagio = document.getElementById('select-estagio');
+    const programaMeta = document.getElementById('programa-meta');
+
+    // Preenche select de Programa
+    function montarSelectPrograma() {
+        // limpa (mantém placeholder)
+        [...selPrograma.options].slice(1).forEach(() => selPrograma.remove(1));
+        PROGRAMAS.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = String(p.id);
+            opt.textContent = p.nome || `Programa ${p.id}`;
+            selPrograma.appendChild(opt);
+        });
+    }
+
+    // Ao escolher programa, popula estágios
+    function onProgramaChange() {
+        const id = selPrograma.value.trim();
+        selEstagio.innerHTML = '<option value="">-- Selecione um estágio --</option>';
+        selEstagio.disabled = true;
+        programaMeta.textContent = '';
+
+        if (!id) return;
+
+        const prog = PROGRAMAS.find(p => String(p.id) === id);
+        if (!prog) return;
+
+        // meta
+        const metas = [
+            prog.cultura ? `Cultura: ${prog.cultura}` : null,
+            prog.safra ? `Safra: ${prog.safra}` : null,
+            prog.ciclo ? `Ciclo: ${prog.ciclo}` : null,
+        ].filter(Boolean).join(' • ');
+        programaMeta.textContent = metas;
+
+        // estágios
+        prog.estagios.forEach(e => {
+            const opt = document.createElement('option');
+            opt.value = e.nome;
+            // exibe o prazo junto, se quiser:
+            opt.textContent = (e.ord ?? e.ord === 0) ? `${e.nome} (DAP: ${e.ord})` : e.nome;
+            selEstagio.appendChild(opt);
+        });
+
+        selEstagio.disabled = prog.estagios.length === 0;
+    }
+
+    selPrograma?.addEventListener('change', onProgramaChange);
+    montarSelectPrograma();
+
+    // Utilitários para injetar linhas de defensivo/dose:
+    function setSelectByValue(selectEl, value) {
+        // tenta achar a option com o value (id farmbox)
+        const valStr = String(value);
+        for (let i = 0; i < selectEl.options.length; i++) {
+            if (String(selectEl.options[i].value) === valStr) {
+                selectEl.selectedIndex = i;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function ensureRowCount(count) {
+        const container = document.getElementById("defensivos-container");
+        // cria linhas a mais, se necessário
+        while (container.children.length < count) {
+            const lastAddBtn = container.lastElementChild?.querySelector('button.btn.btn-outline-primary.btn-sm');
+            if (lastAddBtn) lastAddBtn.click(); // usa seu próprio duplicarLinha
+            else {
+                // fallback: duplica manualmente a última linha
+                const base = container.lastElementChild || container.querySelector('.defensivo-group');
+                container.appendChild(base.cloneNode(true));
+            }
+        }
+        // remove linhas excedentes
+        while (container.children.length > count && container.children.length > 1) {
+            container.lastElementChild.querySelector('.remove-defensivo-btn')?.click();
+        }
+    }
+
+    function limparResultadosDasLinhas() {
+        document.querySelectorAll("#defensivos-container .defensivo-group").forEach(g => {
+            g.querySelector("input[name='dosage_value']").value = "";
+            const res = g.querySelector(".dose-result");
+            if (res) res.textContent = "0,00";
+            const sel = g.querySelector("select[name='input_id']");
+            sel.selectedIndex = 0;
+            atualizarTipo(sel);
+        });
+        atualizarDoseResultados();
+    }
+
+    // Ao escolher estágio, injeta os itens no grid
+    function onEstagioChange() {
+        const progId = selPrograma.value.trim();
+        const estagioNome = selEstagio.value.trim();
+        if (!progId || !estagioNome) {
+            limparResultadosDasLinhas();
+            return;
+        }
+
+        const prog = PROGRAMAS.find(p => String(p.id) === progId);
+        if (!prog) return;
+
+        const estagio = prog.estagios.find(e => e.nome === estagioNome);
+        if (!estagio) {
+            limparResultadosDasLinhas();
+            return;
+        }
+
+        const itens = estagio.itens || [];
+        // garante número de linhas = qtd itens
+        ensureRowCount(itens.length);
+
+        // preenche cada linha
+        const grupos = document.querySelectorAll("#defensivos-container .defensivo-group");
+        // Função para normalizar comparações (remove acentos + lowercase)
+        const norm = s => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+        // Marca cada item com índice original para preservar a ordem secundária
+        const itensOrdenados = itens
+            .map((it, i) => ({ ...it, __idx: i }))
+            .sort((a, b) => {
+
+                // 1) "Operação" SEMPRE primeiro
+                const isAOperacao = norm(a.tipo) === 'operacao';
+                const isBOperacao = norm(b.tipo) === 'operacao';
+                if (isAOperacao && !isBOperacao) return -1; // a vem antes
+                if (!isAOperacao && isBOperacao) return 1;  // b vem antes
+
+                // 2) Caso não seja operação, ordenar pelos demais tipos alfabeticamente
+                const ta = norm(a.tipo);
+                const tb = norm(b.tipo);
+                if (ta !== tb) return ta.localeCompare(tb, 'pt-BR', { sensitivity: 'base' });
+
+                // 3) Critério secundário → mantém ordem original dentro do tipo
+                return a.__idx - b.__idx;
+            });
+
+        // Agora popula os inputs, mantendo tudo como estava
+        itensOrdenados.forEach((it, idx) => {
+            const grupo = grupos[idx];
+            const select = grupo.querySelector("select[name='input_id']");
+            const doseInput = grupo.querySelector("input[name='dosage_value']");
+
+            if (setSelectByValue(select, it.id_farmbox)) {
+                atualizarTipo(select);
+            } else {
+                select.selectedIndex = 0;
+            }
+
+            // Mantém dose com ponto ( <input type="number"> exige ponto )
+            doseInput.value = (it.dose ?? "").toString();
+        });
+
+        // se tiver mais linhas do que itens (p.ex., restou 1 linha “sobrando” e só veio 0 itens)
+        for (let i = itens.length; i < grupos.length; i++) {
+            const grupo = grupos[i];
+            const select = grupo.querySelector("select[name='input_id']");
+            const doseInput = grupo.querySelector("input[name='dosage_value']");
+            select.selectedIndex = 0;
+            doseInput.value = "";
+            atualizarTipo(select);
+        }
+
+        // recalc dos totais/resultado
+        atualizarDoseResultados();
+        verificaDefensivosSelecionados();
+        atualizarEstadoBotoesRemoverDefensivo();
+    }
+
+    selEstagio?.addEventListener('change', onEstagioChange);
+
+    function resetProgramaEstagio() {
+        // limpa selects e meta
+        const selPrograma = document.getElementById('select-programa');
+        const selEstagio = document.getElementById('select-estagio');
+        const programaMeta = document.getElementById('programa-meta');
+
+        if (selPrograma) selPrograma.value = '';
+        if (selEstagio) {
+            selEstagio.innerHTML = '<option value="">-- Selecione um estágio --</option>';
+            selEstagio.disabled = true;
+        }
+        if (programaMeta) programaMeta.textContent = '';
+
+        // deixa somente 1 linha de defensivo, limpa tudo
+        ensureRowCount(1);
+        const unica = document.querySelector("#defensivos-container .defensivo-group");
+        if (unica) {
+            const select = unica.querySelector("select[name='input_id']");
+            const doseInput = unica.querySelector("input[name='dosage_value']");
+            const res = unica.querySelector(".dose-result");
+            if (select) { select.selectedIndex = 0; atualizarTipo(select); }
+            if (doseInput) doseInput.value = "";
+            if (res) res.textContent = "0,00";
+        }
+
+        atualizarDoseResultados();
+        verificaDefensivosSelecionados();
+        atualizarEstadoBotoesRemoverDefensivo();
+    }
+
+    document.getElementById('btn-reset-programa')?.addEventListener('click', resetProgramaEstagio);
+
+
+    // ========= FIM DA PARTE NOVA =========
+
     function enviarAplicacao() {
         const btn = document.getElementById("btn-submit");
         const originalText = btn.innerHTML;
@@ -302,7 +519,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (defensivoId && dose) {
                 const selectedOption = group.querySelector("select[name='input_id']").selectedOptions[0];
                 const unidade = selectedOption?.dataset?.unidade;
-                const parsedDose = parseFloat(dose);
+                const parsedDose = parseFloat(String(dose).replace(',', '.'));
 
                 inputs.push({
                     input_id: parseInt(defensivoId.replace(/\./g, ''), 10),

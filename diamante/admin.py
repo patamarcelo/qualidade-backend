@@ -115,6 +115,8 @@ logger = logging.getLogger(__name__)
 from .services.generate_kml import create_kml
 from django.contrib.admin.helpers import ActionForm as AdminActionForm
 
+from collections import defaultdict
+
 
 
 main_path = (
@@ -1073,6 +1075,76 @@ def abrir_aplicacao_farmbox(self, request, queryset):
         {"sought_area": float(p.area_colheita), "plantation_id": p.id_farmbox}
         for p in ordered_queryset
     ]
+    
+    programa_query = (
+        Aplicacao.objects.select_related(
+            "defensivo",
+            "operacao",
+            "operacao__programa",
+            "operacao__programa__safra",
+            "operacao__programa__ciclo",
+            "operacao__programa__cultura",
+        )
+        .values(
+            "defensivo__produto",
+            "defensivo__tipo",
+            "defensivo__id_farmbox",
+            "dose",
+            "operacao",
+            "operacao__estagio",
+            "operacao__prazo_dap",
+            "operacao__programa",
+            "operacao__programa__nome",
+            "operacao__programa__safra__safra",
+            "operacao__programa__ciclo__ciclo",
+            "operacao__programa__cultura__cultura",
+        )
+        .filter(
+            ativo=True,
+        )
+        .filter(operacao__programa__ativo=True)
+    )
+    
+    agrupado = defaultdict(lambda: {"__meta__": {}, "__estagios__": defaultdict(list)})
+    
+    for r in programa_query:
+        prog_id = r["operacao__programa"]
+        estagio = r["operacao__estagio"] or "Sem estágio"
+        prazo = r.get("operacao__prazo_dap")  # pode ser int/None
+
+        if not agrupado[prog_id]["__meta__"]:
+            agrupado[prog_id]["__meta__"] = {
+                "id": prog_id,
+                "nome": r["operacao__programa__nome"],
+                "safra": r["operacao__programa__safra__safra"],
+                "ciclo": r["operacao__programa__ciclo__ciclo"],
+                "cultura": r["operacao__programa__cultura__cultura"],
+            }
+
+        # cria o bloco do estágio se não existir
+        if estagio not in agrupado[prog_id]["__estagios__"]:
+            agrupado[prog_id]["__estagios__"][estagio] = {"nome": estagio, "ord": prazo, "itens": []}
+        else:
+            # mantém o menor prazo (ou o primeiro) como critério de ordenação
+            blk = agrupado[prog_id]["__estagios__"][estagio]
+            if blk["ord"] is None or (prazo is not None and prazo < blk["ord"]):
+                blk["ord"] = prazo
+
+        agrupado[prog_id]["__estagios__"][estagio]["itens"].append({
+            "produto": r["defensivo__produto"],
+            "tipo": r["defensivo__tipo"],
+            "id_farmbox": r["defensivo__id_farmbox"],
+            "dose": float(r["dose"]) if r["dose"] is not None else None,
+        })
+
+    programas_data = []
+    for prog_id, bloco in agrupado.items():
+        estagios_list = list(bloco["__estagios__"].values())
+        # ⬇️ ORDENA por ord (prazo_dap), nulos por último
+        estagios_list.sort(key=lambda e: (e["ord"] is None, e["ord"]))
+        programas_data.append({**bloco["__meta__"], "estagios": estagios_list})
+
+
 
     # Dados do primeiro plantio (todos devem ter os mesmos dados de fazenda/safra nesse contexto)
     first = queryset[0]
@@ -1096,6 +1168,7 @@ def abrir_aplicacao_farmbox(self, request, queryset):
         RESPONSE_ID=int(response_id),
         FARM_ID=int(farm_id_farmbox),
         HARVEST_ID=int(harvest_id_farm),
+        programa_data_json=mark_safe(json.dumps(programas_data)),  # passa como JSON seguro
     )
 
     return render(request, 'admin/abrir_aplicacao_farmbox.html', context)
