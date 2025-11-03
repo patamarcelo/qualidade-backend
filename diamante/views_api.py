@@ -5311,7 +5311,6 @@ def save_from_protheus_logic(data_json, user_id):
                                         print('plantio id: ', plantio_id)
                                         print('Projeto: ', get_proj.nome)
                                         print('data to Find: ', str(safra), int(ciclo), int(origem_id), str(parcela))
-                                        print('deposito id: ', deposito_id)
                                         failed += 1
                                         problem_load = {
                                             "parcela": parcela,
