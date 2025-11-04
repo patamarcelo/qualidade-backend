@@ -1295,6 +1295,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
                 'area_colheita',
                 'data_prevista_plantio'
             )
+        total_area = queryset.aggregate(total_area_colheita=Sum('area_colheita'))['total_area_colheita']
 
         if request.method == 'POST':
             form = UpdateDataPrevistaPlantioForm(request.POST)
@@ -1361,6 +1362,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
             self.admin_site.each_context(request),
             form=form,
             queryset=queryset,
+            total_area_selected=total_area,
             title='Atualizar Data Prevista de Plantio',
             next_url=next_url,
         )

@@ -138,7 +138,10 @@
 {% block content %}
 <h1 style="margin-bottom: 1rem;">{{ title }}</h1>
 
-<p><strong>Itens selecionados:</strong> {{ queryset.count }}</p>
+<div style="display: flex; flex-direction: row; gap: 30px; margin-bottom: 10px;">
+    <span><strong>Itens selecionados:</strong> {{ queryset.count }}</span>
+    <span><strong>Área Total:</strong> {{ total_area_selected }}</span>
+</div>
 
 <table class="modern-table table-striped" role="grid" aria-readonly="true">
     <thead>
