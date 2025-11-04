@@ -33,7 +33,7 @@ from django.db.models import Subquery, OuterRef
 from django.utils.formats import localize
 
 
-from django.db.models import Case, When, DecimalField, Value
+from django.db.models import Case, When, DecimalField, Value, IntegerField
 from django.db.models.functions import Coalesce, Round
 
 from django.core import serializers
@@ -1519,9 +1519,29 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
     def get_ordering(self, request):
         return ["data_plantio"]
 
+    # def get_queryset(self, request):
+    #     print(connection.settings_dict)
+    #     return (
+    #         super(PlantioAdmin, self)
+    #         .get_queryset(request)
+    #         .select_related(
+    #             "talhao",
+    #             "safra",
+    #             "ciclo",
+    #             "talhao__fazenda",
+    #             "talhao__fazenda__fazenda",
+    #             "variedade",
+    #             "variedade__cultura",
+    #             "programa"
+    #         )
+    #         .prefetch_related(
+    #             "programa__variedade"
+    #         )
+    #     )
     def get_queryset(self, request):
-        print(connection.settings_dict)
-        return (
+        # print(connection.settings_dict)
+
+        qs = (
             super(PlantioAdmin, self)
             .get_queryset(request)
             .select_related(
@@ -1532,12 +1552,30 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
                 "talhao__fazenda__fazenda",
                 "variedade",
                 "variedade__cultura",
-                "programa"
+                "programa",
             )
-            .prefetch_related(
-                "programa__variedade"
-            )
+            .prefetch_related("programa__variedade")
         )
+
+        # Usa a primeira data não nula entre data_plantio e data_prevista_plantio.
+        # Quem não tem nenhuma delas vai pro fim e, nesses casos, ordena por talhao__id_talhao.
+        qs = qs.annotate(
+            sort_date=Coalesce("data_plantio", "data_prevista_plantio"),
+            is_null_both=Case(
+                When(
+                    Q(data_plantio__isnull=True) & Q(data_prevista_plantio__isnull=True),
+                    then=Value(1),
+                ),
+                default=Value(0),
+                output_field=IntegerField(),
+            ),
+        ).order_by(
+            "is_null_both",      # Primeiro quem tem alguma data (0), depois quem não tem (1)
+            "sort_date",         # data_plantio; se nula, data_prevista_plantio
+            "talhao__id_talhao", # para os sem data, ordena pelo ID do talhão
+        )
+
+        return qs
 
     def get_search_results(self, request, queryset, search_term):
         try:
