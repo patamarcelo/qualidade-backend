@@ -1,0 +1,69 @@
+{% load formatar_numero %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Resumo de Parcelas em Janela de Análise</title>
+  <style>
+    body { font-family: Arial, sans-serif; color: #333333; background-color: #f9f9f9; padding: 20px; }
+    h2 { color: #2E86C1; margin-bottom: 6px; }
+    p { margin: 6px 0; }
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th, td { border: 1px solid #dddddd; padding: 8px 12px; text-align: left; }
+    th { background-color: #2E86C1; color: white; }
+    tbody tr:nth-child(even) { background-color: #f2f2f2; }
+    tbody tr:nth-child(odd) { background-color: #ffffff; }
+    .footer { margin-top: 20px; font-size: 0.85em; color: #555555; }
+    .muted { color: #777; }
+  </style>
+</head>
+<body>
+  <h2>{{ data_email|date:"d/m/Y" }} — Parcelas na Janela de Análise</h2>
+  <p class="muted">
+    Regra: <strong>{{ regra.nome }}</strong> • Janela: D{{ regra.target_day|default_if_none:"-" }} (abre {{ regra.target_day|add:"-"|add:regra.lead_days }} → fecha {{ regra.target_day }})
+  </p>
+  <p class="muted">
+    Intervalo de datas do plantio considerado hoje:
+    <strong>{{ intervalo_min|date:"d/m/Y" }}</strong> – <strong>{{ intervalo_max|date:"d/m/Y" }}</strong>
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Fazenda</th>
+        <th>Projeto</th>
+        <th>Parcela</th>
+        <th>Cultura</th>
+        <th>Variedade</th>
+        <th>Área (ha)</th>
+        <th>Data de Plantio</th>
+        <th>DAP</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% if parcelas and parcelas|length > 0 %}
+        {% for parcela in parcelas %}
+          <tr style="background-color: {% if forloop.counter0|divisibleby:2 %}#ffffff{% else %}#f2f2f2{% endif %};">
+            <td>{{ parcela.fazenda }}</td>
+            <td>{{ parcela.projeto }}</td>
+            <td>{{ parcela.parcela }}</td>
+            <td>{{ parcela.cultura }}</td>
+            <td>{{ parcela.variedade }}</td>
+            <td>{% if parcela.area != "-" %}{{ parcela.area|br_float }}{% else %}-{% endif %}</td>
+            <td>{% if parcela.data_plantio %}{{ parcela.data_plantio|date:"d/m/Y" }}{% else %}-{% endif %}</td>
+            <td>{{ parcela.dap }}</td>
+          </tr>
+        {% endfor %}
+      {% else %}
+        <tr>
+          <td colspan="7" class="muted">Nenhuma parcela encontrada na janela para hoje.</td>
+        </tr>
+      {% endif %}
+    </tbody>
+  </table>
+
+  <div class="footer">
+    <em>Este e-mail lista parcelas cuja <strong>Data de Plantio</strong> cai na janela calculada hoje segundo a regra acima (DAP dentro do intervalo).</em>
+  </div>
+</body>
+</html>

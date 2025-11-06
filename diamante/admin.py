@@ -4208,7 +4208,7 @@ class AlertRuleAdmin(admin.ModelAdmin):
         dmin_br = date_format(dmin, format="SHORT_DATE_FORMAT", use_l10n=True)
         dmax_br = date_format(dmax, format="SHORT_DATE_FORMAT", use_l10n=True)
         return f"{dmin_br} – {dmax_br}"
-    get_intervalo_datas_br.short_description = "Intervalo (datas)"
+    get_intervalo_datas_br.short_description = "Intervalo (datas plantio)"
 
     def plantios_na_janela(self, obj):
         """

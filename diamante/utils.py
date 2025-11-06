@@ -34,6 +34,8 @@ from django.utils import timezone
 from django.template.loader import render_to_string
 from diamante.gmail.gmail_api import send_mail
 
+from datetime import date
+from django.utils.html import strip_tags
 
 
 # pr_mungo = Programa.objects.all()[2]
@@ -1524,3 +1526,144 @@ def get_color_for_date(date_obj):
         return colors_plantio_map.get(key, "#ffff")
     except Exception:
         return "#FFF"
+    
+    
+
+def _none_safe(v, fallback=""):
+    return v if v not in (None, "") else fallback
+
+
+def _projeto_from_plantio(p):
+    """
+    Extrai projeto/fazenda de forma segura seguindo sua cadeia:
+    talhao -> fazenda -> fazenda.nome (projeto) / fazenda.nome
+    Ajuste se sua hierarquia tiver nomes diferentes.
+    """
+    try:
+        return p.talhao.fazenda.fazenda.nome
+    except Exception:
+        # fallback para o nome da fazenda ou id do talhão
+        try:
+            return p.talhao.fazenda.nome
+        except Exception:
+            return str(getattr(p, "talhao", "-"))
+
+
+def _sort_key(p):
+    # Projeto
+    try:
+        projeto = _none_safe(p.talhao.fazenda.fazenda.nome, "")
+    except:
+        projeto = ""
+
+    # Fazenda
+    try:
+        fazenda = _none_safe(p.talhao.fazenda.nome, "")
+    except:
+        fazenda = ""
+
+    # Data de plantio (garante tipo date, fallback mínimo)
+    try:
+        data_plantio = p.data_plantio
+        # caso venha datetime, converte:
+        if hasattr(data_plantio, "date"):
+            data_plantio = data_plantio.date()
+    except:
+        data_plantio = date.min  # empurra para o topo se algo vier errado
+
+    return (projeto, fazenda, data_plantio)
+
+
+def enviar_email_alerta_mungo_verde_por_regra(template_path="email/resumo_alerta_mungo_verde.html"):
+    """
+    Usa rule.filtered_plantios_in_window() para montar a lista e envia o e-mail
+    no formato que você já usa hoje (render_to_string + send_mail).
+
+    Retorna a contagem de destinatários (len(recipient_list)).
+    """
+    
+    from .models import AlertRule, EmailAberturaST
+    
+    # 1) Descobrir a regra específica
+    rule = (
+        AlertRule.objects.filter(nome__iexact="Alerta - Mungo Verde", ativo=True)
+        .select_related("variedade", "variedade__cultura")
+        .first()
+    )
+    if not rule:
+        raise ValueError("Nenhuma AlertRule encontrada para 'Alerta Mungo Verde'.")
+
+    today = timezone.localdate()
+
+    # Query base (já filtrada pela janela da regra)
+    qs = rule.filtered_plantios_in_window(today=today).select_related(
+        "variedade",
+        "variedade__cultura",
+        "talhao",
+        "talhao__fazenda",
+        "talhao__fazenda__fazenda",
+    )
+
+    # Ordenação conforme seu critério:
+    plantios_ordenados = sorted(qs, key=_sort_key)
+
+    # Monta a estrutura esperada no template
+    # (mantive o nome 'parcelas' como no seu template atual)
+    lista_proximas = []
+    for p in plantios_ordenados:
+        data_plantio = p.data_plantio if isinstance(p.data_plantio, date) else getattr(p.data_plantio, "date", lambda: None)()
+        dap = (today - data_plantio).days if data_plantio else "-"
+        lista_proximas.append({
+            "fazenda": _projeto_from_plantio(p),
+            "id": getattr(p, "id", "-"),
+            "cultura": getattr(getattr(p, "variedade", None), "cultura", None).cultura if getattr(getattr(p, "variedade", None), "cultura", None) else "-",
+            "variedade": getattr(getattr(p, "variedade", None), "variedade", "-"),
+            "area": getattr(p, "area_colheita", "-"),   # ajuste se o campo for outro
+            "data_plantio": data_plantio,
+            "dap": dap,
+            "projeto" : p.talhao.fazenda.nome,
+            "parcela": p.talhao.id_talhao
+        })
+
+    # Data no cabeçalho (dd/mm/aaaa)
+    data_formatada = today.strftime("%d/%m/%Y")
+
+    intervalo_min, intervalo_max = rule.window_date_range_for_today(today=today)
+
+
+    # Render HTML (mesmo caminho/nome que você usa hoje)
+    html_content = render_to_string(
+        template_path,
+        {
+            "parcelas": lista_proximas,
+            "data_email": data_formatada,
+            "regra": rule,  # opcional, caso use no template
+            "intervalo_min": intervalo_min,    # 👈 novo
+            "intervalo_max": intervalo_max,    # 👈 novo
+        },
+    )
+
+    # Lista de e-mails pela sua lógica/tabela (só trocando o tipo da atividade)
+    emails_to_send = list(
+        EmailAberturaST.objects.filter(
+            atividade__tipo="Alerta Mungo Verde",
+            ativo=True
+        ).values_list("email", flat=True)
+    )
+
+    if not emails_to_send:
+        return 0
+
+    # Envio no formato idêntico ao seu (com pequeno upgrade: html_message)
+    try:
+        send_mail(
+            subject=f"Alerta Mungo Verde — {data_formatada}",
+            message=html_content,                    # << HTML direto
+            from_email="patamarcelo@gmail.com",
+            recipient_list=emails_to_send,
+            fail_silently=False,
+        )
+    except Exception as e:
+        print("Erro em enviar o email: ", e)
+
+    return len(emails_to_send)

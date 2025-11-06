@@ -5,7 +5,7 @@ from django_apscheduler.jobstores import DjangoJobStore, register_events
 from django_apscheduler.models import DjangoJobExecution
 import logging
 from diamante.cron import get_hour_test
-from diamante.utils import finalizar_parcelas_encerradas
+from diamante.utils import finalizar_parcelas_encerradas, enviar_email_alerta_mungo_verde_por_regra
 
 from datetime import datetime
 
@@ -96,6 +96,17 @@ def start():
                     id="enviar_email_diario_0630",
                     replace_existing=True,
                     misfire_grace_time=3600  # tolerância de 1 hora caso haja atraso
+                )
+                
+                scheduler.add_job(
+                    enviar_email_alerta_mungo_verde_por_regra,
+                    'cron',
+                    day_of_week='sun',    # Domingo
+                    hour=12,
+                    minute=0,
+                    id='alerta_mungo_verde_domingo_12h',
+                    replace_existing=True,
+                    misfire_grace_time=3600
                 )
                 
             register_events(scheduler)

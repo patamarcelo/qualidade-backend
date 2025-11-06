@@ -1620,7 +1620,13 @@ class AlertRule(Base):
         Filtra Plantio pela cultura/variedade (se definidos) dentro da janela “em análise” hoje.
         """
         data_min, data_max = self.window_date_range_for_today(today)
-        qs = Plantio.objects.filter(data_plantio__gte=data_min, data_plantio__lte=data_max)
+        qs = Plantio.objects.filter(
+            data_plantio__gte=data_min,
+            data_plantio__lte=data_max,
+            inicializado_plantio=True,
+            plantio_descontinuado=False,
+            finalizado_colheita=False
+            )
         if self.cultura_id:
             qs = qs.filter(variedade__cultura_id=self.cultura_id)
         if self.variedade_id:
