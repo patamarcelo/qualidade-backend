@@ -1534,3 +1534,96 @@ class EmailAberturaST(Base):
 
     def __str__(self):
         return self.email
+
+class AlertRule(Base):
+    """
+    Regra de alerta baseada em dias após plantio.
+    Você define:
+      - filtros (cultura/variedade – ambos opcionais)
+      - dia alvo (ideal) e antecedência (lead_days) para abrir a janela
+      - recorrência (ex.: semanal)
+      - canais e destinatários
+    """
+    FREQ_CHOICES = [
+        ("DAILY", "Diário"),
+        ("WEEKLY", "Semanal"),
+        ("MONTHLY", "Mensal"),
+    ]
+
+    nome      = models.CharField(max_length=140, unique=True)
+    descricao = models.CharField(max_length=140, unique=True)
+
+    # Filtros (um ou ambos). Se ambos vazios -> aplica a todos os plantios.
+    cultura = models.ForeignKey(Cultura, on_delete=models.SET_NULL, blank=True, null=True, related_name="alert_rules")
+    variedade = models.ForeignKey(Variedade, on_delete=models.SET_NULL, blank=True, null=True, related_name="alert_rules")
+
+    # Janela relativa ao plantio
+    target_day = models.PositiveIntegerField(
+        help_text="Dia ideal para a análise (ex.: 55)."
+    )
+    
+    lead_days = models.PositiveIntegerField(
+        default=0,
+        help_text="Quantos dias antes do dia ideal a janela se abre (ex.: 5 abre a janela em 50)."
+    )
+
+    # Recorrência
+    freq = models.CharField(max_length=10, choices=FREQ_CHOICES, default="WEEKLY")
+    weekday = models.PositiveSmallIntegerField(
+        default=0,
+        help_text="0=Segunda ... 6=Domingo (use se freq for semanal)."
+    )
+
+    # Canais
+    send_email = models.BooleanField(default=True)
+    send_whatsapp = models.BooleanField(default=True)
+
+    # Destinatários
+    # recipients = models.ManyToManyField(EncarregadoContact, blank=True, related_name="alert_rules")
+
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["ativo"]),
+        ]
+
+    def __str__(self):
+        alvo = f"D{self.target_day}"
+        janela = f"{self.target_day - self.lead_days}–{self.target_day}"
+        filtro = (
+            f" [{self.cultura or '*'} / {self.variedade or '*'}]"
+        )
+        return f"{self.nome} ({alvo} janela {janela}){filtro}"
+
+    # Helpers de janela
+    @property
+    def window_days(self):
+        start = max(0, self.target_day - self.lead_days)
+        end = self.target_day
+        return start, end
+
+    def window_date_range_for_today(self, today=None):
+        """
+        Retorna (data_min, data_max) para filtrar Plantio.data_plantio entre (today - end) e (today - start)
+        Ex.: target=55, lead=5 -> start=50, end=55
+             data_plantio ∈ [today-55, today-50]
+        """
+        if today is None:
+            today = timezone.localdate()
+        start, end = self.window_days
+        data_min = today - timedelta(days=end)
+        data_max = today - timedelta(days=start)
+        return data_min, data_max
+
+    def filtered_plantios_in_window(self, today=None):
+        """
+        Filtra Plantio pela cultura/variedade (se definidos) dentro da janela “em análise” hoje.
+        """
+        data_min, data_max = self.window_date_range_for_today(today)
+        qs = Plantio.objects.filter(data_plantio__gte=data_min, data_plantio__lte=data_max)
+        if self.cultura_id:
+            qs = qs.filter(variedade__cultura_id=self.cultura_id)
+        if self.variedade_id:
+            qs = qs.filter(variedade_id=self.variedade_id)
+        return qs
+

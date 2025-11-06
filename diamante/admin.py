@@ -118,7 +118,6 @@ from django.contrib.admin.helpers import ActionForm as AdminActionForm
 from collections import defaultdict
 
 
-
 main_path = (
     "http://127.0.0.1:8000"
     if DEBUG == True
@@ -574,6 +573,8 @@ class TalhaoAdmin(admin.ModelAdmin):
 class CulturaAdmin(admin.ModelAdmin):
     list_display = ("cultura", "tipo_producao", 'id_protheus_planejamento')
     ordering = ("cultura",)
+    search_fields = ("cultura",)           # <-- necessário pro autocomplete
+
 
 
 @admin.register(Variedade)
@@ -4097,3 +4098,149 @@ class TiposAtividadesEmailsAdmin(admin.ModelAdmin):
     list_display = ['tipo']
     
 # list_display = ("criados", "projeto", "email", 'ativo')
+
+
+
+
+
+@admin.register(AlertRule)
+class AlertRuleAdmin(admin.ModelAdmin):
+    # ---- colunas da lista ----
+    list_display = (
+        "nome",
+        "descricao",
+        "get_cultura",
+        "get_variedade",
+        "target_day",
+        "lead_days",
+        "get_janela_dias",
+        "get_intervalo_datas_br",
+        "plantios_na_janela",
+        "get_freq",
+        "get_weekday_label",
+        "send_email",
+        "send_whatsapp",
+        "ativo",
+        "get_criados_br",
+        "get_modificado_br",
+    )
+    list_display_links = ("nome",)
+    list_per_page = 50
+    ordering = ("-ativo", "nome")
+
+    # ---- filtros/busca ----
+    list_filter = (
+        "ativo",
+        "freq",
+        "weekday",
+        "send_email",
+        "send_whatsapp",
+        "cultura",
+        "variedade",
+    )
+    search_fields = (
+        "nome",
+        "descricao",
+        "variedade__variedade",
+        "variedade__cultura__cultura",
+    )
+    autocomplete_fields = ("cultura", "variedade")
+
+    # ---- somente leitura e layout ----
+    readonly_fields = ("criados", "modificado")
+    fieldsets = (
+        ("Identificação", {
+            "fields": (
+                ("ativo",),
+                ("nome", "descricao"),
+                ("observacao",),
+            )
+        }),
+        ("Filtro (escopo da regra)", {
+            "fields": (
+                ("cultura", "variedade"),
+            )
+        }),
+        ("Janela (dias após o plantio)", {
+            "fields": (
+                ("target_day", "lead_days"),
+            )
+        }),
+        ("Recorrência e canais", {
+            "fields": (
+                ("freq", "weekday"),
+                ("send_email", "send_whatsapp"),
+            )
+        }),
+        ("Sistema", {
+            "fields": (
+                ("criados", "modificado"),
+            )
+        }),
+    )
+
+    # ---- otimização da queryset ----
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        # Evita N+1 em cultura/variedade e não traz campos grandes desnecessários
+        return (
+            qs.select_related("cultura", "variedade", "variedade__cultura")
+              .defer("observacao")
+        )
+
+    # ---- helpers de exibição ----
+    def get_cultura(self, obj):
+        return obj.cultura.cultura if obj.cultura_id else "—"
+    get_cultura.short_description = "Cultura"
+
+    def get_variedade(self, obj):
+        return obj.variedade.variedade if obj.variedade_id else "—"
+    get_variedade.short_description = "Variedade"
+
+    def get_janela_dias(self, obj):
+        start, end = obj.window_days
+        return f"{start}–{end} dias"
+    get_janela_dias.short_description = "Janela (dias)"
+
+    def get_intervalo_datas_br(self, obj):
+        today = timezone.localdate()
+        dmin, dmax = obj.window_date_range_for_today(today)
+        dmin_br = date_format(dmin, format="SHORT_DATE_FORMAT", use_l10n=True)
+        dmax_br = date_format(dmax, format="SHORT_DATE_FORMAT", use_l10n=True)
+        return f"{dmin_br} – {dmax_br}"
+    get_intervalo_datas_br.short_description = "Intervalo (datas)"
+
+    def plantios_na_janela(self, obj):
+        """
+        Mostra contagem dos plantios que caem na janela HOJE.
+        (Se tiver muitas regras/plantios, considere cachear ou anotar via batch)
+        """
+        today = timezone.localdate()
+        return obj.filtered_plantios_in_window(today=today).count()
+    plantios_na_janela.short_description = "Plantios na janela"
+
+    def get_freq(self, obj):
+        # exibe o label da choice
+        return dict(obj.FREQ_CHOICES).get(obj.freq, obj.freq)
+    get_freq.short_description = "Frequência"
+
+    def get_weekday_label(self, obj):
+        mapa = {
+            0: "Seg",
+            1: "Ter",
+            2: "Qua",
+            3: "Qui",
+            4: "Sex",
+            5: "Sáb",
+            6: "Dom",
+        }
+        return mapa.get(obj.weekday, obj.weekday)
+    get_weekday_label.short_description = "Dia (semana)"
+
+    def get_criados_br(self, obj):
+        return date_format(obj.criados, format="SHORT_DATETIME_FORMAT", use_l10n=True)
+    get_criados_br.short_description = "Criado em"
+
+    def get_modificado_br(self, obj):
+        return date_format(obj.modificado, format="SHORT_DATETIME_FORMAT", use_l10n=True)
+    get_modificado_br.short_description = "Atualizado em"
