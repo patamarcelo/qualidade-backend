@@ -1625,6 +1625,11 @@ def enviar_email_alerta_mungo_verde_por_regra(template_path="email/resumo_alerta
             "parcela": p.talhao.id_talhao
         })
 
+    # ✅ Se não há parcelas na janela → não envia
+    if not lista_proximas:
+        print("Nenhuma parcela na janela. Email NÃO enviado.")
+        return 0
+
     # Data no cabeçalho (dd/mm/aaaa)
     data_formatada = today.strftime("%d/%m/%Y")
 
