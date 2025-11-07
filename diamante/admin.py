@@ -71,7 +71,7 @@ import requests
 
 from admin_confirm.admin import AdminConfirmMixin, confirm_action
 from django.urls import path
-from django.http import HttpResponseRedirect
+
 
 from usuario.models import CustomUsuario as User
 from rest_framework.authtoken.models import Token
@@ -117,6 +117,10 @@ from django.contrib.admin.helpers import ActionForm as AdminActionForm
 
 from collections import defaultdict
 
+from django.core.cache import cache
+
+from django.contrib.admin import helpers
+from django.template.response import TemplateResponse
 
 main_path = (
     "http://127.0.0.1:8000"
@@ -1192,7 +1196,7 @@ class GerarKMLForm(AdminActionForm):
 
 @admin.register(Plantio)
 class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
-    actions = [export_plantio, area_aferida, abrir_aplicacao_farmbox, gerar_formulario_plantio, 'update_data_prevista_plantio', 'gerar_kml_aviacao']
+    actions = [export_plantio, area_aferida, abrir_aplicacao_farmbox, gerar_formulario_plantio, 'update_data_prevista_plantio', 'gerar_kml_aviacao', 'zerar_plantio_para_replantio']
     show_full_result_count = False
     autocomplete_fields = ["talhao", "programa", "variedade"]
     action_form = GerarKMLForm
@@ -1223,6 +1227,108 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         return custom_urls + urls
     
     
+    @admin.action(description="Zerar Para Replantio (com confirmação)")
+    def zerar_plantio_para_replantio(self, request, queryset):
+        """
+        Passo 1: Mostrar confirmação
+        Passo 2: Se confirmado, aplicar as mudanças e redirecionar de volta
+        """
+        # Se o usuário ainda não confirmou, mostra a página de confirmação
+        if "confirm" not in request.POST:
+            # IDs selecionados (se não for 'select all across')
+            selected = request.POST.getlist(helpers.ACTION_CHECKBOX_NAME)
+            
+            
+            # pega o contexto padrão do Admin (site_title, site_header, user, etc.)
+            base_ctx = self.admin_site.each_context(request)
+            
+            
+            # alguns temas (ex.: adminlte3) esperam available_apps SEMPRE
+            base_ctx["available_apps"] = self.admin_site.get_app_list(request)
+            
+            context = {
+                **base_ctx,
+                "title": "Confirmar: Zerar para Replantio",
+                "queryset": queryset,  # para listar os itens na página
+                "opts": self.model._meta,
+                "action_checkbox_name": helpers.ACTION_CHECKBOX_NAME,
+                "selected": selected,
+                "select_across": request.POST.get("select_across") == "1",
+                "action": "zerar_plantio_para_replantio",   # nome da action
+                "index": request.POST.get("index", "0"),
+            }
+            return TemplateResponse(
+                request,
+                "admin/plantio/confirm_zerar_replantio.html",  # veja template abaixo
+                context,
+            )
+
+        # --- A partir daqui é a confirmação (POST com confirm=yes) ---
+        try:
+            select_across = request.POST.get("select_across") == "1"
+            selected_ids = request.POST.getlist(helpers.ACTION_CHECKBOX_NAME)
+
+            # Quando 'select across' (selecionar tudo), usamos o queryset sob os filtros atuais.
+            # Caso contrário, filtramos pelos IDs que vieram do formulário.
+            if select_across:
+                qs = queryset  # já vem com os filtros atuais do changelist
+            else:
+                qs = self.model.objects.filter(pk__in=selected_ids)
+
+            pks = list(qs.values_list("pk", flat=True))
+            if not pks:
+                self.message_user(request, "Nada selecionado.", level=messages.WARNING)
+                return HttpResponseRedirect(request.get_full_path())
+
+            # Campos fixos/nulos
+            FIELDS_TO_RESET = dict(
+                inicializado_plantio=False,
+                finalizado_plantio=False,
+                finalizado_colheita=False,
+                area_parcial=None,
+                data_plantio=None,
+                data_emergencia=None,
+                veiculos_carregados=0,
+                area_aferida=False,
+                plantio_descontinuado=False,
+                cronograma_programa=None,
+                replantio=True,
+                farmbox_update=False,
+                data_prevista_plantio=None,
+            )
+
+            with transaction.atomic():
+                # 1) Desativar todos os extratos ligados aos plantios
+                desativados = (
+                    PlantioExtratoArea.objects
+                    .filter(plantio_id__in=pks, ativo=True)
+                    .update(ativo=False)
+                )
+
+                # 2) Zerar/ajustar campos dos plantios
+                atualizados = (
+                    Plantio.objects
+                    .filter(pk__in=pks)
+                    .update(
+                        **FIELDS_TO_RESET,
+                        area_colheita=F("area_planejamento_plantio")  # <= igualar
+                    )
+                )
+
+                # 3) Limpar todo o cache
+                cache.clear()
+
+            self.message_user(
+                request,
+                f"Zerado(s) {atualizados} Plantio(s) e desativado(s) {desativados} extrato(s). Cache limpo.",
+                level=messages.SUCCESS,
+            )
+            return HttpResponseRedirect(request.get_full_path())
+
+        except Exception as e:
+            self.message_user(request, f"Erro ao zerar para replantio: {e}", level=messages.ERROR)
+            return HttpResponseRedirect(request.get_full_path())
+        
     @admin.action(description="Gerar KML")
     def gerar_kml_aviacao(self, request, queryset):
         try:
