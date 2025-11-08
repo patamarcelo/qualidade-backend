@@ -1219,7 +1219,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 talhao_id__in={k[2] for k in combo_keys},
             ).only("id", "safra_id", "ciclo_id", "talhao_id", "farmbox_update", "finalizado_colheita",
                 "variedade_id", "programa_id", "id_farmbox", "area_colheita", "area_planejamento_plantio",
-                "map_centro_id", "map_geo_points", "data_plantio", "data_emergencia", "finalizado_plantio")
+                "map_centro_id", "map_geo_points", "data_plantio", "data_emergencia", "inicializado_plantio")
 
             # Índice por (safra_id, ciclo_id, talhao_id)
             plantio_by_combo = {(p.safra_id, p.ciclo_id, p.talhao_id): p for p in plantios_combo_qs}
@@ -1282,7 +1282,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         # status do plantio
                         if state == "active" and date_plantio:
                             novo.data_plantio = date_plantio
-                            novo.finalizado_plantio = True
+                            novo.inicializado_plantio = True
                             novo.area_colheita = total_area_plantada
                         if emergence_date:
                             novo.data_emergencia = emergence_date
@@ -1303,7 +1303,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                             inst.map_geo_points = map_geo_points_farm
                         if state == "active" and date_plantio:
                             inst.data_plantio = date_plantio
-                            inst.finalizado_plantio = True
+                            inst.inicializado_plantio = True
                             inst.area_colheita = total_area_plantada
                         if emergence_date:
                             inst.data_emergencia = emergence_date
@@ -1340,7 +1340,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     fields = [
                         "id_farmbox", "area_colheita", "area_planejamento_plantio",
                         "map_centro_id", "map_geo_points",
-                        "data_plantio", "finalizado_plantio", "data_emergencia",
+                        "data_plantio", "inicializado_plantio", "data_emergencia",
                         "variedade",
                     ]
                     for i in range(0, len(to_update), BATCH_SIZE):
