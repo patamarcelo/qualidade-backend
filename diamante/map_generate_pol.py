@@ -87,7 +87,8 @@ def draw_cartoon_map(
     ids_farmbox_planner=[],
     color_array=[],
     planned_date=[],
-    print_for_planned_date=True
+    print_for_planned_date=True,
+    selected_color=""
 ):
     fig, ax = plt.subplots(
         edgecolor="none"
@@ -104,6 +105,8 @@ def draw_cartoon_map(
             print(index_value)
             print(planner_id_farmbox)
             filled_color = colors_map.get(str(index_value), "white")
+            if selected_color and selected_color != '#FFF':
+                filled_color = selected_color
             print('filled new color: ', filled_color)
             ax.add_patch(
                     Polygon(
@@ -118,6 +121,8 @@ def draw_cartoon_map(
             if id_farm in filled_polygon_index:
                 
                 new_filled_color = filled_color
+                if selected_color and selected_color != '#FFF':
+                    new_filled_color = selected_color
                 if color_array:
                     get_color = [item["color_selected"] 
                                 for item in color_array 

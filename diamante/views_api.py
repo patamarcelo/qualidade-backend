@@ -4059,6 +4059,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
         safra_filter = safra_request.get('safra', '2025/2026') if safra_request else '2025/2026'
         ciclo_filter = safra_request.get('ciclo', '3') if safra_request else '3'
         planejamento_plantio = False
+        
+        selected_color = request.data.get("selectedColor", "")
 
         try:
             filter_safra_and_ciclo = parcelas_filter[0]
@@ -4196,7 +4198,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 ids_farmbox_planner=ids_farmbox,
                 color_array=color_array,
                 planned_date=planned_date,
-                print_for_planned_date=False
+                print_for_planned_date=False,
+                selected_color=selected_color
             )
 
             data_img = base64.b64encode(img_buffer.getvalue()).decode()
