@@ -4813,7 +4813,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "ciclo__ciclo",
                     "finalizado_colheita"
                 )
-                .filter(safra__safra="2025/2026", ciclo__ciclo="2")
+                .filter(safra__safra="2025/2026", ciclo__ciclo__in=["2", "3"])
             )
             response = {
                 "msg": f"Aplicação Aberta com sucesso!!!!",
