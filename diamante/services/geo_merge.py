@@ -7,6 +7,7 @@ from shapely.geometry.base import BaseGeometry
 from pyproj import CRS, Transformer
 from xml.dom.minidom import Document
 import math
+from math import isclose
 
 # ---------- Helpers de projeção ----------
 def choose_utm_epsg(polys_ll: List[Polygon]) -> int:
@@ -161,7 +162,7 @@ def mst_edges(parts: List[Polygon], tol_m: float):
 
 # ---------- Núcleo “híbrido no-flood” ----------
 def merge_no_flood(parcelas: List[Dict], tol_m: float = 20.0, corridor_width_m: float = 1.0,
-                   style_color: str = "7d007700") -> str:
+                   style_color: str = "60FFFFFF") -> str:
     """
     Retorna o KML como string.
     Estratégia:
@@ -211,8 +212,51 @@ def merge_no_flood(parcelas: List[Dict], tol_m: float = 20.0, corridor_width_m: 
         finals_ll.append(FINAL_ll)
         finals_names.append(", ".join([names[i] for i in idxs]))
 
-    # ---- KML (com buracos) ----
-    def coords_to_kml_str(coords):
+    def _pts_equal(a, b, eps=1e-12):
+        return isclose(a[0], b[0], abs_tol=eps) and isclose(a[1], b[1], abs_tol=eps)
+
+    def _clean_ring_for_kml(iterable_coords, eps=1e-12):
+        """
+        - Remove duplicatas consecutivas (com tolerância)
+        - Garante fechamento
+        - Retorna lista já pronta p/ KML ([(x,y), ...]) ou [] se degenerado (<3 únicos)
+        """
+        coords = [(float(x), float(y)) for (x, y) in iterable_coords]
+
+        # 1) remove duplicatas consecutivas
+        cleaned = []
+        last = None
+        for pt in coords:
+            if last is None or not _pts_equal(pt, last, eps):
+                cleaned.append(pt)
+                last = pt
+
+        if not cleaned:
+            return []
+
+        # 2) fecha anel se precisar
+        if not _pts_equal(cleaned[0], cleaned[-1], eps):
+            cleaned.append(cleaned[0])
+
+        # 3) conta únicos (sem considerar o último duplicado do fechamento)
+        uniques = []
+        for pt in cleaned[:-1]:
+            if not uniques or not _pts_equal(pt, uniques[-1], eps):
+                uniques.append(pt)
+
+        # KML exige >= 3 coordenadas únicas para formar polígono
+        if len(uniques) < 3:
+            return []
+
+        # 4) volta a fechar com o primeiro dos "uniques"
+        closed = uniques[:]
+        if not _pts_equal(closed[0], closed[-1], eps):
+            closed.append(closed[0])
+
+        return closed
+
+    def _coords_to_kml_str(coords):
+        # coords já limpos/fechados
         return " ".join(f"{x:.8f},{y:.8f}" for (x, y) in coords)
 
     doc = Document()
@@ -233,7 +277,14 @@ def merge_no_flood(parcelas: List[Dict], tol_m: float = 20.0, corridor_width_m: 
 
     counter = 1
     for idx, geom in enumerate(finals_ll):
-        for poly in polygon_parts(geom):
+        geoms = [geom] if isinstance(geom, Polygon) else list(geom.geoms)
+        for poly in geoms:
+            # ------ outer ring ------
+            outer_clean = _clean_ring_for_kml(list(poly.exterior.coords))
+            if not outer_clean:
+                # Se o outer degradou (ex.: união gerou sliver), pula este poly
+                continue
+
             pm = doc.createElement("Placemark")
             nm = doc.createElement("name"); nm.appendChild(doc.createTextNode(f"Talhao_{counter}"))
             su = doc.createElement("styleUrl"); su.appendChild(doc.createTextNode("#styleMerged"))
@@ -241,19 +292,23 @@ def merge_no_flood(parcelas: List[Dict], tol_m: float = 20.0, corridor_width_m: 
 
             pg = doc.createElement("Polygon")
 
-            # outer
+            # outerBoundaryIs
             obi = doc.createElement("outerBoundaryIs")
             lr = doc.createElement("LinearRing")
-            coords = doc.createElement("coordinates")
-            coords.appendChild(doc.createTextNode(coords_to_kml_str(list(poly.exterior.coords))))
-            lr.appendChild(coords); obi.appendChild(lr); pg.appendChild(obi)
+            coords_el = doc.createElement("coordinates")
+            coords_el.appendChild(doc.createTextNode(_coords_to_kml_str(outer_clean)))
+            lr.appendChild(coords_el); obi.appendChild(lr); pg.appendChild(obi)
 
-            # inners (buracos)
+            # ------ inner rings (buracos) ------
             for interior in poly.interiors:
+                inner_clean = _clean_ring_for_kml(list(interior.coords))
+                if not inner_clean:
+                    # buraco degenerado → ignora (evita erro do Earth)
+                    continue
                 ibi = doc.createElement("innerBoundaryIs")
                 lr_i = doc.createElement("LinearRing")
                 coords_i = doc.createElement("coordinates")
-                coords_i.appendChild(doc.createTextNode(coords_to_kml_str(list(interior.coords))))
+                coords_i.appendChild(doc.createTextNode(_coords_to_kml_str(inner_clean)))
                 lr_i.appendChild(coords_i); ibi.appendChild(lr_i); pg.appendChild(ibi)
 
             pm.appendChild(pg)
