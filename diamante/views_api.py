@@ -5144,6 +5144,33 @@ class PlantioViewSet(viewsets.ModelViewSet):
 
         # Return the response
         return Response(response_data, status=status.HTTP_200_OK)
+    
+    @action(detail=False, methods=["POST"])
+    def kml_merge_view(self, request):
+        try:
+            payload = json.loads(request.body.decode("utf-8"))
+            # payload esperado:
+            # {
+            #   "farmName": "Projeto X",
+            #   "parcelas": [
+            #       {"talhao": "B12", "coords": [{"latitude": -10.66, "longitude": -49.83}, ...]},
+            #       ...
+            #   ],
+            #   "tol_m": 20.0,            // opcional (default 20)
+            #   "corridor_width_m": 1.0   // opcional (default 1.0)
+            # }
+            parcelas = payload.get("parcelas") or []
+            tol_m = float(payload.get("tol_m", 20.0))
+            corridor_width_m = float(payload.get("corridor_width_m", 1.0))
+
+            kml_str = merge_no_flood(parcelas, tol_m=tol_m, corridor_width_m=corridor_width_m)
+
+            resp = HttpResponse(kml_str, content_type="application/vnd.google-earth.kml+xml")
+            resp["Content-Disposition"] = f'attachment; filename="talhoes-merge.kml"'
+            return resp
+
+        except Exception as e:
+            return JsonResponse({"detail": f"Erro ao processar: {e}"}, status=400)
 
 
 class DefensivoViewSet(viewsets.ModelViewSet):
@@ -5306,34 +5333,6 @@ class DefensivoViewSet(viewsets.ModelViewSet):
         except Exception as e:
             response = {"message": f"Ocorreu um Erro em pegar os defensivos: {e}"}
             return Response(response, status=status.HTTP_400_BAD_REQUEST)
-    
-    
-    @action(detail=False, methods=["POST"])
-    def kml_merge_view(self, request):
-        try:
-            payload = json.loads(request.body.decode("utf-8"))
-            # payload esperado:
-            # {
-            #   "farmName": "Projeto X",
-            #   "parcelas": [
-            #       {"talhao": "B12", "coords": [{"latitude": -10.66, "longitude": -49.83}, ...]},
-            #       ...
-            #   ],
-            #   "tol_m": 20.0,            // opcional (default 20)
-            #   "corridor_width_m": 1.0   // opcional (default 1.0)
-            # }
-            parcelas = payload.get("parcelas") or []
-            tol_m = float(payload.get("tol_m", 20.0))
-            corridor_width_m = float(payload.get("corridor_width_m", 1.0))
-
-            kml_str = merge_no_flood(parcelas, tol_m=tol_m, corridor_width_m=corridor_width_m)
-
-            resp = HttpResponse(kml_str, content_type="application/vnd.google-earth.kml+xml")
-            resp["Content-Disposition"] = f'attachment; filename="talhoes-merge.kml"'
-            return resp
-
-        except Exception as e:
-            return JsonResponse({"detail": f"Erro ao processar: {e}"}, status=400)
 
 
 # --------------------- ---------------------- FARMBOX APPLICATIONS UPDATE API END  --------------------- ----------------------#

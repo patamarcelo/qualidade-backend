@@ -23,21 +23,56 @@ def to_polygons_ll(parcelas: List[Dict]) -> Tuple[List[Polygon], List[str]]:
     Espera cada parcela com:
       {
         "talhao": "B12",
-        "coords": [{"latitude": -10.66, "longitude": -49.83}, ...]  # anel exterior, já fechado ou não
+        "coords": [{"latitude": -10.66, "longitude": -49.83}, ...]  # anel exterior (fechado ou não)
       }
     """
-    polys, names = []
     polys, names = [], []
+
     for parc in parcelas:
         nome = (parc.get("talhao") or "Sem nome").strip()
         coords = parc.get("coords") or []
-        ring = [(float(p["longitude"]), float(p["latitude"])) for p in coords]
-        if len(ring) >= 3:
-            # garante fechamento do anel
-            if ring[0] != ring[-1]:
-                ring.append(ring[0])
-            polys.append(Polygon(ring))
-            names.append(nome)
+
+        # (lon, lat) para shapely + remove duplicatas consecutivas
+        ring = []
+        last = None
+        for p in coords:
+            if "longitude" in p and "latitude" in p:
+                pt = (float(p["longitude"]), float(p["latitude"]))
+                if last is None or pt != last:
+                    ring.append(pt)
+                    last = pt
+
+        # precisa de ao menos 3 pontos distintos (fechamento vira 4)
+        if len(ring) < 3:
+            continue
+
+        # garante fechamento do anel
+        if ring[0] != ring[-1]:
+            ring.append(ring[0])
+
+        poly = Polygon(ring)
+        if poly.is_empty or poly.area <= 0:
+            continue
+
+        # correção leve se inválido
+        if not poly.is_valid:
+            poly = poly.buffer(0)
+            if poly.is_empty or poly.area <= 0:
+                continue
+
+        # pode vir MultiPolygon depois do buffer(0); mantenha união das partes > 0
+        if isinstance(poly, MultiPolygon):
+            parts = [p for p in poly.geoms if (not p.is_empty and p.area > 0)]
+            if not parts:
+                continue
+            poly = unary_union(parts)
+
+        if poly.is_empty or poly.area <= 0:
+            continue
+
+        polys.append(poly)
+        names.append(nome)
+
     return polys, names
 
 def polygon_parts(g: BaseGeometry) -> List[Polygon]:
@@ -176,9 +211,9 @@ def merge_no_flood(parcelas: List[Dict], tol_m: float = 20.0, corridor_width_m: 
         finals_ll.append(FINAL_ll)
         finals_names.append(", ".join([names[i] for i in idxs]))
 
-    # ---- KML ----
-    def coords_to_kml_str(poly: Polygon):
-        return " ".join(f"{x:.8f},{y:.8f}" for (x, y) in list(poly.exterior.coords))
+    # ---- KML (com buracos) ----
+    def coords_to_kml_str(coords):
+        return " ".join(f"{x:.8f},{y:.8f}" for (x, y) in coords)
 
     doc = Document()
     kml = doc.createElement("kml"); kml.setAttribute("xmlns", "http://www.opengis.net/kml/2.2")
@@ -205,10 +240,22 @@ def merge_no_flood(parcelas: List[Dict], tol_m: float = 20.0, corridor_width_m: 
             pm.appendChild(nm); pm.appendChild(su)
 
             pg = doc.createElement("Polygon")
+
+            # outer
             obi = doc.createElement("outerBoundaryIs")
             lr = doc.createElement("LinearRing")
-            coords = doc.createElement("coordinates"); coords.appendChild(doc.createTextNode(coords_to_kml_str(poly)))
+            coords = doc.createElement("coordinates")
+            coords.appendChild(doc.createTextNode(coords_to_kml_str(list(poly.exterior.coords))))
             lr.appendChild(coords); obi.appendChild(lr); pg.appendChild(obi)
+
+            # inners (buracos)
+            for interior in poly.interiors:
+                ibi = doc.createElement("innerBoundaryIs")
+                lr_i = doc.createElement("LinearRing")
+                coords_i = doc.createElement("coordinates")
+                coords_i.appendChild(doc.createTextNode(coords_to_kml_str(list(interior.coords))))
+                lr_i.appendChild(coords_i); ibi.appendChild(lr_i); pg.appendChild(ibi)
+
             pm.appendChild(pg)
             document.appendChild(pm)
             counter += 1
