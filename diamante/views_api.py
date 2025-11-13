@@ -5161,7 +5161,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             # }
             parcelas = payload.get("parcelas") or []
             tol_m = float(payload.get("tol_m", 20.0))
-            corridor_width_m = float(payload.get("corridor_width_m", 1.0))
+            corridor_width_m = float(payload.get("corridor_width_m", 0.1))
 
             kml_str = merge_no_flood(parcelas, tol_m=tol_m, corridor_width_m=corridor_width_m)
 
