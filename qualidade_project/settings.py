@@ -85,7 +85,8 @@ INSTALLED_APPS = [
     "crispy_bootstrap4",
     "storages",
     "aviacao",
-    "anymail"
+    "anymail",
+    "kmltools",
 ]
 
 MIDDLEWARE = [

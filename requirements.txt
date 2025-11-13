@@ -1,5 +1,6 @@
 anytree==2.8.0
 APScheduler==3.10.4
+arrow==1.4.0
 asgiref==3.7.2
 CacheControl==0.13.1
 cachetools==5.3.1
@@ -39,6 +40,7 @@ djangorestframework==3.14.0
 dnspython==2.3.0
 dropbox==11.36.2
 et-xmlfile==1.1.0
+fastkml==1.4.0
 firebase-admin==6.2.0
 fonttools==4.50.0
 future==0.18.3
@@ -76,6 +78,7 @@ psycopg2-binary==2.9.10
 pyasn1==0.5.0
 pyasn1-modules==0.3.0
 pycparser==2.21
+pygeoif==1.6.0
 PyJWT==2.8.0
 pymongo==4.4.0
 pyparsing==3.1.1

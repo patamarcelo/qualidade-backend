@@ -35,6 +35,7 @@ urlpatterns = [
     path("auth/", CustomAuthToken.as_view()),
     path("talhao/", TalhoesView.as_view()),
     path("aviacao/", include("aviacao.urls")),
+    path("kmltools/", include("kmltools.urls")),
 ]
 
 urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
