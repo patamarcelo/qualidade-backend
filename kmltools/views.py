@@ -50,11 +50,17 @@ class KMLUnionView(APIView):
             tol_m = float(request.data.get("tol_m", 20.0))
         except (TypeError, ValueError):
             tol_m = 20.0
+            
+        tol_m = max(1.0, min(tol_m, 50.0))
+
 
         try:
             corridor_width_m = float(request.data.get("corridor_width_m", 0.1))
         except (TypeError, ValueError):
             corridor_width_m = 0.1
+            
+        corridor_width_m = max(0.01, corridor_width_m)  # evita zero/negativo
+
 
         parcelas = []
         total_polygons = 0
