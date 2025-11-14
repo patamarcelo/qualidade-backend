@@ -51,7 +51,7 @@ class KMLUnionView(APIView):
         except (TypeError, ValueError):
             tol_m = 20.0
             
-        tol_m = max(1.0, min(tol_m, 50.0))
+        tol_m = max(1.0, min(tol_m, 9999999.0))
 
 
         try:
