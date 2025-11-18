@@ -3128,6 +3128,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
     def get_plantio_detail_map(self, request):
         if request.user.is_authenticated:
             try:
+                print('resuest data detaul map: ', request.data)
                 safra_filter = None
                 cicle_filter = None
                 try:
@@ -3139,53 +3140,72 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 print(cicle_filter)
                 safra_filter = "2023/2024" if safra_filter == None else safra_filter
                 cicle_filter = "1" if cicle_filter == None else cicle_filter
+                
+                
+                use_multi = request.data.get("use_multi", '')
+                # use_multi = False
+                
+                multi_list = request.GET.getlist("multi_ciclos[]")  # ex: ["2", "3"]
+                multi_list = ["2", "3"]
+                
 
-                cache_key_qs_plantio_map = f"get_plantio_map_{safra_filter}_{cicle_filter}"
-                print('cache_key:', cache_key_qs_plantio_map)
-                qs_plantio = cache.get(cache_key_qs_plantio_map)
-                if not qs_plantio:
-                    qs_plantio = (
-                        Plantio.objects.select_related(
-                            "safra",
-                            "ciclo",
-                            "talhao",
-                            "fazenda",
-                            "programa",
-                            "variedade",
-                            "variedade__cultura",
-                            "talhao__fazenda",
-                            "talhao__fazenda__fazenda",
-                        )
-                        .values(
-                            "id",
-                            "modificado",
-                            "talhao__id_talhao",
-                            "talhao__id_unico",
-                            "talhao_id",
-                            "safra__safra",
-                            "ciclo__ciclo",
-                            "talhao__fazenda__nome",
-                            "talhao__fazenda__map_centro_id",
-                            "talhao__fazenda__map_zoom",
-                            "talhao__fazenda__fazenda__nome",
-                            "variedade__nome_fantasia",
-                            "variedade__cultura__cultura",
-                            "variedade__cultura__map_color",
-                            "variedade__cultura__map_color_line",
-                            "finalizado_plantio",
-                            "finalizado_colheita",
-                            "plantio_descontinuado",
-                            "inicializado_plantio",
-                            "area_colheita",
-                            "area_planejamento_plantio",
-                            "map_centro_id",
-                            "map_geo_points",
-                        )
-                        .filter(safra=s_dict[safra_filter], ciclo=c_dict[cicle_filter])
-                        .filter(plantio_descontinuado=False)
-                        # .filter(variedade__cultura__isnull=False)
+                # cache_key_qs_plantio_map = f"get_plantio_map_{safra_filter}_{cicle_filter}_{use_multi}"
+                # print('cache_key:', cache_key_qs_plantio_map)
+                # qs_plantio = cache.get(cache_key_qs_plantio_map)
+                # if not qs_plantio:
+                qs_plantio = (
+                    Plantio.objects.select_related(
+                        "safra",
+                        "ciclo",
+                        "talhao",
+                        "fazenda",
+                        "programa",
+                        "variedade",
+                        "variedade__cultura",
+                        "talhao__fazenda",
+                        "talhao__fazenda__fazenda",
                     )
-                    cache.set(cache_key_qs_plantio_map, qs_plantio, timeout=60*5*6)  # cache for 5 minutes
+                    .values(
+                        "id",
+                        "modificado",
+                        "talhao__id_talhao",
+                        "talhao__id_unico",
+                        "talhao_id",
+                        "safra__safra",
+                        "ciclo__ciclo",
+                        "talhao__fazenda__nome",
+                        "talhao__fazenda__map_centro_id",
+                        "talhao__fazenda__map_zoom",
+                        "talhao__fazenda__fazenda__nome",
+                        "variedade__nome_fantasia",
+                        "variedade__cultura__cultura",
+                        "variedade__cultura__map_color",
+                        "variedade__cultura__map_color_line",
+                        "finalizado_plantio",
+                        "finalizado_colheita",
+                        "plantio_descontinuado",
+                        "inicializado_plantio",
+                        "area_colheita",
+                        "area_planejamento_plantio",
+                        "map_centro_id",
+                        "map_geo_points",
+                    )
+                    # .filter(safra=s_dict[safra_filter], ciclo=c_dict[cicle_filter])
+                    .filter(safra=s_dict[safra_filter])
+                    .filter(plantio_descontinuado=False)
+                    # .filter(variedade__cultura__isnull=False)
+                )
+                
+                if use_multi and multi_list:
+                    # === Forma 1 ===
+                    qs_plantio = qs_plantio.filter(variedade__cultura__isnull=False)
+                    qs_plantio = qs_plantio.filter(ciclo__ciclo__in=multi_list)
+
+                else:
+                    # === Forma 2 ===
+                    qs_plantio = qs_plantio.filter(ciclo=c_dict[cicle_filter])
+                    
+                    # cache.set(cache_key_qs_plantio_map, qs_plantio, timeout=60*5*6)  # cache for 5 minutes
                 result = [
                     {
                         "fazenda": i["talhao__fazenda__nome"],
@@ -3242,6 +3262,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             try:
                 safra_filter = None
                 cicle_filter = None
+                print('resuest data: ', request.data)
                 try:
                     safra_filter = request.data["safra"]
                     cicle_filter = request.data["ciclo"]
@@ -3249,6 +3270,14 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     print(e)
                 safra_filter = "2023/2024" if safra_filter == None else safra_filter
                 cicle_filter = "1" if cicle_filter == None else cicle_filter
+                
+                use_multi = request.data.get("use_multi", '')
+                # use_multi = False
+                
+                multi_list = request.GET.getlist("multi_ciclos[]")  # ex: ["2", "3"]
+                multi_list = ["2", "3"]
+                
+
                 qs_colheita = Colheita.objects.values(
                     "plantio__id",
                     "plantio__talhao__fazenda__nome",
@@ -3293,10 +3322,18 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "map_geo_points",
                 ).filter(
                     safra=s_dict[safra_filter],
-                    ciclo=c_dict[cicle_filter],
                     plantio_descontinuado=False,
                 )
-                # .filter(variedade__cultura__isnull=False)
+                
+                
+                if use_multi and multi_list:
+                    # === Forma 1 ===
+                    qs_plantio = qs_plantio.filter(variedade__cultura__isnull=False)
+                    qs_plantio = qs_plantio.filter(ciclo__ciclo__in=multi_list)
+
+                else:
+                    # === Forma 2 ===
+                    qs_plantio = qs_plantio.filter(ciclo=c_dict[cicle_filter])
 
                 result = [x for x in qs_plantio]
                 for i in qs_colheita:
