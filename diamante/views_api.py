@@ -2006,14 +2006,46 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     .filter(safra__safra=safra_filter, ciclo__ciclo=cicle_filter)
                     .order_by("data_plantio")
                 )
+                
+                qs_by_day_extrato = (
+                    PlantioExtratoArea.objects.select_related(
+                        "plantio",
+                        "plantio__talhao",
+                        "plantio__talhao__fazenda",
+                        "plantio__talhao__fazenda__fazenda",
+                        "plantio__variedade",
+                        "plantio__variedade__cultura",
+                    )
+                    .annotate(
+                        talhao__fazenda__nome=F("plantio__talhao__fazenda__nome"),
+                        talhao__fazenda__fazenda__nome=F("plantio__talhao__fazenda__fazenda__nome"),
+                        variedade__cultura__cultura=F("plantio__variedade__cultura__cultura"),
+                    )
+                    .values(
+                        "data_plantio",
+                        "talhao__fazenda__nome",
+                        "talhao__fazenda__fazenda__nome",
+                        "variedade__cultura__cultura",
+                    )
+                    .annotate(area_total=Sum("area_plantada"))
+                    .filter(
+                        ativo=True,
+                        plantio__plantio_descontinuado=False,
+                        plantio__safra__safra=safra_filter,
+                        plantio__ciclo__ciclo=cicle_filter,
+                    )
+                    .order_by("data_plantio")
+                )
 
                 response = {
                     "msg": f"Consulta realizada com sucesso GetPlantioDone API!! - Safra: {safra_filter} - Ciclo: {cicle_filter}",
                     "total_return": len(qs),
                     "data": qs,
                     "plantio_by_day": qs_by_day,
+                    "plantio_by_day_extrato": qs_by_day_extrato,
                     # "resume_by_farm": qsFarm,
                 }
+                
                 return Response(response, status=status.HTTP_200_OK)
             except Exception as e:
                 response = {"message": f"Ocorreu um Erro: {e}"}
