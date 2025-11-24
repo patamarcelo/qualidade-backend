@@ -1687,22 +1687,33 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         return qs
 
     def get_search_results(self, request, queryset, search_term):
-        try:
-            ciclo_filter = CicloAtual.objects.filter(nome="Colheita")[0]
-        except IndexError:
-            # Handle the case where CicloAtual doesn't exist
-            # Return None or an empty queryset
-            return None, False
+        # tenta pegar ciclo "Colheita", mas não quebra se não existir
+        ciclo_filter = CicloAtual.objects.filter(nome="Colheita").first()
 
-        queryset, use_distinct = super().get_search_results(
-            request, queryset, search_term
-        )
+        # --- tratamento do operador "!" no search ---
+        negate = False
+        term = search_term
 
-        # Exclude only for autocomplete
+        if search_term and search_term.startswith("!"):
+            negate = True
+            term = search_term[1:].strip()  # tira o "!" e espaços
+
+        # se for busca normal, deixa o Django fazer o trabalho
+        if not negate:
+            queryset, use_distinct = super().get_search_results(
+                request, queryset, term
+            )
+        else:
+            # se for "!termo", começamos do queryset original (sem filtro por texto)
+            use_distinct = False  # em geral não precisa de distinct aqui
+
+        # --- filtros especiais para autocomplete/model_name ---
+
         print("resquest_Path", request.path)
-        model_request =  request.GET.get('model_name')
-        print('model request: ', model_request)
-        if model_request and model_request == 'plantioextratoarea':
+        model_request = request.GET.get("model_name")
+        print("model request: ", model_request)
+
+        if model_request and model_request == "plantioextratoarea":
             queryset = queryset.filter(
                 ciclo__ciclo__in=["2", "3"],
                 safra__safra="2025/2026",
@@ -1710,22 +1721,50 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
                 plantio_descontinuado=False,
                 programa__isnull=False,
             )
-            if not queryset.exists():  # Check for empty queryset
-                return None, False 
+
+            # aplica a lógica do "!" também aqui, se estiver usando
+            if negate and term:
+                q = Q()
+                for field in self.search_fields:
+                    q |= Q(**{f"{field}__icontains": term})
+                queryset = queryset.exclude(q)
+
+            if not queryset.exists():
+                return queryset.none(), use_distinct
+
             return queryset, use_distinct
 
-        if request.path == "/admin/autocomplete/":
+        if request.path == "/admin/autocomplete/" and ciclo_filter:
             queryset = queryset.filter(
                 ciclo=ciclo_filter.ciclo,
                 finalizado_plantio=True,
                 finalizado_colheita=False,
                 plantio_descontinuado=False,
             )
-            if not queryset.exists():  # Check for empty queryset
-                return None, False 
-            return queryset, use_distinct
-        return queryset, use_distinct
 
+            # aplica a lógica do "!" também no autocomplete, se quiser
+            if negate and term:
+                q = Q()
+                for field in self.search_fields:
+                    q |= Q(**{f"{field}__icontains": term})
+                queryset = queryset.exclude(q)
+
+            if not queryset.exists():
+                return queryset.none(), use_distinct
+
+            return queryset, use_distinct
+
+        # --- caso padrão: changelist normal do admin ---
+
+        if negate and term:
+            # monta um Q com OR em todos os search_fields
+            q = Q()
+            for field in self.search_fields:
+                q |= Q(**{f"{field}__icontains": term})
+
+            queryset = queryset.exclude(q)
+
+        return queryset, use_distinct
 
     formfield_overrides = {
         models.JSONField: {
