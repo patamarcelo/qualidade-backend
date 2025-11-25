@@ -1428,7 +1428,8 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
                     print('id Farm: ', instance.id_farmbox) 
                     # Atualiza somente se houver valor
                     
-                    
+                    # Guarda o programa original para comparar depois
+                    old_programa = instance.programa
 
                     
                     if nova_data:
@@ -1438,9 +1439,16 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
                     # PROGRAMa
                     if clear_prog:                      # escolheu "⛔ Limpar Programa"
                         instance.programa = None
+                        instance.cronograma_programa = None
                     elif sent_prog and novo_programa:   # escolheu algum programa válido
-                        instance.programa = novo_programa
-                    
+                        if old_programa != novo_programa:
+                            print(
+                                'Programa alterado: ',
+                                'antes =', old_programa.id if old_programa else None,
+                                'depois =', novo_programa.id
+                            )
+                            instance.programa = novo_programa
+                            instance.cronograma_programa = None  # força regenerar no save()
                     
                     if clear_var:
                         instance.variedade = None
