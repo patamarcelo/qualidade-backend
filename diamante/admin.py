@@ -3070,7 +3070,7 @@ class OperacaoAdmin(admin.ModelAdmin):
                 current_op = form.instance.estagio
             current_program = form.instance.programa
             current_query = Plantio.objects.filter(
-                programa=current_program, finalizado_plantio=True
+                programa=current_program, inicializado_plantio=True
             )
             
             # ✅ Criar task no banco
@@ -3102,7 +3102,7 @@ class OperacaoAdmin(admin.ModelAdmin):
             current_op = form.instance.estagio
             current_program = form.instance.programa
             current_query = Plantio.objects.filter(
-                programa=current_program, finalizado_plantio=True
+                programa=current_program, inicializado_plantio=True
             )
             admin_form_remove_index(current_query, current_op)
 
