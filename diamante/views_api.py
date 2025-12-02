@@ -1543,9 +1543,6 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     safra_filter = current_safra.safra.safra
                     cicle_filter = current_safra.ciclo.ciclo
 
-                safra_filter = "2024/2025" if safra_filter == None else safra_filter
-                cicle_filter = "2" if cicle_filter == None else cicle_filter
-
                 qs = (
                     Plantio.objects.values(
                         "safra__safra",
