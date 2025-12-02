@@ -2394,6 +2394,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                     "cronograma": [
                                         {
                                             "estagio": x["estagio"],
+                                            "estagio_id": x["id"],
                                             "dap": x["prazo_dap"],
                                             "data prevista": get_prev_app_date(
                                                 i["data_plantio"], x["prazo_dap"]
@@ -3129,6 +3130,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                         "estagio": x["estagio"]
                                         + "|"
                                         + i["programa__nome_fantasia"],
+                                        "estagio_id": x["estagio_id"],
                                     }
                                     for x in i["cronograma_programa"][1:]
                                 ],
