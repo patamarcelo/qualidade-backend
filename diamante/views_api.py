@@ -4888,7 +4888,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "safra__safra",
                     "pk",
                     "ciclo__ciclo",
-                    "finalizado_colheita"
+                    "finalizado_colheita",
+                    "finalizado_plantio"
                 )
                 .filter(safra__safra="2025/2026", ciclo__ciclo__in=["2", "3"])
             )
