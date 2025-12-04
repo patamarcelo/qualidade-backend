@@ -1219,7 +1219,7 @@ def finalizar_parcelas_encerradas():
     lista_finalizadas = []
     lista_erros = []
     lista_proximas = []
-    dias_para_verificar_encerramento = 4
+    dias_para_verificar_encerramento = 3
     
     # 3) Faz a verificação dos 7 dias
     for parcela in queryset:

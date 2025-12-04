@@ -2247,6 +2247,13 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 cache_key_qs_planejamento = f"get_plantio_operacoes_detail_qs_planejamento_{safra_filter}_{cicle_filter}"
                 print('cache_key:', cache_key_qs_planejamento)
                 qs_planejamento = cache.get(cache_key_qs_planejamento)
+                
+                use_multi = request.data.get("use_multi", False)
+                print('useMulti Hereeee: ', use_multi)
+                
+                multi_list = request.GET.getlist("multi_ciclos[]")  # ex: ["2", "3"]
+                multi_list = ["2", "3"]
+                
                 if not qs_planejamento:
                     qs_planejamento = (
                         PlannerPlantio.objects.select_related(
@@ -2268,8 +2275,14 @@ class PlantioViewSet(viewsets.ModelViewSet):
                             "start_date",
                             "area",
                         )
-                        .filter(safra__safra=safra_filter, ciclo__ciclo=cicle_filter)
+                        # .filter(safra__safra=safra_filter, ciclo__ciclo=cicle_filter)
                     )
+                    if use_multi and multi_list:
+                    # === Forma 1 ===
+                        qs_planejamento = qs_planejamento.filter(ciclo__ciclo__in=multi_list, safra__safra=safra_filter)
+                    else:
+                        # === Forma 2 ===
+                        qs_planejamento = qs_planejamento.filter(safra__safra=safra_filter, ciclo__ciclo=cicle_filter)
                     cache.set(cache_key_qs_planejamento, qs_planejamento, timeout=60*5*6)  # cache for 5 minutes
 
                 cache_key_qs_plantio_get_plantio_operacoes_detail = f"get_plantio_operacoes_detail_qs_plantio_{safra_filter}_{cicle_filter}"
@@ -2312,11 +2325,18 @@ class PlantioViewSet(viewsets.ModelViewSet):
                             "programa__nome",
                         )
                         .filter(~Q(programa_id=None))
-                        .filter(safra=s_dict[safra_filter], ciclo=c_dict[cicle_filter])
+                        # .filter(safra=s_dict[safra_filter], ciclo=c_dict[cicle_filter])
                         .filter(Q(data_plantio=None))
                         .filter(plantio_descontinuado=False)
                         .filter(finalizado_colheita=False)
                     )
+                    if use_multi and multi_list:
+                        # === Forma 1 ===
+                        qs_plantio = qs_plantio.filter(ciclo__ciclo__in=multi_list, safra=s_dict[safra_filter])
+
+                    else:
+                        # === Forma 2 ===
+                        qs_plantio = qs_plantio.filter(safra=s_dict[safra_filter], ciclo=c_dict[cicle_filter])
                     cache.set(cache_key_qs_plantio_get_plantio_operacoes_detail, qs_plantio, timeout=60*5*6)  # cache for 5 minutes
 
                 qs_programas = Operacao.objects.values(
@@ -2351,12 +2371,22 @@ class PlantioViewSet(viewsets.ModelViewSet):
                             "operacao__programa__cultura__cultura",
                         )
                         .filter(~Q(operacao__programa_id=None))
-                        .filter(
+                        .filter(ativo=True)
+                        # .filter(
+                        #     operacao__programa__safra=s_dict[safra_filter],
+                        #     operacao__programa__ciclo=c_dict[cicle_filter],
+                        # )
+                    )
+                    
+                    if use_multi and multi_list:
+                        # === Forma 1 ===
+                        qs_aplicacoes = qs_aplicacoes.filter(operacao__programa__ciclo__ciclo__in=multi_list, operacao__programa__safra=s_dict[safra_filter])
+                    else:
+                        # === Forma 2 ===
+                        qs_aplicacoes = qs_aplicacoes.filter(
                             operacao__programa__safra=s_dict[safra_filter],
                             operacao__programa__ciclo=c_dict[cicle_filter],
-                            ativo=True,
                         )
-                    )
                     cache.set(cache_key_qs_aplicacoes, qs_aplicacoes, timeout=60*5*6)  # cache for 5 minutes
 
                 final_result = {i["talhao__fazenda__nome"]: {} for i in qs_plantio}
@@ -2479,7 +2509,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         # print('data Prevista check: ', today_check)
                         # print('data Prevista check: ', type(today_check))
                         # print(data_prevista_plantio > today_check)
-                        print('\n')
+                        # print('\n')
                         if data_plantio is None:
                             final_result[k][kk].update(
                                 {
@@ -2502,7 +2532,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 }
                             )
                             index += 1
-                print(qs_planejamento)
+                # print(qs_planejamento)
 
                 # RESUMO POR DIA COM TOTAIS DE APLICACOES
                 final_by_day = []
@@ -2976,8 +3006,16 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     safra_filter = ["2024/2025"] if safra_filter == None else [safra_filter]
                     cicle_filter = "1" if cicle_filter == None else cicle_filter
                 qs_start_time = time.time()
+
+                use_multi = request.data.get("use_multi", False)
+                print('useMulti Hereeee againnnn: ', use_multi)
+                # use_multi = True
+                
+                multi_list = request.GET.getlist("multi_ciclos[]")  # ex: ["2", "3"]
+                multi_list = ["2", "3"]
+                
                 if device == 'WEB':
-                    cache_key = f"get_plantio_operacoes_detail_json_program_qs_plantio_web_{safra_filter[0]}_{cicle_filter}"
+                    cache_key = f"get_plantio_operacoes_detail_json_program_qs_plantio_web_{use_multi}_{safra_filter[0]}_{cicle_filter}"
                     print('cache_key web:', cache_key)
                     qs_plantio = cache.get(cache_key)
                     if not qs_plantio:
@@ -3023,15 +3061,23 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 "cronograma_programa",
                             )
                             .filter(~Q(programa_id=None))
-                            .filter(safra__safra__in=safra_filter)
-                            .filter(ciclo=c_dict[cicle_filter])
+                            # .filter(safra__safra__in=safra_filter)
+                            # .filter(ciclo=c_dict[cicle_filter])
                             .filter(data_plantio__isnull=False)
                             .filter(plantio_descontinuado=False)
                             .filter(finalizado_colheita=False)
                         )
+                        if use_multi and multi_list:
+                            # === Forma 1 ===
+                            qs_plantio = qs_plantio.filter(ciclo__ciclo__in=multi_list).filter(safra__safra__in=safra_filter)
+
+                        else:
+                            # === Forma 2 ===
+                            qs_plantio = qs_plantio.filter(ciclo=c_dict[cicle_filter]).filter(safra__safra__in=safra_filter)
+                        
                         cache.set(cache_key, qs_plantio, timeout=60*5*6)  # cache for 60 minutes
                 else:
-                    cache_key = f"get_plantio_operacoes_detail_json_program_qs_plantio_{safra_filter}_{cicle_filter}"
+                    cache_key = f"get_plantio_operacoes_detail_json_program_qs_plantio_{use_multi}_{safra_filter}_{cicle_filter}"
                     print('cache_key:', cache_key)
                     qs_plantio = cache.get(cache_key)
                     if not qs_plantio:
@@ -3077,11 +3123,20 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 "cronograma_programa",
                             )
                             .filter(~Q(programa_id=None))
-                            .filter(safra__safra__in=safra_filter)
+                            # .filter(safra__safra__in=safra_filter)
                             .filter(data_plantio__isnull=False)
                             .filter(plantio_descontinuado=False)
                             .filter(finalizado_colheita=False)
                         )
+                        
+                        if use_multi and multi_list:
+                            # === Forma 1 ===
+                            qs_plantio = qs_plantio.filter(ciclo__ciclo__in=multi_list, safra__safra__in=safra_filter)
+
+                        else:
+                            # === Forma 2 ===
+                            qs_plantio = qs_plantio.filter(ciclo=c_dict[cicle_filter], safra__safra__in=safra_filter)
+
                         cache.set(cache_key, qs_plantio, timeout=60*5*12)  # cache for 60 minutes
                 qs_end_time = time.time()
                 print(f"Time for database query: {qs_end_time - qs_start_time:.2f} seconds")
@@ -3127,7 +3182,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                         "estagio": x["estagio"]
                                         + "|"
                                         + i["programa__nome_fantasia"],
-                                        "estagio_id": x["estagio_id"],
+                                        "estagio_id": x.get("estagio_id") or ""
                                     }
                                     for x in i["cronograma_programa"][1:]
                                 ],
