@@ -57,9 +57,9 @@ class KMLUnionView(APIView):
         try:
             tol_m = float(request.data.get("tol_m", 20.0))
         except (TypeError, ValueError):
-            tol_m = 20.0
+            tol_m = 1
 
-        tol_m = self.clamp(tol_m, min_value=20.0)  # mínimo garantido
+        tol_m = self.clamp(tol_m, min_value=1)  # mínimo garantido
 
 
         # corridor_width_m — mínimo 1
