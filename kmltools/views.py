@@ -56,6 +56,7 @@ class KMLUnionView(APIView):
         # tol_m — mínimo 20
         try:
             tol_m = float(request.data.get("tol_m", 20.0))
+            print('[TOL_M]tol_m received from FrontEd: ', tol_m)
         except (TypeError, ValueError):
             tol_m = 1
 
@@ -65,6 +66,7 @@ class KMLUnionView(APIView):
         # corridor_width_m — mínimo 1
         try:
             corridor_width_m = float(request.data.get("corridor_width_m", 1.0))
+            print('[corridor_width_m] received from FrontEd: ', tol_m)
         except (TypeError, ValueError):
             corridor_width_m = 1.0
 
@@ -76,11 +78,13 @@ class KMLUnionView(APIView):
 
         # namespace padrão do KML 2.2
         KML_NS = {"kml": "http://www.opengis.net/kml/2.2"}
-
+        count = 1
         for uploaded in files:
             raw_bytes = uploaded.read()
 
             print("\n" + "=" * 60)
+            print('arquivo recebido Nº: ', count)
+            count = count + 1
             print(f"📄 Recebido arquivo: {uploaded.name}")
             print(f"📦 Tamanho: {uploaded.size} bytes")
             print("-" * 60)
