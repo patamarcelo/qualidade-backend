@@ -3083,11 +3083,11 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 safra__safra__in=safra_filter
                             )
                         else:
-                            # qs_plantio = qs_plantio.filter(ciclo=c_dict[cicle_filter]).filter(safra__safra__in=safra_filter)
-                            qs_plantio = qs_plantio.filter(
-                                ciclo__ciclo=cicle_filter,
-                                safra__safra__in=safra_filter
-                            )
+                            qs_plantio = qs_plantio.filter(ciclo=c_dict[cicle_filter]).filter(safra__safra__in=safra_filter)
+                            # qs_plantio = qs_plantio.filter(
+                            #     ciclo__ciclo=cicle_filter,
+                            #     safra__safra__in=safra_filter
+                            # )
                         
                         # cache.set(cache_key, qs_plantio, timeout=60*5*6)  # cache for 60 minutes
                 else:
