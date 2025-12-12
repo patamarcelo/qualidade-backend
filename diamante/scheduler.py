@@ -90,7 +90,7 @@ def start():
                 scheduler.add_job(
                     enviar_email_diario,
                     'cron',
-                    day_of_week="mon-sat",  # Segunda a sábado
+                    day_of_week="mon-fri",   # Segunda a sexta-feira
                     hour="6",
                     minute="20",
                     id="enviar_email_diario_0630",

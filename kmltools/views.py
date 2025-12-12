@@ -36,6 +36,14 @@ class KMLUnionView(APIView):
     """
 
     parser_classes = [MultiPartParser, FormParser]
+    
+    def clamp(self, value, min_value=None, max_value=None):
+        if min_value is not None:
+            value = max(min_value, value)
+        if max_value is not None:
+            value = min(max_value, value)
+        return value
+
 
     def post(self, request, *args, **kwargs):
         files = request.FILES.getlist("files")
@@ -45,21 +53,24 @@ class KMLUnionView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # parâmetros opcionais
+        # tol_m — mínimo 20
         try:
             tol_m = float(request.data.get("tol_m", 20.0))
+            print('[TOL_M]tol_m received from FrontEd: ', tol_m)
         except (TypeError, ValueError):
-            tol_m = 20.0
-            
-        tol_m = max(1.0, min(tol_m, 9999999.0))
+            tol_m = 1
+
+        tol_m = self.clamp(tol_m, min_value=1)  # mínimo garantido
 
 
+        # corridor_width_m — mínimo 1
         try:
-            corridor_width_m = float(request.data.get("corridor_width_m", 0.1))
+            corridor_width_m = float(request.data.get("corridor_width_m", 1.0))
+            print('[corridor_width_m] received from FrontEd: ', tol_m)
         except (TypeError, ValueError):
-            corridor_width_m = 0.1
-            
-        corridor_width_m = max(0.01, corridor_width_m)  # evita zero/negativo
+            corridor_width_m = 1.0
+
+        corridor_width_m = self.clamp(corridor_width_m, min_value=1.0)  # mínimo garantido
 
 
         parcelas = []
@@ -67,11 +78,13 @@ class KMLUnionView(APIView):
 
         # namespace padrão do KML 2.2
         KML_NS = {"kml": "http://www.opengis.net/kml/2.2"}
-
+        count = 1
         for uploaded in files:
             raw_bytes = uploaded.read()
 
             print("\n" + "=" * 60)
+            print('arquivo recebido Nº: ', count)
+            count = count + 1
             print(f"📄 Recebido arquivo: {uploaded.name}")
             print(f"📦 Tamanho: {uploaded.size} bytes")
             print("-" * 60)

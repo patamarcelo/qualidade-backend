@@ -51,7 +51,7 @@ def enviar_email_diario():
         html_content = render_to_string("email/email_reuniao.html")
         emails_to_send = EmailAberturaST.objects.filter(atividade__tipo='Reuniao Diaria 0630', ativo=True).values_list('email', flat=True)
         send_mail(
-            subject="Reunião Diária - 06:30 até 07:30",
+            subject="Reunião Diária - 06:30 até 08:30",
             message=html_content,
             from_email=settings.EMAIL_HOST_USER,
             recipient_list=emails_to_send,
