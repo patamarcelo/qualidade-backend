@@ -1843,7 +1843,8 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         "get_description_descontinuado_plantio",
         "area_aferida",
         "area_parcial",
-        "acompanhamento_medias"
+        "acompanhamento_medias",
+        "id_farmbox",
         # "check_var_on_programa_list"
         # "detail",
     )
