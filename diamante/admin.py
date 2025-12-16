@@ -1808,6 +1808,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         "plantio_descontinuado",
         "talhao__fazenda__fazenda",
         "programa__nome",
+        "talhao__modulo",
         # "talhao__fazenda__nome",
         "variedade",
         "modificado",
