@@ -49,6 +49,9 @@ print('DEBUG', DEBUG)
 
 ALLOWED_HOSTS = ["*"]
 
+KML_DEBUG_SAVE = os.getenv("KML_DEBUG_SAVE", "0")
+
+
 
 # Application definition
 
