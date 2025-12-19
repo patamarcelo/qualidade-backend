@@ -8,6 +8,11 @@ from django.contrib.admin.widgets import AdminDateWidget
 from django.contrib.admin.widgets import AutocompleteSelect
 from django.contrib import admin
 
+
+class AdminDateWidgetComOntem(AdminDateWidget):
+    template_name = "admin/widgets/data_com_ontem.html"
+    
+
 class ProgramaAdminForm(forms.ModelForm):
     duplicar = forms.BooleanField(required=False, label="Duplicar de outro programa?")
     keep_price = forms.BooleanField(required=False, label="Manter o Custo?")
@@ -118,6 +123,7 @@ class PlantioExtratoAreaForm(forms.ModelForm):
             'finalizado_plantio': forms.CheckboxInput(attrs={
                 'class': 'form-check-input check-custom',
             }),
+            "data_plantio": AdminDateWidgetComOntem(),
             # 'data_plantio': forms.DateInput(attrs={
             #     'class': 'form-control',
             #     'type': 'date',  # HTML5 date input
@@ -196,3 +202,5 @@ class UpdateDataPrevistaPlantioForm(forms.Form):
         cleaned['_sent_variedade']  = (raw_var not in (None, ''))
 
         return cleaned
+    
+    

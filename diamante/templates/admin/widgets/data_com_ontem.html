@@ -1,0 +1,32 @@
+{% load i18n %}
+
+<input type="text" name="{{ widget.name }}"{% include "django/forms/widgets/attrs.html" %}>
+
+<span class="datetimeshortcuts">
+  | 
+  <a href="#" class="datetimeshortcuts" id="datelink_yesterday_{{ widget.attrs.id }}">
+    {% trans "Ontem" %}
+  </a>
+</span>
+
+<script>
+(function() {
+  function pad2(n){ return n < 10 ? "0" + n : "" + n; }
+
+  var inputId = "{{ widget.attrs.id|escapejs }}";
+  var input = document.getElementById(inputId);
+  var link = document.getElementById("datelink_yesterday_" + inputId);
+
+  if (!input || !link) return;
+
+  link.addEventListener("click", function(e) {
+    e.preventDefault();
+    var d = new Date();
+    d.setDate(d.getDate() - 1);
+
+    // dd/mm/aaaa (coerente com seu help_text)
+    input.value = pad2(d.getDate()) + "/" + pad2(d.getMonth() + 1) + "/" + d.getFullYear();
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+})();
+</script>
