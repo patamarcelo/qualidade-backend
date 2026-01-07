@@ -13,8 +13,25 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework import status
+from django.http import HttpResponse
 
 from .services import merge_no_flood
+
+from .authentication import FirebaseAuthentication
+from rest_framework.permissions import IsAuthenticated
+from .models import BillingProfile, WeeklyUsage
+from django.utils import timezone
+
+from django.db import transaction
+from django.db import IntegrityError
+
+
+import os
+import stripe
+from rest_framework.exceptions import ValidationError
+
+
+FREE_WEEKLY_LIMIT = 3
 
 
 def _debug_enabled():
@@ -94,6 +111,8 @@ def _save_kml_debug_bundle_storage(
 
 class KMLUnionView(APIView):
     parser_classes = [MultiPartParser, FormParser]
+    authentication_classes = (FirebaseAuthentication,)
+    permission_classes = (IsAuthenticated,)
 
     def clamp(self, value, min_value=None, max_value=None):
         if min_value is not None:
@@ -103,13 +122,64 @@ class KMLUnionView(APIView):
         return value
 
     def post(self, request, *args, **kwargs):
+        week_key = None
+        weekly_used = None
+        weekly_remaining = None
+        
+        
         files = request.FILES.getlist("files")
         if not files:
             return Response(
                 {"detail": "Nenhum arquivo enviado. Use o campo 'files'."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        
+        bp = getattr(request.user, "billing", None)
+        if not bp:
+            return Response(
+                {"detail": "BillingProfile ausente. Faça login novamente.", "code": "BILLING_PROFILE_MISSING"},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
 
+        plan = bp.plan
+        
+        
+
+        if plan == "free":
+            today = timezone.localdate()
+            year, week_num, _ = today.isocalendar()
+            week_key = f"{year}{week_num:02d}"
+
+
+            with transaction.atomic():
+                try:
+                    usage, _ = WeeklyUsage.objects.select_for_update().get_or_create(
+                        user=request.user,
+                        week=week_key,
+                        defaults={"count": 0},
+                    )
+                except IntegrityError:
+                    usage = WeeklyUsage.objects.select_for_update().get(user=request.user, week=week_key)
+
+                if usage.count >= FREE_WEEKLY_LIMIT:
+                    return Response(
+                        {
+                            "detail": "Limite semanal do plano gratuito atingido (3 unificações/semana).",
+                            "code": "FREE_WEEKLY_LIMIT_REACHED",
+                            "plan": "free",
+                            "limit": FREE_WEEKLY_LIMIT,
+                            "used": usage.count,
+                            "week": week_key,
+                            "weekly_remaining": 0,
+                        },
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+
+                usage.count += 1
+                usage.save(update_fields=["count", "updated_at"])
+                weekly_used = usage.count
+                weekly_remaining = max(0, FREE_WEEKLY_LIMIT - weekly_used)
+                
         request_id = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
         debug_enabled = _debug_enabled()
 
@@ -282,6 +352,212 @@ class KMLUnionView(APIView):
                 "input_area_ha": metrics.get("input_area_ha"),
                 "output_area_m2": metrics.get("output_area_m2"),
                 "output_area_ha": metrics.get("output_area_ha"),
+                
+                "plan": plan,
+                "weekly_limit": FREE_WEEKLY_LIMIT if plan == "free" else None,
+                "weekly_used": weekly_used if plan == "free" else None,
+                "weekly_remaining": weekly_remaining if plan == "free" else None,
+                "week": week_key if plan == "free" else None,
             },
             status=status.HTTP_200_OK,
         )
+
+class MeView(APIView):
+    authentication_classes = (FirebaseAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        bp = getattr(request.user, "billing", None)
+
+        return Response(
+            {
+                "email": request.user.email,
+                "plan": bp.plan if bp else "free",
+                "firebase_uid": bp.firebase_uid if bp else None,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class UsageView(APIView):
+    authentication_classes = (FirebaseAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        today = timezone.localdate()
+        year, week_num, _ = today.isocalendar()
+        week_key = f"{year}{week_num:02d}"
+
+        used = (
+            WeeklyUsage.objects.filter(user=request.user, week=week_key)
+            .values_list("count", flat=True)
+            .first()
+        ) or 0
+
+        remaining = max(0, FREE_WEEKLY_LIMIT - used)
+
+        bp = getattr(request.user, "billing", None)
+        plan = bp.plan if bp else "free"
+
+        # Se pro, você pode retornar remaining=None (ilimitado)
+        if plan != "free":
+            return Response(
+                {
+                    "plan": plan,
+                    "week": week_key,
+                    "weekly_limit": None,
+                    "weekly_used": used,  # opcional
+                    "weekly_remaining": None,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        return Response(
+            {
+                "plan": "free",
+                "week": week_key,
+                "weekly_limit": FREE_WEEKLY_LIMIT,
+                "weekly_used": used,
+                "weekly_remaining": remaining,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+
+
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+
+class CreateCheckoutSessionView(APIView):
+    authentication_classes = (FirebaseAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    def post(self, request):
+        bp = getattr(request.user, "billing", None)
+        if not bp:
+            return Response(
+                {"detail": "BillingProfile ausente.", "code": "BILLING_PROFILE_MISSING"},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        billing_cycle = (request.data.get("billing_cycle") or "").lower().strip()
+        if billing_cycle not in ("monthly", "yearly"):
+            raise ValidationError({"billing_cycle": "Use 'monthly' ou 'yearly'."})
+
+        price_id = os.getenv("STRIPE_PRICE_ID_MONTHLY") if billing_cycle == "monthly" else os.getenv("STRIPE_PRICE_ID_YEARLY")
+        if not price_id:
+            return Response(
+                {"detail": "Stripe price_id não configurado no servidor.", "code": "STRIPE_PRICE_ID_MISSING"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        app_url = os.getenv("APP_URL", "http://localhost:5173").rstrip("/")
+        success_url = f"{app_url}/billing/success"
+        cancel_url = f"{app_url}/billing/cancel"
+
+        # garante customer
+        if not bp.stripe_customer_id:
+            customer = stripe.Customer.create(
+                email=request.user.email,
+                metadata={"firebase_uid": bp.firebase_uid, "django_user_id": str(request.user.id)},
+            )
+            bp.stripe_customer_id = customer["id"]
+            bp.save(update_fields=["stripe_customer_id", "updated_at"])
+
+        session = stripe.checkout.Session.create(
+            mode="subscription",
+            customer=bp.stripe_customer_id,
+            line_items=[{"price": price_id, "quantity": 1}],
+            success_url=success_url + "?session_id={CHECKOUT_SESSION_ID}",
+            cancel_url=cancel_url,
+            allow_promotion_codes=True,
+            subscription_data={
+                "metadata": {
+                    "firebase_uid": bp.firebase_uid,
+                    "django_user_id": str(request.user.id),
+                }
+            },
+            metadata={
+                "firebase_uid": bp.firebase_uid,
+                "django_user_id": str(request.user.id),
+            },
+        )
+
+        return Response(
+            {
+                "checkout_url": session["url"],
+                "session_id": session["id"],
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+
+
+class StripeWebhookView(APIView):
+    authentication_classes = ()
+    permission_classes = ()
+
+    def post(self, request):
+        payload = request.body
+        sig_header = request.META.get("HTTP_STRIPE_SIGNATURE")
+        endpoint_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
+
+        if not endpoint_secret:
+            return HttpResponse(status=500)
+
+        try:
+            event = stripe.Webhook.construct_event(payload, sig_header, endpoint_secret)
+        except Exception:
+            return HttpResponse(status=400)
+
+        event_type = event["type"]
+        data = event["data"]["object"]
+
+        # 1) checkout.session.completed -> pega subscription e customer
+        if event_type == "checkout.session.completed":
+            customer_id = data.get("customer")
+            subscription_id = data.get("subscription")
+
+            if customer_id:
+                bp = BillingProfile.objects.filter(stripe_customer_id=customer_id).first()
+                if bp and subscription_id:
+                    bp.stripe_subscription_id = subscription_id
+                    bp.plan = "pro"
+                    bp.save(update_fields=["stripe_subscription_id", "plan", "updated_at"])
+
+        # 2) invoice.paid -> atualiza período (mais confiável para renovação)
+        if event_type == "invoice.paid":
+            customer_id = data.get("customer")
+            subscription_id = data.get("subscription")
+            period_end = None
+
+            # Stripe manda timestamps (unix) frequentemente
+            lines = data.get("lines", {}).get("data", [])
+            if lines:
+                pe = lines[0].get("period", {}).get("end")
+                if pe:
+                    period_end = timezone.datetime.fromtimestamp(int(pe), tz=timezone.utc)
+
+            if customer_id:
+                bp = BillingProfile.objects.filter(stripe_customer_id=customer_id).first()
+                if bp:
+                    bp.plan = "pro"
+                    if subscription_id:
+                        bp.stripe_subscription_id = subscription_id
+                    if period_end:
+                        bp.current_period_end = period_end
+                    bp.save(update_fields=["plan", "stripe_subscription_id", "current_period_end", "updated_at"])
+
+        # 3) customer.subscription.deleted -> volta para free
+        if event_type == "customer.subscription.deleted":
+            customer_id = data.get("customer")
+            if customer_id:
+                bp = BillingProfile.objects.filter(stripe_customer_id=customer_id).first()
+                if bp:
+                    bp.plan = "free"
+                    bp.current_period_end = None
+                    bp.stripe_subscription_id = None
+                    bp.save(update_fields=["plan", "current_period_end", "stripe_subscription_id", "updated_at"])
+
+        return HttpResponse(status=200)
