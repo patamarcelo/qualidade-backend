@@ -125,6 +125,8 @@ class KMLUnionView(APIView):
         week_key = None
         weekly_used = None
         weekly_remaining = None
+        usage = None
+
         
         
         files = request.FILES.getlist("files")
@@ -174,11 +176,11 @@ class KMLUnionView(APIView):
                         },
                         status=status.HTTP_403_FORBIDDEN,
                     )
-
                 usage.count += 1
                 usage.save(update_fields=["count", "updated_at"])
                 weekly_used = usage.count
                 weekly_remaining = max(0, FREE_WEEKLY_LIMIT - weekly_used)
+                
                 
         request_id = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
         debug_enabled = _debug_enabled()
@@ -433,6 +435,7 @@ class CreateCheckoutSessionView(APIView):
     permission_classes = (IsAuthenticated,)
 
     def post(self, request):
+        stripe.api_key = os.getenv("STRIPE_SECRET_KEY")  # ou settings.STRIPE_SECRET_KEY
         bp = getattr(request.user, "billing", None)
         if not bp:
             return Response(
@@ -502,6 +505,8 @@ class StripeWebhookView(APIView):
         payload = request.body
         sig_header = request.META.get("HTTP_STRIPE_SIGNATURE")
         endpoint_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
+        stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+
 
         if not endpoint_secret:
             return HttpResponse(status=500)
