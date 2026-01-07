@@ -37,6 +37,7 @@ class UsuarioManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
         # extra_fields.setdefault('is_staff', True) padrao como False
         extra_fields.setdefault("is_superuser", False)
+        extra_fields.setdefault("is_staff", False)
         return self._create_user(email, password, **extra_fields)
 
     def create_superuser(self, email, password, **extra_fields):
@@ -55,10 +56,9 @@ class UsuarioManager(BaseUserManager):
 
 class CustomUsuario(AbstractUser):
     email = models.EmailField("E-mail", unique=True)
-    fone = models.CharField("Telefone", max_length=15)
-    first_name = models.CharField("First Name", max_length=15)
-    last_name = models.CharField("Last Name", max_length=15)
-    last_name = models.CharField("Last Name", max_length=15)
+    fone = models.CharField("Telefone", max_length=15, blank=True, null=True)
+    first_name = models.CharField("First Name", max_length=150, blank=True)
+    last_name = models.CharField("Last Name", max_length=150, blank=True)
     is_staff = models.BooleanField("Membro da equipe", default=False)
     # image      = models.ImageField(storage=DropBoxStorage(), default='images/User1.jpg', blank=True)
     # image      = models.ImageField(upload_to=get_file_path, default='images/User1.jpg', blank=True)
@@ -67,16 +67,13 @@ class CustomUsuario(AbstractUser):
     api_secret = models.CharField("Api Secret", max_length=200, blank=True, null=True)
 
     USERNAME_FIELD = "email"
-    REQUIRED_FIELDS = ["first_name", "last_name", "fone"]
+    REQUIRED_FIELDS = []
 
     def image_tag(self):
-        from django.utils.html import escape
+        if getattr(self, "image", None) and getattr(self.image, "url", None):
+            return mark_safe(f'<img src="{self.image.url}" width="50" height="50" style="border-radius:10px;" />')
+        return ""
 
-        # return u'<img src="%s" />' % escape(self.image)
-        return mark_safe(
-            '<img src="%s" width="50" height="50" border-radius="10" />'
-            % (self.image.url)
-        )
 
     image_tag.short_description = "Foto"
     image_tag.allow_tags = True
