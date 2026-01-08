@@ -371,14 +371,69 @@ class MeView(APIView):
     def get(self, request):
         bp = getattr(request.user, "billing", None)
 
-        return Response(
-            {
-                "email": request.user.email,
-                "plan": bp.plan if bp else "free",
-                "firebase_uid": bp.firebase_uid if bp else None,
-            },
-            status=status.HTTP_200_OK,
-        )
+        # Se não tem billing profile, retorne o mínimo
+        if not bp:
+            return Response({"email": request.user.email, "plan": "free"})
+
+        # FAIL-SAFE: se ele está pro mas não tem deadline, ou se já passou, ou se o Stripe não está ativo, corrige.
+        # Regra simples: se tiver subscription_id, consulta Stripe e sincroniza.
+        if bp.plan == "pro" or bp.stripe_subscription_id:
+            if bp.stripe_subscription_id:
+                try:
+                    sub = stripe.Subscription.retrieve(bp.stripe_subscription_id)
+                    status_ = (sub.get("status") or "").lower().strip()
+                    cpe_ts = sub.get("current_period_end")
+                    cpe = timezone.datetime.fromtimestamp(int(cpe_ts), tz=timezone.utc) if cpe_ts else None
+                    cap = bool(sub.get("cancel_at_period_end") or False)
+
+                    # Atualiza campos locais
+                    bp.current_period_end = cpe
+                    if hasattr(bp, "cancel_at_period_end"):
+                        bp.cancel_at_period_end = cap
+
+                    # Decide plano
+                    if status_ in ("active", "trialing"):
+                        bp.plan = "pro"
+                    else:
+                        bp.plan = "free"
+                        bp.current_period_end = None
+                        bp.stripe_subscription_id = None
+                        if hasattr(bp, "cancel_at_period_end"):
+                            bp.cancel_at_period_end = False
+
+                    bp.save(update_fields=[
+                        "plan", "current_period_end", "stripe_subscription_id", "updated_at",
+                        *(["cancel_at_period_end"] if hasattr(bp, "cancel_at_period_end") else [])
+                    ])
+                except Exception:
+                    # Se Stripe falhar, usa deadline local se existir
+                    if bp.current_period_end and timezone.now() > bp.current_period_end:
+                        bp.plan = "free"
+                        bp.current_period_end = None
+                        bp.stripe_subscription_id = None
+                        if hasattr(bp, "cancel_at_period_end"):
+                            bp.cancel_at_period_end = False
+                            bp.save(update_fields=["plan", "current_period_end", "stripe_subscription_id", "cancel_at_period_end", "updated_at"])
+                        else:
+                            bp.save(update_fields=["plan", "current_period_end", "stripe_subscription_id", "updated_at"])
+
+            else:
+                # pro sem subscription_id => inconsistente; rebaixa
+                bp.plan = "free"
+                bp.current_period_end = None
+                if hasattr(bp, "cancel_at_period_end"):
+                    bp.cancel_at_period_end = False
+                    bp.save(update_fields=["plan", "current_period_end", "cancel_at_period_end", "updated_at"])
+                else:
+                    bp.save(update_fields=["plan", "current_period_end", "updated_at"])
+
+        return Response({
+            "email": request.user.email,
+            "plan": bp.plan,
+            "current_period_end": bp.current_period_end.isoformat() if bp.current_period_end else None,
+            "cancel_at_period_end": getattr(bp, "cancel_at_period_end", None),
+        })
+
 
 
 class UsageView(APIView):
@@ -497,7 +552,50 @@ class CreateCheckoutSessionView(APIView):
         )
 
 
+def _dt_from_unix(ts):
+    if not ts:
+        return None
+    try:
+        return timezone.datetime.fromtimestamp(int(ts), tz=timezone.utc)
+    except Exception:
+        return None
 
+
+def _sync_bp_from_subscription(bp: BillingProfile, sub: dict):
+    """
+    Sincroniza BillingProfile a partir de um objeto Subscription do Stripe.
+    Fonte de verdade: status + current_period_end + cancel_at_period_end.
+    """
+    status_ = (sub.get("status") or "").lower().strip()
+    cpe = _dt_from_unix(sub.get("current_period_end"))
+    cap = bool(sub.get("cancel_at_period_end") or False)
+
+    # Guardar IDs sempre que possível
+    bp.stripe_subscription_id = sub.get("id") or bp.stripe_subscription_id
+    bp.current_period_end = cpe
+    if hasattr(bp, "cancel_at_period_end"):
+        bp.cancel_at_period_end = cap
+
+    # Regras de acesso:
+    # - "active" e "trialing" => Pro
+    # - "past_due"/"unpaid" => depende de regra de negócio; aqui eu corto (mais simples e "definitivo")
+    #   Se quiser tolerância, trate past_due como pro por X dias.
+    if status_ in ("active", "trialing"):
+        bp.plan = "pro"
+    else:
+        bp.plan = "free"
+        bp.current_period_end = None
+        bp.stripe_subscription_id = None
+        if hasattr(bp, "cancel_at_period_end"):
+            bp.cancel_at_period_end = False
+
+    bp.save(update_fields=[
+        "plan",
+        "stripe_subscription_id",
+        "current_period_end",
+        "updated_at",
+        *(["cancel_at_period_end"] if hasattr(bp, "cancel_at_period_end") else [])
+    ])
 
 
 class StripeWebhookView(APIView):
@@ -505,14 +603,13 @@ class StripeWebhookView(APIView):
     permission_classes = ()
 
     def post(self, request):
-        stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
-
         payload = request.body
         sig_header = request.META.get("HTTP_STRIPE_SIGNATURE")
         endpoint_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
+        stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
-        if not endpoint_secret or not sig_header:
-            return HttpResponse(status=400)
+        if not endpoint_secret:
+            return HttpResponse(status=500)
 
         try:
             event = stripe.Webhook.construct_event(payload, sig_header, endpoint_secret)
@@ -522,153 +619,65 @@ class StripeWebhookView(APIView):
         event_type = event.get("type")
         data = (event.get("data") or {}).get("object") or {}
 
-        def _to_dt(ts):
-            if not ts:
-                return None
-            try:
-                return timezone.datetime.fromtimestamp(int(ts), tz=timezone.utc)
-            except Exception:
-                return None
+        # --- Eventos que você PRECISA ouvir ---
+        # 1) customer.subscription.created / updated: captura current_period_end e cancel_at_period_end
+        if event_type in ("customer.subscription.created", "customer.subscription.updated"):
+            sub = data
+            customer_id = sub.get("customer")
+            if customer_id:
+                bp = BillingProfile.objects.filter(stripe_customer_id=customer_id).first()
+                if bp:
+                    _sync_bp_from_subscription(bp, sub)
+            return HttpResponse(status=200)
 
-        def _get_bp_by_customer(customer_id: str | None):
-            if not customer_id:
-                return None
-            return BillingProfile.objects.filter(stripe_customer_id=customer_id).first()
+        # 2) customer.subscription.deleted: encerra e rebaixa
+        if event_type == "customer.subscription.deleted":
+            sub = data
+            customer_id = sub.get("customer")
+            if customer_id:
+                bp = BillingProfile.objects.filter(stripe_customer_id=customer_id).first()
+                if bp:
+                    # deleted => free
+                    bp.plan = "free"
+                    bp.current_period_end = None
+                    bp.stripe_subscription_id = None
+                    if hasattr(bp, "cancel_at_period_end"):
+                        bp.cancel_at_period_end = False
+                        bp.save(update_fields=["plan", "current_period_end", "stripe_subscription_id", "cancel_at_period_end", "updated_at"])
+                    else:
+                        bp.save(update_fields=["plan", "current_period_end", "stripe_subscription_id", "updated_at"])
+            return HttpResponse(status=200)
 
-        def _set_free(bp: BillingProfile):
-            bp.plan = "free"
-            bp.current_period_end = None
-            bp.stripe_subscription_id = None
-            bp.save(update_fields=["plan", "current_period_end", "stripe_subscription_id", "updated_at"])
-
-        # 1) checkout.session.completed -> marca pro e tenta setar período (ok manter)
+        # 3) checkout.session.completed: garante stripe_subscription_id no seu bp (opcional)
         if event_type == "checkout.session.completed":
             customer_id = data.get("customer")
             subscription_id = data.get("subscription")
-
-            bp = _get_bp_by_customer(customer_id)
-            if bp and subscription_id:
-                # aqui dá para setar período já, mas nem sempre vem pronto nesse evento;
-                # por isso o subscription.updated é o mais confiável para "fim do período".
-                period_end = None
-                try:
-                    sub = stripe.Subscription.retrieve(subscription_id)
-                    period_end = _to_dt(sub.get("current_period_end"))
-                except Exception:
-                    pass
-
-                bp.stripe_subscription_id = subscription_id
-                bp.plan = "pro"
-                if period_end:
-                    bp.current_period_end = period_end
-                bp.save(update_fields=["stripe_subscription_id", "plan", "current_period_end", "updated_at"])
-
+            if customer_id and subscription_id:
+                bp = BillingProfile.objects.filter(stripe_customer_id=customer_id).first()
+                if bp:
+                    bp.stripe_subscription_id = subscription_id
+                    bp.plan = "pro"
+                    bp.save(update_fields=["stripe_subscription_id", "plan", "updated_at"])
             return HttpResponse(status=200)
 
-        # 2) invoice.payment_succeeded / invoice.paid -> renovação paga
-        if event_type in ("invoice.payment_succeeded", "invoice.paid"):
+        # 4) invoice.payment_succeeded: reforço para períodos (opcional)
+        # Se vier, ótimo, mas não dependa dele.
+        if event_type == "invoice.payment_succeeded":
             customer_id = data.get("customer")
             subscription_id = data.get("subscription")
-
-            bp = _get_bp_by_customer(customer_id)
-            if bp:
-                period_end = None
-
-                # Preferir subscription.current_period_end
-                if subscription_id:
+            if customer_id and subscription_id:
+                bp = BillingProfile.objects.filter(stripe_customer_id=customer_id).first()
+                if bp:
                     try:
                         sub = stripe.Subscription.retrieve(subscription_id)
-                        period_end = _to_dt(sub.get("current_period_end"))
+                        _sync_bp_from_subscription(bp, sub)
                     except Exception:
                         pass
-
-                # fallback: invoice lines
-                if not period_end:
-                    try:
-                        lines = (data.get("lines") or {}).get("data") or []
-                        ends = []
-                        for ln in lines:
-                            pe = (ln.get("period") or {}).get("end")
-                            if pe:
-                                ends.append(int(pe))
-                        if ends:
-                            period_end = _to_dt(max(ends))
-                    except Exception:
-                        pass
-
-                bp.plan = "pro"
-                if subscription_id:
-                    bp.stripe_subscription_id = subscription_id
-                if period_end:
-                    bp.current_period_end = period_end
-
-                bp.save(update_fields=["plan", "stripe_subscription_id", "current_period_end", "updated_at"])
-
             return HttpResponse(status=200)
 
-        # 3) customer.subscription.updated -> EVENTO-CHAVE para "acabou o período"
-        # Esse evento acontece quando:
-        # - o usuário cancela (cancel_at_period_end muda)
-        # - chega no final e o status muda (canceled, unpaid etc.)
-        # - status muda por falha de cobrança (past_due/unpaid)
-        if event_type == "customer.subscription.updated":
-            customer_id = data.get("customer")
-            subscription_id = data.get("id")  # aqui o "id" já é o subscription id
-            status = (data.get("status") or "").lower()
-            cancel_at_period_end = bool(data.get("cancel_at_period_end"))
-            current_period_end = _to_dt(data.get("current_period_end"))
-            ended_at = _to_dt(data.get("ended_at"))  # pode existir em alguns casos
-
-            bp = _get_bp_by_customer(customer_id)
-            if not bp:
-                return HttpResponse(status=200)
-
-            # sempre manter o vínculo e o período atualizado
-            if subscription_id:
-                bp.stripe_subscription_id = subscription_id
-            if current_period_end:
-                bp.current_period_end = current_period_end
-
-            # regra de negócio:
-            # - enquanto estiver ativo/trialing, é pro
-            # - se estiver past_due/unpaid, você escolhe: manter pro com grace ou cortar.
-            #   Aqui vou cortar quando virar unpaid/canceled, e manter em past_due (ajuste se quiser).
-            if status in ("active", "trialing"):
-                bp.plan = "pro"
-            elif status in ("canceled", "unpaid"):
-                # aqui é o "acabou" de verdade (ou cobrança encerrada)
-                bp.plan = "free"
-                bp.current_period_end = None
-                bp.stripe_subscription_id = None
-            else:
-                # past_due, incomplete, incomplete_expired etc.
-                # escolha conservadora: mantém pro até acabar o período se cancel_at_period_end for true,
-                # ou mantém pro se ainda tem current_period_end no futuro.
-                # (você pode trocar para free se quiser cortar imediatamente)
-                bp.plan = "pro" if (cancel_at_period_end or (bp.current_period_end and bp.current_period_end > timezone.now())) else "free"
-
-            # se o Stripe já marcou ended_at, corta imediatamente
-            if ended_at:
-                bp.plan = "free"
-                bp.current_period_end = None
-                bp.stripe_subscription_id = None
-
-            bp.save(update_fields=["plan", "stripe_subscription_id", "current_period_end", "updated_at"])
-            return HttpResponse(status=200)
-
-        # 4) customer.subscription.deleted -> fallback final
-        if event_type == "customer.subscription.deleted":
-            customer_id = data.get("customer")
-            bp = _get_bp_by_customer(customer_id)
-            if bp:
-                _set_free(bp)
-            return HttpResponse(status=200)
-
-        # opcional: se quiser reagir a falha imediatamente
-        # if event_type == "invoice.payment_failed":
-        #     ... decidir se corta ou entra em grace ...
-
+        # Outras events: ignore
         return HttpResponse(status=200)
+
 
 class CreateBillingPortalSessionView(APIView):
     authentication_classes = (FirebaseAuthentication,)

@@ -25,8 +25,10 @@ class BillingProfile(models.Model):
     
     stripe_subscription_id = models.CharField(max_length=255, blank=True, null=True)
     current_period_end = models.DateTimeField(blank=True, null=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
+    cancel_at_period_end = models.BooleanField(default=False)
+
+    updated_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
