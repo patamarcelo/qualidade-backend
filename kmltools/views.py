@@ -552,6 +552,7 @@ class CreateCheckoutSessionView(APIView):
         )
 
 
+
 def _dt_from_unix(ts):
     if not ts:
         return None
@@ -562,28 +563,24 @@ def _dt_from_unix(ts):
 
 
 def _sync_bp_from_subscription(bp: BillingProfile, sub: dict):
-    """
-    Fonte da verdade:
-      - status
-      - current_period_end
-      - cancel_at_period_end
-    """
     status_ = (sub.get("status") or "").lower().strip()
     cpe = _dt_from_unix(sub.get("current_period_end"))
     cap = bool(sub.get("cancel_at_period_end") or False)
 
+    # Sempre persistir os dados “fonte da verdade”
     bp.stripe_subscription_id = sub.get("id") or bp.stripe_subscription_id
     bp.current_period_end = cpe
     bp.cancel_at_period_end = cap
 
-    # Acesso pro enquanto active/trialing.
-    # Se você quiser manter Pro até o fim do período mesmo em "canceled",
-    # o correto é tratar cap=True como Pro até current_period_end.
+    # Regra de negócio:
+    # - Se está active/trialing: Pro
+    # - Se cancel_at_period_end=True e current_period_end ainda no futuro: continua Pro até a data
+    now = timezone.now()
     if status_ in ("active", "trialing"):
         bp.plan = "pro"
+    elif cap and cpe and cpe > now:
+        bp.plan = "pro"
     else:
-        # Se cancel_at_period_end=True, normalmente o status ainda fica "active".
-        # Aqui, estados não-active caem para free (mais conservador).
         bp.plan = "free"
         bp.current_period_end = None
         bp.stripe_subscription_id = None
@@ -596,7 +593,6 @@ def _sync_bp_from_subscription(bp: BillingProfile, sub: dict):
         "cancel_at_period_end",
         "updated_at",
     ])
-
 
 class StripeWebhookView(APIView):
     authentication_classes = ()
@@ -624,11 +620,25 @@ class StripeWebhookView(APIView):
         # 1) Subscription created/updated: atualiza period_end e cancel_at_period_end
         if event_type in ("customer.subscription.created", "customer.subscription.updated"):
             customer_id = obj.get("customer")
-            if customer_id:
+            sub_id = obj.get("id")
+
+            print("[stripe] subscription event:", event_type, "customer:", customer_id, "sub:", sub_id)
+
+            if customer_id and sub_id:
                 bp = BillingProfile.objects.filter(stripe_customer_id=customer_id).first()
                 if bp:
-                    _sync_bp_from_subscription(bp, obj)
+                    try:
+                        # fonte da verdade
+                        sub = stripe.Subscription.retrieve(sub_id)
+                        print("[stripe] sub status:", sub.get("status"),
+                            "cpe:", sub.get("current_period_end"),
+                            "cap:", sub.get("cancel_at_period_end"))
+                        _sync_bp_from_subscription(bp, sub)
+                    except Exception as e:
+                        print("[stripe] error retrieving subscription:", str(e))
+
             return HttpResponse(status=200)
+
 
         # 2) checkout.session.completed: sincroniza subscription IMEDIATAMENTE (não depende do timing)
         if event_type == "checkout.session.completed":
