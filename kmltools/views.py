@@ -618,6 +618,8 @@ class StripeWebhookView(APIView):
 
         event_type = event.get("type")
         obj = (event.get("data") or {}).get("object") or {}
+        
+        print('check event type: ', event_type)
 
         # 1) Subscription created/updated: atualiza period_end e cancel_at_period_end
         if event_type in ("customer.subscription.created", "customer.subscription.updated"):
