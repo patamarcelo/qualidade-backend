@@ -430,12 +430,14 @@ class UsageView(APIView):
 
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
+
 class CreateCheckoutSessionView(APIView):
     authentication_classes = (FirebaseAuthentication,)
     permission_classes = (IsAuthenticated,)
 
     def post(self, request):
-        stripe.api_key = os.getenv("STRIPE_SECRET_KEY")  # ou settings.STRIPE_SECRET_KEY
+        stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+
         bp = getattr(request.user, "billing", None)
         if not bp:
             return Response(
@@ -454,9 +456,11 @@ class CreateCheckoutSessionView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
+        # IMPORTANTE: em produção, APP_URL precisa ser https://kmlunifier.com
+        # (não localhost). Esse é o URL que o Stripe vai redirecionar após o pagamento.
         app_url = os.getenv("APP_URL", "http://localhost:5173").rstrip("/")
-        success_url = f"{app_url}/billing/success"
-        cancel_url = f"{app_url}/billing/cancel"
+        success_url = f"{app_url}/?stripe=success&session_id={{CHECKOUT_SESSION_ID}}"
+        cancel_url = f"{app_url}/?stripe=cancel"
 
         # garante customer
         if not bp.stripe_customer_id:
@@ -470,8 +474,9 @@ class CreateCheckoutSessionView(APIView):
         session = stripe.checkout.Session.create(
             mode="subscription",
             customer=bp.stripe_customer_id,
+            client_reference_id=str(request.user.id),
             line_items=[{"price": price_id, "quantity": 1}],
-            success_url=success_url + "?session_id={CHECKOUT_SESSION_ID}",
+            success_url=success_url,
             cancel_url=cancel_url,
             allow_promotion_codes=True,
             subscription_data={
@@ -487,14 +492,9 @@ class CreateCheckoutSessionView(APIView):
         )
 
         return Response(
-            {
-                "checkout_url": session["url"],
-                "session_id": session["id"],
-            },
+            {"checkout_url": session["url"], "session_id": session["id"]},
             status=status.HTTP_200_OK,
         )
-
-
 
 
 class StripeWebhookView(APIView):
@@ -502,24 +502,61 @@ class StripeWebhookView(APIView):
     permission_classes = ()
 
     def post(self, request):
+        stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+
         payload = request.body
         sig_header = request.META.get("HTTP_STRIPE_SIGNATURE")
         endpoint_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
-        stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
-
-        if not endpoint_secret:
-            return HttpResponse(status=500)
+        if not endpoint_secret or not sig_header:
+            return HttpResponse(status=400)
 
         try:
             event = stripe.Webhook.construct_event(payload, sig_header, endpoint_secret)
         except Exception:
             return HttpResponse(status=400)
 
-        event_type = event["type"]
-        data = event["data"]["object"]
+        event_type = event.get("type")
+        data = (event.get("data") or {}).get("object") or {}
 
-        # 1) checkout.session.completed -> pega subscription e customer
+        # helpers
+        def _to_dt(ts: int | None):
+            if not ts:
+                return None
+            try:
+                return timezone.datetime.fromtimestamp(int(ts), tz=timezone.utc)
+            except Exception:
+                return None
+
+        def _get_period_end_from_subscription(subscription_id: str | None):
+            if not subscription_id:
+                return None
+            try:
+                sub = stripe.Subscription.retrieve(subscription_id)
+                return _to_dt(sub.get("current_period_end"))
+            except Exception:
+                return None
+
+        def _get_period_end_from_invoice_lines(invoice_obj: dict):
+            # fallback: extrair do invoice lines (quando disponível)
+            try:
+                lines = (invoice_obj.get("lines") or {}).get("data") or []
+                ends = []
+                for ln in lines:
+                    pe = (ln.get("period") or {}).get("end")
+                    if pe:
+                        ends.append(int(pe))
+                if ends:
+                    return _to_dt(max(ends))
+            except Exception:
+                pass
+            return None
+
+        # 1) checkout.session.completed
+        # Aqui a gente já seta:
+        # - stripe_subscription_id
+        # - plan="pro" (se você quiser só após pagamento confirmado, remova este plan aqui)
+        # - current_period_end (buscando direto na subscription)
         if event_type == "checkout.session.completed":
             customer_id = data.get("customer")
             subscription_id = data.get("subscription")
@@ -527,22 +564,26 @@ class StripeWebhookView(APIView):
             if customer_id:
                 bp = BillingProfile.objects.filter(stripe_customer_id=customer_id).first()
                 if bp and subscription_id:
+                    period_end = _get_period_end_from_subscription(subscription_id)
+
                     bp.stripe_subscription_id = subscription_id
                     bp.plan = "pro"
-                    bp.save(update_fields=["stripe_subscription_id", "plan", "updated_at"])
+                    if period_end:
+                        bp.current_period_end = period_end
 
-        # 2) invoice.paid -> atualiza período (mais confiável para renovação)
-        if event_type == "invoice.paid":
+                    bp.save(update_fields=["stripe_subscription_id", "plan", "current_period_end", "updated_at"])
+
+            return HttpResponse(status=200)
+
+        # 2) invoice.payment_succeeded / invoice.paid
+        # Mais confiável para renovação; atualiza current_period_end sempre que uma fatura é paga.
+        if event_type in ("invoice.payment_succeeded", "invoice.paid"):
             customer_id = data.get("customer")
             subscription_id = data.get("subscription")
-            period_end = None
 
-            # Stripe manda timestamps (unix) frequentemente
-            lines = data.get("lines", {}).get("data", [])
-            if lines:
-                pe = lines[0].get("period", {}).get("end")
-                if pe:
-                    period_end = timezone.datetime.fromtimestamp(int(pe), tz=timezone.utc)
+            period_end = _get_period_end_from_subscription(subscription_id)
+            if not period_end:
+                period_end = _get_period_end_from_invoice_lines(data)
 
             if customer_id:
                 bp = BillingProfile.objects.filter(stripe_customer_id=customer_id).first()
@@ -552,7 +593,10 @@ class StripeWebhookView(APIView):
                         bp.stripe_subscription_id = subscription_id
                     if period_end:
                         bp.current_period_end = period_end
+
                     bp.save(update_fields=["plan", "stripe_subscription_id", "current_period_end", "updated_at"])
+
+            return HttpResponse(status=200)
 
         # 3) customer.subscription.deleted -> volta para free
         if event_type == "customer.subscription.deleted":
@@ -565,4 +609,7 @@ class StripeWebhookView(APIView):
                     bp.stripe_subscription_id = None
                     bp.save(update_fields=["plan", "current_period_end", "stripe_subscription_id", "updated_at"])
 
+            return HttpResponse(status=200)
+
+        # outros eventos ignorados
         return HttpResponse(status=200)
