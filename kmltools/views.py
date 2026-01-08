@@ -497,6 +497,9 @@ class CreateCheckoutSessionView(APIView):
         )
 
 
+
+
+
 class StripeWebhookView(APIView):
     authentication_classes = ()
     permission_classes = ()
@@ -519,8 +522,7 @@ class StripeWebhookView(APIView):
         event_type = event.get("type")
         data = (event.get("data") or {}).get("object") or {}
 
-        # helpers
-        def _to_dt(ts: int | None):
+        def _to_dt(ts):
             if not ts:
                 return None
             try:
@@ -528,88 +530,142 @@ class StripeWebhookView(APIView):
             except Exception:
                 return None
 
-        def _get_period_end_from_subscription(subscription_id: str | None):
-            if not subscription_id:
+        def _get_bp_by_customer(customer_id: str | None):
+            if not customer_id:
                 return None
-            try:
-                sub = stripe.Subscription.retrieve(subscription_id)
-                return _to_dt(sub.get("current_period_end"))
-            except Exception:
-                return None
+            return BillingProfile.objects.filter(stripe_customer_id=customer_id).first()
 
-        def _get_period_end_from_invoice_lines(invoice_obj: dict):
-            # fallback: extrair do invoice lines (quando disponível)
-            try:
-                lines = (invoice_obj.get("lines") or {}).get("data") or []
-                ends = []
-                for ln in lines:
-                    pe = (ln.get("period") or {}).get("end")
-                    if pe:
-                        ends.append(int(pe))
-                if ends:
-                    return _to_dt(max(ends))
-            except Exception:
-                pass
-            return None
+        def _set_free(bp: BillingProfile):
+            bp.plan = "free"
+            bp.current_period_end = None
+            bp.stripe_subscription_id = None
+            bp.save(update_fields=["plan", "current_period_end", "stripe_subscription_id", "updated_at"])
 
-        # 1) checkout.session.completed
-        # Aqui a gente já seta:
-        # - stripe_subscription_id
-        # - plan="pro" (se você quiser só após pagamento confirmado, remova este plan aqui)
-        # - current_period_end (buscando direto na subscription)
+        # 1) checkout.session.completed -> marca pro e tenta setar período (ok manter)
         if event_type == "checkout.session.completed":
             customer_id = data.get("customer")
             subscription_id = data.get("subscription")
 
-            if customer_id:
-                bp = BillingProfile.objects.filter(stripe_customer_id=customer_id).first()
-                if bp and subscription_id:
-                    period_end = _get_period_end_from_subscription(subscription_id)
+            bp = _get_bp_by_customer(customer_id)
+            if bp and subscription_id:
+                # aqui dá para setar período já, mas nem sempre vem pronto nesse evento;
+                # por isso o subscription.updated é o mais confiável para "fim do período".
+                period_end = None
+                try:
+                    sub = stripe.Subscription.retrieve(subscription_id)
+                    period_end = _to_dt(sub.get("current_period_end"))
+                except Exception:
+                    pass
 
-                    bp.stripe_subscription_id = subscription_id
-                    bp.plan = "pro"
-                    if period_end:
-                        bp.current_period_end = period_end
-
-                    bp.save(update_fields=["stripe_subscription_id", "plan", "current_period_end", "updated_at"])
+                bp.stripe_subscription_id = subscription_id
+                bp.plan = "pro"
+                if period_end:
+                    bp.current_period_end = period_end
+                bp.save(update_fields=["stripe_subscription_id", "plan", "current_period_end", "updated_at"])
 
             return HttpResponse(status=200)
 
-        # 2) invoice.payment_succeeded / invoice.paid
-        # Mais confiável para renovação; atualiza current_period_end sempre que uma fatura é paga.
+        # 2) invoice.payment_succeeded / invoice.paid -> renovação paga
         if event_type in ("invoice.payment_succeeded", "invoice.paid"):
             customer_id = data.get("customer")
             subscription_id = data.get("subscription")
 
-            period_end = _get_period_end_from_subscription(subscription_id)
-            if not period_end:
-                period_end = _get_period_end_from_invoice_lines(data)
+            bp = _get_bp_by_customer(customer_id)
+            if bp:
+                period_end = None
 
-            if customer_id:
-                bp = BillingProfile.objects.filter(stripe_customer_id=customer_id).first()
-                if bp:
-                    bp.plan = "pro"
-                    if subscription_id:
-                        bp.stripe_subscription_id = subscription_id
-                    if period_end:
-                        bp.current_period_end = period_end
+                # Preferir subscription.current_period_end
+                if subscription_id:
+                    try:
+                        sub = stripe.Subscription.retrieve(subscription_id)
+                        period_end = _to_dt(sub.get("current_period_end"))
+                    except Exception:
+                        pass
 
-                    bp.save(update_fields=["plan", "stripe_subscription_id", "current_period_end", "updated_at"])
+                # fallback: invoice lines
+                if not period_end:
+                    try:
+                        lines = (data.get("lines") or {}).get("data") or []
+                        ends = []
+                        for ln in lines:
+                            pe = (ln.get("period") or {}).get("end")
+                            if pe:
+                                ends.append(int(pe))
+                        if ends:
+                            period_end = _to_dt(max(ends))
+                    except Exception:
+                        pass
+
+                bp.plan = "pro"
+                if subscription_id:
+                    bp.stripe_subscription_id = subscription_id
+                if period_end:
+                    bp.current_period_end = period_end
+
+                bp.save(update_fields=["plan", "stripe_subscription_id", "current_period_end", "updated_at"])
 
             return HttpResponse(status=200)
 
-        # 3) customer.subscription.deleted -> volta para free
+        # 3) customer.subscription.updated -> EVENTO-CHAVE para "acabou o período"
+        # Esse evento acontece quando:
+        # - o usuário cancela (cancel_at_period_end muda)
+        # - chega no final e o status muda (canceled, unpaid etc.)
+        # - status muda por falha de cobrança (past_due/unpaid)
+        if event_type == "customer.subscription.updated":
+            customer_id = data.get("customer")
+            subscription_id = data.get("id")  # aqui o "id" já é o subscription id
+            status = (data.get("status") or "").lower()
+            cancel_at_period_end = bool(data.get("cancel_at_period_end"))
+            current_period_end = _to_dt(data.get("current_period_end"))
+            ended_at = _to_dt(data.get("ended_at"))  # pode existir em alguns casos
+
+            bp = _get_bp_by_customer(customer_id)
+            if not bp:
+                return HttpResponse(status=200)
+
+            # sempre manter o vínculo e o período atualizado
+            if subscription_id:
+                bp.stripe_subscription_id = subscription_id
+            if current_period_end:
+                bp.current_period_end = current_period_end
+
+            # regra de negócio:
+            # - enquanto estiver ativo/trialing, é pro
+            # - se estiver past_due/unpaid, você escolhe: manter pro com grace ou cortar.
+            #   Aqui vou cortar quando virar unpaid/canceled, e manter em past_due (ajuste se quiser).
+            if status in ("active", "trialing"):
+                bp.plan = "pro"
+            elif status in ("canceled", "unpaid"):
+                # aqui é o "acabou" de verdade (ou cobrança encerrada)
+                bp.plan = "free"
+                bp.current_period_end = None
+                bp.stripe_subscription_id = None
+            else:
+                # past_due, incomplete, incomplete_expired etc.
+                # escolha conservadora: mantém pro até acabar o período se cancel_at_period_end for true,
+                # ou mantém pro se ainda tem current_period_end no futuro.
+                # (você pode trocar para free se quiser cortar imediatamente)
+                bp.plan = "pro" if (cancel_at_period_end or (bp.current_period_end and bp.current_period_end > timezone.now())) else "free"
+
+            # se o Stripe já marcou ended_at, corta imediatamente
+            if ended_at:
+                bp.plan = "free"
+                bp.current_period_end = None
+                bp.stripe_subscription_id = None
+
+            bp.save(update_fields=["plan", "stripe_subscription_id", "current_period_end", "updated_at"])
+            return HttpResponse(status=200)
+
+        # 4) customer.subscription.deleted -> fallback final
         if event_type == "customer.subscription.deleted":
             customer_id = data.get("customer")
-            if customer_id:
-                bp = BillingProfile.objects.filter(stripe_customer_id=customer_id).first()
-                if bp:
-                    bp.plan = "free"
-                    bp.current_period_end = None
-                    bp.stripe_subscription_id = None
-                    bp.save(update_fields=["plan", "current_period_end", "stripe_subscription_id", "updated_at"])
-
+            bp = _get_bp_by_customer(customer_id)
+            if bp:
+                _set_free(bp)
             return HttpResponse(status=200)
 
-        # outros eventos ignorados
+        # opcional: se quiser reagir a falha imediatamente
+        # if event_type == "invoice.payment_failed":
+        #     ... decidir se corta ou entra em grace ...
+
         return HttpResponse(status=200)
