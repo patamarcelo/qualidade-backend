@@ -669,3 +669,42 @@ class StripeWebhookView(APIView):
         #     ... decidir se corta ou entra em grace ...
 
         return HttpResponse(status=200)
+
+class CreateBillingPortalSessionView(APIView):
+    authentication_classes = (FirebaseAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    def post(self, request):
+        stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+
+        bp = getattr(request.user, "billing", None)
+        if not bp or not bp.stripe_customer_id:
+            return Response(
+                {"detail": "Stripe customer inexistente para este usuário.", "code": "STRIPE_CUSTOMER_MISSING"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # return_url: se vier do front, usa; senão usa APP_URL padrão
+        body_return_url = None
+        try:
+            body_return_url = (request.data or {}).get("return_url")
+        except Exception:
+            body_return_url = None
+
+        app_url = os.getenv("APP_URL", "http://localhost:5173").rstrip("/")
+        return_url = (body_return_url or f"{app_url}/?stripe=portal_return").strip()
+
+        try:
+            portal_session = stripe.billing_portal.Session.create(
+                customer=bp.stripe_customer_id,
+                return_url=return_url,
+            )
+        except stripe.error.StripeError as e:
+            # Mostra mensagem útil para debug
+            msg = getattr(e, "user_message", None) or str(e)
+            return Response(
+                {"detail": msg, "code": "STRIPE_PORTAL_ERROR"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response({"url": portal_session["url"]}, status=status.HTTP_200_OK)
