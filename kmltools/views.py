@@ -553,6 +553,16 @@ class CreateCheckoutSessionView(APIView):
         )
 
 # ---- helpers + webhook (copy/paste) ----
+import os
+from datetime import timedelta
+
+import stripe
+from django.utils import timezone
+from django.http import HttpResponse
+from rest_framework.views import APIView
+
+from .models import BillingProfile
+
 
 def _dt_from_unix(ts):
     if not ts:
@@ -826,6 +836,7 @@ class StripeWebhookView(APIView):
             return HttpResponse(status=200)
 
         return HttpResponse(status=200)
+
 
 
 class CreateBillingPortalSessionView(APIView):
