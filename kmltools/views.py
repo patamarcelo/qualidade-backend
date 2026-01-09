@@ -18,7 +18,7 @@ from .services import merge_no_flood
 
 from .authentication import FirebaseAuthentication
 from rest_framework.permissions import IsAuthenticated
-from .models import BillingProfile, WeeklyUsage
+from .models import BillingProfile, WeeklyUsage, KMLMergeJob
 from django.utils import timezone
 from datetime import timedelta
 
@@ -30,6 +30,11 @@ import os
 import stripe
 from rest_framework.exceptions import ValidationError
 from datetime import datetime, timedelta, timezone as py_timezone  # <-- IMPORTANTE
+
+
+from rest_framework.pagination import PageNumberPagination
+from django.shortcuts import get_object_or_404
+
 
 
 FREE_WEEKLY_LIMIT = 2
@@ -324,6 +329,38 @@ class KMLUnionView(APIView):
 
         try:
             download_url = default_storage.url(saved_path)
+            
+            # ---- Persistir histórico do merge (metadata) ----
+            try:
+                input_filenames = [getattr(f, "name", "") for f in files]
+
+                job = KMLMergeJob.objects.create(
+                    user=request.user,
+                    request_id=request_id,
+                    plan=plan,
+                    status=KMLMergeJob.STATUS_SUCCESS,
+                    tol_m=tol_m,
+                    corridor_width_m=corridor_width_m,
+                    total_files=len(files),
+                    total_polygons=total_polygons,
+
+                    output_polygons=metrics.get("output_polygons"),
+                    merged_polygons=metrics.get("merged_polygons"),
+
+                    input_area_m2=metrics.get("input_area_m2"),
+                    input_area_ha=metrics.get("input_area_ha"),
+                    output_area_m2=metrics.get("output_area_m2"),
+                    output_area_ha=metrics.get("output_area_ha"),
+
+                    storage_path=saved_path,
+                    metrics=metrics or {},
+                    input_filenames=input_filenames,
+                )
+            except Exception as e:
+                # Não quebrar o response por falha de histórico
+                print(f"[KML_HISTORY] Falha ao salvar histórico do merge {request_id}: {e}")
+                job = None
+
         except NotImplementedError:
             media_url = settings.MEDIA_URL
             if not media_url.endswith("/"):
@@ -361,6 +398,8 @@ class KMLUnionView(APIView):
                 "weekly_used": weekly_used if plan == "free" else None,
                 "weekly_remaining": weekly_remaining if plan == "free" else None,
                 "week": week_key if plan == "free" else None,
+                
+                "job_id": str(job.id) if job else None,
             },
             status=status.HTTP_200_OK,
         )
@@ -856,3 +895,87 @@ class CreateBillingPortalSessionView(APIView):
             )
 
         return Response({"url": portal_session["url"]}, status=status.HTTP_200_OK)
+
+
+
+
+
+
+class KMLHistoryPagination(PageNumberPagination):
+    page_size = 20
+    page_size_query_param = "page_size"
+    max_page_size = 100
+
+
+class KMLHistoryView(APIView):
+    authentication_classes = (FirebaseAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        qs = KMLMergeJob.objects.filter(user=request.user).order_by("-created_at")
+
+        # filtros opcionais
+        status_ = (request.query_params.get("status") or "").strip().lower()
+        if status_ in ("success", "error"):
+            qs = qs.filter(status=status_)
+
+        paginator = KMLHistoryPagination()
+        page = paginator.paginate_queryset(qs, request)
+
+        # serialização simples (sem criar Serializer por enquanto)
+        items = []
+        for job in page:
+            try:
+                url = default_storage.url(job.storage_path) if job.storage_path else None
+            except Exception:
+                url = None
+
+            items.append({
+                "id": str(job.id),
+                "request_id": job.request_id,
+                "status": job.status,
+                "plan": job.plan,
+                "created_at": job.created_at.isoformat(),
+
+                "total_files": job.total_files,
+                "total_polygons": job.total_polygons,
+                "tol_m": job.tol_m,
+                "corridor_width_m": job.corridor_width_m,
+
+                "output_polygons": job.output_polygons,
+                "merged_polygons": job.merged_polygons,
+                "input_area_m2": job.input_area_m2,
+                "input_area_ha": job.input_area_ha,
+                "output_area_m2": job.output_area_m2,
+                "output_area_ha": job.output_area_ha,
+
+                "download_url": url,
+                "input_filenames": job.input_filenames,
+            })
+
+        return paginator.get_paginated_response(items)
+
+
+class KMLHistoryDownloadView(APIView):
+    authentication_classes = (FirebaseAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request, job_id):
+        job = get_object_or_404(KMLMergeJob, id=job_id, user=request.user)
+
+        if not job.storage_path:
+            return Response({"detail": "Arquivo não disponível."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            url = default_storage.url(job.storage_path)
+        except Exception:
+            url = None
+
+        if not url:
+            return Response({"detail": "Não foi possível gerar a URL de download."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response({
+            "id": str(job.id),
+            "request_id": job.request_id,
+            "download_url": url,
+        }, status=status.HTTP_200_OK)
