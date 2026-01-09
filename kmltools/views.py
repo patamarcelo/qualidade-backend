@@ -2,7 +2,6 @@ import os
 import uuid
 import json
 import xml.etree.ElementTree as ET
-from datetime import datetime
 from threading import Thread
 
 from django.conf import settings
@@ -30,6 +29,7 @@ from django.db import IntegrityError
 import os
 import stripe
 from rest_framework.exceptions import ValidationError
+from datetime import datetime, timedelta, timezone as py_timezone  # <-- IMPORTANTE
 
 
 FREE_WEEKLY_LIMIT = 2
@@ -554,23 +554,22 @@ class CreateCheckoutSessionView(APIView):
 
 
 
+# =========================
+# Helpers
+# =========================
+
 def _dt_from_unix(ts, label="ts"):
     """
-    Converte ts unix -> datetime UTC.
-    Aceita int/float/str/StripeObject.
-    Loga o erro se falhar (não engole silenciosamente).
+    Converte unix timestamp (segundos) para datetime timezone-aware em UTC.
+    NÃO usa django.utils.timezone.utc (não existe no Django 5).
     """
-    if ts in (None, "", 0, "0"):
+    if ts is None:
         return None
     try:
-        # Alguns payloads podem vir como string/float
-        # e alguns objetos do stripe podem ser "truthy" mas não int-castáveis direto.
-        if isinstance(ts, str):
-            ts = ts.strip()
-        ts_int = int(float(ts))
-        return timezone.datetime.fromtimestamp(ts_int, tz=timezone.utc)
+        ts_int = int(ts)
+        return datetime.fromtimestamp(ts_int, tz=py_timezone.utc)
     except Exception as e:
-        print(f"[stripe][dt] failed converting {label}={ts!r} ({type(ts)}) -> {e}")
+        print(f"[stripe][dt] failed converting {label}={ts} ({type(ts)}) -> {e}")
         return None
 
 
@@ -584,7 +583,7 @@ def _add_months(dt, months: int):
 
 def _derive_period_end_from_anchor(sub: dict):
     """
-    Deriva deadline quando Stripe não traz current_period_end.
+    Deriva deadline quando Stripe não manda current_period_end.
     Usa billing_cycle_anchor + intervalo do price (month/year).
     """
     anchor_ts = sub.get("billing_cycle_anchor") or sub.get("start_date") or sub.get("created")
@@ -602,80 +601,66 @@ def _derive_period_end_from_anchor(sub: dict):
             recurring = price.get("recurring") or {}
             interval = recurring.get("interval")  # 'month' / 'year'
             interval_count = int(recurring.get("interval_count") or 1)
-    except Exception as e:
-        print("[stripe][derive] failed reading interval from price:", str(e))
+    except Exception:
+        interval = None
 
     if interval == "month":
         return _add_months(anchor, interval_count)
     if interval == "year":
-        # usa meses para evitar problemas de 29/02
-        return _add_months(anchor, 12 * interval_count)
+        return anchor.replace(year=anchor.year + interval_count)
 
-    # fallback conservador
     return anchor + timedelta(days=30)
 
 
 def _extract_period_end_from_invoice(invoice: dict):
     """
-    Busca period_end no invoice lines (muito comum em invoice.*).
+    Pega o maior period.end das lines do invoice.
     """
     try:
         lines = (invoice.get("lines") or {}).get("data") or []
         ends = []
         for ln in lines:
             pe = (ln.get("period") or {}).get("end")
-            if pe:
-                ends.append(int(pe))
-        if ends:
-            return _dt_from_unix(max(ends), "invoice.lines.period.end")
+            dt = _dt_from_unix(pe, "invoice.lines.period.end")
+            if dt:
+                ends.append(dt)
+        return max(ends) if ends else None
     except Exception as e:
-        print("[stripe][invoice] failed extracting period_end:", str(e))
-    return None
+        print("[stripe] failed extracting cpe from invoice:", str(e))
+        return None
 
 
 def _sync_bp_from_subscription(bp: BillingProfile, sub: dict, period_end_fallback=None):
-    """
-    Fonte de verdade:
-      - status
-      - cancel_at_period_end
-      - cancel_at
-      - current_period_end (quando vier)
-    E se não vier current_period_end, deriva.
-    """
     status_ = (sub.get("status") or "").lower().strip()
 
     raw_cpe = sub.get("current_period_end")
-    raw_cancel_at = sub.get("cancel_at")
     raw_cap = sub.get("cancel_at_period_end")
+    raw_cancel_at = sub.get("cancel_at")
 
     cpe = _dt_from_unix(raw_cpe, "sub.current_period_end")
     cancel_at_dt = _dt_from_unix(raw_cancel_at, "sub.cancel_at")
-    cap = bool(raw_cap or False)
 
-    # 1) Se cancel_at veio, é o melhor deadline (quando usuário cancela e mantém até o fim)
+    # Fallbacks de deadline
     if not cpe and cancel_at_dt:
         cpe = cancel_at_dt
-
-    # 2) Fallback pelo invoice
     if not cpe and period_end_fallback:
         cpe = period_end_fallback
-
-    # 3) Se ainda não tem, deriva do anchor + price interval
     if not cpe:
         cpe = _derive_period_end_from_anchor(sub)
 
-    now = timezone.now()
+    # Boolean local: considerar flag OU a presença de cancel_at (seu Stripe está usando cancel_at)
+    cap_local = bool(raw_cap) or bool(cancel_at_dt)
 
     bp.stripe_subscription_id = sub.get("id") or bp.stripe_subscription_id
     bp.current_period_end = cpe
+    bp.cancel_at_period_end = cap_local
 
-    # IMPORTANTÍSSIMO: só funciona se existir no model+DB
-    if hasattr(bp, "cancel_at_period_end"):
-        bp.cancel_at_period_end = cap or bool(cancel_at_dt)
+    now = timezone.now()
 
-    # Plano:
+    # Regra de plano:
     # - active/trialing => pro
-    # - senão => pro até deadline (se houver e futura), senão free
+    # - caso contrário, se ainda existe deadline futura => pro até expirar
+    # - senão => free
     if status_ in ("active", "trialing"):
         bp.plan = "pro"
     else:
@@ -685,19 +670,20 @@ def _sync_bp_from_subscription(bp: BillingProfile, sub: dict, period_end_fallbac
             bp.plan = "free"
             bp.current_period_end = None
             bp.stripe_subscription_id = None
-            if hasattr(bp, "cancel_at_period_end"):
-                bp.cancel_at_period_end = False
+            bp.cancel_at_period_end = False
 
-    update_fields = ["plan", "stripe_subscription_id", "current_period_end", "updated_at"]
-    if hasattr(bp, "cancel_at_period_end"):
-        update_fields.append("cancel_at_period_end")
-
-    bp.save(update_fields=update_fields)
+    bp.save(update_fields=[
+        "plan",
+        "stripe_subscription_id",
+        "current_period_end",
+        "cancel_at_period_end",
+        "updated_at",
+    ])
 
     print(
         "[stripe][sync] saved -> plan:", bp.plan,
         "cpe:", bp.current_period_end,
-        "cap(local):", getattr(bp, "cancel_at_period_end", None),
+        "cap(local):", bp.cancel_at_period_end,
         "status:", status_,
         "raw_cap:", raw_cap,
         "raw_cancel_at:", raw_cancel_at,
@@ -706,6 +692,10 @@ def _sync_bp_from_subscription(bp: BillingProfile, sub: dict, period_end_fallbac
         "period_end_fallback:", period_end_fallback,
     )
 
+
+# =========================
+# Webhook
+# =========================
 
 class StripeWebhookView(APIView):
     authentication_classes = ()
@@ -740,15 +730,15 @@ class StripeWebhookView(APIView):
                 bp = BillingProfile.objects.filter(stripe_customer_id=customer_id).first()
                 if bp:
                     try:
-                        # SEMPRE pegue a subscription completa do Stripe (não confie só no payload)
+                        # expand price para permitir derivação
                         sub = stripe.Subscription.retrieve(sub_id, expand=["items.data.price"])
                         _sync_bp_from_subscription(bp, sub)
                     except Exception as e:
-                        print("[stripe] retrieve subscription failed:", str(e))
+                        print("[stripe] retrieve sub failed:", str(e))
 
             return HttpResponse(status=200)
 
-        # 2) checkout.session.completed (reforço)
+        # 2) checkout.session.completed (garante sub_id e sincroniza)
         if event_type == "checkout.session.completed":
             customer_id = obj.get("customer")
             subscription_id = obj.get("subscription")
@@ -769,33 +759,35 @@ class StripeWebhookView(APIView):
 
             return HttpResponse(status=200)
 
-        # 3) invoice events fallback
+        # 3) invoice events (fallback)
         if event_type in ("invoice.paid", "invoice.payment_succeeded"):
             invoice = obj
             customer_id = invoice.get("customer")
             subscription_id = invoice.get("subscription")
             print("[stripe] invoice event:", event_type, "customer:", customer_id, "sub:", subscription_id)
 
+            cpe_from_invoice = _extract_period_end_from_invoice(invoice)
+            print("[stripe] cpe from invoice:", cpe_from_invoice)
+
             if customer_id and subscription_id:
                 bp = BillingProfile.objects.filter(stripe_customer_id=customer_id).first()
                 if bp:
-                    cpe_from_invoice = _extract_period_end_from_invoice(invoice)
-                    print("[stripe] cpe from invoice:", cpe_from_invoice)
-
                     try:
                         sub = stripe.Subscription.retrieve(subscription_id, expand=["items.data.price"])
                         _sync_bp_from_subscription(bp, sub, period_end_fallback=cpe_from_invoice)
                     except Exception as e:
-                        print("[stripe] invoice retrieve subscription failed:", str(e))
+                        # mesmo sem subscription, salva ao menos deadline do invoice
+                        print("[stripe] invoice retrieve sub failed:", str(e))
                         if cpe_from_invoice:
                             bp.plan = "pro"
                             bp.stripe_subscription_id = subscription_id
                             bp.current_period_end = cpe_from_invoice
                             bp.save(update_fields=["plan", "stripe_subscription_id", "current_period_end", "updated_at"])
+                            print("[stripe] saved cpe from invoice only")
 
             return HttpResponse(status=200)
 
-        # 4) subscription deleted (encerramento definitivo)
+        # 4) subscription deleted (quando encerra de verdade)
         if event_type == "customer.subscription.deleted":
             customer_id = obj.get("customer")
             print("[stripe] subscription deleted customer:", customer_id)
@@ -806,14 +798,11 @@ class StripeWebhookView(APIView):
                     bp.plan = "free"
                     bp.current_period_end = None
                     bp.stripe_subscription_id = None
-                    if hasattr(bp, "cancel_at_period_end"):
-                        bp.cancel_at_period_end = False
-
-                    update_fields = ["plan", "current_period_end", "stripe_subscription_id", "updated_at"]
-                    if hasattr(bp, "cancel_at_period_end"):
-                        update_fields.append("cancel_at_period_end")
-
-                    bp.save(update_fields=update_fields)
+                    bp.cancel_at_period_end = False
+                    bp.save(update_fields=[
+                        "plan", "current_period_end", "stripe_subscription_id", "cancel_at_period_end", "updated_at"
+                    ])
+                    print("[stripe] downgraded to free (deleted)")
 
             return HttpResponse(status=200)
 
