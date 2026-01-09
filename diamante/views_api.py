@@ -170,6 +170,9 @@ from types import SimpleNamespace
 from .services.generate_kml import create_kml
 from .services.geo_merge import merge_no_flood
 
+import unicodedata
+
+
 # Get a named logger
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -5600,6 +5603,12 @@ def adjust_percent_parcelas(percent):
             return list_percent[0]
     else:
         return ""
+    
+def normalize(text):
+    if not text:
+        return ""
+    return unicodedata.normalize("NFKD", str(text)).encode("ASCII", "ignore").decode("ASCII").upper()
+
 
 
 def save_from_protheus_logic(data_json, user_id):
@@ -5692,18 +5701,20 @@ def save_from_protheus_logic(data_json, user_id):
                                 i["Percentual_Parcela"]
                             )
                             id_farmtruck = i["ID_Integracao"]
+                            
+                            destino_norm = normalize(destino)
 
-                            if "UBS" in str(destino):
+                            if "UBS" in destino_norm:
                                 destino = 2
-                            elif "BADU" in str(destino):
+                            elif "BADU" in destino_norm:
                                 destino = 10
-                            elif "FAZENDAO" in str(destino):
+                            elif "FAZENDAO" in destino_norm:
                                 destino = 4
-                            elif "DIAMANTE" in str(destino):
+                            elif "DIAMANTE" in destino_norm:
                                 destino = 1
-                            elif "BIGUA" in str(destino):
+                            elif "BIGUA" in destino_norm:
                                 destino = 3
-                            elif "JK" in str(destino):
+                            elif "JK" in destino_norm:
                                 destino = 7
 
                             final_ticket = f"{filial}{ticket}"

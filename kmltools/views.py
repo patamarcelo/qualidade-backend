@@ -365,6 +365,7 @@ class KMLUnionView(APIView):
             status=status.HTTP_200_OK,
         )
 
+
 class MeView(APIView):
     authentication_classes = (FirebaseAuthentication,)
     permission_classes = (IsAuthenticated,)
@@ -372,68 +373,75 @@ class MeView(APIView):
     def get(self, request):
         bp = getattr(request.user, "billing", None)
 
-        # Se não tem billing profile, retorne o mínimo
         if not bp:
             return Response({"email": request.user.email, "plan": "free"})
 
-        # FAIL-SAFE: se ele está pro mas não tem deadline, ou se já passou, ou se o Stripe não está ativo, corrige.
-        # Regra simples: se tiver subscription_id, consulta Stripe e sincroniza.
+        # Só faz sync se fizer sentido
         if bp.plan == "pro" or bp.stripe_subscription_id:
             if bp.stripe_subscription_id:
                 try:
                     sub = stripe.Subscription.retrieve(bp.stripe_subscription_id)
+
                     status_ = (sub.get("status") or "").lower().strip()
                     cpe_ts = sub.get("current_period_end")
-                    cpe = timezone.datetime.fromtimestamp(int(cpe_ts), tz=timezone.utc) if cpe_ts else None
                     cap = bool(sub.get("cancel_at_period_end") or False)
 
-                    # Atualiza campos locais
-                    bp.current_period_end = cpe
-                    if hasattr(bp, "cancel_at_period_end"):
-                        bp.cancel_at_period_end = cap
+                    # Converte current_period_end (Stripe -> datetime UTC)
+                    cpe = None
+                    if cpe_ts:
+                        cpe = timezone.datetime.fromtimestamp(int(cpe_ts), tz=py_timezone.utc)
 
-                    # Decide plano
+                    # Atualiza campos locais (sem apagar deadline local se Stripe vier sem cpe)
+                    if cpe:
+                        bp.current_period_end = cpe
+                    bp.cancel_at_period_end = cap
+
+                    # Decide plano pelo status do Stripe
                     if status_ in ("active", "trialing"):
                         bp.plan = "pro"
                     else:
                         bp.plan = "free"
                         bp.current_period_end = None
                         bp.stripe_subscription_id = None
-                        if hasattr(bp, "cancel_at_period_end"):
-                            bp.cancel_at_period_end = False
+                        bp.cancel_at_period_end = False
 
                     bp.save(update_fields=[
-                        "plan", "current_period_end", "stripe_subscription_id", "updated_at",
-                        *(["cancel_at_period_end"] if hasattr(bp, "cancel_at_period_end") else [])
+                        "plan",
+                        "current_period_end",
+                        "stripe_subscription_id",
+                        "cancel_at_period_end",
+                        "updated_at",
                     ])
+
                 except Exception:
-                    # Se Stripe falhar, usa deadline local se existir
+                    # Se Stripe falhar, rebaixa por deadline local
                     if bp.current_period_end and timezone.now() > bp.current_period_end:
                         bp.plan = "free"
                         bp.current_period_end = None
                         bp.stripe_subscription_id = None
-                        if hasattr(bp, "cancel_at_period_end"):
-                            bp.cancel_at_period_end = False
-                            bp.save(update_fields=["plan", "current_period_end", "stripe_subscription_id", "cancel_at_period_end", "updated_at"])
-                        else:
-                            bp.save(update_fields=["plan", "current_period_end", "stripe_subscription_id", "updated_at"])
+                        bp.cancel_at_period_end = False
+                        bp.save(update_fields=[
+                            "plan",
+                            "current_period_end",
+                            "stripe_subscription_id",
+                            "cancel_at_period_end",
+                            "updated_at",
+                        ])
 
             else:
-                # pro sem subscription_id => inconsistente; rebaixa
+                # pro sem subscription_id => inconsistente
                 bp.plan = "free"
                 bp.current_period_end = None
-                if hasattr(bp, "cancel_at_period_end"):
-                    bp.cancel_at_period_end = False
-                    bp.save(update_fields=["plan", "current_period_end", "cancel_at_period_end", "updated_at"])
-                else:
-                    bp.save(update_fields=["plan", "current_period_end", "updated_at"])
+                bp.cancel_at_period_end = False
+                bp.save(update_fields=["plan", "current_period_end", "cancel_at_period_end", "updated_at"])
 
         return Response({
             "email": request.user.email,
             "plan": bp.plan,
             "current_period_end": bp.current_period_end.isoformat() if bp.current_period_end else None,
-            "cancel_at_period_end": getattr(bp, "cancel_at_period_end", None),
+            "cancel_at_period_end": bp.cancel_at_period_end,
         })
+
 
 
 
