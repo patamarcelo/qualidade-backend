@@ -5263,7 +5263,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     .values(
                         "talhao__id_talhao",
                         "map_geo_points",
-                        "map_centro_id"
+                        "map_centro_id",
+                        "pk",
                         
                     )
                 )
