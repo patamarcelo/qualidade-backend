@@ -5225,86 +5225,85 @@ class PlantioViewSet(viewsets.ModelViewSet):
             }
             return Response(response, status=status.HTTP_208_ALREADY_REPORTED)
 
-    from django.db.models import Q
 
-@action(detail=False, methods=["GET", "POST"])
-def get_plot_mapa_data_fetchrn_app(self, request, pk=None):
-    if not request.user.is_authenticated:
-        return Response({"message": "Você precisa estar logado!!!"}, status=status.HTTP_400_BAD_REQUEST)
+    @action(detail=False, methods=["GET", "POST"])
+    def get_plot_mapa_data_fetchrn_app(self, request, pk=None):
+        if not request.user.is_authenticated:
+            return Response({"message": "Você precisa estar logado!!!"}, status=status.HTTP_400_BAD_REQUEST)
 
-    try:
-        # 1) Params básicos (query -> body -> default)
-        safra_filter = (
-            request.query_params.get("safra")
-            or request.data.get("safra")
-            or "2025/2026"
-        )
-
-        ciclo_filter = (
-            request.query_params.get("ciclo")
-            or request.data.get("ciclo")
-            or "3"
-        )
-
-        farm_filter = (
-            request.query_params.get("farm")
-            or request.data.get("farm")
-            or None
-        )
-
-        # 2) onlyIds (query -> body)
-        only_ids = request.query_params.get("onlyIds") or request.data.get("onlyIds") or []
-
-        # Normaliza onlyIds (aceita lista ou "1,2,3")
-        if isinstance(only_ids, str):
-            only_ids = [x.strip() for x in only_ids.split(",") if x.strip()]
-
-        # Converte para int quando possível (id_farmbox geralmente é int)
-        normalized_only_ids = []
-        if isinstance(only_ids, (list, tuple)):
-            for x in only_ids:
-                if x is None:
-                    continue
-                try:
-                    normalized_only_ids.append(int(x))
-                except (TypeError, ValueError):
-                    # se vier algo não numérico, ignora
-                    continue
-
-        # 3) Base queryset (sempre exclui Milheto)
-        qs = Plantio.objects.filter(~Q(variedade__cultura__cultura="Milheto"))
-
-        # 4) Condicional: se tem onlyIds -> filtra por id_farmbox__in
-        if normalized_only_ids:
-            # Segurança: mantém farm_filter se vier (evita pegar IDs de outra fazenda por engano)
-            if farm_filter is not None:
-                qs = qs.filter(talhao__fazenda__id_farmbox=farm_filter)
-
-            qs = qs.filter(id_farmbox__in=normalized_only_ids)
-
-        else:
-            # Comportamento antigo
-            qs = qs.filter(
-                safra__safra=safra_filter,
-                ciclo__ciclo=ciclo_filter,
-                talhao__fazenda__id_farmbox=farm_filter,
+        try:
+            # 1) Params básicos (query -> body -> default)
+            safra_filter = (
+                request.query_params.get("safra")
+                or request.data.get("safra")
+                or "2025/2026"
             )
 
-        qs = qs.values(
-            "talhao__id_talhao",
-            "map_geo_points",
-            "map_centro_id",
-            "pk",
-            "id_farmbox",
-        )
+            ciclo_filter = (
+                request.query_params.get("ciclo")
+                or request.data.get("ciclo")
+                or "3"
+            )
 
-        return Response(
-            {"msg": "Consulta realizada com sucesso!!", "data": qs},
-            status=status.HTTP_200_OK
-        )
+            farm_filter = (
+                request.query_params.get("farm")
+                or request.data.get("farm")
+                or None
+            )
 
-    except Exception as e:
-        return Response({"message": f"Ocorreu um Erro: {e}"}, status=status.HTTP_400_BAD_REQUEST)
+            # 2) onlyIds (query -> body)
+            only_ids = request.query_params.get("onlyIds") or request.data.get("onlyIds") or []
+
+            # Normaliza onlyIds (aceita lista ou "1,2,3")
+            if isinstance(only_ids, str):
+                only_ids = [x.strip() for x in only_ids.split(",") if x.strip()]
+
+            # Converte para int quando possível (id_farmbox geralmente é int)
+            normalized_only_ids = []
+            if isinstance(only_ids, (list, tuple)):
+                for x in only_ids:
+                    if x is None:
+                        continue
+                    try:
+                        normalized_only_ids.append(int(x))
+                    except (TypeError, ValueError):
+                        # se vier algo não numérico, ignora
+                        continue
+
+            # 3) Base queryset (sempre exclui Milheto)
+            qs = Plantio.objects.filter(~Q(variedade__cultura__cultura="Milheto"))
+
+            # 4) Condicional: se tem onlyIds -> filtra por id_farmbox__in
+            if normalized_only_ids:
+                # Segurança: mantém farm_filter se vier (evita pegar IDs de outra fazenda por engano)
+                if farm_filter is not None:
+                    qs = qs.filter(talhao__fazenda__id_farmbox=farm_filter)
+
+                qs = qs.filter(id_farmbox__in=normalized_only_ids)
+
+            else:
+                # Comportamento antigo
+                qs = qs.filter(
+                    safra__safra=safra_filter,
+                    ciclo__ciclo=ciclo_filter,
+                    talhao__fazenda__id_farmbox=farm_filter,
+                )
+
+            qs = qs.values(
+                "talhao__id_talhao",
+                "map_geo_points",
+                "map_centro_id",
+                "pk",
+                "id_farmbox",
+            )
+
+            return Response(
+                {"msg": "Consulta realizada com sucesso!!", "data": qs},
+                status=status.HTTP_200_OK
+            )
+
+        except Exception as e:
+            return Response({"message": f"Ocorreu um Erro: {e}"}, status=status.HTTP_400_BAD_REQUEST)
 
     
     @action(detail=False, methods=['GET'])
