@@ -5226,6 +5226,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             return Response(response, status=status.HTTP_208_ALREADY_REPORTED)
 
 
+
     @action(detail=False, methods=["GET", "POST"])
     def get_plot_mapa_data_fetchrn_app(self, request, pk=None):
         if not request.user.is_authenticated:
@@ -5258,7 +5259,6 @@ class PlantioViewSet(viewsets.ModelViewSet):
             if isinstance(only_ids, str):
                 only_ids = [x.strip() for x in only_ids.split(",") if x.strip()]
 
-            # Converte para int quando possível (id_farmbox geralmente é int)
             normalized_only_ids = []
             if isinstance(only_ids, (list, tuple)):
                 for x in only_ids:
@@ -5267,43 +5267,82 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     try:
                         normalized_only_ids.append(int(x))
                     except (TypeError, ValueError):
-                        # se vier algo não numérico, ignora
                         continue
 
             # 3) Base queryset (sempre exclui Milheto)
-            qs = Plantio.objects.filter(~Q(variedade__cultura__cultura="Milheto"))
+            base_qs = Plantio.objects.filter(~Q(variedade__cultura__cultura="Milheto"))
 
-            # 4) Condicional: se tem onlyIds -> filtra por id_farmbox__in
+            if farm_filter is not None:
+                base_qs = base_qs.filter(talhao__fazenda__id_farmbox=farm_filter)
+
+            meta = {
+                "farm": farm_filter,
+                "mode": "default",
+                "pairs": [{"safra": safra_filter, "ciclo": ciclo_filter}],
+            }
+
+            # 4) Se tem onlyIds -> descobrir pares (safra/ciclo) e buscar TODOS talhões desses pares
             if normalized_only_ids:
-                # Segurança: mantém farm_filter se vier (evita pegar IDs de outra fazenda por engano)
-                if farm_filter is not None:
-                    qs = qs.filter(talhao__fazenda__id_farmbox=farm_filter)
+                meta["mode"] = "onlyIds"
 
-                qs = qs.filter(id_farmbox__in=normalized_only_ids)
-
-            else:
-                # Comportamento antigo
-                qs = qs.filter(
-                    safra__safra=safra_filter,
-                    ciclo__ciclo=ciclo_filter,
-                    talhao__fazenda__id_farmbox=farm_filter,
+                # 4.1 Descobre pares de safra/ciclo presentes nos IDs
+                pairs = list(
+                    base_qs.filter(id_farmbox__in=normalized_only_ids)
+                    .values("safra__safra", "ciclo__ciclo")
+                    .distinct()
                 )
 
-            qs = qs.values(
+                # Se por algum motivo não achou pares, faz fallback pro default
+                if not pairs:
+                    qs = base_qs.filter(
+                        safra__safra=safra_filter,
+                        ciclo__ciclo=ciclo_filter,
+                    )
+                    meta["mode"] = "fallback_default"
+                    meta["pairs"] = [{"safra": safra_filter, "ciclo": ciclo_filter}]
+                else:
+                    # 4.2 Monta OR de todos os pares
+                    pair_q = Q()
+                    normalized_pairs = []
+                    for p in pairs:
+                        s = p.get("safra__safra")
+                        c = p.get("ciclo__ciclo")
+                        if s is None or c is None:
+                            continue
+                        normalized_pairs.append({"safra": s, "ciclo": c})
+                        pair_q |= Q(safra__safra=s, ciclo__ciclo=c)
+
+                    meta["pairs"] = normalized_pairs
+
+                    # 4.3 Busca TODOS os talhões da fazenda que estão em qualquer par safra/ciclo
+                    qs = base_qs.filter(pair_q)
+
+            else:
+                # 5) Sem onlyIds -> comportamento antigo
+                qs = base_qs.filter(
+                    safra__safra=safra_filter,
+                    ciclo__ciclo=ciclo_filter,
+                )
+
+            # 6) Retorno do mapa
+            data = qs.values(
                 "talhao__id_talhao",
                 "map_geo_points",
                 "map_centro_id",
                 "pk",
                 "id_farmbox",
+                "safra__safra",
+                "ciclo__ciclo",
             )
 
             return Response(
-                {"msg": "Consulta realizada com sucesso!!", "data": qs},
+                {"msg": "Consulta realizada com sucesso!!", "meta": meta, "data": data},
                 status=status.HTTP_200_OK
             )
 
         except Exception as e:
             return Response({"message": f"Ocorreu um Erro: {e}"}, status=status.HTTP_400_BAD_REQUEST)
+
 
     
     @action(detail=False, methods=['GET'])
