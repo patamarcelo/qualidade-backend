@@ -5265,6 +5265,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         "map_geo_points",
                         "map_centro_id",
                         "pk",
+                        "id_farmbox",
                         
                     )
                 )
