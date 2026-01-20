@@ -133,31 +133,29 @@ class KMLUnionView(APIView):
         weekly_remaining = None
         usage = None
 
-        
-        
         files = request.FILES.getlist("files")
         if not files:
             return Response(
                 {"detail": "Nenhum arquivo enviado. Use o campo 'files'."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        
+
         bp = getattr(request.user, "billing", None)
         if not bp:
             return Response(
-                {"detail": "BillingProfile ausente. Faça login novamente.", "code": "BILLING_PROFILE_MISSING"},
+                {
+                    "detail": "BillingProfile ausente. Faça login novamente.",
+                    "code": "BILLING_PROFILE_MISSING",
+                },
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
         plan = bp.plan
-        
-        
 
         if plan == "free":
             today = timezone.localdate()
             year, week_num, _ = today.isocalendar()
             week_key = f"{year}{week_num:02d}"
-
 
             with transaction.atomic():
                 try:
@@ -167,7 +165,9 @@ class KMLUnionView(APIView):
                         defaults={"count": 0},
                     )
                 except IntegrityError:
-                    usage = WeeklyUsage.objects.select_for_update().get(user=request.user, week=week_key)
+                    usage = WeeklyUsage.objects.select_for_update().get(
+                        user=request.user, week=week_key
+                    )
 
                 if usage.count >= FREE_WEEKLY_LIMIT:
                     return Response(
@@ -182,12 +182,12 @@ class KMLUnionView(APIView):
                         },
                         status=status.HTTP_403_FORBIDDEN,
                     )
+
                 usage.count += 1
                 usage.save(update_fields=["count", "updated_at"])
                 weekly_used = usage.count
                 weekly_remaining = max(0, FREE_WEEKLY_LIMIT - weekly_used)
-                
-                
+
         request_id = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
         debug_enabled = _debug_enabled()
 
@@ -210,9 +210,40 @@ class KMLUnionView(APIView):
         parcelas = []
         total_polygons = 0
 
-        KML_NS = {"kml": "http://www.opengis.net/kml/2.2"}
-
         debug_files = []  # [(filename, bytes)]
+
+        # ---------- helpers namespace-agnostic ----------
+        def _findall_anyns(node, tag: str):
+            # 1) com namespace (wildcard)
+            for el in node.findall(f".//{{*}}{tag}"):
+                yield el
+            # 2) sem namespace
+            for el in node.findall(f".//{tag}"):
+                yield el
+
+        def _first_anyns(node, tag: str):
+            for el in _findall_anyns(node, tag):
+                return el
+            return None
+
+        def _parse_kml_coordinates_text(text: str):
+            # aceita "lon,lat" e "lon,lat,alt" (ignora alt)
+            coords = []
+            if not text:
+                return coords
+            tokens = text.replace("\n", " ").replace("\t", " ").split()
+            for token in tokens:
+                parts = token.split(",")
+                if len(parts) < 2:
+                    continue
+                try:
+                    lon = float(parts[0])
+                    lat = float(parts[1])
+                except ValueError:
+                    continue
+                coords.append({"latitude": lat, "longitude": lon})
+            return coords
+        # ----------------------------------------------
 
         count = 1
         for uploaded in files:
@@ -239,41 +270,35 @@ class KMLUnionView(APIView):
             try:
                 root = ET.fromstring(raw_bytes)
 
-                for placemark in root.findall(".//kml:Placemark", KML_NS):
-                    name_el = placemark.find("kml:name", KML_NS)
-                    talhao_name_base = (
-                        name_el.text.strip()
-                        if name_el is not None and name_el.text
-                        else ""
-                    )
+                placemarks = list(_findall_anyns(root, "Placemark"))
+                # fallback: alguns KMLs podem vir “crus” (Polygon direto)
+                if not placemarks:
+                    placemarks = [root]
+
+                for placemark in placemarks:
+                    name_el = _first_anyns(placemark, "name")
+                    talhao_name_base = (name_el.text or "").strip() if name_el is not None else ""
+
                     if not talhao_name_base:
                         talhao_name_base = os.path.splitext(uploaded.name)[0]
 
                     poly_idx_pm = 0
 
-                    for poly in placemark.findall(".//kml:Polygon", KML_NS):
-                        coord_el = poly.find(
-                            ".//kml:outerBoundaryIs/kml:LinearRing/kml:coordinates",
-                            KML_NS,
-                        )
+                    for poly in _findall_anyns(placemark, "Polygon"):
+                        outer = _first_anyns(poly, "outerBoundaryIs")
+                        if outer is None:
+                            continue
+
+                        lr = _first_anyns(outer, "LinearRing")
+                        if lr is None:
+                            continue
+
+                        coord_el = _first_anyns(lr, "coordinates")
                         if coord_el is None or not (coord_el.text and coord_el.text.strip()):
                             continue
 
-                        coord_tokens = coord_el.text.strip().split()
-
-                        coords = []
-                        for token in coord_tokens:
-                            parts = token.split(",")
-                            if len(parts) < 2:
-                                continue
-                            try:
-                                lon = float(parts[0])
-                                lat = float(parts[1])
-                            except ValueError:
-                                continue
-                            coords.append({"latitude": lat, "longitude": lon})
-
-                        if not coords:
+                        coords = _parse_kml_coordinates_text(coord_el.text)
+                        if len(coords) < 3:
                             continue
 
                         poly_idx_pm += 1
@@ -302,7 +327,10 @@ class KMLUnionView(APIView):
 
         if not parcelas:
             return Response(
-                {"detail": "Nenhum polígono válido encontrado nos arquivos KML.", "request_id": request_id},
+                {
+                    "detail": "Nenhum polígono válido encontrado nos arquivos KML.",
+                    "request_id": request_id,
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -314,7 +342,10 @@ class KMLUnionView(APIView):
                 return_metrics=True,
             )
         except ValueError as e:
-            return Response({"detail": str(e), "request_id": request_id}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"detail": str(e), "request_id": request_id},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         except Exception as e:
             print(f"❌ Erro interno no merge_no_flood: {e}")
             return Response(
@@ -329,7 +360,7 @@ class KMLUnionView(APIView):
 
         try:
             download_url = default_storage.url(saved_path)
-            
+
             # ---- Persistir histórico do merge (metadata) ----
             try:
                 input_filenames = [getattr(f, "name", "") for f in files]
@@ -343,21 +374,17 @@ class KMLUnionView(APIView):
                     corridor_width_m=corridor_width_m,
                     total_files=len(files),
                     total_polygons=total_polygons,
-
                     output_polygons=metrics.get("output_polygons"),
                     merged_polygons=metrics.get("merged_polygons"),
-
                     input_area_m2=metrics.get("input_area_m2"),
                     input_area_ha=metrics.get("input_area_ha"),
                     output_area_m2=metrics.get("output_area_m2"),
                     output_area_ha=metrics.get("output_area_ha"),
-
                     storage_path=saved_path,
                     metrics=metrics or {},
                     input_filenames=input_filenames,
                 )
             except Exception as e:
-                # Não quebrar o response por falha de histórico
                 print(f"[KML_HISTORY] Falha ao salvar histórico do merge {request_id}: {e}")
                 job = None
 
@@ -384,7 +411,6 @@ class KMLUnionView(APIView):
                 "total_files": len(files),
                 "tol_m": tol_m,
                 "corridor_width_m": corridor_width_m,
-
                 # métricas como antes (flat)
                 "output_polygons": metrics.get("output_polygons"),
                 "merged_polygons": metrics.get("merged_polygons"),
@@ -392,18 +418,15 @@ class KMLUnionView(APIView):
                 "input_area_ha": metrics.get("input_area_ha"),
                 "output_area_m2": metrics.get("output_area_m2"),
                 "output_area_ha": metrics.get("output_area_ha"),
-                
                 "plan": plan,
                 "weekly_limit": FREE_WEEKLY_LIMIT if plan == "free" else None,
                 "weekly_used": weekly_used if plan == "free" else None,
                 "weekly_remaining": weekly_remaining if plan == "free" else None,
                 "week": week_key if plan == "free" else None,
-                
                 "job_id": str(job.id) if job else None,
             },
             status=status.HTTP_200_OK,
         )
-
 
 class MeView(APIView):
     authentication_classes = (FirebaseAuthentication,)

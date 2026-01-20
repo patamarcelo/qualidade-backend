@@ -164,7 +164,8 @@ def mst_edges(parts: List[Polygon], tol_m: float):
     for i in range(m):
         for j in range(i + 1, m):
             d = parts[i].distance(parts[j])
-            if d <= tol_m:
+            # IMPORTANTE: se d == 0, já há overlap/toque; não precisa corredor (evita degeneração)
+            if 0 < d <= tol_m:
                 edges.append((d, i, j))
 
     edges.sort(key=lambda x: x[0])
@@ -194,7 +195,6 @@ def mst_edges(parts: List[Polygon], tol_m: float):
 
     return chosen
 
-
 def merge_no_flood(
     parcelas: List[Dict],
     tol_m: float = 20.0,
@@ -222,18 +222,25 @@ def merge_no_flood(
 
         SHELL = unary_union([p.buffer(tol_m) for p in originals]).buffer(-tol_m)
 
+        # 1) Parte base: dissolve overlaps de verdade (unary_union já faz isso)
         parts = []
         for g in originals:
             parts.extend(polygon_parts(g))
 
+        BASE = unary_union(parts)
+
+        # 2) Corredores só para "pontes" quando há gap (distância > 0), conforme mst_edges ajustado
         corridors = []
         if len(parts) > 1:
             for a, b in mst_edges(parts, tol_m):
                 Apt, Bpt = nearest_points(parts[a], parts[b])
+                # evita corredor degenerado (mesmo ponto)
+                if Apt.equals(Bpt):
+                    continue
                 line = LineString([Apt.coords[0], Bpt.coords[0]])
-                corridors.append(
-                    line.buffer(corridor_width_m / 2.0, cap_style=2, join_style=2)
-                )
+                buf = line.buffer(corridor_width_m / 2.0, cap_style=2, join_style=2)
+                if buf and (not buf.is_empty):
+                    corridors.append(buf)
 
         BASE = unary_union(parts + corridors)
 
@@ -241,12 +248,23 @@ def merge_no_flood(
         if corridor_mask and (not corridor_mask.is_empty):
             corridor_mask = corridor_mask.buffer(max(0.01, corridor_width_m * 0.6))
 
+        # --- GARANTIA: FINAL_utm SEMPRE definido ---
         if corridor_mask and (not corridor_mask.is_empty):
             FINAL_utm = BASE.union(SHELL.intersection(corridor_mask))
         else:
             FINAL_utm = BASE
 
+        # dissolve determinístico (agora é seguro)
+        FINAL_utm = unary_union(FINAL_utm)
+
+        # corrige inválidos
+        if (FINAL_utm is not None) and (not FINAL_utm.is_empty) and (not FINAL_utm.is_valid):
+            FINAL_utm = FINAL_utm.buffer(0)
+
         FINAL_ll = shp_transform(to_ll, FINAL_utm)
+
+
+
 
         total_output_area_m2_geod += geodesic_area_m2(FINAL_ll)
 
