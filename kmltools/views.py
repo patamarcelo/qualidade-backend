@@ -37,12 +37,6 @@ from django.shortcuts import get_object_or_404
 
 
 
-from datetime import datetime, timedelta
-from datetime import timezone as py_timezone
-
-
-
-
 FREE_WEEKLY_LIMIT = 2
 
 
@@ -633,10 +627,8 @@ class CreateCheckoutSessionView(APIView):
 # =========================
 # Helpers
 # =========================
-# kmltools/billing/views_stripe_webhook.py  (ajuste o path conforme seu projeto)
 
-
-
+# kmltools/views.py (ou onde você mantém o webhook)
 # =========================
 # Helpers
 # =========================
@@ -692,7 +684,6 @@ def _derive_period_end_from_anchor(sub: dict):
     if interval == "year":
         return anchor.replace(year=anchor.year + interval_count)
 
-    # fallback genérico
     return anchor + timedelta(days=30)
 
 
@@ -714,81 +705,42 @@ def _extract_period_end_from_invoice(invoice: dict):
         return None
 
 
-def _extract_uid_from_object(obj: dict):
+def _extract_firebase_uid(obj: dict):
     """
-    Melhor esforço para achar o UID (Firebase) que você passou pro Stripe.
-    - checkout.session.completed: client_reference_id é o melhor lugar
-    - metadata.user_uid/uid/firebase_uid
+    Tenta extrair firebase_uid de onde normalmente aparece:
+    - obj.metadata.firebase_uid / user_uid / uid
+    - subscription.customer.metadata (não vem no evento; só via retrieve/expand)
+    - checkout.session.client_reference_id (se você setar como firebase_uid)
     """
     if not isinstance(obj, dict):
         return None
 
-    uid = obj.get("client_reference_id")
-    if uid:
-        return str(uid)
-
+    # 1) metadata direto no objeto do evento
     md = obj.get("metadata") or {}
-    for k in ("user_uid", "uid", "firebase_uid"):
+    for k in ("firebase_uid", "user_uid", "uid"):
         v = md.get(k)
         if v:
             return str(v)
 
+    # 2) checkout.session: client_reference_id
+    cr = obj.get("client_reference_id")
+    if cr:
+        return str(cr)
+
     return None
 
 
-def _find_bp(customer_id=None, uid=None):
+def _find_bp(customer_id=None, firebase_uid=None):
     """
-    Localiza BillingProfile por customer_id ou por uid (se existir campo no model).
-    Ajuste 'user_uid' se no seu model tiver outro nome.
+    No seu schema: BillingProfile.user e firebase_uid são obrigatórios.
+    Então: webhook só atualiza BP existente.
     """
     bp = None
     if customer_id:
         bp = BillingProfile.objects.filter(stripe_customer_id=customer_id).first()
-
-    if not bp and uid and hasattr(BillingProfile, "user_uid"):
-        bp = BillingProfile.objects.filter(user_uid=uid).first()
-
+    if not bp and firebase_uid:
+        bp = BillingProfile.objects.filter(firebase_uid=firebase_uid).first()
     return bp
-
-
-def _get_or_create_bp(customer_id=None, uid=None):
-    """
-    Garante que exista um BillingProfile quando:
-    - não encontrou por customer_id
-    - mas temos uid (ou customer_id)
-    Só cria fallback se der para preencher algo identificável.
-    """
-    bp = _find_bp(customer_id=customer_id, uid=uid)
-    if bp:
-        return bp
-
-    if not (customer_id or uid):
-        return None
-
-    create_kwargs = {}
-    if customer_id:
-        create_kwargs["stripe_customer_id"] = customer_id
-    if uid and hasattr(BillingProfile, "user_uid"):
-        create_kwargs["user_uid"] = uid
-
-    # plano default
-    create_kwargs["plan"] = "free"
-
-    bp = BillingProfile.objects.create(**create_kwargs)
-    print("[stripe] created BillingProfile fallback -> bp_id:", bp.id, "uid:", uid, "customer:", customer_id)
-    return bp
-
-
-def _ensure_customer_on_bp(bp: BillingProfile, customer_id: str):
-    """
-    Se o BP foi encontrado por uid e ainda não tem stripe_customer_id, salva.
-    """
-    if not bp or not customer_id:
-        return
-    if getattr(bp, "stripe_customer_id", None) != customer_id:
-        bp.stripe_customer_id = customer_id
-        bp.save(update_fields=["stripe_customer_id", "updated_at"])
-        print("[stripe] updated bp.stripe_customer_id -> bp_id:", bp.id, "customer:", customer_id)
 
 
 def _sync_bp_from_subscription(bp: BillingProfile, sub: dict, period_end_fallback=None):
@@ -809,7 +761,7 @@ def _sync_bp_from_subscription(bp: BillingProfile, sub: dict, period_end_fallbac
     if not cpe:
         cpe = _derive_period_end_from_anchor(sub)
 
-    # Boolean local: considerar flag OU a presença de cancel_at (Stripe pode usar cancel_at)
+    # Boolean local: considerar flag OU a presença de cancel_at
     cap_local = bool(raw_cap) or bool(cancel_at_dt)
 
     bp.stripe_subscription_id = sub.get("id") or bp.stripe_subscription_id
@@ -819,9 +771,6 @@ def _sync_bp_from_subscription(bp: BillingProfile, sub: dict, period_end_fallbac
     now = timezone.now()
 
     # Regra de plano:
-    # - active/trialing => pro
-    # - caso contrário, se ainda existe deadline futura => pro até expirar
-    # - senão => free
     if status_ in ("active", "trialing"):
         bp.plan = "pro"
     else:
@@ -842,7 +791,8 @@ def _sync_bp_from_subscription(bp: BillingProfile, sub: dict, period_end_fallbac
     ])
 
     print(
-        "[stripe][sync] saved -> plan:", bp.plan,
+        "[stripe][sync] saved -> bp_id:", bp.id,
+        "plan:", bp.plan,
         "cpe:", bp.current_period_end,
         "cap(local):", bp.cancel_at_period_end,
         "status:", status_,
@@ -851,26 +801,11 @@ def _sync_bp_from_subscription(bp: BillingProfile, sub: dict, period_end_fallbac
         "raw_cpe:", raw_cpe,
         "billing_cycle_anchor:", sub.get("billing_cycle_anchor"),
         "period_end_fallback:", period_end_fallback,
-        "bp_id:", bp.id,
     )
 
 
-def _retrieve_and_sync_subscription(bp: BillingProfile, subscription_id: str, period_end_fallback=None):
-    if not bp or not subscription_id:
-        return
-    try:
-        sub = stripe.Subscription.retrieve(subscription_id, expand=["items.data.price"])
-        _sync_bp_from_subscription(bp, sub, period_end_fallback=period_end_fallback)
-    except Exception as e:
-        print("[stripe] retrieve subscription failed:", str(e), "sub:", subscription_id)
-
-        # fallback mínimo se der pra salvar deadline do invoice
-        if period_end_fallback:
-            bp.plan = "pro"
-            bp.stripe_subscription_id = subscription_id
-            bp.current_period_end = period_end_fallback
-            bp.save(update_fields=["plan", "stripe_subscription_id", "current_period_end", "updated_at"])
-            print("[stripe] saved cpe fallback only -> bp_id:", bp.id, "cpe:", bp.current_period_end)
+def _retrieve_subscription(subscription_id: str):
+    return stripe.Subscription.retrieve(subscription_id, expand=["items.data.price"])
 
 
 # =========================
@@ -907,49 +842,61 @@ class StripeWebhookView(APIView):
         if event_type in ("customer.subscription.created", "customer.subscription.updated"):
             customer_id = obj.get("customer")
             sub_id = obj.get("id")
-            uid = _extract_uid_from_object(obj)
+            firebase_uid = _extract_firebase_uid(obj)
 
-            print("[stripe] sub event:", event_type, "customer:", customer_id, "sub:", sub_id, "uid:", uid)
+            print("[stripe] sub event:", event_type, "customer:", customer_id, "sub:", sub_id, "firebase_uid:", firebase_uid)
 
-            bp = _get_or_create_bp(customer_id=customer_id, uid=uid)
+            bp = _find_bp(customer_id=customer_id, firebase_uid=firebase_uid)
             if not bp:
-                print("[stripe] BillingProfile NOT FOUND (sub event) customer:", customer_id, "uid:", uid)
+                print("[stripe] BP NOT FOUND (sub). Will not create. customer:", customer_id, "firebase_uid:", firebase_uid)
                 return HttpResponse(status=200)
 
-            _ensure_customer_on_bp(bp, customer_id)
+            # garante customer_id no BP (se ainda não tiver)
+            if customer_id and not bp.stripe_customer_id:
+                bp.stripe_customer_id = customer_id
+                bp.save(update_fields=["stripe_customer_id", "updated_at"])
+                print("[stripe] set bp.stripe_customer_id from sub event -> bp_id:", bp.id, "customer:", customer_id)
 
             if sub_id:
-                _retrieve_and_sync_subscription(bp, sub_id)
-            else:
-                print("[stripe] sub event missing sub_id customer:", customer_id)
+                try:
+                    sub = _retrieve_subscription(sub_id)
+                    _sync_bp_from_subscription(bp, sub)
+                except Exception as e:
+                    print("[stripe] retrieve sub failed:", str(e))
 
             return HttpResponse(status=200)
 
-        # 2) checkout.session.completed (garante sub_id e sincroniza)
+        # 2) checkout.session.completed
         if event_type == "checkout.session.completed":
             customer_id = obj.get("customer")
             subscription_id = obj.get("subscription")
-            uid = _extract_uid_from_object(obj)
+            firebase_uid = _extract_firebase_uid(obj)
 
-            print("[stripe] checkout completed customer:", customer_id, "sub:", subscription_id, "uid:", uid)
+            print("[stripe] checkout completed customer:", customer_id, "sub:", subscription_id, "firebase_uid:", firebase_uid)
 
-            bp = _get_or_create_bp(customer_id=customer_id, uid=uid)
+            bp = _find_bp(customer_id=customer_id, firebase_uid=firebase_uid)
             if not bp:
-                print("[stripe] BillingProfile NOT FOUND (checkout) customer:", customer_id, "uid:", uid)
+                print("[stripe] BP NOT FOUND (checkout). Will not create. customer:", customer_id, "firebase_uid:", firebase_uid)
                 return HttpResponse(status=200)
 
-            _ensure_customer_on_bp(bp, customer_id)
+            # garante customer_id no BP
+            if customer_id and (bp.stripe_customer_id != customer_id):
+                bp.stripe_customer_id = customer_id
+                bp.save(update_fields=["stripe_customer_id", "updated_at"])
+                print("[stripe] updated bp.stripe_customer_id from checkout -> bp_id:", bp.id, "customer:", customer_id)
 
             if subscription_id:
-                # garante PRO imediatamente (antes do retrieve)
+                # seta PRO imediatamente
                 bp.stripe_subscription_id = subscription_id
                 bp.plan = "pro"
                 bp.save(update_fields=["stripe_subscription_id", "plan", "updated_at"])
                 print("[stripe] saved pro from checkout -> bp_id:", bp.id, "sub:", subscription_id)
 
-                _retrieve_and_sync_subscription(bp, subscription_id)
-            else:
-                print("[stripe] checkout missing subscription_id customer:", customer_id, "bp_id:", bp.id)
+                try:
+                    sub = _retrieve_subscription(subscription_id)
+                    _sync_bp_from_subscription(bp, sub)
+                except Exception as e:
+                    print("[stripe] checkout retrieve/sync failed:", str(e))
 
             return HttpResponse(status=200)
 
@@ -958,54 +905,60 @@ class StripeWebhookView(APIView):
             invoice = obj
             customer_id = invoice.get("customer")
             subscription_id = invoice.get("subscription")
-            uid = _extract_uid_from_object(invoice)
+            firebase_uid = _extract_firebase_uid(invoice)
 
-            print("[stripe] invoice event:", event_type, "customer:", customer_id, "sub:", subscription_id, "uid:", uid)
+            print("[stripe] invoice event:", event_type, "customer:", customer_id, "sub:", subscription_id, "firebase_uid:", firebase_uid)
 
             cpe_from_invoice = _extract_period_end_from_invoice(invoice)
             print("[stripe] cpe from invoice:", cpe_from_invoice)
 
-            bp = _get_or_create_bp(customer_id=customer_id, uid=uid)
+            bp = _find_bp(customer_id=customer_id, firebase_uid=firebase_uid)
             if not bp:
-                print("[stripe] BillingProfile NOT FOUND (invoice) customer:", customer_id, "uid:", uid)
+                print("[stripe] BP NOT FOUND (invoice). Will not create. customer:", customer_id, "firebase_uid:", firebase_uid)
                 return HttpResponse(status=200)
 
-            _ensure_customer_on_bp(bp, customer_id)
+            if customer_id and (bp.stripe_customer_id != customer_id):
+                bp.stripe_customer_id = customer_id
+                bp.save(update_fields=["stripe_customer_id", "updated_at"])
+                print("[stripe] updated bp.stripe_customer_id from invoice -> bp_id:", bp.id, "customer:", customer_id)
 
             if subscription_id:
-                _retrieve_and_sync_subscription(bp, subscription_id, period_end_fallback=cpe_from_invoice)
-            else:
-                # sem subscription_id: salva o mínimo se tiver deadline
-                if cpe_from_invoice:
-                    bp.plan = "pro"
-                    bp.current_period_end = cpe_from_invoice
-                    bp.save(update_fields=["plan", "current_period_end", "updated_at"])
-                    print("[stripe] invoice no sub_id: saved cpe only -> bp_id:", bp.id)
+                try:
+                    sub = _retrieve_subscription(subscription_id)
+                    _sync_bp_from_subscription(bp, sub, period_end_fallback=cpe_from_invoice)
+                except Exception as e:
+                    print("[stripe] invoice retrieve sub failed:", str(e))
+                    # fallback mínimo: salva cpe do invoice
+                    if cpe_from_invoice:
+                        bp.plan = "pro"
+                        bp.stripe_subscription_id = subscription_id
+                        bp.current_period_end = cpe_from_invoice
+                        bp.save(update_fields=["plan", "stripe_subscription_id", "current_period_end", "updated_at"])
+                        print("[stripe] saved cpe from invoice only -> bp_id:", bp.id)
 
             return HttpResponse(status=200)
 
-        # 4) subscription deleted (quando encerra de verdade)
+        # 4) subscription deleted
         if event_type == "customer.subscription.deleted":
             customer_id = obj.get("customer")
-            uid = _extract_uid_from_object(obj)
+            firebase_uid = _extract_firebase_uid(obj)
 
-            print("[stripe] subscription deleted customer:", customer_id, "uid:", uid)
+            print("[stripe] subscription deleted customer:", customer_id, "firebase_uid:", firebase_uid)
 
-            bp = _find_bp(customer_id=customer_id, uid=uid)
+            bp = _find_bp(customer_id=customer_id, firebase_uid=firebase_uid)
             if not bp:
-                print("[stripe] BillingProfile NOT FOUND (deleted) customer:", customer_id, "uid:", uid)
+                print("[stripe] BP NOT FOUND (deleted). Will not create. customer:", customer_id, "firebase_uid:", firebase_uid)
                 return HttpResponse(status=200)
 
             bp.plan = "free"
             bp.current_period_end = None
             bp.stripe_subscription_id = None
             bp.cancel_at_period_end = False
-
             bp.save(update_fields=[
                 "plan", "current_period_end", "stripe_subscription_id", "cancel_at_period_end", "updated_at"
             ])
-
             print("[stripe] downgraded to free (deleted) -> bp_id:", bp.id)
+
             return HttpResponse(status=200)
 
         return HttpResponse(status=200)
