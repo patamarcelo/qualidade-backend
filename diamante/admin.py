@@ -11,6 +11,7 @@ from django.utils.html import format_html
 # Register your models here.
 from django.contrib import admin
 from .models import *
+from .forms import AplicacoesProgramaInlineFormSet
 
 import json
 from django.core.serializers.json import DjangoJSONEncoder
@@ -121,6 +122,8 @@ from django.core.cache import cache
 
 from django.contrib.admin import helpers
 from django.template.response import TemplateResponse
+
+from django.db import close_old_connections
 
 main_path = (
     "http://127.0.0.1:8000"
@@ -485,6 +488,8 @@ class AplicacoesProgramaInline(admin.TabularInline):
     # fields = ["defensivo", "dose", "ativo", 'preco']
     fields = ["defensivo", "dose", "ativo"]
     autocomplete_fields = ["defensivo"]
+    formset = AplicacoesProgramaInlineFormSet
+
     
     class Media:
         css = {
@@ -2956,7 +2961,7 @@ class OperacaoAdmin(admin.ModelAdmin):
         css = {
             'all': ('admin/css/highlight_deleted_inlines.css',)
         }
-        js = ('admin/js/highlight_deleted_inlines.js',"https://cdn.jsdelivr.net/npm/sweetalert2@11", "admin/js/task_monitor_admin.js")
+        js = ('admin/js/highlight_deleted_inlines.js',"https://cdn.jsdelivr.net/npm/sweetalert2@11")
     # class Media:
     #     js = ('admin/js/highlight_deleted_inlines.js',)
     def get_queryset(self, request):
@@ -2980,22 +2985,38 @@ class OperacaoAdmin(admin.ModelAdmin):
 
     inlines = [AplicacoesProgramaInline]
     
+    from django.db import close_old_connections
+    from django.utils import timezone
+
     @staticmethod
     def processar_operacao_em_background(task_id, query, current_op, produtos, changed_dap, newDap, nome_estagio_alterado, estagio_alterado):
-        task = BackgroundTaskStatus.objects.get(task_id=task_id)
-        task.status = "running"
-        task.save()
+        close_old_connections()  # <-- fundamental em thread
+
+        task = None
+        started_at = timezone.now()
 
         try:
+            task = BackgroundTaskStatus.objects.get(task_id=task_id)
+            task.status = "running"
+            task.started_at = started_at  # se você tiver esse campo
+            task.save(update_fields=["status", "started_at"] if hasattr(task, "started_at") else ["status"])
+
             admin_form_alter_programa_and_save(
                 query, current_op, produtos, changed_dap, newDap, nome_estagio_alterado, estagio_alterado
             )
+
             task.status = "done"
+            task.result = {"ok": True}
         except Exception as e:
-            task.status = "failed"
-            task.result = {"error": str(e)}
-        task.ended_at = timezone.now()
-        task.save()
+            if task:
+                task.status = "failed"
+                task.result = {"error": str(e)}
+        finally:
+            if task:
+                task.ended_at = timezone.now()
+                task.save(update_fields=["status", "result", "ended_at"] if hasattr(task, "result") else ["status", "ended_at"])
+            close_old_connections()
+
     
     def changelist_view(self, request, extra_context=None):
         extra_context = extra_context or {}

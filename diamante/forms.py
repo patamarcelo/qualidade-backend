@@ -1,5 +1,5 @@
 from django import forms
-from .models import PlantioExtratoArea, Programa, Variedade, Plantio
+from .models import PlantioExtratoArea, Programa, Variedade, Plantio, BackgroundTaskStatus
 from django.core.exceptions import ValidationError
 from django.db.models import Sum
 from django.utils.safestring import mark_safe
@@ -7,6 +7,9 @@ from django.utils.safestring import mark_safe
 from django.contrib.admin.widgets import AdminDateWidget
 from django.contrib.admin.widgets import AutocompleteSelect
 from django.contrib import admin
+
+from django.forms.models import BaseInlineFormSet
+from django.core.exceptions import ValidationError
 
 
 class AdminDateWidgetComOntem(AdminDateWidget):
@@ -204,3 +207,27 @@ class UpdateDataPrevistaPlantioForm(forms.Form):
         return cleaned
     
     
+
+
+
+
+class AplicacoesProgramaInlineFormSet(BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+
+        # se form pai não existe ainda, não valida
+        if not self.instance or not getattr(self.instance, "programa_id", None):
+            return
+
+        programa_nome = self.instance.programa.nome
+
+        exists_running = BackgroundTaskStatus.objects.filter(
+            task_name=programa_nome,
+            status__in=["pending", "running"]
+        ).exists()
+
+        if exists_running:
+            raise ValidationError(
+                f"Já existe uma tarefa em andamento para o programa '{programa_nome}'. "
+                "Aguarde finalizar para salvar novamente."
+            )

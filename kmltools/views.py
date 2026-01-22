@@ -1,3 +1,4 @@
+# kmltools/views.py
 import os
 import uuid
 import json
@@ -433,7 +434,10 @@ class MeView(APIView):
     permission_classes = (IsAuthenticated,)
 
     def get(self, request):
+        print("[me] user.email:", getattr(request.user, "email", None))
+        print("[me] user.uid:", getattr(request.user, "uid", None))  # se seu User tiver campo uid
         bp = getattr(request.user, "billing", None)
+        print("[me] bp:", bp, "bp.user_id:", getattr(bp, "user_id", None))
 
         if not bp:
             return Response({"email": request.user.email, "plan": "free"})
