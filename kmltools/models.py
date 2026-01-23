@@ -3,6 +3,12 @@ from django.conf import settings
 from django.db import models
 import uuid
 
+from django.conf import settings
+from django.db import models
+from django.utils import timezone
+from datetime import date
+
+
 class BillingProfile(models.Model):
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
@@ -14,26 +20,103 @@ class BillingProfile(models.Model):
 
     plan = models.CharField(
         max_length=20,
-        choices=[("free", "Free"), ("pro", "Pro")],
+        choices=[
+            ("free", "Free"),
+            ("prepaid", "Prepaid"),
+            ("pro_monthly", "Pro Monthly"),
+            ("pro_yearly", "Pro Yearly"),
+            ("pro", "Pro")
+        ],
         default="free",
     )
 
-    stripe_customer_id = models.CharField(
-        max_length=255,
-        blank=True,
-        null=True,
-    )
-    
+    # Stripe
+    stripe_customer_id = models.CharField(max_length=255, blank=True, null=True)
     stripe_subscription_id = models.CharField(max_length=255, blank=True, null=True)
     current_period_end = models.DateTimeField(blank=True, null=True)
-
     cancel_at_period_end = models.BooleanField(default=False)
+
+    # =========================
+    # Créditos
+    # =========================
+    # Free: reseta para 2 todo mês (não cumulativo)
+    free_monthly_credits = models.PositiveIntegerField(default=0)
+    free_month_key = models.DateField(blank=True, null=True)  # YYYY-MM-01
+
+    # Prepaid: cumulativo, nunca expira
+    prepaid_credits = models.PositiveIntegerField(default=0)
+
+    # Auditoria/analytics (total de merges)
+    credits_used_total = models.PositiveIntegerField(default=0)
 
     updated_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"{self.user.email} [{self.plan}]"
+
+    @property
+    def is_unlimited(self) -> bool:
+        return self.plan in ("pro_monthly", "pro_yearly")
+
+    def _month_key(self, d: date) -> date:
+        return date(d.year, d.month, 1)
+
+    def reset_free_monthly_if_needed(self, monthly_amount=2, now=None):
+        """
+        Free: NÃO cumulativo. Quando muda o mês, reseta para monthly_amount.
+        """
+        if self.plan != "free":
+            return
+
+        today = now or timezone.localdate()
+        mk = self._month_key(today)
+
+        if self.free_month_key != mk:
+            self.free_month_key = mk
+            self.free_monthly_credits = monthly_amount
+            self.save(update_fields=["free_month_key", "free_monthly_credits", "updated_at"])
+
+    def consume_one_merge_credit(self, monthly_free_amount=2) -> str:
+        """
+        Consome 1 crédito por merge, conforme regras:
+        - Pro: ilimitado (não consome saldo)
+        - Free: reseta mensal para 2 e consome primeiro free; se acabar, usa prepaid
+        - Prepaid: consome prepaid
+        Retorna qual bucket foi usado: 'pro'|'free'|'prepaid'
+        Lança ValueError('INSUFFICIENT_CREDITS') se não houver saldo.
+        """
+        if self.is_unlimited:
+            self.credits_used_total += 1
+            self.save(update_fields=["credits_used_total", "updated_at"])
+            return "pro"
+
+        if self.plan == "free":
+            self.reset_free_monthly_if_needed(monthly_amount=monthly_free_amount)
+
+            if self.free_monthly_credits > 0:
+                self.free_monthly_credits -= 1
+                self.credits_used_total += 1
+                self.save(update_fields=["free_monthly_credits", "credits_used_total", "updated_at"])
+                return "free"
+
+            if self.prepaid_credits > 0:
+                self.prepaid_credits -= 1
+                self.credits_used_total += 1
+                self.save(update_fields=["prepaid_credits", "credits_used_total", "updated_at"])
+                return "prepaid"
+
+            raise ValueError("INSUFFICIENT_CREDITS")
+
+        # prepaid plan
+        if self.prepaid_credits > 0:
+            self.prepaid_credits -= 1
+            self.credits_used_total += 1
+            self.save(update_fields=["prepaid_credits", "credits_used_total", "updated_at"])
+            return "prepaid"
+
+        raise ValueError("INSUFFICIENT_CREDITS")
+
 
 
 class WeeklyUsage(models.Model):

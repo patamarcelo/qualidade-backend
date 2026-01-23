@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import KMLUnionView, MeView, UsageView, CreateCheckoutSessionView, StripeWebhookView, CreateBillingPortalSessionView, KMLHistoryDownloadView, KMLHistoryView
+from .views import KMLUnionView, MeView, UsageView, CreateCheckoutSessionView, StripeWebhookView, CreateBillingPortalSessionView, KMLHistoryDownloadView, KMLHistoryView, CreatePrepaidCheckoutSessionView
 
 urlpatterns = [
     path("kml-union/", KMLUnionView.as_view(), name="kml-union"),
@@ -11,6 +11,7 @@ urlpatterns = [
 urlpatterns += [
     path("billing/checkout/", CreateCheckoutSessionView.as_view(), name="billing-checkout"),
     path("billing/portal/", CreateBillingPortalSessionView.as_view(), name="billing-portal"),  # NEW
+    path("billing/checkout-prepaid/", CreatePrepaidCheckoutSessionView.as_view(), name="billing-checkout-prepaid"),
     
     # Histórico
     path("kml/history/", KMLHistoryView.as_view(), name="kml-history"),

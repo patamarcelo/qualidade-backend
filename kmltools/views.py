@@ -1,44 +1,37 @@
-# kmltools/views.py
 import os
 import uuid
 import json
 import xml.etree.ElementTree as ET
 from threading import Thread
+from datetime import datetime, timedelta, timezone as py_timezone
+
+import stripe
 
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
-
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework.parsers import MultiPartParser, FormParser
-from rest_framework import status
+from django.db import IntegrityError, transaction
 from django.http import HttpResponse
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
 
-from .services import merge_no_flood
+from rest_framework import status
+from rest_framework.exceptions import ValidationError
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.parsers import FormParser, MultiPartParser
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from .authentication import FirebaseAuthentication
-from rest_framework.permissions import IsAuthenticated
 from .models import BillingProfile, WeeklyUsage, KMLMergeJob
-from django.utils import timezone
-from datetime import timedelta
-
-from django.db import transaction
-from django.db import IntegrityError
+from kmltools.services import merge_no_flood
+from kmltools.newservices.credits import reserve_one_credit, refund_one_credit, NoCreditsLeft
 
 
-import os
-import stripe
-from rest_framework.exceptions import ValidationError
-from datetime import datetime, timedelta, timezone as py_timezone  # <-- IMPORTANTE
+FREE_MONTHLY_CREDITS = 2
+PREPAID_CREDITS_PER_PACK = 10
 
-
-from rest_framework.pagination import PageNumberPagination
-from django.shortcuts import get_object_or_404
-
-
-
-FREE_WEEKLY_LIMIT = 2
 
 
 def _debug_enabled():
@@ -114,7 +107,101 @@ def _save_kml_debug_bundle_storage(
     except Exception as e:
         print(f"[KML_DEBUG] Falha ao salvar bundle {request_id}: {e}")
 
+class MeView(APIView):
+    authentication_classes = (FirebaseAuthentication,)
+    permission_classes = (IsAuthenticated,)
 
+    def get(self, request):
+        bp = getattr(request.user, "billing", None)
+        stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+
+        if not bp:
+            return Response({"email": request.user.email, "plan": "free"})
+
+        # Só faz sync se fizer sentido
+        if bp.plan in ("pro_monthly", "pro_yearly") or bp.stripe_subscription_id:
+            if bp.stripe_subscription_id:
+                try:
+                    sub = stripe.Subscription.retrieve(bp.stripe_subscription_id)
+
+                    status_ = (sub.get("status") or "").lower().strip()
+                    cpe_ts = sub.get("current_period_end")
+                    cap = bool(sub.get("cancel_at_period_end") or False)
+
+                    cpe = None
+                    if cpe_ts:
+                        cpe = timezone.datetime.fromtimestamp(int(cpe_ts), tz=py_timezone.utc)
+
+                    if cpe:
+                        bp.current_period_end = cpe
+                    bp.cancel_at_period_end = cap
+
+                    # determina intervalo (month/year)
+                    interval = None
+                    try:
+                        items = (sub.get("items") or {}).get("data") or []
+                        if items:
+                            price = items[0].get("price") or {}
+                            recurring = price.get("recurring") or {}
+                            interval = (recurring.get("interval") or "").lower().strip()
+                    except Exception:
+                        interval = None
+
+                    if status_ in ("active", "trialing"):
+                        bp.plan = "pro_yearly" if interval == "year" else "pro_monthly"
+                    else:
+                        if bp.plan in ("pro_monthly", "pro_yearly"):
+                            bp.plan = "free"
+                        bp.current_period_end = None
+                        bp.stripe_subscription_id = None
+                        bp.cancel_at_period_end = False
+
+                    bp.save(update_fields=[
+                        "plan",
+                        "current_period_end",
+                        "stripe_subscription_id",
+                        "cancel_at_period_end",
+                        "updated_at",
+                    ])
+
+                except Exception:
+                    # Se Stripe falhar, rebaixa por deadline local
+                    if bp.current_period_end and timezone.now() > bp.current_period_end:
+                        if bp.plan in ("pro_monthly", "pro_yearly"):
+                            bp.plan = "free"
+                        bp.current_period_end = None
+                        bp.stripe_subscription_id = None
+                        bp.cancel_at_period_end = False
+                        bp.save(update_fields=[
+                            "plan",
+                            "current_period_end",
+                            "stripe_subscription_id",
+                            "cancel_at_period_end",
+                            "updated_at",
+                        ])
+
+            else:
+                # pro_* sem subscription_id => inconsistente
+                if bp.plan in ("pro_monthly", "pro_yearly"):
+                    bp.plan = "free"
+                bp.current_period_end = None
+                bp.cancel_at_period_end = False
+                bp.save(update_fields=["plan", "current_period_end", "cancel_at_period_end", "updated_at"])
+
+        # Para UX: se free, garante reset mensal (não cumulativo) ao consultar
+        if bp.plan == "free":
+            bp.reset_free_monthly_if_needed(monthly_amount=FREE_MONTHLY_CREDITS)
+            bp.refresh_from_db()
+
+        return Response({
+            "email": request.user.email,
+            "plan": bp.plan,
+            "free_monthly_credits": bp.free_monthly_credits,
+            "prepaid_credits": bp.prepaid_credits,
+            "credits_used_total": bp.credits_used_total,
+            "current_period_end": bp.current_period_end.isoformat() if bp.current_period_end else None,
+            "cancel_at_period_end": bp.cancel_at_period_end,
+        })
 
 class KMLUnionView(APIView):
     parser_classes = [MultiPartParser, FormParser]
@@ -131,8 +218,8 @@ class KMLUnionView(APIView):
     def post(self, request, *args, **kwargs):
         week_key = None
         weekly_used = None
-        weekly_remaining = None
         usage = None
+        request_id = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
 
         files = request.FILES.getlist("files")
         if not files:
@@ -151,45 +238,45 @@ class KMLUnionView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
-        plan = bp.plan
+        # =========
+        # 1) Reserva crédito ANTES (atômico) — fonte da verdade
+        # =========
+        try:
+            consumption = reserve_one_credit(request.user)  # kind: "pro"|"prepaid"|"free"
+        except NoCreditsLeft:
+            return Response(
+                {
+                    "detail": "No credits left. Please upgrade or buy prepaid credits.",
+                    "code": "NO_CREDITS_LEFT",
+                    "request_id": request_id,
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        except Exception as e:
+            err_id = uuid.uuid4().hex[:10]
+            print(f"[CREDITS][{err_id}] reserve_one_credit failed: {type(e).__name__}: {e}")
+            return Response(
+                {
+                    "detail": "Could not validate credits.",
+                    "code": "CREDIT_CHECK_FAILED",
+                    "err_id": err_id,
+                    "err_type": type(e).__name__,
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
-        if plan == "free":
-            today = timezone.localdate()
-            year, week_num, _ = today.isocalendar()
-            week_key = f"{year}{week_num:02d}"
+        # Se der qualquer erro a partir daqui, devolvemos o crédito reservado
+        def _refund_safely():
+            try:
+                refund_one_credit(request.user, consumption)
+            except Exception:
+                # Não derruba request por falha de refund; apenas logaria em produção
+                pass
 
-            with transaction.atomic():
-                try:
-                    usage, _ = WeeklyUsage.objects.select_for_update().get_or_create(
-                        user=request.user,
-                        week=week_key,
-                        defaults={"count": 0},
-                    )
-                except IntegrityError:
-                    usage = WeeklyUsage.objects.select_for_update().get(
-                        user=request.user, week=week_key
-                    )
-
-                if usage.count >= FREE_WEEKLY_LIMIT:
-                    return Response(
-                        {
-                            "detail": "Limite semanal do plano gratuito atingido (3 unificações/semana).",
-                            "code": "FREE_WEEKLY_LIMIT_REACHED",
-                            "plan": "free",
-                            "limit": FREE_WEEKLY_LIMIT,
-                            "used": usage.count,
-                            "week": week_key,
-                            "weekly_remaining": 0,
-                        },
-                        status=status.HTTP_403_FORBIDDEN,
-                    )
-
-                usage.count += 1
-                usage.save(update_fields=["count", "updated_at"])
-                weekly_used = usage.count
-                weekly_remaining = max(0, FREE_WEEKLY_LIMIT - weekly_used)
-
-        request_id = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
+        # ====== Semana (analytics) — calculada aqui, mas incrementa SOMENTE no sucesso ======
+        today = timezone.localdate()
+        year, week_num, _ = today.isocalendar()
+        week_key = f"{year}{week_num:02d}"
         debug_enabled = _debug_enabled()
 
         # tol_m — mínimo 1
@@ -210,15 +297,12 @@ class KMLUnionView(APIView):
 
         parcelas = []
         total_polygons = 0
-
         debug_files = []  # [(filename, bytes)]
 
         # ---------- helpers namespace-agnostic ----------
         def _findall_anyns(node, tag: str):
-            # 1) com namespace (wildcard)
             for el in node.findall(f".//{{*}}{tag}"):
                 yield el
-            # 2) sem namespace
             for el in node.findall(f".//{tag}"):
                 yield el
 
@@ -228,7 +312,6 @@ class KMLUnionView(APIView):
             return None
 
         def _parse_kml_coordinates_text(text: str):
-            # aceita "lon,lat" e "lon,lat,alt" (ignora alt)
             coords = []
             if not text:
                 return coords
@@ -246,130 +329,149 @@ class KMLUnionView(APIView):
             return coords
         # ----------------------------------------------
 
-        count = 1
-        for uploaded in files:
-            raw_bytes = uploaded.read()
+        # =========
+        # 2) Processamento — qualquer falha faz refund
+        # =========
+        try:
+            count = 1
+            for uploaded in files:
+                raw_bytes = uploaded.read()
 
-            print("\n" + "=" * 60)
-            print("arquivo recebido Nº:", count)
-            count += 1
-            print(f"📄 Recebido arquivo: {uploaded.name}")
-            print(f"📦 Tamanho: {uploaded.size} bytes")
-            print("-" * 60)
+                print("\n" + "=" * 60)
+                print("arquivo recebido Nº:", count)
+                count += 1
+                print(f"📄 Recebido arquivo: {uploaded.name}")
+                print(f"📦 Tamanho: {uploaded.size} bytes")
+                print("-" * 60)
+                try:
+                    snippet = raw_bytes[:500].decode("utf-8", errors="ignore")
+                except Exception:
+                    snippet = str(raw_bytes[:200])
+                print("🔍 Início do arquivo (snippet):")
+                print(snippet)
+                print("-" * 60)
+
+                if debug_enabled:
+                    debug_files.append((uploaded.name, raw_bytes))
+
+                poly_idx_file = 0
+                try:
+                    root = ET.fromstring(raw_bytes)
+
+                    placemarks = list(_findall_anyns(root, "Placemark"))
+                    if not placemarks:
+                        placemarks = [root]
+
+                    for placemark in placemarks:
+                        name_el = _first_anyns(placemark, "name")
+                        talhao_name_base = (name_el.text or "").strip() if name_el is not None else ""
+
+                        if not talhao_name_base:
+                            talhao_name_base = os.path.splitext(uploaded.name)[0]
+
+                        poly_idx_pm = 0
+
+                        for poly in _findall_anyns(placemark, "Polygon"):
+                            outer = _first_anyns(poly, "outerBoundaryIs")
+                            if outer is None:
+                                continue
+
+                            lr = _first_anyns(outer, "LinearRing")
+                            if lr is None:
+                                continue
+
+                            coord_el = _first_anyns(lr, "coordinates")
+                            if coord_el is None or not (coord_el.text and coord_el.text.strip()):
+                                continue
+
+                            coords = _parse_kml_coordinates_text(coord_el.text)
+                            if len(coords) < 3:
+                                continue
+
+                            poly_idx_pm += 1
+                            poly_idx_file += 1
+                            total_polygons += 1
+
+                            talhao_name = talhao_name_base if poly_idx_pm == 1 else f"{talhao_name_base}_{poly_idx_pm}"
+                            parcelas.append({"talhao": talhao_name, "coords": coords})
+
+                    print(f"✅ Polígonos extraídos desse arquivo: {poly_idx_file}")
+
+                except ET.ParseError as e:
+                    print(f"❌ Erro de parse XML em {uploaded.name}: {e}")
+                except Exception as e:
+                    print(f"❌ Erro ao processar KML {uploaded.name}: {e}")
+
+            print("=" * 60)
+            print(f"📊 Total de polígonos extraídos de todos os arquivos: {total_polygons}")
+            print(f"📊 Total de parcelas geradas: {len(parcelas)}")
+            print("=" * 60)
+
+            if not parcelas:
+                # Falha => refund (crédito não deve ser cobrado)
+                _refund_safely()
+                return Response(
+                    {"detail": "Nenhum polígono válido encontrado nos arquivos KML.", "request_id": request_id},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
             try:
-                snippet = raw_bytes[:500].decode("utf-8", errors="ignore")
-            except Exception:
-                snippet = str(raw_bytes[:200])
-            print("🔍 Início do arquivo (snippet):")
-            print(snippet)
-            print("-" * 60)
-
-            if debug_enabled:
-                debug_files.append((uploaded.name, raw_bytes))
-
-            poly_idx_file = 0
-            try:
-                root = ET.fromstring(raw_bytes)
-
-                placemarks = list(_findall_anyns(root, "Placemark"))
-                # fallback: alguns KMLs podem vir “crus” (Polygon direto)
-                if not placemarks:
-                    placemarks = [root]
-
-                for placemark in placemarks:
-                    name_el = _first_anyns(placemark, "name")
-                    talhao_name_base = (name_el.text or "").strip() if name_el is not None else ""
-
-                    if not talhao_name_base:
-                        talhao_name_base = os.path.splitext(uploaded.name)[0]
-
-                    poly_idx_pm = 0
-
-                    for poly in _findall_anyns(placemark, "Polygon"):
-                        outer = _first_anyns(poly, "outerBoundaryIs")
-                        if outer is None:
-                            continue
-
-                        lr = _first_anyns(outer, "LinearRing")
-                        if lr is None:
-                            continue
-
-                        coord_el = _first_anyns(lr, "coordinates")
-                        if coord_el is None or not (coord_el.text and coord_el.text.strip()):
-                            continue
-
-                        coords = _parse_kml_coordinates_text(coord_el.text)
-                        if len(coords) < 3:
-                            continue
-
-                        poly_idx_pm += 1
-                        poly_idx_file += 1
-                        total_polygons += 1
-
-                        talhao_name = (
-                            talhao_name_base
-                            if poly_idx_pm == 1
-                            else f"{talhao_name_base}_{poly_idx_pm}"
-                        )
-
-                        parcelas.append({"talhao": talhao_name, "coords": coords})
-
-                print(f"✅ Polígonos extraídos desse arquivo: {poly_idx_file}")
-
-            except ET.ParseError as e:
-                print(f"❌ Erro de parse XML em {uploaded.name}: {e}")
+                kml_str, metrics = merge_no_flood(
+                    parcelas,
+                    tol_m=tol_m,
+                    corridor_width_m=corridor_width_m,
+                    return_metrics=True,
+                )
+            except ValueError as e:
+                _refund_safely()
+                return Response({"detail": str(e), "request_id": request_id}, status=status.HTTP_400_BAD_REQUEST)
             except Exception as e:
-                print(f"❌ Erro ao processar KML {uploaded.name}: {e}")
+                print(f"❌ Erro interno no merge_no_flood: {e}")
+                _refund_safely()
+                return Response(
+                    {"detail": "Erro interno ao unificar polígonos.", "request_id": request_id},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
 
-        print("=" * 60)
-        print(f"📊 Total de polígonos extraídos de todos os arquivos: {total_polygons}")
-        print(f"📊 Total de parcelas geradas: {len(parcelas)}")
-        print("=" * 60)
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"kml_unions/union_{ts}_{uuid.uuid4().hex[:6]}.kml"
+            saved_path = default_storage.save(filename, ContentFile(kml_str.encode("utf-8")))
 
-        if not parcelas:
-            return Response(
-                {
-                    "detail": "Nenhum polígono válido encontrado nos arquivos KML.",
-                    "request_id": request_id,
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            try:
+                download_url = default_storage.url(saved_path)
+            except NotImplementedError:
+                media_url = settings.MEDIA_URL
+                if not media_url.endswith("/"):
+                    media_url += "/"
+                download_url = request.build_absolute_uri(media_url + saved_path)
 
-        try:
-            kml_str, metrics = merge_no_flood(
-                parcelas,
-                tol_m=tol_m,
-                corridor_width_m=corridor_width_m,
-                return_metrics=True,
-            )
-        except ValueError as e:
-            return Response(
-                {"detail": str(e), "request_id": request_id},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        except Exception as e:
-            print(f"❌ Erro interno no merge_no_flood: {e}")
-            return Response(
-                {"detail": "Erro interno ao unificar polígonos.", "request_id": request_id},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+            # =========
+            # 3) SUCESSO: agora sim incrementa WeeklyUsage (analytics)
+            # =========
+            with transaction.atomic():
+                try:
+                    usage, _ = WeeklyUsage.objects.select_for_update().get_or_create(
+                        user=request.user,
+                        week=week_key,
+                        defaults={"count": 0},
+                    )
+                except IntegrityError:
+                    usage = WeeklyUsage.objects.select_for_update().get(user=request.user, week=week_key)
 
-        # salva o KML final (como você já fazia)
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"kml_unions/union_{ts}_{uuid.uuid4().hex[:6]}.kml"
-        saved_path = default_storage.save(filename, ContentFile(kml_str.encode("utf-8")))
-
-        try:
-            download_url = default_storage.url(saved_path)
+                usage.count += 1
+                usage.save(update_fields=["count", "updated_at"])
+                weekly_used = usage.count
 
             # ---- Persistir histórico do merge (metadata) ----
+            job = None
             try:
                 input_filenames = [getattr(f, "name", "") for f in files]
+                plan_now = getattr(request.user.billing, "plan", None)  # best-effort
 
                 job = KMLMergeJob.objects.create(
                     user=request.user,
                     request_id=request_id,
-                    plan=plan,
+                    plan=plan_now or getattr(bp, "plan", "unknown"),
                     status=KMLMergeJob.STATUS_SUCCESS,
                     tol_m=tol_m,
                     corridor_width_m=corridor_width_m,
@@ -387,129 +489,60 @@ class KMLUnionView(APIView):
                 )
             except Exception as e:
                 print(f"[KML_HISTORY] Falha ao salvar histórico do merge {request_id}: {e}")
-                job = None
 
-        except NotImplementedError:
-            media_url = settings.MEDIA_URL
-            if not media_url.endswith("/"):
-                media_url += "/"
-            download_url = request.build_absolute_uri(media_url + saved_path)
+            if debug_enabled:
+                Thread(
+                    target=_save_kml_debug_bundle_storage,
+                    args=(request_id, tol_m, corridor_width_m, debug_files, kml_str, metrics),
+                    daemon=True,
+                ).start()
 
-        # debug em background (sem afetar o response)
-        if debug_enabled:
-            Thread(
-                target=_save_kml_debug_bundle_storage,
-                args=(request_id, tol_m, corridor_width_m, debug_files, kml_str, metrics),
-                daemon=True,
-            ).start()
+            # Recarrega bp para devolver contadores atualizados
+            try:
+                bp.refresh_from_db()
+            except Exception:
+                pass
 
-        # ====== RESPOSTA: manter mesmo objeto “flat” do seu endpoint ======
-        return Response(
-            {
-                "request_id": request_id,
-                "download_url": download_url,
-                "total_polygons": total_polygons,
-                "total_files": len(files),
-                "tol_m": tol_m,
-                "corridor_width_m": corridor_width_m,
-                # métricas como antes (flat)
-                "output_polygons": metrics.get("output_polygons"),
-                "merged_polygons": metrics.get("merged_polygons"),
-                "input_area_m2": metrics.get("input_area_m2"),
-                "input_area_ha": metrics.get("input_area_ha"),
-                "output_area_m2": metrics.get("output_area_m2"),
-                "output_area_ha": metrics.get("output_area_ha"),
-                "plan": plan,
-                "weekly_limit": FREE_WEEKLY_LIMIT if plan == "free" else None,
-                "weekly_used": weekly_used if plan == "free" else None,
-                "weekly_remaining": weekly_remaining if plan == "free" else None,
-                "week": week_key if plan == "free" else None,
-                "job_id": str(job.id) if job else None,
-            },
-            status=status.HTTP_200_OK,
-        )
+            plan = getattr(bp, "plan", None)
 
-class MeView(APIView):
-    authentication_classes = (FirebaseAuthentication,)
-    permission_classes = (IsAuthenticated,)
+            # Campos retornados: adapte os nomes conforme seus models atuais
+            free_left = getattr(bp, "free_monthly_credits", None)  # se você expõe assim
+            prepaid_left = getattr(bp, "prepaid_credits", None)
+            credits_used_total = getattr(bp, "credits_used_total", None)
 
-    def get(self, request):
-        print("[me] user.email:", getattr(request.user, "email", None))
-        print("[me] user.uid:", getattr(request.user, "uid", None))  # se seu User tiver campo uid
-        bp = getattr(request.user, "billing", None)
-        print("[me] bp:", bp, "bp.user_id:", getattr(bp, "user_id", None))
+            return Response(
+                {
+                    "request_id": request_id,
+                    "download_url": download_url,
+                    "total_polygons": total_polygons,
+                    "total_files": len(files),
+                    "tol_m": tol_m,
+                    "corridor_width_m": corridor_width_m,
+                    "output_polygons": metrics.get("output_polygons"),
+                    "merged_polygons": metrics.get("merged_polygons"),
+                    "input_area_m2": metrics.get("input_area_m2"),
+                    "input_area_ha": metrics.get("input_area_ha"),
+                    "output_area_m2": metrics.get("output_area_m2"),
+                    "output_area_ha": metrics.get("output_area_ha"),
+                    "plan": plan,
+                    "week": week_key,
+                    "weekly_used": weekly_used,
+                    "free_monthly_credits": free_left,
+                    "prepaid_credits": prepaid_left,
+                    "credits_used_total": credits_used_total,
+                    "consumed_from": getattr(consumption, "kind", None),  # "pro"|"prepaid"|"free"
+                    "job_id": str(job.id) if job else None,
+                },
+                status=status.HTTP_200_OK,
+            )
 
-        if not bp:
-            return Response({"email": request.user.email, "plan": "free"})
-
-        # Só faz sync se fizer sentido
-        if bp.plan == "pro" or bp.stripe_subscription_id:
-            if bp.stripe_subscription_id:
-                try:
-                    sub = stripe.Subscription.retrieve(bp.stripe_subscription_id)
-
-                    status_ = (sub.get("status") or "").lower().strip()
-                    cpe_ts = sub.get("current_period_end")
-                    cap = bool(sub.get("cancel_at_period_end") or False)
-
-                    # Converte current_period_end (Stripe -> datetime UTC)
-                    cpe = None
-                    if cpe_ts:
-                        cpe = timezone.datetime.fromtimestamp(int(cpe_ts), tz=py_timezone.utc)
-
-                    # Atualiza campos locais (sem apagar deadline local se Stripe vier sem cpe)
-                    if cpe:
-                        bp.current_period_end = cpe
-                    bp.cancel_at_period_end = cap
-
-                    # Decide plano pelo status do Stripe
-                    if status_ in ("active", "trialing"):
-                        bp.plan = "pro"
-                    else:
-                        bp.plan = "free"
-                        bp.current_period_end = None
-                        bp.stripe_subscription_id = None
-                        bp.cancel_at_period_end = False
-
-                    bp.save(update_fields=[
-                        "plan",
-                        "current_period_end",
-                        "stripe_subscription_id",
-                        "cancel_at_period_end",
-                        "updated_at",
-                    ])
-
-                except Exception:
-                    # Se Stripe falhar, rebaixa por deadline local
-                    if bp.current_period_end and timezone.now() > bp.current_period_end:
-                        bp.plan = "free"
-                        bp.current_period_end = None
-                        bp.stripe_subscription_id = None
-                        bp.cancel_at_period_end = False
-                        bp.save(update_fields=[
-                            "plan",
-                            "current_period_end",
-                            "stripe_subscription_id",
-                            "cancel_at_period_end",
-                            "updated_at",
-                        ])
-
-            else:
-                # pro sem subscription_id => inconsistente
-                bp.plan = "free"
-                bp.current_period_end = None
-                bp.cancel_at_period_end = False
-                bp.save(update_fields=["plan", "current_period_end", "cancel_at_period_end", "updated_at"])
-
-        return Response({
-            "email": request.user.email,
-            "plan": bp.plan,
-            "current_period_end": bp.current_period_end.isoformat() if bp.current_period_end else None,
-            "cancel_at_period_end": bp.cancel_at_period_end,
-        })
-
-
-
+        except Exception as e:
+            # Falha inesperada => refund
+            _refund_safely()
+            return Response(
+                {"detail": str(e) or "Merge failed.", "code": "MERGE_FAILED"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
 class UsageView(APIView):
     authentication_classes = (FirebaseAuthentication,)
@@ -526,35 +559,42 @@ class UsageView(APIView):
             .first()
         ) or 0
 
-        remaining = max(0, FREE_WEEKLY_LIMIT - used)
-
         bp = getattr(request.user, "billing", None)
-        plan = bp.plan if bp else "free"
-
-        # Se pro, você pode retornar remaining=None (ilimitado)
-        if plan != "free":
+        if not bp:
             return Response(
                 {
-                    "plan": plan,
+                    "plan": "free",
                     "week": week_key,
-                    "weekly_limit": None,
-                    "weekly_used": used,  # opcional
-                    "weekly_remaining": None,
+                    "weekly_used": used,
+                    "free_monthly_credits": 0,
+                    "prepaid_credits": 0,
+                    "credits_used_total": 0,
+                    "is_unlimited": False,
+                    "current_period_end": None,
+                    "cancel_at_period_end": False,
                 },
                 status=status.HTTP_200_OK,
             )
 
+        # UX: se free, reseta mensal ao consultar
+        if bp.plan == "free":
+            bp.reset_free_monthly_if_needed(monthly_amount=FREE_MONTHLY_CREDITS)
+            bp.refresh_from_db()
+
         return Response(
             {
-                "plan": "free",
+                "plan": bp.plan,
                 "week": week_key,
-                "weekly_limit": FREE_WEEKLY_LIMIT,
                 "weekly_used": used,
-                "weekly_remaining": remaining,
+                "free_monthly_credits": bp.free_monthly_credits,
+                "prepaid_credits": bp.prepaid_credits,
+                "credits_used_total": bp.credits_used_total,
+                "is_unlimited": bp.is_unlimited,
+                "current_period_end": bp.current_period_end.isoformat() if bp.current_period_end else None,
+                "cancel_at_period_end": bp.cancel_at_period_end,
             },
             status=status.HTTP_200_OK,
         )
-
 
 
 
@@ -579,20 +619,21 @@ class CreateCheckoutSessionView(APIView):
         if billing_cycle not in ("monthly", "yearly"):
             raise ValidationError({"billing_cycle": "Use 'monthly' ou 'yearly'."})
 
-        price_id = os.getenv("STRIPE_PRICE_ID_MONTHLY") if billing_cycle == "monthly" else os.getenv("STRIPE_PRICE_ID_YEARLY")
+        price_id = (
+            os.getenv("STRIPE_PRICE_ID_MONTHLY")
+            if billing_cycle == "monthly"
+            else os.getenv("STRIPE_PRICE_ID_YEARLY")
+        )
         if not price_id:
             return Response(
                 {"detail": "Stripe price_id não configurado no servidor.", "code": "STRIPE_PRICE_ID_MISSING"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-        # IMPORTANTE: em produção, APP_URL precisa ser https://kmlunifier.com
-        # (não localhost). Esse é o URL que o Stripe vai redirecionar após o pagamento.
         app_url = os.getenv("APP_URL", "http://localhost:5173").rstrip("/")
         success_url = f"{app_url}/?stripe=success&session_id={{CHECKOUT_SESSION_ID}}"
         cancel_url = f"{app_url}/?stripe=cancel"
 
-        # garante customer
         if not bp.stripe_customer_id:
             customer = stripe.Customer.create(
                 email=request.user.email,
@@ -625,7 +666,6 @@ class CreateCheckoutSessionView(APIView):
             {"checkout_url": session["url"], "session_id": session["id"]},
             status=status.HTTP_200_OK,
         )
-
 
 
 # =========================
@@ -747,6 +787,7 @@ def _find_bp(customer_id=None, firebase_uid=None):
     return bp
 
 
+
 def _sync_bp_from_subscription(bp: BillingProfile, sub: dict, period_end_fallback=None):
     status_ = (sub.get("status") or "").lower().strip()
 
@@ -757,7 +798,6 @@ def _sync_bp_from_subscription(bp: BillingProfile, sub: dict, period_end_fallbac
     cpe = _dt_from_unix(raw_cpe, "sub.current_period_end")
     cancel_at_dt = _dt_from_unix(raw_cancel_at, "sub.cancel_at")
 
-    # Fallbacks de deadline
     if not cpe and cancel_at_dt:
         cpe = cancel_at_dt
     if not cpe and period_end_fallback:
@@ -765,7 +805,6 @@ def _sync_bp_from_subscription(bp: BillingProfile, sub: dict, period_end_fallbac
     if not cpe:
         cpe = _derive_period_end_from_anchor(sub)
 
-    # Boolean local: considerar flag OU a presença de cancel_at
     cap_local = bool(raw_cap) or bool(cancel_at_dt)
 
     bp.stripe_subscription_id = sub.get("id") or bp.stripe_subscription_id
@@ -774,14 +813,28 @@ def _sync_bp_from_subscription(bp: BillingProfile, sub: dict, period_end_fallbac
 
     now = timezone.now()
 
-    # Regra de plano:
+    # intervalo: month/year
+    interval = None
+    try:
+        items = (sub.get("items") or {}).get("data") or []
+        if items:
+            price = items[0].get("price") or {}
+            recurring = price.get("recurring") or {}
+            interval = (recurring.get("interval") or "").lower().strip()
+    except Exception:
+        interval = None
+
     if status_ in ("active", "trialing"):
-        bp.plan = "pro"
+        bp.plan = "pro_yearly" if interval == "year" else "pro_monthly"
     else:
         if cpe and cpe > now:
-            bp.plan = "pro"
+            # ainda dentro do período: mantém pro_* se já estava, senão assume monthly
+            if bp.plan not in ("pro_monthly", "pro_yearly"):
+                bp.plan = "pro_monthly"
         else:
-            bp.plan = "free"
+            # rebaixa para free apenas se estava em pro_*
+            if bp.plan in ("pro_monthly", "pro_yearly"):
+                bp.plan = "free"
             bp.current_period_end = None
             bp.stripe_subscription_id = None
             bp.cancel_at_period_end = False
@@ -800,6 +853,7 @@ def _sync_bp_from_subscription(bp: BillingProfile, sub: dict, period_end_fallbac
         "cpe:", bp.current_period_end,
         "cap(local):", bp.cancel_at_period_end,
         "status:", status_,
+        "interval:", interval,
         "raw_cap:", raw_cap,
         "raw_cancel_at:", raw_cancel_at,
         "raw_cpe:", raw_cpe,
@@ -810,6 +864,7 @@ def _sync_bp_from_subscription(bp: BillingProfile, sub: dict, period_end_fallbac
 
 def _retrieve_subscription(subscription_id: str):
     return stripe.Subscription.retrieve(subscription_id, expand=["items.data.price"])
+
 
 
 # =========================
@@ -855,7 +910,6 @@ class StripeWebhookView(APIView):
                 print("[stripe] BP NOT FOUND (sub). Will not create. customer:", customer_id, "firebase_uid:", firebase_uid)
                 return HttpResponse(status=200)
 
-            # garante customer_id no BP (se ainda não tiver)
             if customer_id and not bp.stripe_customer_id:
                 bp.stripe_customer_id = customer_id
                 bp.save(update_fields=["stripe_customer_id", "updated_at"])
@@ -870,31 +924,47 @@ class StripeWebhookView(APIView):
 
             return HttpResponse(status=200)
 
-        # 2) checkout.session.completed
+        # 2) checkout.session.completed (subscription OR prepaid payment)
         if event_type == "checkout.session.completed":
             customer_id = obj.get("customer")
             subscription_id = obj.get("subscription")
             firebase_uid = _extract_firebase_uid(obj)
 
-            print("[stripe] checkout completed customer:", customer_id, "sub:", subscription_id, "firebase_uid:", firebase_uid)
+            mode = (obj.get("mode") or "").lower().strip()
+            kind = ((obj.get("metadata") or {}).get("kind") or "").lower().strip()
+
+            print(
+                "[stripe] checkout completed customer:", customer_id,
+                "mode:", mode,
+                "kind:", kind,
+                "sub:", subscription_id,
+                "firebase_uid:", firebase_uid
+            )
 
             bp = _find_bp(customer_id=customer_id, firebase_uid=firebase_uid)
             if not bp:
                 print("[stripe] BP NOT FOUND (checkout). Will not create. customer:", customer_id, "firebase_uid:", firebase_uid)
                 return HttpResponse(status=200)
 
-            # garante customer_id no BP
             if customer_id and (bp.stripe_customer_id != customer_id):
                 bp.stripe_customer_id = customer_id
                 bp.save(update_fields=["stripe_customer_id", "updated_at"])
                 print("[stripe] updated bp.stripe_customer_id from checkout -> bp_id:", bp.id, "customer:", customer_id)
 
+            # PREPAID
+            if mode == "payment" and kind == "prepaid_10":
+                with transaction.atomic():
+                    bp = BillingProfile.objects.select_for_update().get(pk=bp.pk)
+                    bp.prepaid_credits += PREPAID_CREDITS_PER_PACK
+                    if not bp.is_unlimited:
+                        bp.plan = "prepaid"
+                    bp.save(update_fields=["prepaid_credits", "plan", "updated_at"])
+                return HttpResponse(status=200)
+
+            # SUBSCRIPTION
             if subscription_id:
-                # seta PRO imediatamente
                 bp.stripe_subscription_id = subscription_id
-                bp.plan = "pro"
-                bp.save(update_fields=["stripe_subscription_id", "plan", "updated_at"])
-                print("[stripe] saved pro from checkout -> bp_id:", bp.id, "sub:", subscription_id)
+                bp.save(update_fields=["stripe_subscription_id", "updated_at"])
 
                 try:
                     sub = _retrieve_subscription(subscription_id)
@@ -932,9 +1002,10 @@ class StripeWebhookView(APIView):
                     _sync_bp_from_subscription(bp, sub, period_end_fallback=cpe_from_invoice)
                 except Exception as e:
                     print("[stripe] invoice retrieve sub failed:", str(e))
-                    # fallback mínimo: salva cpe do invoice
                     if cpe_from_invoice:
-                        bp.plan = "pro"
+                        # fallback mínimo: mantém pro_* se já estava; senão assume monthly
+                        if bp.plan not in ("pro_monthly", "pro_yearly"):
+                            bp.plan = "pro_monthly"
                         bp.stripe_subscription_id = subscription_id
                         bp.current_period_end = cpe_from_invoice
                         bp.save(update_fields=["plan", "stripe_subscription_id", "current_period_end", "updated_at"])
@@ -954,19 +1025,19 @@ class StripeWebhookView(APIView):
                 print("[stripe] BP NOT FOUND (deleted). Will not create. customer:", customer_id, "firebase_uid:", firebase_uid)
                 return HttpResponse(status=200)
 
-            bp.plan = "free"
+            # só rebaixa para free se estava em pro_*
+            if bp.plan in ("pro_monthly", "pro_yearly"):
+                bp.plan = "free"
+
             bp.current_period_end = None
             bp.stripe_subscription_id = None
             bp.cancel_at_period_end = False
-            bp.save(update_fields=[
-                "plan", "current_period_end", "stripe_subscription_id", "cancel_at_period_end", "updated_at"
-            ])
-            print("[stripe] downgraded to free (deleted) -> bp_id:", bp.id)
+            bp.save(update_fields=["plan", "current_period_end", "stripe_subscription_id", "cancel_at_period_end", "updated_at"])
+            print("[stripe] subscription deleted -> bp_id:", bp.id, "new_plan:", bp.plan)
 
             return HttpResponse(status=200)
 
         return HttpResponse(status=200)
-
 
 
 class CreateBillingPortalSessionView(APIView):
@@ -1008,6 +1079,56 @@ class CreateBillingPortalSessionView(APIView):
 
         return Response({"url": portal_session["url"]}, status=status.HTTP_200_OK)
 
+
+
+class CreatePrepaidCheckoutSessionView(APIView):
+    authentication_classes = (FirebaseAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    def post(self, request):
+        stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+
+        bp = getattr(request.user, "billing", None)
+        if not bp:
+            return Response(
+                {"detail": "BillingProfile ausente.", "code": "BILLING_PROFILE_MISSING"},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        price_id = os.getenv("STRIPE_PRICE_ID_PREPAID_10")
+        if not price_id:
+            return Response(
+                {"detail": "Stripe price_id prepaid não configurado.", "code": "STRIPE_PRICE_ID_MISSING"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        app_url = os.getenv("APP_URL", "http://localhost:5173").rstrip("/")
+        success_url = f"{app_url}/?stripe=success&session_id={{CHECKOUT_SESSION_ID}}"
+        cancel_url = f"{app_url}/?stripe=cancel"
+
+        if not bp.stripe_customer_id:
+            customer = stripe.Customer.create(
+                email=request.user.email,
+                metadata={"firebase_uid": bp.firebase_uid, "django_user_id": str(request.user.id)},
+            )
+            bp.stripe_customer_id = customer["id"]
+            bp.save(update_fields=["stripe_customer_id", "updated_at"])
+
+        session = stripe.checkout.Session.create(
+            mode="payment",
+            customer=bp.stripe_customer_id,
+            client_reference_id=str(request.user.id),
+            line_items=[{"price": price_id, "quantity": 1}],
+            success_url=success_url,
+            cancel_url=cancel_url,
+            metadata={
+                "kind": "prepaid_10",
+                "firebase_uid": bp.firebase_uid,
+                "django_user_id": str(request.user.id),
+            },
+        )
+
+        return Response({"checkout_url": session["url"], "session_id": session["id"]}, status=status.HTTP_200_OK)
 
 
 
