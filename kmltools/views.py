@@ -267,6 +267,110 @@ class KMLUnionView(APIView):
         return value
 
     # ---------- helpers namespace-agnostic ----------
+    
+    def _coords_latlon_to_geojson_ring(self, coords_latlon):
+        """
+        coords_latlon: lista de dicts {latitude, longitude}
+        GeoJSON usa [lon, lat] e exige anel fechado.
+        """
+        ring = []
+        for p in coords_latlon or []:
+            try:
+                ring.append([float(p["longitude"]), float(p["latitude"])])
+            except Exception:
+                continue
+
+        if len(ring) >= 3 and ring[0] != ring[-1]:
+            ring.append(ring[0])
+
+        return ring
+
+    def _kml_str_to_geojson(self, kml_str: str) -> dict:
+        """
+        Converte o KML final (string) em GeoJSON FeatureCollection.
+        Suporta Polygon (outer ring). (Holes podem ser adicionados depois se necessário.)
+        """
+        if not kml_str:
+            return {"type": "FeatureCollection", "features": []}
+
+        try:
+            root = ET.fromstring(kml_str.encode("utf-8", errors="ignore"))
+        except Exception:
+            return {"type": "FeatureCollection", "features": []}
+
+        features = []
+        poly_idx = 0
+
+        placemarks = list(self._findall_anyns(root, "Placemark"))
+        if not placemarks:
+            placemarks = [root]
+
+        for placemark in placemarks:
+            name_el = self._first_anyns(placemark, "name")
+            base_name = (name_el.text or "").strip() if name_el is not None else ""
+
+            for poly in self._findall_anyns(placemark, "Polygon"):
+                outer = self._first_anyns(poly, "outerBoundaryIs")
+                if outer is None:
+                    continue
+
+                lr = self._first_anyns(outer, "LinearRing")
+                if lr is None:
+                    continue
+
+                coord_el = self._first_anyns(lr, "coordinates")
+                if coord_el is None or not (coord_el.text and coord_el.text.strip()):
+                    continue
+
+                coords_latlon = self._parse_kml_coordinates_text(coord_el.text)
+                ring = self._coords_latlon_to_geojson_ring(coords_latlon)
+                if len(ring) < 4:
+                    continue
+
+                poly_idx += 1
+                fname = base_name or f"Polygon {poly_idx}"
+
+                features.append(
+                    {
+                        "type": "Feature",
+                        "properties": {"name": fname, "idx": poly_idx},
+                        "geometry": {"type": "Polygon", "coordinates": [ring]},
+                    }
+                )
+
+        return {"type": "FeatureCollection", "features": features}
+    
+    def _parcelas_to_geojson(self, parcelas):
+        features = []
+        idx = 0
+
+        for p in parcelas:
+            ring = []
+            for c in p.get("coords", []):
+                try:
+                    ring.append([float(c["longitude"]), float(c["latitude"])])
+                except Exception:
+                    continue
+
+            if len(ring) < 3:
+                continue
+
+            if ring[0] != ring[-1]:
+                ring.append(ring[0])
+
+            idx += 1
+            features.append({
+                "type": "Feature",
+                "properties": {"name": p.get("talhao"), "idx": idx},
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [ring],
+                },
+            })
+
+        return {"type": "FeatureCollection", "features": features}
+
+
     def _findall_anyns(self, node, tag: str):
         for el in node.findall(f".//{{*}}{tag}"):
             yield el
@@ -698,6 +802,12 @@ class KMLUnionView(APIView):
                     corridor_width_m=corridor_width_m,
                     return_metrics=True,
                 )
+                print("[KML_OUT] snippet:", (kml_str or "")[:500])
+                preview_geojson = self._kml_str_to_geojson(kml_str)
+                print("[PREVIEW] geojson features:", len(preview_geojson.get("features", [])))
+                input_preview_geojson = self._parcelas_to_geojson(parcelas)
+                
+
             except ValueError as e:
                 _refund_safely()
                 return Response(
@@ -810,6 +920,8 @@ class KMLUnionView(APIView):
                     "job_id": str(job.id) if job else None,
                     # diagnóstico por arquivo (muito útil para suporte)
                     "files_report": file_reports,
+                    "input_preview_geojson": input_preview_geojson,
+                    "preview_geojson": preview_geojson,
                 },
                 status=status.HTTP_200_OK,
             )
