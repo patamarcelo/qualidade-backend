@@ -349,3 +349,12 @@ MESSAGE_TAGS = {
     messages.WARNING: 'warning',  # garante que WARNING = alert-warning
     messages.ERROR: 'danger',      # bootstrap usa "danger" em vez de "error"
 }
+
+
+# settings.py
+KML_NETLINK_ALLOWED_HOST_SUFFIXES = ("google.com", "googleusercontent.com", "maps.google.com", "www.google.com")
+KML_NETLINK_MAX_BYTES = 8 * 1024 * 1024
+KML_NETLINK_CONNECT_TIMEOUT = 3
+KML_NETLINK_READ_TIMEOUT = 6
+KML_NETLINK_MAX_REDIRECTS = 3
+KML_NETLINK_CACHE_TTL = 60 * 60

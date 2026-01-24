@@ -29,6 +29,58 @@ from kmltools.services import merge_no_flood
 from kmltools.newservices.credits import reserve_one_credit, refund_one_credit, NoCreditsLeft
 
 
+
+
+import re
+
+import zipfile
+from io import BytesIO
+
+from urllib.parse import urlparse
+
+
+import requests
+
+
+from django.core.cache import cache
+
+
+
+
+
+
+
+# aceita href com texto direto OU com <![CDATA[...]]>
+NETWORKLINK_HREF_RE = re.compile(
+    r"<href>\s*(?:<!\[CDATA\[)?\s*([^<\]\s]+)\s*(?:\]\]>)?\s*</href>",
+    re.IGNORECASE,
+)
+
+
+
+
+# Ajuste a allowlist conforme você quiser (MVP seguro)
+DEFAULT_ALLOWED_HOST_SUFFIXES = (
+    "google.com",
+    "googleusercontent.com",
+    "maps.google.com",
+    "www.google.com",
+)
+
+# limites “anti-surpresa” (performance)
+DEFAULT_MAX_REMOTE_BYTES = 8 * 1024 * 1024  # 8MB
+DEFAULT_CONNECT_TIMEOUT = 3
+DEFAULT_READ_TIMEOUT = 6
+DEFAULT_MAX_REDIRECTS = 3
+DEFAULT_CACHE_TTL_SECONDS = 60 * 60  # 1h
+
+
+class NetworkLinkResolveError(Exception):
+    pass
+
+
+
+
 FREE_MONTHLY_CREDITS = 2
 PREPAID_CREDITS_PER_PACK = 10
 
@@ -202,7 +254,6 @@ class MeView(APIView):
             "current_period_end": bp.current_period_end.isoformat() if bp.current_period_end else None,
             "cancel_at_period_end": bp.cancel_at_period_end,
         })
-
 class KMLUnionView(APIView):
     parser_classes = [MultiPartParser, FormParser]
     authentication_classes = (FirebaseAuthentication,)
@@ -214,6 +265,227 @@ class KMLUnionView(APIView):
         if max_value is not None:
             value = min(max_value, value)
         return value
+
+    # ---------- helpers namespace-agnostic ----------
+    def _findall_anyns(self, node, tag: str):
+        for el in node.findall(f".//{{*}}{tag}"):
+            yield el
+        for el in node.findall(f".//{tag}"):
+            yield el
+
+    def _first_anyns(self, node, tag: str):
+        for el in self._findall_anyns(node, tag):
+            return el
+        return None
+
+    def _parse_kml_coordinates_text(self, text: str):
+        coords = []
+        if not text:
+            return coords
+        tokens = text.replace("\n", " ").replace("\t", " ").split()
+        for token in tokens:
+            parts = token.split(",")
+            if len(parts) < 2:
+                continue
+            try:
+                lon = float(parts[0])
+                lat = float(parts[1])
+            except ValueError:
+                continue
+            coords.append({"latitude": lat, "longitude": lon})
+        return coords
+
+    def _bytes_has_coordinates(self, b: bytes) -> bool:
+        # FAST PATH: evita decodificar inteiro; checa substring em lower
+        # (KML é texto, então isso funciona bem)
+        try:
+            return b.lower().find(b"<coordinates") != -1
+        except Exception:
+            return False
+
+    def _is_networklink_kml(self, text: str) -> bool:
+        t = (text or "").lower()
+        return ("<networklink" in t) and ("<href" in t) and ("<coordinates" not in t)
+
+
+    def _extract_networklink_href(self, text: str) -> str | None:
+        if not text:
+            return None
+
+        # 1) tenta regex (rápido e suficiente na maioria dos casos)
+        m = NETWORKLINK_HREF_RE.search(text)
+        if m:
+            href = (m.group(1) or "").strip()
+            return href or None
+
+        # 2) fallback: parse XML e pega <href> namespace-agnostic
+        # (cobre casos com formatação estranha / espaços / CDATA incomum)
+        try:
+            root = ET.fromstring(text.encode("utf-8", errors="ignore"))
+
+            # procura qualquer <href> com ou sem namespace
+            href_el = None
+            for el in root.findall(".//{*}href"):
+                href_el = el
+                break
+            if href_el is None:
+                for el in root.findall(".//href"):
+                    href_el = el
+                    break
+
+            if href_el is None:
+                return None
+
+            # itertext() captura CDATA e textos internos
+            href = "".join(href_el.itertext()).strip()
+            return href or None
+        except Exception:
+            return None
+
+
+    def _allowed_hosts(self):
+        # permite override via settings, sem mexer no código
+        return getattr(settings, "KML_NETLINK_ALLOWED_HOST_SUFFIXES", DEFAULT_ALLOWED_HOST_SUFFIXES)
+
+    def _remote_limits(self):
+        return {
+            "max_bytes": getattr(settings, "KML_NETLINK_MAX_BYTES", DEFAULT_MAX_REMOTE_BYTES),
+            "connect_timeout": getattr(settings, "KML_NETLINK_CONNECT_TIMEOUT", DEFAULT_CONNECT_TIMEOUT),
+            "read_timeout": getattr(settings, "KML_NETLINK_READ_TIMEOUT", DEFAULT_READ_TIMEOUT),
+            "max_redirects": getattr(settings, "KML_NETLINK_MAX_REDIRECTS", DEFAULT_MAX_REDIRECTS),
+            "ttl": getattr(settings, "KML_NETLINK_CACHE_TTL", DEFAULT_CACHE_TTL_SECONDS),
+        }
+
+    def _is_allowed_host(self, url: str) -> bool:
+        host = urlparse(url).hostname or ""
+        host = host.lower().strip()
+        allowed = self._allowed_hosts()
+        return any(host == s or host.endswith("." + s) for s in allowed)
+
+    def _fetch_remote(self, url: str) -> bytes:
+        if not self._is_allowed_host(url):
+            raise NetworkLinkResolveError(f"Host não permitido: {urlparse(url).hostname}")
+
+        lim = self._remote_limits()
+        cache_key = f"netlink:v2:{url}"
+        cached = cache.get(cache_key)
+        if cached:
+            return cached
+
+        try:
+            with requests.Session() as s:
+                s.max_redirects = lim["max_redirects"]
+                r = s.get(
+                    url,
+                    timeout=(lim["connect_timeout"], lim["read_timeout"]),
+                    stream=True,
+                    headers={"User-Agent": "kmlunifier/1.0"},
+                )
+                r.raise_for_status()
+
+                cl = r.headers.get("Content-Length")
+                if cl and int(cl) > lim["max_bytes"]:
+                    raise NetworkLinkResolveError("Arquivo remoto excede o limite de tamanho.")
+
+                chunks = []
+                total = 0
+                for chunk in r.iter_content(chunk_size=65536):
+                    if not chunk:
+                        continue
+                    total += len(chunk)
+                    if total > lim["max_bytes"]:
+                        raise NetworkLinkResolveError("Arquivo remoto excede o limite de tamanho.")
+                    chunks.append(chunk)
+
+                data = b"".join(chunks)
+
+        except requests.exceptions.Timeout:
+            raise NetworkLinkResolveError("Timeout ao resolver NetworkLink.")
+        except requests.exceptions.TooManyRedirects:
+            raise NetworkLinkResolveError("Redirects demais ao resolver NetworkLink.")
+        except requests.RequestException as e:
+            raise NetworkLinkResolveError(f"Falha HTTP ao resolver NetworkLink: {e}")
+
+        cache.set(cache_key, data, lim["ttl"])
+        return data
+
+    def _maybe_extract_kml_from_kmz(self, data: bytes) -> bytes:
+        # Se não for zip, devolve como está
+        if not data or len(data) < 4:
+            return data
+        if data[:2] != b"PK":
+            return data
+
+        try:
+            zf = zipfile.ZipFile(BytesIO(data))
+            # prefer doc.kml, senão primeiro .kml
+            names = zf.namelist()
+            target = None
+            if "doc.kml" in names:
+                target = "doc.kml"
+            else:
+                for n in names:
+                    if n.lower().endswith(".kml"):
+                        target = n
+                        break
+            if not target:
+                return data
+            return zf.read(target)
+        except Exception:
+            # falha silenciosa → mantém comportamento atual (não quebra nada)
+            return data
+
+    def _resolve_networklink_if_needed(self, raw_bytes: bytes, filename: str):
+        """
+        Retorna: (bytes_resolvidos, info_dict)
+        info_dict: {networklink_detected, networklink_resolved, networklink_href, networklink_error}
+        """
+        info = {
+            "networklink_detected": False,
+            "networklink_resolved": False,
+            "networklink_href": None,
+            "networklink_error": None,
+        }
+
+        # FAST PATH: se já tem coordinates, não faz nada (zero custo)
+        if self._bytes_has_coordinates(raw_bytes):
+            return raw_bytes, info
+
+        # Só agora decodifica (custo só em casos suspeitos)
+        try:
+            text = raw_bytes.decode("utf-8", errors="ignore")
+        except Exception:
+            text = ""
+
+        if not self._is_networklink_kml(text):
+            return raw_bytes, info
+
+        info["networklink_detected"] = True
+        href = self._extract_networklink_href(text)
+        info["networklink_href"] = href
+
+        if not href:
+            info["networklink_error"] = "NetworkLink sem href."
+            return raw_bytes, info
+
+        # Resolve remoto sob regras estritas
+        try:
+            remote = self._fetch_remote(href)
+            remote = self._maybe_extract_kml_from_kmz(remote)
+
+            # se mesmo assim não tem coordinates, não adianta
+            if not self._bytes_has_coordinates(remote):
+                info["networklink_error"] = "Conteúdo remoto não contém <coordinates>."
+                return raw_bytes, info
+
+            info["networklink_resolved"] = True
+            return remote, info
+
+        except Exception as e:
+            info["networklink_error"] = str(e)
+            return raw_bytes, info
+
+    # ----------------------------------------------
 
     def post(self, request, *args, **kwargs):
         week_key = None
@@ -239,10 +511,10 @@ class KMLUnionView(APIView):
             )
 
         # =========
-        # 1) Reserva crédito ANTES (atômico) — fonte da verdade
+        # 1) Reserva crédito ANTES
         # =========
         try:
-            consumption = reserve_one_credit(request.user)  # kind: "pro"|"prepaid"|"free"
+            consumption = reserve_one_credit(request.user)
         except NoCreditsLeft:
             return Response(
                 {
@@ -265,21 +537,19 @@ class KMLUnionView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-        # Se der qualquer erro a partir daqui, devolvemos o crédito reservado
         def _refund_safely():
             try:
                 refund_one_credit(request.user, consumption)
             except Exception:
-                # Não derruba request por falha de refund; apenas logaria em produção
                 pass
 
-        # ====== Semana (analytics) — calculada aqui, mas incrementa SOMENTE no sucesso ======
+        # Semana (analytics)
         today = timezone.localdate()
         year, week_num, _ = today.isocalendar()
         week_key = f"{year}{week_num:02d}"
         debug_enabled = _debug_enabled()
 
-        # tol_m — mínimo 1
+        # tol_m
         try:
             tol_m = float(request.data.get("tol_m", 20.0))
             print("[TOL_M] tol_m received from FrontEnd:", tol_m)
@@ -287,7 +557,7 @@ class KMLUnionView(APIView):
             tol_m = 20.0
         tol_m = self.clamp(tol_m, min_value=1.0)
 
-        # corridor_width_m — mínimo 1
+        # corridor_width_m
         try:
             corridor_width_m = float(request.data.get("corridor_width_m", 1.0))
             print("[corridor_width_m] received from FrontEnd:", corridor_width_m)
@@ -297,41 +567,9 @@ class KMLUnionView(APIView):
 
         parcelas = []
         total_polygons = 0
-        debug_files = []  # [(filename, bytes)]
+        debug_files = []
+        file_reports = []  # diagnóstico por arquivo
 
-        # ---------- helpers namespace-agnostic ----------
-        def _findall_anyns(node, tag: str):
-            for el in node.findall(f".//{{*}}{tag}"):
-                yield el
-            for el in node.findall(f".//{tag}"):
-                yield el
-
-        def _first_anyns(node, tag: str):
-            for el in _findall_anyns(node, tag):
-                return el
-            return None
-
-        def _parse_kml_coordinates_text(text: str):
-            coords = []
-            if not text:
-                return coords
-            tokens = text.replace("\n", " ").replace("\t", " ").split()
-            for token in tokens:
-                parts = token.split(",")
-                if len(parts) < 2:
-                    continue
-                try:
-                    lon = float(parts[0])
-                    lat = float(parts[1])
-                except ValueError:
-                    continue
-                coords.append({"latitude": lat, "longitude": lon})
-            return coords
-        # ----------------------------------------------
-
-        # =========
-        # 2) Processamento — qualquer falha faz refund
-        # =========
         try:
             count = 1
             for uploaded in files:
@@ -354,16 +592,27 @@ class KMLUnionView(APIView):
                 if debug_enabled:
                     debug_files.append((uploaded.name, raw_bytes))
 
+                # --- NetworkLink support (não afeta KML normal) ---
+                resolved_bytes, netinfo = self._resolve_networklink_if_needed(raw_bytes, uploaded.name)
+                if netinfo["networklink_detected"]:
+                    print(
+                        f"[NETLINK] detected={netinfo['networklink_detected']} "
+                        f"resolved={netinfo['networklink_resolved']} "
+                        f"href={netinfo['networklink_href']}"
+                    )
+                    if netinfo["networklink_error"]:
+                        print(f"[NETLINK] error={netinfo['networklink_error']}")
+
                 poly_idx_file = 0
                 try:
-                    root = ET.fromstring(raw_bytes)
+                    root = ET.fromstring(resolved_bytes)
 
-                    placemarks = list(_findall_anyns(root, "Placemark"))
+                    placemarks = list(self._findall_anyns(root, "Placemark"))
                     if not placemarks:
                         placemarks = [root]
 
                     for placemark in placemarks:
-                        name_el = _first_anyns(placemark, "name")
+                        name_el = self._first_anyns(placemark, "name")
                         talhao_name_base = (name_el.text or "").strip() if name_el is not None else ""
 
                         if not talhao_name_base:
@@ -371,20 +620,20 @@ class KMLUnionView(APIView):
 
                         poly_idx_pm = 0
 
-                        for poly in _findall_anyns(placemark, "Polygon"):
-                            outer = _first_anyns(poly, "outerBoundaryIs")
+                        for poly in self._findall_anyns(placemark, "Polygon"):
+                            outer = self._first_anyns(poly, "outerBoundaryIs")
                             if outer is None:
                                 continue
 
-                            lr = _first_anyns(outer, "LinearRing")
+                            lr = self._first_anyns(outer, "LinearRing")
                             if lr is None:
                                 continue
 
-                            coord_el = _first_anyns(lr, "coordinates")
+                            coord_el = self._first_anyns(lr, "coordinates")
                             if coord_el is None or not (coord_el.text and coord_el.text.strip()):
                                 continue
 
-                            coords = _parse_kml_coordinates_text(coord_el.text)
+                            coords = self._parse_kml_coordinates_text(coord_el.text)
                             if len(coords) < 3:
                                 continue
 
@@ -397,10 +646,34 @@ class KMLUnionView(APIView):
 
                     print(f"✅ Polígonos extraídos desse arquivo: {poly_idx_file}")
 
+                    file_reports.append(
+                        {
+                            "filename": uploaded.name,
+                            "polygons_extracted": poly_idx_file,
+                            **netinfo,
+                        }
+                    )
+
                 except ET.ParseError as e:
                     print(f"❌ Erro de parse XML em {uploaded.name}: {e}")
+                    file_reports.append(
+                        {
+                            "filename": uploaded.name,
+                            "polygons_extracted": 0,
+                            **netinfo,
+                            "parse_error": str(e),
+                        }
+                    )
                 except Exception as e:
                     print(f"❌ Erro ao processar KML {uploaded.name}: {e}")
+                    file_reports.append(
+                        {
+                            "filename": uploaded.name,
+                            "polygons_extracted": 0,
+                            **netinfo,
+                            "process_error": str(e),
+                        }
+                    )
 
             print("=" * 60)
             print(f"📊 Total de polígonos extraídos de todos os arquivos: {total_polygons}")
@@ -408,10 +681,13 @@ class KMLUnionView(APIView):
             print("=" * 60)
 
             if not parcelas:
-                # Falha => refund (crédito não deve ser cobrado)
                 _refund_safely()
                 return Response(
-                    {"detail": "Nenhum polígono válido encontrado nos arquivos KML.", "request_id": request_id},
+                    {
+                        "detail": "Nenhum polígono válido encontrado nos arquivos KML.",
+                        "request_id": request_id,
+                        "files_report": file_reports,
+                    },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
@@ -424,12 +700,15 @@ class KMLUnionView(APIView):
                 )
             except ValueError as e:
                 _refund_safely()
-                return Response({"detail": str(e), "request_id": request_id}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(
+                    {"detail": str(e), "request_id": request_id, "files_report": file_reports},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             except Exception as e:
                 print(f"❌ Erro interno no merge_no_flood: {e}")
                 _refund_safely()
                 return Response(
-                    {"detail": "Erro interno ao unificar polígonos.", "request_id": request_id},
+                    {"detail": "Erro interno ao unificar polígonos.", "request_id": request_id, "files_report": file_reports},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 )
 
@@ -446,7 +725,7 @@ class KMLUnionView(APIView):
                 download_url = request.build_absolute_uri(media_url + saved_path)
 
             # =========
-            # 3) SUCESSO: agora sim incrementa WeeklyUsage (analytics)
+            # 3) SUCESSO: incrementa WeeklyUsage
             # =========
             with transaction.atomic():
                 try:
@@ -466,7 +745,7 @@ class KMLUnionView(APIView):
             job = None
             try:
                 input_filenames = [getattr(f, "name", "") for f in files]
-                plan_now = getattr(request.user.billing, "plan", None)  # best-effort
+                plan_now = getattr(request.user.billing, "plan", None)
 
                 job = KMLMergeJob.objects.create(
                     user=request.user,
@@ -497,16 +776,13 @@ class KMLUnionView(APIView):
                     daemon=True,
                 ).start()
 
-            # Recarrega bp para devolver contadores atualizados
             try:
                 bp.refresh_from_db()
             except Exception:
                 pass
 
             plan = getattr(bp, "plan", None)
-
-            # Campos retornados: adapte os nomes conforme seus models atuais
-            free_left = getattr(bp, "free_monthly_credits", None)  # se você expõe assim
+            free_left = getattr(bp, "free_monthly_credits", None)
             prepaid_left = getattr(bp, "prepaid_credits", None)
             credits_used_total = getattr(bp, "credits_used_total", None)
 
@@ -530,20 +806,20 @@ class KMLUnionView(APIView):
                     "free_monthly_credits": free_left,
                     "prepaid_credits": prepaid_left,
                     "credits_used_total": credits_used_total,
-                    "consumed_from": getattr(consumption, "kind", None),  # "pro"|"prepaid"|"free"
+                    "consumed_from": getattr(consumption, "kind", None),
                     "job_id": str(job.id) if job else None,
+                    # diagnóstico por arquivo (muito útil para suporte)
+                    "files_report": file_reports,
                 },
                 status=status.HTTP_200_OK,
             )
 
         except Exception as e:
-            # Falha inesperada => refund
             _refund_safely()
             return Response(
                 {"detail": str(e) or "Merge failed.", "code": "MERGE_FAILED"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-
 class UsageView(APIView):
     authentication_classes = (FirebaseAuthentication,)
     permission_classes = (IsAuthenticated,)
