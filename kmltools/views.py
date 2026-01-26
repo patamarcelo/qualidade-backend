@@ -81,7 +81,7 @@ class NetworkLinkResolveError(Exception):
 
 
 
-FREE_MONTHLY_CREDITS = 1
+FREE_MONTHLY_CREDITS = 0
 PREPAID_CREDITS_PER_PACK = 5
 
 
@@ -254,6 +254,15 @@ class MeView(APIView):
             "current_period_end": bp.current_period_end.isoformat() if bp.current_period_end else None,
             "cancel_at_period_end": bp.cancel_at_period_end,
         })
+
+# (mantém seus imports/constantes/helpers já existentes no arquivo)
+# - NETWORKLINK_HREF_RE
+# - DEFAULT_ALLOWED_HOST_SUFFIXES, etc
+# - _debug_enabled, _save_kml_debug_bundle_storage
+# - NetworkLinkResolveError
+# - e todos os helpers _resolve_networklink_if_needed, _findall_anyns, etc (já estão na sua classe)
+
+
 class KMLUnionView(APIView):
     parser_classes = [MultiPartParser, FormParser]
     authentication_classes = (FirebaseAuthentication,)
@@ -267,29 +276,19 @@ class KMLUnionView(APIView):
         return value
 
     # ---------- helpers namespace-agnostic ----------
-    
+
     def _coords_latlon_to_geojson_ring(self, coords_latlon):
-        """
-        coords_latlon: lista de dicts {latitude, longitude}
-        GeoJSON usa [lon, lat] e exige anel fechado.
-        """
         ring = []
         for p in coords_latlon or []:
             try:
                 ring.append([float(p["longitude"]), float(p["latitude"])])
             except Exception:
                 continue
-
         if len(ring) >= 3 and ring[0] != ring[-1]:
             ring.append(ring[0])
-
         return ring
 
     def _kml_str_to_geojson(self, kml_str: str) -> dict:
-        """
-        Converte o KML final (string) em GeoJSON FeatureCollection.
-        Suporta Polygon (outer ring). (Holes podem ser adicionados depois se necessário.)
-        """
         if not kml_str:
             return {"type": "FeatureCollection", "features": []}
 
@@ -339,7 +338,7 @@ class KMLUnionView(APIView):
                 )
 
         return {"type": "FeatureCollection", "features": features}
-    
+
     def _parcelas_to_geojson(self, parcelas):
         features = []
         idx = 0
@@ -359,17 +358,15 @@ class KMLUnionView(APIView):
                 ring.append(ring[0])
 
             idx += 1
-            features.append({
-                "type": "Feature",
-                "properties": {"name": p.get("talhao"), "idx": idx},
-                "geometry": {
-                    "type": "Polygon",
-                    "coordinates": [ring],
-                },
-            })
+            features.append(
+                {
+                    "type": "Feature",
+                    "properties": {"name": p.get("talhao"), "idx": idx},
+                    "geometry": {"type": "Polygon", "coordinates": [ring]},
+                }
+            )
 
         return {"type": "FeatureCollection", "features": features}
-
 
     def _findall_anyns(self, node, tag: str):
         for el in node.findall(f".//{{*}}{tag}"):
@@ -398,10 +395,13 @@ class KMLUnionView(APIView):
                 continue
             coords.append({"latitude": lat, "longitude": lon})
         return coords
+    
+        # -----------------------------
+    # NetworkLink robust (como antes)
+    # -----------------------------
 
     def _bytes_has_coordinates(self, b: bytes) -> bool:
-        # FAST PATH: evita decodificar inteiro; checa substring em lower
-        # (KML é texto, então isso funciona bem)
+        # FAST PATH: evita decodificar inteiro
         try:
             return b.lower().find(b"<coordinates") != -1
         except Exception:
@@ -409,25 +409,23 @@ class KMLUnionView(APIView):
 
     def _is_networklink_kml(self, text: str) -> bool:
         t = (text or "").lower()
+        # NetworkLink típico: tem <NetworkLink><Link><href>... e não tem <coordinates>
         return ("<networklink" in t) and ("<href" in t) and ("<coordinates" not in t)
 
-
-    def _extract_networklink_href(self, text: str) -> str | None:
+    def _extract_networklink_href(self, text: str):
         if not text:
             return None
 
-        # 1) tenta regex (rápido e suficiente na maioria dos casos)
+        # 1) regex (rápido)
         m = NETWORKLINK_HREF_RE.search(text)
         if m:
             href = (m.group(1) or "").strip()
             return href or None
 
-        # 2) fallback: parse XML e pega <href> namespace-agnostic
-        # (cobre casos com formatação estranha / espaços / CDATA incomum)
+        # 2) fallback: XML parse e pega <href> namespace-agnostic
         try:
             root = ET.fromstring(text.encode("utf-8", errors="ignore"))
 
-            # procura qualquer <href> com ou sem namespace
             href_el = None
             for el in root.findall(".//{*}href"):
                 href_el = el
@@ -440,16 +438,17 @@ class KMLUnionView(APIView):
             if href_el is None:
                 return None
 
-            # itertext() captura CDATA e textos internos
             href = "".join(href_el.itertext()).strip()
             return href or None
         except Exception:
             return None
 
-
     def _allowed_hosts(self):
-        # permite override via settings, sem mexer no código
-        return getattr(settings, "KML_NETLINK_ALLOWED_HOST_SUFFIXES", DEFAULT_ALLOWED_HOST_SUFFIXES)
+        return getattr(
+            settings,
+            "KML_NETLINK_ALLOWED_HOST_SUFFIXES",
+            DEFAULT_ALLOWED_HOST_SUFFIXES,
+        )
 
     def _remote_limits(self):
         return {
@@ -522,7 +521,6 @@ class KMLUnionView(APIView):
 
         try:
             zf = zipfile.ZipFile(BytesIO(data))
-            # prefer doc.kml, senão primeiro .kml
             names = zf.namelist()
             target = None
             if "doc.kml" in names:
@@ -536,7 +534,6 @@ class KMLUnionView(APIView):
                 return data
             return zf.read(target)
         except Exception:
-            # falha silenciosa → mantém comportamento atual (não quebra nada)
             return data
 
     def _resolve_networklink_if_needed(self, raw_bytes: bytes, filename: str):
@@ -551,11 +548,11 @@ class KMLUnionView(APIView):
             "networklink_error": None,
         }
 
-        # FAST PATH: se já tem coordinates, não faz nada (zero custo)
+        # FAST PATH: se já tem coordinates, não faz nada
         if self._bytes_has_coordinates(raw_bytes):
             return raw_bytes, info
 
-        # Só agora decodifica (custo só em casos suspeitos)
+        # Só agora decodifica
         try:
             text = raw_bytes.decode("utf-8", errors="ignore")
         except Exception:
@@ -572,12 +569,10 @@ class KMLUnionView(APIView):
             info["networklink_error"] = "NetworkLink sem href."
             return raw_bytes, info
 
-        # Resolve remoto sob regras estritas
         try:
             remote = self._fetch_remote(href)
             remote = self._maybe_extract_kml_from_kmz(remote)
 
-            # se mesmo assim não tem coordinates, não adianta
             if not self._bytes_has_coordinates(remote):
                 info["networklink_error"] = "Conteúdo remoto não contém <coordinates>."
                 return raw_bytes, info
@@ -589,12 +584,16 @@ class KMLUnionView(APIView):
             info["networklink_error"] = str(e)
             return raw_bytes, info
 
-    # ----------------------------------------------
+
+    # ----------------------------------------------------------
+    # ✅ IMPORTANTE: os helpers de NetworkLink (resolve, fetch, etc)
+    # permanecem na sua classe como já estão no seu arquivo.
+    # Aqui nós apenas chamamos: self._resolve_networklink_if_needed(...)
+    # ----------------------------------------------------------
 
     def post(self, request, *args, **kwargs):
         week_key = None
         weekly_used = None
-        usage = None
         request_id = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
 
         files = request.FILES.getlist("files")
@@ -614,44 +613,16 @@ class KMLUnionView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
-        # =========
-        # 1) Reserva crédito ANTES
-        # =========
-        try:
-            consumption = reserve_one_credit(request.user)
-        except NoCreditsLeft:
-            return Response(
-                {
-                    "detail": "No credits left. Please upgrade or buy prepaid credits.",
-                    "code": "NO_CREDITS_LEFT",
-                    "request_id": request_id,
-                },
-                status=status.HTTP_403_FORBIDDEN,
-            )
-        except Exception as e:
-            err_id = uuid.uuid4().hex[:10]
-            print(f"[CREDITS][{err_id}] reserve_one_credit failed: {type(e).__name__}: {e}")
-            return Response(
-                {
-                    "detail": "Could not validate credits.",
-                    "code": "CREDIT_CHECK_FAILED",
-                    "err_id": err_id,
-                    "err_type": type(e).__name__,
-                },
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-
-        def _refund_safely():
-            try:
-                refund_one_credit(request.user, consumption)
-            except Exception:
-                pass
-
         # Semana (analytics)
         today = timezone.localdate()
         year, week_num, _ = today.isocalendar()
         week_key = f"{year}{week_num:02d}"
-        debug_enabled = _debug_enabled()
+
+        debug_enabled = False
+        try:
+            debug_enabled = _debug_enabled()
+        except Exception:
+            debug_enabled = False
 
         # tol_m
         try:
@@ -672,7 +643,7 @@ class KMLUnionView(APIView):
         parcelas = []
         total_polygons = 0
         debug_files = []
-        file_reports = []  # diagnóstico por arquivo
+        file_reports = []
 
         try:
             count = 1
@@ -696,16 +667,26 @@ class KMLUnionView(APIView):
                 if debug_enabled:
                     debug_files.append((uploaded.name, raw_bytes))
 
+                
                 # --- NetworkLink support (não afeta KML normal) ---
-                resolved_bytes, netinfo = self._resolve_networklink_if_needed(raw_bytes, uploaded.name)
-                if netinfo["networklink_detected"]:
+                try:
+                    resolved_bytes, netinfo = self._resolve_networklink_if_needed(raw_bytes, uploaded.name)
+                except Exception as e:
+                    resolved_bytes, netinfo = raw_bytes, {
+                        "networklink_detected": True,
+                        "networklink_resolved": False,
+                        "networklink_href": None,
+                        "networklink_error": f"resolver_crash: {type(e).__name__}: {e}",
+                    }
+
+                if netinfo.get("networklink_detected"):
                     print(
-                        f"[NETLINK] detected={netinfo['networklink_detected']} "
-                        f"resolved={netinfo['networklink_resolved']} "
-                        f"href={netinfo['networklink_href']}"
+                        f"[NETLINK] detected={netinfo.get('networklink_detected')} "
+                        f"resolved={netinfo.get('networklink_resolved')} "
+                        f"href={netinfo.get('networklink_href')}"
                     )
-                    if netinfo["networklink_error"]:
-                        print(f"[NETLINK] error={netinfo['networklink_error']}")
+                    if netinfo.get("networklink_error"):
+                        print(f"[NETLINK] error={netinfo.get('networklink_error')}")
 
                 poly_idx_file = 0
                 try:
@@ -785,7 +766,6 @@ class KMLUnionView(APIView):
             print("=" * 60)
 
             if not parcelas:
-                _refund_safely()
                 return Response(
                     {
                         "detail": "Nenhum polígono válido encontrado nos arquivos KML.",
@@ -806,19 +786,20 @@ class KMLUnionView(APIView):
                 preview_geojson = self._kml_str_to_geojson(kml_str)
                 print("[PREVIEW] geojson features:", len(preview_geojson.get("features", [])))
                 input_preview_geojson = self._parcelas_to_geojson(parcelas)
-                
 
             except ValueError as e:
-                _refund_safely()
                 return Response(
                     {"detail": str(e), "request_id": request_id, "files_report": file_reports},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
             except Exception as e:
                 print(f"❌ Erro interno no merge_no_flood: {e}")
-                _refund_safely()
                 return Response(
-                    {"detail": "Erro interno ao unificar polígonos.", "request_id": request_id, "files_report": file_reports},
+                    {
+                        "detail": "Erro interno ao unificar polígonos.",
+                        "request_id": request_id,
+                        "files_report": file_reports,
+                    },
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 )
 
@@ -826,6 +807,7 @@ class KMLUnionView(APIView):
             filename = f"kml_unions/union_{ts}_{uuid.uuid4().hex[:6]}.kml"
             saved_path = default_storage.save(filename, ContentFile(kml_str.encode("utf-8")))
 
+            # URL (pode falhar em alguns storages; mantemos fallback)
             try:
                 download_url = default_storage.url(saved_path)
             except NotImplementedError:
@@ -833,9 +815,11 @@ class KMLUnionView(APIView):
                 if not media_url.endswith("/"):
                     media_url += "/"
                 download_url = request.build_absolute_uri(media_url + saved_path)
+            except Exception:
+                download_url = None
 
             # =========
-            # 3) SUCESSO: incrementa WeeklyUsage
+            # SUCESSO: incrementa WeeklyUsage (analytics)
             # =========
             with transaction.atomic():
                 try:
@@ -860,18 +844,18 @@ class KMLUnionView(APIView):
                 job = KMLMergeJob.objects.create(
                     user=request.user,
                     request_id=request_id,
-                    plan=plan_now or getattr(bp, "plan", "unknown"),
+                    plan=(plan_now or getattr(bp, "plan", "unknown") or "unknown"),
                     status=KMLMergeJob.STATUS_SUCCESS,
                     tol_m=tol_m,
                     corridor_width_m=corridor_width_m,
                     total_files=len(files),
                     total_polygons=total_polygons,
-                    output_polygons=metrics.get("output_polygons"),
-                    merged_polygons=metrics.get("merged_polygons"),
-                    input_area_m2=metrics.get("input_area_m2"),
-                    input_area_ha=metrics.get("input_area_ha"),
-                    output_area_m2=metrics.get("output_area_m2"),
-                    output_area_ha=metrics.get("output_area_ha"),
+                    output_polygons=(metrics or {}).get("output_polygons"),
+                    merged_polygons=(metrics or {}).get("merged_polygons"),
+                    input_area_m2=(metrics or {}).get("input_area_m2"),
+                    input_area_ha=(metrics or {}).get("input_area_ha"),
+                    output_area_m2=(metrics or {}).get("output_area_m2"),
+                    output_area_ha=(metrics or {}).get("output_area_ha"),
                     storage_path=saved_path,
                     metrics=metrics or {},
                     input_filenames=input_filenames,
@@ -880,45 +864,58 @@ class KMLUnionView(APIView):
                 print(f"[KML_HISTORY] Falha ao salvar histórico do merge {request_id}: {e}")
 
             if debug_enabled:
-                Thread(
-                    target=_save_kml_debug_bundle_storage,
-                    args=(request_id, tol_m, corridor_width_m, debug_files, kml_str, metrics),
-                    daemon=True,
-                ).start()
+                try:
+                    Thread(
+                        target=_save_kml_debug_bundle_storage,
+                        args=(request_id, tol_m, corridor_width_m, debug_files, kml_str, metrics),
+                        daemon=True,
+                    ).start()
+                except Exception:
+                    pass
 
             try:
                 bp.refresh_from_db()
             except Exception:
                 pass
 
-            plan = getattr(bp, "plan", None)
-            free_left = getattr(bp, "free_monthly_credits", None)
-            prepaid_left = getattr(bp, "prepaid_credits", None)
-            credits_used_total = getattr(bp, "credits_used_total", None)
+            plan = (getattr(bp, "plan", None) or "free").lower().strip()
+            prepaid_left = int(getattr(bp, "prepaid_credits", 0) or 0)
+            free_left = int(getattr(bp, "free_monthly_credits", 0) or 0)
+            credits_used_total = int(getattr(bp, "credits_used_total", 0) or 0)
+
+            is_unlimited = bool(getattr(bp, "is_unlimited", False)) or plan in ("pro_monthly", "pro_yearly")
+
+            # ✅ Free = preview-only
+            download_available = bool(is_unlimited) or prepaid_left > 0
+            download_url_out = download_url if download_available else None
 
             return Response(
                 {
                     "request_id": request_id,
-                    "download_url": download_url,
+                    "job_id": str(job.id) if job else None,
+
+                    # ✅ gated info
+                    "download_available": download_available,
+                    "download_url": download_url_out,  # null para free
+
                     "total_polygons": total_polygons,
                     "total_files": len(files),
                     "tol_m": tol_m,
                     "corridor_width_m": corridor_width_m,
-                    "output_polygons": metrics.get("output_polygons"),
-                    "merged_polygons": metrics.get("merged_polygons"),
-                    "input_area_m2": metrics.get("input_area_m2"),
-                    "input_area_ha": metrics.get("input_area_ha"),
-                    "output_area_m2": metrics.get("output_area_m2"),
-                    "output_area_ha": metrics.get("output_area_ha"),
+                    "output_polygons": (metrics or {}).get("output_polygons"),
+                    "merged_polygons": (metrics or {}).get("merged_polygons"),
+                    "input_area_m2": (metrics or {}).get("input_area_m2"),
+                    "input_area_ha": (metrics or {}).get("input_area_ha"),
+                    "output_area_m2": (metrics or {}).get("output_area_m2"),
+                    "output_area_ha": (metrics or {}).get("output_area_ha"),
+
                     "plan": plan,
                     "week": week_key,
                     "weekly_used": weekly_used,
                     "free_monthly_credits": free_left,
                     "prepaid_credits": prepaid_left,
                     "credits_used_total": credits_used_total,
-                    "consumed_from": getattr(consumption, "kind", None),
-                    "job_id": str(job.id) if job else None,
-                    # diagnóstico por arquivo (muito útil para suporte)
+
                     "files_report": file_reports,
                     "input_preview_geojson": input_preview_geojson,
                     "preview_geojson": preview_geojson,
@@ -927,11 +924,85 @@ class KMLUnionView(APIView):
             )
 
         except Exception as e:
-            _refund_safely()
             return Response(
                 {"detail": str(e) or "Merge failed.", "code": "MERGE_FAILED"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+
+class KMLDownloadView(APIView):
+    authentication_classes = (FirebaseAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    def post(self, request, job_id):
+        job = get_object_or_404(KMLMergeJob, id=job_id, user=request.user)
+
+        bp = getattr(request.user, "billing", None)
+        if not bp:
+            return Response(
+                {"detail": "BillingProfile ausente.", "code": "BILLING_PROFILE_MISSING"},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        plan = (getattr(bp, "plan", None) or "free").lower().strip()
+        is_unlimited = bool(getattr(bp, "is_unlimited", False)) or plan in ("pro_monthly", "pro_yearly")
+
+        # ✅ Pro/unlimited: sempre ok (não consome)
+        if is_unlimited:
+            try:
+                url = default_storage.url(job.storage_path)
+            except Exception:
+                url = None
+
+            if not url:
+                return Response(
+                    {"detail": "Could not generate download URL.", "code": "DOWNLOAD_URL_FAILED"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
+            return Response(
+                {"download_url": url, "consumed": False, "plan": plan},
+                status=status.HTTP_200_OK,
+            )
+
+        # ✅ Prepaid: consome 1 crédito agora (atomic)
+        with transaction.atomic():
+            bp = BillingProfile.objects.select_for_update().get(pk=bp.pk)
+
+            prepaid_left = int(getattr(bp, "prepaid_credits", 0) or 0)
+            if prepaid_left <= 0:
+                return Response(
+                    {"detail": "No credits left. Please buy prepaid credits or go Pro.", "code": "NO_CREDITS_LEFT"},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+            bp.prepaid_credits = prepaid_left - 1
+            bp.credits_used_total = int(getattr(bp, "credits_used_total", 0) or 0) + 1
+            bp.save(update_fields=["prepaid_credits", "credits_used_total", "updated_at"])
+
+            prepaid_after = int(bp.prepaid_credits or 0)
+
+        try:
+            url = default_storage.url(job.storage_path)
+        except Exception:
+            url = None
+
+        if not url:
+            return Response(
+                {"detail": "Could not generate download URL.", "code": "DOWNLOAD_URL_FAILED"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        return Response(
+            {
+                "download_url": url,
+                "consumed": True,
+                "prepaid_credits": prepaid_after,
+                "plan": (getattr(bp, "plan", None) or "prepaid").lower().strip(),
+            },
+            status=status.HTTP_200_OK,
+        )
+
 class UsageView(APIView):
     authentication_classes = (FirebaseAuthentication,)
     permission_classes = (IsAuthenticated,)
