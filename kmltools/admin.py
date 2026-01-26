@@ -4,8 +4,7 @@ from django.utils import timezone
 from django.db.models import Sum
 from django.contrib.auth import get_user_model
 
-from .models import BillingProfile, WeeklyUsage, KMLMergeJob
-
+from .models import BillingProfile, WeeklyUsage, KMLMergeJob, MergeFeedback
 
 # =========================
 # Helpers
@@ -324,3 +323,12 @@ class KMLMergeJobAdmin(admin.ModelAdmin):
 
     user_email.short_description = "Email"
     user_email.admin_order_field = "user__email"
+
+
+
+@admin.register(MergeFeedback)
+class MergeFeedbackAdmin(admin.ModelAdmin):
+    list_display = ("id", "user", "merge_job", "source", "created_at")
+    list_filter = ("source", "created_at")
+    search_fields = ("message", "user__email", "merge_job__id", "merge_job__request_id")
+    ordering = ("-created_at",)

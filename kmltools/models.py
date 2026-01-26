@@ -189,3 +189,37 @@ class KMLMergeJob(models.Model):
 
     def __str__(self):
         return f"KMLMergeJob({self.user_id}, {self.request_id}, {self.status})"
+
+
+class MergeFeedback(models.Model):
+    id = models.BigAutoField(primary_key=True)
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="kml_merge_feedbacks",
+        db_index=True,
+    )
+
+    merge_job = models.ForeignKey(
+        "kmltools.KMLMergeJob",
+        on_delete=models.CASCADE,
+        related_name="feedbacks",
+        db_index=True,
+    )
+
+    message = models.TextField()
+
+    # opcional (mas útil): origem/UX
+    source = models.CharField(max_length=32, blank=True, default="ui")  # ui|email|admin|api
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["user", "-created_at"]),
+            models.Index(fields=["merge_job", "-created_at"]),
+        ]
+
+    def __str__(self):
+        return f"MergeFeedback({self.user_id}, job={self.merge_job_id})"
