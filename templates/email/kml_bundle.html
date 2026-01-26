@@ -1,0 +1,34 @@
+<!doctype html>
+<html>
+
+<body style="font-family: Arial, sans-serif; color:#111; line-height:1.4;">
+    <div style="max-width:640px; margin:0 auto; padding:24px;">
+        <h2 style="margin:0 0 12px 0;">Your KML bundle is attached</h2>
+
+        <p style="margin:0 0 14px 0;">
+            We attached a ZIP containing:
+            <br />- meta.json (merge details)
+            <br />- inputs (your original/resolved KML files)
+            <br />- outputs (the merged KML)
+        </p>
+
+        <div style="background:#f6f6f6; padding:14px; border-radius:10px; margin:16px 0;">
+            <div><strong>Job ID:</strong> {{ job_id }}</div>
+            <div><strong>Request ID:</strong> {{ request_id }}</div>
+            {% if total_files %}<div><strong>Files:</strong> {{ total_files }}</div>{% endif %}
+            {% if total_polygons %}<div><strong>Polygons:</strong> {{ total_polygons }}</div>{% endif %}
+            <div><strong>Plan:</strong> {{ plan }}</div>
+        </div>
+
+        <p style="margin:0; font-size:13px; color:#444;">
+            If you didn’t request this, you can ignore this email.
+        </p>
+
+        <hr style="border:none; border-top:1px solid #e6e6e6; margin:18px 0;" />
+        <p style="margin:0; font-size:12px; color:#666;">
+            {{ app_name }} • Automated message
+        </p>
+    </div>
+</body>
+
+</html>

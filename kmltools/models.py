@@ -180,6 +180,16 @@ class KMLMergeJob(models.Model):
     input_filenames = models.JSONField(blank=True, default=list)
 
     created_at = models.DateTimeField(auto_now_add=True)
+    
+    
+    # Lista de paths no storage (default_storage) de cada input salvo
+    input_storage_paths = models.JSONField(blank=True, null=True)
+
+    # Path do meta.json no storage
+    meta_storage_path = models.CharField(max_length=1024, blank=True, null=True)
+
+    # Auditoria (opcional, mas recomendo)
+    download_email_sent_at = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         indexes = [

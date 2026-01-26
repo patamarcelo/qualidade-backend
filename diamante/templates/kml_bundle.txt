@@ -1,0 +1,10 @@
+Your KML bundle is attached.
+
+It includes:
+- meta.json (merge details)
+- inputs (your KML files)
+- outputs (merged KML)
+
+Job ID: {{ job_id }}
+Request ID: {{ request_id }}
+Plan: {{ plan }}
