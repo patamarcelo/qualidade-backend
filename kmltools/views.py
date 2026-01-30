@@ -37,7 +37,8 @@ from .newservices.email_async import queue_job_zip_email
 
 
 
-
+import zipfile
+from io import BytesIO
 
 
 
@@ -526,27 +527,25 @@ class KMLUnionView(APIView):
         return data
 
     def _maybe_extract_kml_from_kmz(self, data: bytes) -> bytes:
-        # Se não for zip, devolve como está
-        if not data or len(data) < 4:
-            return data
-        if data[:2] != b"PK":
+        # Verifica o "Magic Number" do ZIP (PK..)
+        if not data or len(data) < 4 or data[:2] != b"PK":
             return data
 
         try:
-            zf = zipfile.ZipFile(BytesIO(data))
-            names = zf.namelist()
-            target = None
-            if "doc.kml" in names:
-                target = "doc.kml"
-            else:
+            with zipfile.ZipFile(BytesIO(data)) as zf:
+                names = zf.namelist()
+                
+                # Prioridade 1: Arquivo padrão doc.kml
+                if "doc.kml" in names:
+                    return zf.read("doc.kml")
+                
+                # Prioridade 2: Qualquer arquivo que termine com .kml
                 for n in names:
                     if n.lower().endswith(".kml"):
-                        target = n
-                        break
-            if not target:
-                return data
-            return zf.read(target)
-        except Exception:
+                        return zf.read(n)
+            return data
+        except Exception as e:
+            print(f"Erro ao extrair KMZ: {e}")
             return data
 
     def _resolve_networklink_if_needed(self, raw_bytes: bytes, filename: str):
@@ -673,6 +672,19 @@ class KMLUnionView(APIView):
             # -----------------------
             for idx, uploaded in enumerate(files, start=1):
                 raw_bytes = uploaded.read()
+                
+                raw_bytes = self._maybe_extract_kml_from_kmz(raw_bytes)
+                
+                try:
+                    # Se o arquivo original era .kmz, trocamos para .kml no nome salvo, 
+                    # já que extraímos o conteúdo.
+                    original_name = uploaded.name
+                    if original_name.lower().endswith(".kmz"):
+                        safe_name = os.path.splitext(original_name)[0] + ".kml"
+                    else:
+                        safe_name = self._safe_filename(original_name)
+                except Exception:
+                    safe_name = f"input_{idx}.kml"
 
                 print("\n" + "=" * 60)
                 print("arquivo recebido Nº:", idx)
