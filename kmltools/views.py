@@ -25,7 +25,7 @@ from rest_framework.views import APIView
 
 from .authentication import FirebaseAuthentication
 from .models import BillingProfile, WeeklyUsage, KMLMergeJob
-from kmltools.services import merge_no_flood
+from kmltools.services import merge_no_flood, merge_no_flood_not_union
 from kmltools.newservices.credits import reserve_one_credit, refund_one_credit, NoCreditsLeft
 
 
@@ -617,6 +617,8 @@ class KMLUnionView(APIView):
         request_id = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
 
         files = request.FILES.getlist("files")
+        mode = request.data.get("merge_mode", "union")
+        print('[MODE] - ', mode)
         if not files:
             return Response(
                 {"detail": "Nenhum arquivo enviado. Use o campo 'files'."},
@@ -826,25 +828,45 @@ class KMLUnionView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            # -----------------------
+            ## -----------------------
             # Merge
             # -----------------------
             try:
-                kml_str, metrics = merge_no_flood(
-                    parcelas,
-                    tol_m=tol_m,
-                    corridor_width_m=corridor_width_m,
-                    return_metrics=True,
-                )
+                merge_mode = (mode or "union").lower().strip()
+                print("[MERGE HERE MODE] -", merge_mode)
+
+                debug_geojson = None
+
+                if merge_mode == "no_union":
+                    kml_str, metrics, debug_geojson = merge_no_flood_not_union(
+                        parcelas,
+                        tol_m=tol_m,
+                        corridor_width_m=corridor_width_m,
+                        return_metrics=True,
+                    )
+                else:
+                    kml_str, metrics = merge_no_flood(
+                        parcelas,
+                        tol_m=tol_m,
+                        corridor_width_m=corridor_width_m,
+                        return_metrics=True,
+                    )
+
                 print("[KML_OUT] snippet:", (kml_str or "")[:500])
+
+                # ✅ gera preview 1 vez
                 preview_geojson = self._kml_str_to_geojson(kml_str)
+
+                # ✅ injeta as linhas se existirem
+                if debug_geojson:
+                    extra_feats = (debug_geojson.get("features") or [])
+                    if extra_feats:
+                        preview_geojson["features"] = (preview_geojson.get("features") or []) + extra_feats
+
                 print("[PREVIEW] geojson features:", len(preview_geojson.get("features", [])))
+
                 input_preview_geojson = self._parcelas_to_geojson(parcelas)
-            except ValueError as e:
-                return Response(
-                    {"detail": str(e), "request_id": request_id, "files_report": file_reports},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+
             except Exception as e:
                 print(f"❌ Erro interno no merge_no_flood: {e}")
                 return Response(

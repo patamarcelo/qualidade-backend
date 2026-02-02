@@ -13,6 +13,7 @@ from pyproj import CRS, Transformer, Geod
 from xml.dom.minidom import Document
 
 
+
 GEOD = Geod(ellps="WGS84")
 
 
@@ -401,5 +402,432 @@ def merge_no_flood(
             "output_area_m2_geodesic": float(total_output_area_m2_geod),
         }
         return kml_str, metrics
+
+    return kml_str
+
+from typing import List, Dict, Tuple
+from math import isclose
+from xml.dom.minidom import Document
+
+from shapely.geometry import LineString, MultiLineString
+from shapely.ops import nearest_points, transform as shp_transform, unary_union
+
+
+def merge_no_flood_not_union(
+    parcelas: List[Dict],
+    tol_m: float = 20.0,
+    corridor_width_m: float = 0.10,       # 10 cm (bem fino)
+    style_color: str = "60FFFFFF",
+    return_metrics: bool = False,
+    force_connect: bool = True,
+    min_corridor_width_m: float = 0.10,   # piso 10 cm
+    touch_bridge_len_m: float = 0.40,     # 40 cm quando dist==0
+    max_rounds: int = 4,
+    export_debug_lines: bool = True,      # ✅ deixa visível as “formas originais”
+) -> str:
+    """
+    - Cria corredores mínimos para conectar (MST).
+    - Faz unary_union(polys + corredores) => 1 único Polygon.
+    - Opcional: exporta LineStrings com as bordas originais + linhas dos corredores
+      (só visual; não altera a área final).
+    """
+
+    polys_ll, names = to_polygons_ll(parcelas)
+    if not polys_ll:
+        raise ValueError("Nenhuma parcela válida recebida.")
+
+    epsg = choose_utm_epsg(polys_ll)
+    groups, polys_utm, to_ll = build_groups_by_proximity(polys_ll, tol_m, epsg)
+
+    input_area_m2 = sum(p.area for p in polys_utm)
+    input_area_ha = input_area_m2 / 10000.0
+    total_output_area_m2_geod = 0.0
+
+    # ----------------- helpers -----------------
+
+    def _fix(g):
+        if g and (not g.is_empty) and (not g.is_valid):
+            return g.buffer(0)
+        return g
+
+    def _pts_equal(a, b, eps=1e-12):
+        return isclose(a[0], b[0], abs_tol=eps) and isclose(a[1], b[1], abs_tol=eps)
+
+    def _clean_ring_for_kml(iterable_coords, eps=1e-12):
+        coords = [(float(x), float(y)) for (x, y) in iterable_coords]
+
+        cleaned = []
+        last = None
+        for pt in coords:
+            if last is None or not _pts_equal(pt, last, eps):
+                cleaned.append(pt)
+                last = pt
+
+        if not cleaned:
+            return []
+
+        if not _pts_equal(cleaned[0], cleaned[-1], eps):
+            cleaned.append(cleaned[0])
+
+        uniques = []
+        for pt in cleaned[:-1]:
+            if not uniques or not _pts_equal(pt, uniques[-1], eps):
+                uniques.append(pt)
+
+        if len(uniques) < 3:
+            return []
+
+        closed = uniques[:]
+        if not _pts_equal(closed[0], closed[-1], eps):
+            closed.append(closed[0])
+
+        return closed
+
+    def _coords_to_kml_str(coords):
+        return " ".join(f"{x:.8f},{y:.8f}" for (x, y) in coords)
+
+    def _line_coords_to_kml_str(coords):
+        return " ".join(f"{float(x):.8f},{float(y):.8f}" for (x, y) in coords)
+
+    # ---------- MST (Kruskal) por distância borda-borda ----------
+    def _mst_edges_by_geom_distance(geoms) -> List[Tuple[float, int, int]]:
+        n = len(geoms)
+        if n < 2:
+            return []
+
+        parent = list(range(n))
+        rank = [0] * n
+
+        def find(x):
+            while parent[x] != x:
+                parent[x] = parent[parent[x]]
+                x = parent[x]
+            return x
+
+        def union(a, b):
+            ra, rb = find(a), find(b)
+            if ra == rb:
+                return False
+            if rank[ra] < rank[rb]:
+                parent[ra] = rb
+            elif rank[ra] > rank[rb]:
+                parent[rb] = ra
+            else:
+                parent[rb] = ra
+                rank[ra] += 1
+            return True
+
+        edges = []
+        for i in range(n):
+            for j in range(i + 1, n):
+                d = geoms[i].distance(geoms[j])  # UTM metros
+                edges.append((d, i, j))
+
+        edges.sort(key=lambda x: x[0])
+
+        out = []
+        for d, i, j in edges:
+            if union(i, j):
+                out.append((d, i, j))
+                if len(out) == n - 1:
+                    break
+        return out
+
+    def _unit_direction(a_geom, b_geom):
+        pa = a_geom.representative_point()
+        pb = b_geom.representative_point()
+        dx = pb.x - pa.x
+        dy = pb.y - pa.y
+        norm = (dx * dx + dy * dy) ** 0.5
+        if norm < 1e-9:
+            return (1.0, 0.0)
+        return (dx / norm, dy / norm)
+
+    def _touch_bridge(a_geom, b_geom, contact_point, width_m: float, length_m: float):
+        # micro-ponte curtinha atravessando o contato
+        ux, uy = _unit_direction(a_geom, b_geom)
+        L = max(float(length_m), width_m * 2.0, 0.2)
+
+        x, y = float(contact_point.x), float(contact_point.y)
+        p1 = (x - ux * (L / 2.0), y - uy * (L / 2.0))
+        p2 = (x + ux * (L / 2.0), y + uy * (L / 2.0))
+
+        line = LineString([p1, p2])
+        buf = line.buffer(width_m / 2.0, cap_style=2, join_style=2)
+        return _fix(buf) if buf and not buf.is_empty else None, line
+
+    def _gap_bridge(a_geom, b_geom, width_m: float):
+        Apt, Bpt = nearest_points(a_geom, b_geom)
+        line = LineString([Apt.coords[0], Bpt.coords[0]])
+        buf = line.buffer(width_m / 2.0, cap_style=2, join_style=2)
+        return _fix(buf) if buf and not buf.is_empty else None, line
+
+    def _make_corridor(a_geom, b_geom, width_m: float):
+        Apt, Bpt = nearest_points(a_geom, b_geom)
+        if Apt.equals(Bpt):
+            return _touch_bridge(a_geom, b_geom, Apt, width_m, touch_bridge_len_m)
+        return _gap_bridge(a_geom, b_geom, width_m)
+
+    def _connect_and_union(parts, width_m: float):
+        """
+        Conecta via MST com corredores mínimos e dissolve.
+        Se ainda ficar MultiPolygon, conecta componentes e repete.
+        """
+        current = [_fix(p) for p in parts if p and not p.is_empty]
+        if not current:
+            return None, [], []
+
+        corridors_used = []
+        link_lines_used = []
+
+        for _ in range(max_rounds):
+            if len(current) <= 1:
+                merged = _fix(unary_union(current))
+                polys = polygon_parts(merged)
+                return (polys[0] if len(polys) == 1 else merged), corridors_used, link_lines_used
+
+            mst = _mst_edges_by_geom_distance(current)
+
+            corridors = []
+            for d, i, j in mst:
+                cor, ln = _make_corridor(current[i], current[j], width_m)
+                if cor is not None and (not cor.is_empty):
+                    corridors.append(cor)
+                    corridors_used.append(cor)
+                if ln is not None and (not ln.is_empty):
+                    link_lines_used.append(ln)
+
+            merged = unary_union([*current, *corridors]) if corridors else unary_union(current)
+            merged = _fix(merged)
+
+            polys = polygon_parts(merged)
+            if len(polys) == 1:
+                return polys[0], corridors_used, link_lines_used
+
+            current = polys
+
+        merged = _fix(unary_union(current))
+        polys = polygon_parts(merged)
+        if polys:
+            return max(polys, key=lambda g: g.area), corridors_used, link_lines_used
+        return merged, corridors_used, link_lines_used
+
+    # ----------------- coletar polígonos originais (UTM) -----------------
+    all_parts_utm = []
+    for _, idxs in groups.items():
+        originals = [polys_utm[i] for i in idxs]
+        for g in originals:
+            for p in polygon_parts(g):
+                p = _fix(p)
+                if p and not p.is_empty:
+                    all_parts_utm.append(p)
+
+    if not all_parts_utm:
+        raise ValueError("Nenhuma geometria poligonal válida para processar.")
+
+    # largura efetiva (nunca 0)
+    w = max(0.02, float(min_corridor_width_m or 0), float(corridor_width_m or 0))
+
+    if force_connect:
+        final_utm, corridors_used, link_lines_used = _connect_and_union(all_parts_utm, w)
+    else:
+        final_utm = _fix(unary_union(all_parts_utm))
+        corridors_used, link_lines_used = [], []
+
+    if final_utm is None or final_utm.is_empty:
+        raise ValueError("Falha ao gerar geometria final.")
+
+    final_ll = shp_transform(to_ll, final_utm)
+    total_output_area_m2_geod += geodesic_area_m2(final_ll)
+
+    # ----------------- métricas -----------------
+    output_area_m2_utm = 0.0
+    for p in polygon_parts(final_utm):
+        output_area_m2_utm += p.area
+    output_area_ha_utm = output_area_m2_utm / 10000.0
+
+    # ----------------- KML -----------------
+    doc = Document()
+    kml = doc.createElement("kml")
+    kml.setAttribute("xmlns", "http://www.opengis.net/kml/2.2")
+    doc.appendChild(kml)
+
+    document = doc.createElement("Document")
+    kml.appendChild(document)
+
+    # style do polígono final
+    style = doc.createElement("Style")
+    style.setAttribute("id", "styleMerged")
+
+    ls = doc.createElement("LineStyle")
+    lc = doc.createElement("color")
+    lc.appendChild(doc.createTextNode("ff000000"))
+    lw_el = doc.createElement("width")
+    lw_el.appendChild(doc.createTextNode("2"))
+    ls.appendChild(lc)
+    ls.appendChild(lw_el)
+
+    ps = doc.createElement("PolyStyle")
+    pc = doc.createElement("color")
+    pc.appendChild(doc.createTextNode(style_color))
+    ps.appendChild(pc)
+
+    style.appendChild(ls)
+    style.appendChild(ps)
+    document.appendChild(style)
+
+    # style das linhas (debug visual)
+    if export_debug_lines:
+        style_lines = doc.createElement("Style")
+        style_lines.setAttribute("id", "styleLines")
+
+        lsL = doc.createElement("LineStyle")
+        lcL = doc.createElement("color")
+        lcL.appendChild(doc.createTextNode("ff00aaff"))  # azul claro
+        lwL = doc.createElement("width")
+        lwL.appendChild(doc.createTextNode("2"))
+        lsL.appendChild(lcL)
+        lsL.appendChild(lwL)
+
+        style_lines.appendChild(lsL)
+        document.appendChild(style_lines)
+
+    # ---- Placemark 1: 1 Polygon final ----
+    pm = doc.createElement("Placemark")
+    nm = doc.createElement("name")
+    nm.appendChild(doc.createTextNode("Merged_1"))
+    su = doc.createElement("styleUrl")
+    su.appendChild(doc.createTextNode("#styleMerged"))
+    pm.appendChild(nm)
+    pm.appendChild(su)
+
+    polys_ll_out = polygon_parts(final_ll)
+    if not polys_ll_out:
+        raise ValueError("Não foi possível extrair polígono final para o KML.")
+    poly = max(polys_ll_out, key=lambda g: g.area)
+
+    outer_clean = _clean_ring_for_kml(list(poly.exterior.coords))
+    if not outer_clean:
+        raise ValueError("Anel externo inválido após limpeza.")
+
+    pg = doc.createElement("Polygon")
+    obi = doc.createElement("outerBoundaryIs")
+    lr = doc.createElement("LinearRing")
+    coords_el = doc.createElement("coordinates")
+    coords_el.appendChild(doc.createTextNode(_coords_to_kml_str(outer_clean)))
+    lr.appendChild(coords_el)
+    obi.appendChild(lr)
+    pg.appendChild(obi)
+
+    for interior in poly.interiors:
+        inner_clean = _clean_ring_for_kml(list(interior.coords))
+        if not inner_clean:
+            continue
+        ibi = doc.createElement("innerBoundaryIs")
+        lr_i = doc.createElement("LinearRing")
+        coords_i = doc.createElement("coordinates")
+        coords_i.appendChild(doc.createTextNode(_coords_to_kml_str(inner_clean)))
+        lr_i.appendChild(coords_i)
+        ibi.appendChild(lr_i)
+        pg.appendChild(ibi)
+
+    pm.appendChild(pg)
+    document.appendChild(pm)
+
+    # ---- Placemark 2: linhas das bordas originais + conexões (visual) ----
+    if export_debug_lines:
+        # bordas originais
+        border_lines = []
+        for p in all_parts_utm:
+            ll = shp_transform(to_ll, p)
+            for poly_i in polygon_parts(ll):
+                border_lines.append(LineString(list(poly_i.exterior.coords)))
+
+        # linhas do MST (as conexões)
+        conn_lines = [shp_transform(to_ll, ln) for ln in link_lines_used if ln and (not ln.is_empty)]
+
+        # junta tudo num MultiLineString (se tiver)
+        all_lines = [ln for ln in (border_lines + conn_lines) if ln and (not ln.is_empty)]
+
+        if all_lines:
+            pmL = doc.createElement("Placemark")
+            nmL = doc.createElement("name")
+            nmL.appendChild(doc.createTextNode("Original_Borders_And_Links"))
+            suL = doc.createElement("styleUrl")
+            suL.appendChild(doc.createTextNode("#styleLines"))
+            pmL.appendChild(nmL)
+            pmL.appendChild(suL)
+
+            mgL = doc.createElement("MultiGeometry")
+
+            for ln in all_lines:
+                coords = list(ln.coords)
+                if len(coords) < 2:
+                    continue
+
+                ls_el = doc.createElement("LineString")
+                tess = doc.createElement("tessellate")
+                tess.appendChild(doc.createTextNode("1"))
+                ls_el.appendChild(tess)
+
+                coords_el = doc.createElement("coordinates")
+                coords_el.appendChild(doc.createTextNode(_line_coords_to_kml_str(coords)))
+                ls_el.appendChild(coords_el)
+
+                mgL.appendChild(ls_el)
+
+            pmL.appendChild(mgL)
+            document.appendChild(pmL)
+
+    kml_str = doc.toprettyxml(indent="  ")
+    
+    def _line_to_coords_ll(line_ll):
+        return [[float(x), float(y)] for (x, y) in list(line_ll.coords)]
+
+    # links (MST)
+    debug_links = []
+    for ln in link_lines_used:
+        ln_ll = shp_transform(to_ll, ln)
+        if ln_ll and not ln_ll.is_empty:
+            debug_links.append(_line_to_coords_ll(ln_ll))
+
+    # bordas originais
+    debug_borders = []
+    for p in all_parts_utm:
+        p_ll = shp_transform(to_ll, p)
+        for poly in polygon_parts(p_ll):
+            ring = list(poly.exterior.coords)
+            if len(ring) >= 2:
+                debug_borders.append([[float(x), float(y)] for (x, y) in ring])
+
+    debug_geojson = {
+        "type": "FeatureCollection",
+        "features": [
+            {
+            "type": "Feature",
+            "properties": {"kind": "links"},
+            "geometry": {"type": "MultiLineString", "coordinates": debug_links},
+            },
+            {
+            "type": "Feature",
+            "properties": {"kind": "borders"},
+            "geometry": {"type": "MultiLineString", "coordinates": debug_borders},
+            },
+        ],
+        }
+    if return_metrics:
+        metrics = {
+            "input_area_m2": float(input_area_m2),
+            "input_area_ha": float(input_area_ha),
+            "output_area_m2": float(output_area_m2_utm),
+            "output_area_ha": float(output_area_ha_utm),
+            "output_polygons": 1,
+            "corridor_width_used_m": float(w),
+            "touch_bridge_len_m": float(touch_bridge_len_m),
+            "corridors_used": int(len(corridors_used)),
+            "parts_in": int(len(all_parts_utm)),
+            "output_area_m2_geodesic": float(total_output_area_m2_geod),
+        }
+        return kml_str, metrics, debug_geojson
 
     return kml_str
