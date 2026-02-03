@@ -5,11 +5,11 @@ from rest_framework.exceptions import AuthenticationFailed
 
 from firebase_admin import auth as fb_auth
 
+from django.db import transaction, IntegrityError
+
 from .models import BillingProfile
 from .firebase_admin_init import init_firebase_admin
 
-
-from django.db import transaction, IntegrityError
 
 class FirebaseAuthentication(BaseAuthentication):
     def authenticate(self, request):
@@ -36,30 +36,61 @@ class FirebaseAuthentication(BaseAuthentication):
         if not email:
             raise AuthenticationFailed("Token sem email.")
 
+        email = (email or "").strip().lower()
+        if not email:
+            raise AuthenticationFailed("Email inválido no token.")
+
         User = get_user_model()
 
-        # Fast path
+        # ✅ Fast path: achou BillingProfile pelo uid
         bp = BillingProfile.objects.select_related("user").filter(firebase_uid=uid).first()
-        if bp:
+        if bp and bp.user:
             return (bp.user, None)
 
-        # Provisionamento seguro
-        with transaction.atomic():
-            user = User.objects.select_for_update().filter(email=email).first()
+        # ✅ Provisionamento idempotente (sem IntegrityError)
+        try:
+            with transaction.atomic():
+                # 1) pega/cria usuário por email (idempotente)
+                user, created = User.objects.get_or_create(email=email)
+                if created:
+                    # evita password None/estranho: marca como "sem senha"
+                    try:
+                        user.set_unusable_password()
+                        user.save(update_fields=["password"])
+                    except Exception:
+                        # se seu CustomUsuario não tiver password padrão, ignore
+                        pass
+
+                # 2) garante BillingProfile
+                bp, bp_created = BillingProfile.objects.get_or_create(
+                    user=user,
+                    defaults={"firebase_uid": uid, "plan": "free"},
+                )
+
+                # 3) se existe BillingProfile mas sem uid, seta
+                if not bp.firebase_uid:
+                    bp.firebase_uid = uid
+                    bp.save(update_fields=["firebase_uid"])
+
+                # 4) se firebase_uid é diferente, NÃO sobrescreve silenciosamente
+                #    (isso evita linkar outra conta por acidente)
+                elif bp.firebase_uid != uid:
+                    raise AuthenticationFailed("Conta já vinculada a outro Firebase UID.")
+
+        except IntegrityError:
+            # Corrida rara: outro request criou ao mesmo tempo
+            user = User.objects.filter(email=email).first()
             if not user:
-                user = User.objects.create_user(email=email, password=None)
+                raise AuthenticationFailed("Erro ao provisionar usuário.")
 
-            bp, _ = BillingProfile.objects.get_or_create(
-                user=user,
-                defaults={"firebase_uid": uid, "plan": "free"},
-            )
+            bp = BillingProfile.objects.filter(user=user).first()
+            if bp and bp.firebase_uid and bp.firebase_uid != uid:
+                raise AuthenticationFailed("Conta já vinculada a outro Firebase UID.")
 
-            # Se já existia por user, mas uid não estava setado/correto, atualiza
-            if bp.firebase_uid != uid:
-                # aqui você decide a política:
-                # - se permitir update (recomendado quando você sabe que é o mesmo email)
-                # - ou bloquear por segurança
+            if bp and not bp.firebase_uid:
                 bp.firebase_uid = uid
                 bp.save(update_fields=["firebase_uid"])
+            elif not bp:
+                BillingProfile.objects.create(user=user, firebase_uid=uid, plan="free")
 
         return (user, None)
