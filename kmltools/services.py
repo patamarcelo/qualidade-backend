@@ -11,6 +11,8 @@ from shapely.ops import unary_union, transform as shp_transform, nearest_points
 
 from pyproj import CRS, Transformer, Geod
 from xml.dom.minidom import Document
+from shapely.geometry.polygon import orient
+
 
 
 
@@ -200,7 +202,7 @@ def merge_no_flood(
     parcelas: List[Dict],
     tol_m: float = 20.0,
     corridor_width_m: float = 1.0,
-    style_color: str = "60FFFFFF",
+    style_color: str = "4d00ff00",  # ~30% de opacidade, verde
     return_metrics: bool = False,
 ) -> str:
     polys_ll, names = to_polygons_ll(parcelas)
@@ -306,8 +308,10 @@ def merge_no_flood(
 
         return closed
 
-    def _coords_to_kml_str(coords):
-        return " ".join(f"{x:.8f},{y:.8f}" for (x, y) in coords)
+    def _coords_to_kml_str(coords, z_m=30.0):
+        return " ".join(f"{x:.8f},{y:.8f},{z_m:.2f}" for (x, y) in coords)
+
+
 
     # métricas “output” em UTM (m²) e contagem de polígonos
     output_area_m2_utm = 0.0
@@ -330,27 +334,40 @@ def merge_no_flood(
     style = doc.createElement("Style")
     style.setAttribute("id", "styleMerged")
 
+    # LineStyle (borda clara)
     ls = doc.createElement("LineStyle")
     lc = doc.createElement("color")
-    lc.appendChild(doc.createTextNode("ff000000"))
+    lc.appendChild(doc.createTextNode("ffffffff"))  # branco sólido (KML ABGR)
     lw = doc.createElement("width")
-    lw.appendChild(doc.createTextNode("2"))
+    lw.appendChild(doc.createTextNode("2.5"))
     ls.appendChild(lc)
     ls.appendChild(lw)
 
+    # PolyStyle (preenchimento forte)
     ps = doc.createElement("PolyStyle")
     pc = doc.createElement("color")
     pc.appendChild(doc.createTextNode(style_color))
+
+
+    fill = doc.createElement("fill")
+    fill.appendChild(doc.createTextNode("1"))
+
+    outline = doc.createElement("outline")
+    outline.appendChild(doc.createTextNode("1"))
+
     ps.appendChild(pc)
+    ps.appendChild(fill)
+    ps.appendChild(outline)
 
     style.appendChild(ls)
     style.appendChild(ps)
     document.appendChild(style)
-
     counter = 1
     for geom in finals_ll:
         for poly in polygon_parts(geom):  # <-- robusto (Polygon/Multi/Collection)
+            poly = orient(poly, sign=1.0)  # outer CCW, holes CW
             outer_clean = _clean_ring_for_kml(list(poly.exterior.coords))
+            # outer_clean = _clean_ring_for_kml(list(poly.exterior.coords))
             if not outer_clean:
                 continue
 
@@ -364,10 +381,20 @@ def merge_no_flood(
 
             pg = doc.createElement("Polygon")
 
+            alt = doc.createElement("altitudeMode")
+            alt.appendChild(doc.createTextNode("relativeToGround"))
+            pg.appendChild(alt)
+
+            extr = doc.createElement("extrude")
+            extr.appendChild(doc.createTextNode("1"))
+            pg.appendChild(extr)
+
             obi = doc.createElement("outerBoundaryIs")
             lr = doc.createElement("LinearRing")
             coords_el = doc.createElement("coordinates")
-            coords_el.appendChild(doc.createTextNode(_coords_to_kml_str(outer_clean)))
+            coords_el.appendChild(
+                doc.createTextNode(_coords_to_kml_str(outer_clean, z_m=30.0))
+            )
             lr.appendChild(coords_el)
             obi.appendChild(lr)
             pg.appendChild(obi)
@@ -379,7 +406,7 @@ def merge_no_flood(
                 ibi = doc.createElement("innerBoundaryIs")
                 lr_i = doc.createElement("LinearRing")
                 coords_i = doc.createElement("coordinates")
-                coords_i.appendChild(doc.createTextNode(_coords_to_kml_str(inner_clean)))
+                coords_i.appendChild(doc.createTextNode(_coords_to_kml_str(inner_clean, z_m=30.0)))
                 lr_i.appendChild(coords_i)
                 ibi.appendChild(lr_i)
                 pg.appendChild(ibi)
@@ -417,7 +444,7 @@ def merge_no_flood_not_union(
     parcelas: List[Dict],
     tol_m: float = 20.0,
     corridor_width_m: float = 0.10,       # 10 cm (bem fino)
-    style_color: str = "60FFFFFF",
+    style_color: str = "4d00ff00",  # ~30% verde (KML ABGR)
     return_metrics: bool = False,
     force_connect: bool = True,
     min_corridor_width_m: float = 0.10,   # piso 10 cm
@@ -483,8 +510,9 @@ def merge_no_flood_not_union(
 
         return closed
 
-    def _coords_to_kml_str(coords):
-        return " ".join(f"{x:.8f},{y:.8f}" for (x, y) in coords)
+    def _coords_to_kml_str(coords, z_m=30.0):
+        return " ".join(f"{x:.8f},{y:.8f},{z_m:.2f}" for (x, y) in coords)
+
 
     def _line_coords_to_kml_str(coords):
         return " ".join(f"{float(x):.8f},{float(y):.8f}" for (x, y) in coords)
@@ -659,22 +687,33 @@ def merge_no_flood_not_union(
     style = doc.createElement("Style")
     style.setAttribute("id", "styleMerged")
 
+    # LineStyle (borda clara)
     ls = doc.createElement("LineStyle")
     lc = doc.createElement("color")
-    lc.appendChild(doc.createTextNode("ff000000"))
+    lc.appendChild(doc.createTextNode("ffffffff"))  # branco sólido
     lw_el = doc.createElement("width")
-    lw_el.appendChild(doc.createTextNode("2"))
+    lw_el.appendChild(doc.createTextNode("2.5"))
     ls.appendChild(lc)
     ls.appendChild(lw_el)
 
+    # PolyStyle (preenchimento)
     ps = doc.createElement("PolyStyle")
     pc = doc.createElement("color")
-    pc.appendChild(doc.createTextNode(style_color))
+    pc.appendChild(doc.createTextNode(style_color))  # usa o param
     ps.appendChild(pc)
+
+    fill = doc.createElement("fill")
+    fill.appendChild(doc.createTextNode("1"))
+    ps.appendChild(fill)
+
+    outline = doc.createElement("outline")
+    outline.appendChild(doc.createTextNode("1"))
+    ps.appendChild(outline)
 
     style.appendChild(ls)
     style.appendChild(ps)
     document.appendChild(style)
+
 
     # style das linhas (debug visual)
     if export_debug_lines:
@@ -711,10 +750,24 @@ def merge_no_flood_not_union(
         raise ValueError("Anel externo inválido após limpeza.")
 
     pg = doc.createElement("Polygon")
+
+    # ✅ ESSENCIAL para Earth Web
+    alt = doc.createElement("altitudeMode")
+    alt.appendChild(doc.createTextNode("relativeToGround"))
+    pg.appendChild(alt)
+
+    extr = doc.createElement("extrude")
+    extr.appendChild(doc.createTextNode("1"))
+    pg.appendChild(extr)
+
+    obi = doc.createElement("outerBoundaryIs")
     obi = doc.createElement("outerBoundaryIs")
     lr = doc.createElement("LinearRing")
     coords_el = doc.createElement("coordinates")
-    coords_el.appendChild(doc.createTextNode(_coords_to_kml_str(outer_clean)))
+    coords_el.appendChild(
+        doc.createTextNode(_coords_to_kml_str(outer_clean, z_m=30.0))
+    )
+
     lr.appendChild(coords_el)
     obi.appendChild(lr)
     pg.appendChild(obi)
@@ -726,7 +779,10 @@ def merge_no_flood_not_union(
         ibi = doc.createElement("innerBoundaryIs")
         lr_i = doc.createElement("LinearRing")
         coords_i = doc.createElement("coordinates")
-        coords_i.appendChild(doc.createTextNode(_coords_to_kml_str(inner_clean)))
+        coords_i.appendChild(
+            doc.createTextNode(_coords_to_kml_str(inner_clean, z_m=30.0))
+        )
+
         lr_i.appendChild(coords_i)
         ibi.appendChild(lr_i)
         pg.appendChild(ibi)
