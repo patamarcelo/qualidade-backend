@@ -53,7 +53,7 @@ class FirebaseAuthentication(BaseAuthentication):
                 # 1) pega/cria usuário por email (idempotente)
                 user = User.objects.filter(email=email).first()
                 if not user:
-                    user = User(email=email, username=email)
+                    user = User(email=email, username=email, origin_app="kmltools")
                     user.set_unusable_password()
                     user.save()
 

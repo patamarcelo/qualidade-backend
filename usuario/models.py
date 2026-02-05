@@ -60,6 +60,17 @@ class CustomUsuario(AbstractUser):
     first_name = models.CharField("First Name", max_length=150, blank=True)
     last_name = models.CharField("Last Name", max_length=150, blank=True)
     is_staff = models.BooleanField("Membro da equipe", default=False)
+    origin_app = models.CharField(
+        max_length=32,
+        choices=[
+            ("diamante", "Diamante"),
+            ("kmltools", "KML Tools"),
+            ("unknown", "Unknown"),
+            ("outro_app", "Outro App"),
+        ],
+        default="unknown",
+        db_index=True,
+    )
     # image      = models.ImageField(storage=DropBoxStorage(), default='images/User1.jpg', blank=True)
     # image      = models.ImageField(upload_to=get_file_path, default='images/User1.jpg', blank=True)
 
