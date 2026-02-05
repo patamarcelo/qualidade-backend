@@ -51,15 +51,15 @@ class FirebaseAuthentication(BaseAuthentication):
         try:
             with transaction.atomic():
                 # 1) pega/cria usuário por email (idempotente)
-                user, created = User.objects.get_or_create(email=email)
-                if created:
-                    # evita password None/estranho: marca como "sem senha"
-                    try:
-                        user.set_unusable_password()
-                        user.save(update_fields=["password"])
-                    except Exception:
-                        # se seu CustomUsuario não tiver password padrão, ignore
-                        pass
+                user = User.objects.filter(email=email).first()
+                if not user:
+                    user = User(email=email, username=email)
+                    user.set_unusable_password()
+                    user.save()
+
+                if not user.username:
+                    user.username = email
+                    user.save(update_fields=["username"])
 
                 # 2) garante BillingProfile
                 bp, bp_created = BillingProfile.objects.get_or_create(
