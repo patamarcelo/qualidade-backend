@@ -22,17 +22,25 @@ def get_file_path(instance, filename):
 
 
 class UsuarioManager(BaseUserManager):
-
     use_in_migrations = True
 
     def _create_user(self, email, password, **extra_fields):
         if not email:
             raise ValueError("O e-mail é Obrigatório")
+
         email = self.normalize_email(email)
-        user = self.model(email=email, username=email, **extra_fields)
-        user.set_password(password)
+        extra_fields.setdefault("username", email)  # garante username
+
+        user = self.model(email=email, **extra_fields)
+
+        if password:
+            user.set_password(password)
+        else:
+            user.set_unusable_password()
+
         user.save(using=self._db)
         return user
+
 
     def create_user(self, email, password=None, **extra_fields):
         # extra_fields.setdefault('is_staff', True) padrao como False
