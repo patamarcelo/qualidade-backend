@@ -167,8 +167,7 @@ def mst_edges(parts: List[Polygon], tol_m: float):
     for i in range(m):
         for j in range(i + 1, m):
             d = parts[i].distance(parts[j])
-            # IMPORTANTE: se d == 0, já há overlap/toque; não precisa corredor (evita degeneração)
-            if 0 < d <= tol_m:
+            if d <= tol_m:   # ✅ inclui d==0
                 edges.append((d, i, j))
 
     edges.sort(key=lambda x: x[0])
@@ -187,6 +186,7 @@ def mst_edges(parts: List[Polygon], tol_m: float):
                 break
         if best is None:
             break
+
         i, j = best
         chosen.append((i, j))
         if i in in_tree:
@@ -197,6 +197,7 @@ def mst_edges(parts: List[Polygon], tol_m: float):
             remaining.discard(i)
 
     return chosen
+
 
 def merge_no_flood(
     parcelas: List[Dict],
@@ -237,13 +238,33 @@ def merge_no_flood(
         if len(parts) > 1:
             for a, b in mst_edges(parts, tol_m):
                 Apt, Bpt = nearest_points(parts[a], parts[b])
-                # evita corredor degenerado (mesmo ponto)
+
                 if Apt.equals(Bpt):
-                    continue
-                line = LineString([Apt.coords[0], Bpt.coords[0]])
+                    # micro-ponte curtinha atravessando o contato
+                    pa = parts[a].representative_point()
+                    pb = parts[b].representative_point()
+                    dx, dy = (pb.x - pa.x), (pb.y - pa.y)
+                    norm = (dx * dx + dy * dy) ** 0.5
+                    ux, uy = (dx / norm, dy / norm) if norm > 1e-9 else (1.0, 0.0)
+
+                    L = max(0.40, corridor_width_m * 2.0)
+                    x, y = float(Apt.x), float(Apt.y)
+                    p1 = (x - ux * (L / 2.0), y - uy * (L / 2.0))
+                    p2 = (x + ux * (L / 2.0), y + uy * (L / 2.0))
+                    line = LineString([p1, p2])
+                else:
+                    line = LineString([Apt.coords[0], Bpt.coords[0]])
+
                 buf = line.buffer(corridor_width_m / 2.0, cap_style=2, join_style=2)
+
                 if buf and (not buf.is_empty):
-                    corridors.append(buf)
+                    # “solda” mínima (não exagerar em corredor fino)
+                    weld = min(0.02, corridor_width_m * 0.25)  # 2cm ou 25% da largura
+                    if weld > 0:
+                        buf = buf.buffer(weld)
+                    if (not buf.is_empty):
+                        corridors.append(buf)
+
 
         BASE = unary_union(parts + corridors)
 
