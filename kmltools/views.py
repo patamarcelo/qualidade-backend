@@ -96,7 +96,7 @@ class NetworkLinkResolveError(Exception):
 
 
 FREE_MONTHLY_CREDITS = 0
-PREPAID_CREDITS_PER_PACK = 5
+PREPAID_CREDITS_PER_PACK = 10
 
 
 
