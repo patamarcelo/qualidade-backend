@@ -358,3 +358,11 @@ KML_NETLINK_CONNECT_TIMEOUT = 3
 KML_NETLINK_READ_TIMEOUT = 6
 KML_NETLINK_MAX_REDIRECTS = 3
 KML_NETLINK_CACHE_TTL = 60 * 60
+
+
+# ✅ Adiciona o header custom
+from corsheaders.defaults import default_headers
+
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    "x-anon-id",
+]

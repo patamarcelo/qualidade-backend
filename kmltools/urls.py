@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import KMLUnionView, MeView, UsageView, CreateCheckoutSessionView, StripeWebhookView, CreateBillingPortalSessionView, KMLHistoryDownloadView, KMLHistoryView, CreatePrepaidCheckoutSessionView, KMLDownloadView, ProfileOnboardingView
+from .views import ClaimJobsView,  KMLUnionView, MeView, UsageView, CreateCheckoutSessionView, StripeWebhookView, CreateBillingPortalSessionView, KMLHistoryDownloadView, KMLHistoryView, CreatePrepaidCheckoutSessionView, KMLDownloadView, ProfileOnboardingView
 from .views_feedback import MergeFeedbackView
 
 urlpatterns = [
@@ -17,6 +17,7 @@ urlpatterns += [
     path("feedback/", MergeFeedbackView.as_view(), name="kmltools-feedback"),
     path("profile/onboarding/", ProfileOnboardingView.as_view(), name="profile-onboarding"),
 
+    path("jobs/claim/", ClaimJobsView.as_view()),
 
 
 

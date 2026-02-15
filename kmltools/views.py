@@ -35,12 +35,11 @@ from .newservices.email_async import queue_job_zip_email
 
 
 
+from rest_framework.permissions import AllowAny
 
 
 import zipfile
 from io import BytesIO
-
-
 
 
 
@@ -61,6 +60,13 @@ from django.core.cache import cache
 
 
 
+from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
+
+class KMLAnonThrottle(AnonRateThrottle):
+    rate = "20/hour"
+
+class KMLUserThrottle(UserRateThrottle):
+    rate = "200/hour"
 
 
 
@@ -283,11 +289,16 @@ class MeView(APIView):
 # - e todos os helpers _resolve_networklink_if_needed, _findall_anyns, etc (já estão na sua classe)
 
 
+
+
 class KMLUnionView(APIView):
     parser_classes = [MultiPartParser, FormParser]
-    authentication_classes = (FirebaseAuthentication,)
-    permission_classes = (IsAuthenticated,)
+    authentication_classes = (FirebaseAuthentication,)  # pode deixar, mas não obriga
+    permission_classes = (AllowAny,)
+    throttle_classes = [KMLAnonThrottle, KMLUserThrottle]
 
+    
+    
     def clamp(self, value, min_value=None, max_value=None):
         if min_value is not None:
             value = max(min_value, value)
@@ -733,15 +744,11 @@ class KMLUnionView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        bp = getattr(request.user, "billing", None)
-        if not bp:
-            return Response(
-                {
-                    "detail": "BillingProfile ausente. Faça login novamente.",
-                    "code": "BILLING_PROFILE_MISSING",
-                },
-                status=status.HTTP_401_UNAUTHORIZED,
-            )
+        user = request.user if getattr(request.user, "is_authenticated", False) else None
+        bp = getattr(user, "billing", None) if user else None
+
+        anon_id = (request.headers.get("X-ANON-ID") or "").strip() or None
+
 
         # Semana (analytics)
         today = timezone.localdate()
@@ -763,12 +770,19 @@ class KMLUnionView(APIView):
         tol_m = self.clamp(tol_m, min_value=1.0)
 
         # corridor_width_m
-        try:
-            corridor_width_m = float(request.data.get("corridor_width_m", 1.0))
-            print("[corridor_width_m] received from FrontEnd:", corridor_width_m)
-        except (TypeError, ValueError):
-            corridor_width_m = 1.0
-        corridor_width_m = self.clamp(corridor_width_m, min_value=1.0)
+        # corridor_width_m
+        raw_corridor = request.data.get("corridor_width_m", None)
+
+        if raw_corridor is None or str(raw_corridor).strip() == "":
+            corridor_width_m = 0.0
+        else:
+            try:
+                corridor_width_m = float(raw_corridor)
+            except (TypeError, ValueError):
+                corridor_width_m = 0.0
+
+        corridor_width_m = self.clamp(corridor_width_m, min_value=0.0, max_value=500.0)
+
 
         parcelas = []
         total_polygons = 0
@@ -836,11 +850,6 @@ class KMLUnionView(APIView):
                 # -----------------------
                 # Persistir input resolvido no storage
                 # -----------------------
-                try:
-                    safe_name = self._safe_filename(uploaded.name)  # você precisa ter esse helper definido na classe
-                except Exception:
-                    safe_name = os.path.basename(uploaded.name) or f"input_{idx}.kml"
-
                 input_path = f"kml_unions/{request_id}/inputs/{idx:02d}_{safe_name}"
                 try:
                     default_storage.save(input_path, ContentFile(resolved_bytes))
@@ -1059,19 +1068,19 @@ class KMLUnionView(APIView):
             # -----------------------
             # Analytics: WeeklyUsage
             # -----------------------
-            with transaction.atomic():
-                try:
+            if user:
+                with transaction.atomic():
                     usage, _ = WeeklyUsage.objects.select_for_update().get_or_create(
-                        user=request.user,
+                        user=user,
                         week=week_key,
                         defaults={"count": 0},
                     )
-                except IntegrityError:
-                    usage = WeeklyUsage.objects.select_for_update().get(user=request.user, week=week_key)
+                    usage.count += 1
+                    usage.save(update_fields=["count", "updated_at"])
+                    weekly_used = usage.count
+            else:
+                weekly_used = None
 
-                usage.count += 1
-                usage.save(update_fields=["count", "updated_at"])
-                weekly_used = usage.count
 
             # -----------------------
             # Persistir Job + Meta
@@ -1080,7 +1089,7 @@ class KMLUnionView(APIView):
             try:
                 import json  # garante import aqui
                 input_filenames = [getattr(f, "name", "") for f in files]
-                plan_now = getattr(request.user.billing, "plan", None)
+                plan_now = getattr(bp, "plan", None) if bp else ("anonymous" if not user else "free")
 
                 meta = {
                     "request_id": request_id,
@@ -1105,9 +1114,10 @@ class KMLUnionView(APIView):
                 )
 
                 job = KMLMergeJob.objects.create(
-                    user=request.user,
+                    user=user,
+                    anon_id=anon_id,
+                    plan=(plan_now or getattr(bp, "plan", "anonymous") or "anonymous"),
                     request_id=request_id,
-                    plan=(plan_now or getattr(bp, "plan", "unknown") or "unknown"),
                     status=KMLMergeJob.STATUS_SUCCESS,
                     tol_m=tol_m,
                     corridor_width_m=corridor_width_m,
@@ -1158,6 +1168,11 @@ class KMLUnionView(APIView):
 
             download_available = bool(is_unlimited) or prepaid_left > 0
             download_url_out = download_url if download_available else None
+            
+            if not user:
+                plan = (getattr(bp, "plan", None) or "anonymous").lower().strip() if bp else "anonymous"
+                download_available = False
+                download_url_out = None
 
             return Response(
                 {
@@ -2003,3 +2018,18 @@ class ProfileOnboardingView(APIView):
             },
             status=200,
         )
+
+
+
+
+class ClaimJobsView(APIView):
+    authentication_classes = (FirebaseAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    def post(self, request):
+        anon_id = (request.headers.get("X-ANON-ID") or "").strip()
+        if not anon_id:
+            return Response({"detail": "Missing X-ANON-ID."}, status=400)
+
+        updated = KMLMergeJob.objects.filter(user__isnull=True, anon_id=anon_id).update(user=request.user)
+        return Response({"claimed": updated}, status=200)
