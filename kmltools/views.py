@@ -268,6 +268,11 @@ class MeView(APIView):
             "credits_used_total": bp.credits_used_total,
             "current_period_end": bp.current_period_end.isoformat() if bp.current_period_end else None,
             "cancel_at_period_end": bp.cancel_at_period_end,
+            "use_case": bp.use_case or "",
+            "usage_frequency": bp.usage_frequency or "",
+            "onboarding_completed_at": bp.onboarding_completed_at.isoformat() if bp.onboarding_completed_at else None,
+            "onboarding_skipped_count": int(bp.onboarding_skipped_count or 0),
+
         })
 
 # (mantém seus imports/constantes/helpers já existentes no arquivo)
@@ -1944,3 +1949,57 @@ class KMLHistoryDownloadView(APIView):
             "request_id": job.request_id,
             "download_url": url,
         }, status=status.HTTP_200_OK)
+
+
+
+class ProfileOnboardingView(APIView):
+    authentication_classes = (FirebaseAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    def patch(self, request):
+        bp = getattr(request.user, "billing", None)
+        if not bp:
+            return Response({"detail": "BillingProfile ausente."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        use_case = (request.data.get("use_case") or "").strip()
+        usage_frequency = (request.data.get("usage_frequency") or "").strip()
+        skipped = bool(request.data.get("skipped") or False)
+
+        allowed_use_case = {k for k, _ in BillingProfile.USE_CASE_CHOICES}
+        allowed_freq = {k for k, _ in BillingProfile.USAGE_FREQUENCY_CHOICES}
+
+        update_fields = ["updated_at"]
+
+        if skipped:
+            bp.onboarding_skipped_count = int(bp.onboarding_skipped_count or 0) + 1
+            update_fields.append("onboarding_skipped_count")
+        else:
+            if use_case and use_case not in allowed_use_case:
+                return Response({"detail": "Invalid use_case.", "code": "INVALID_USE_CASE"}, status=400)
+            if usage_frequency and usage_frequency not in allowed_freq:
+                return Response({"detail": "Invalid usage_frequency.", "code": "INVALID_USAGE_FREQUENCY"}, status=400)
+
+            # grava só se vier preenchido (e normalmente você manda os dois)
+            if use_case:
+                bp.use_case = use_case
+                update_fields.append("use_case")
+            if usage_frequency:
+                bp.usage_frequency = usage_frequency
+                update_fields.append("usage_frequency")
+
+            # marca como concluído quando ambos foram informados
+            if bp.use_case and bp.usage_frequency and not bp.onboarding_completed_at:
+                bp.onboarding_completed_at = timezone.now()
+                update_fields.append("onboarding_completed_at")
+
+        bp.save(update_fields=update_fields)
+
+        return Response(
+            {
+                "use_case": bp.use_case or "",
+                "usage_frequency": bp.usage_frequency or "",
+                "onboarding_completed_at": bp.onboarding_completed_at.isoformat() if bp.onboarding_completed_at else None,
+                "onboarding_skipped_count": int(bp.onboarding_skipped_count or 0),
+            },
+            status=200,
+        )

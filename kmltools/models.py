@@ -48,6 +48,32 @@ class BillingProfile(models.Model):
 
     # Auditoria/analytics (total de merges)
     credits_used_total = models.PositiveIntegerField(default=0)
+    
+    # =========================
+    # ICP / Onboarding (quem é o cliente)
+    # =========================
+    USE_CASE_CHOICES = [
+        ("agriculture", "Agriculture / Farm management"),
+        ("drone_mapping", "Drone mapping"),
+        ("gis", "GIS analysis"),
+        ("engineering", "Engineering / Infrastructure"),
+        ("real_estate", "Real estate / Land survey"),
+        ("academic", "Academic / Study"),
+        ("other", "Other"),
+    ]
+
+    USAGE_FREQUENCY_CHOICES = [
+        ("occasional", "Occasionally"),
+        ("weekly", "Weekly"),
+        ("daily", "Daily"),
+        ("large_batches", "Large batches"),
+    ]
+
+    use_case = models.CharField(max_length=32, blank=True, default="", db_index=True)
+    usage_frequency = models.CharField(max_length=32, blank=True, default="", db_index=True)
+
+    onboarding_completed_at = models.DateTimeField(blank=True, null=True)
+    onboarding_skipped_count = models.PositiveIntegerField(default=0)
 
     updated_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)

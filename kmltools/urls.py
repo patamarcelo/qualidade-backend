@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import KMLUnionView, MeView, UsageView, CreateCheckoutSessionView, StripeWebhookView, CreateBillingPortalSessionView, KMLHistoryDownloadView, KMLHistoryView, CreatePrepaidCheckoutSessionView, KMLDownloadView
+from .views import KMLUnionView, MeView, UsageView, CreateCheckoutSessionView, StripeWebhookView, CreateBillingPortalSessionView, KMLHistoryDownloadView, KMLHistoryView, CreatePrepaidCheckoutSessionView, KMLDownloadView, ProfileOnboardingView
 from .views_feedback import MergeFeedbackView
 
 urlpatterns = [
@@ -15,6 +15,8 @@ urlpatterns += [
     path("billing/checkout-prepaid/", CreatePrepaidCheckoutSessionView.as_view(), name="billing-checkout-prepaid"),
     path("kml-download/<uuid:job_id>/", KMLDownloadView.as_view()),
     path("feedback/", MergeFeedbackView.as_view(), name="kmltools-feedback"),
+    path("profile/onboarding/", ProfileOnboardingView.as_view(), name="profile-onboarding"),
+
 
 
 

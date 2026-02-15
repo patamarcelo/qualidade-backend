@@ -16,28 +16,27 @@ def _email(obj):
 # =========================
 # BillingProfile
 # =========================
+
 @admin.register(BillingProfile)
 class BillingProfileAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "user_email",
-        "firebase_uid",
         "plan",
+        "use_case",           # Novo campo na listagem
+        "usage_frequency",    # Novo campo na listagem
         "is_unlimited_flag",
         "free_monthly_credits",
         "prepaid_credits",
         "credits_used_total",
-        "free_month_key",
-        "stripe_customer_id",
-        "stripe_subscription_id",
-        "current_period_end",
-        "cancel_at_period_end",
+        "onboarding_completed_at", # Útil para ver ativação
         "created_at",
-        "updated_at",
     )
 
     list_filter = (
         "plan",
+        "use_case",           # Filtro para segmentação
+        "usage_frequency",    # Filtro para segmentação
         "cancel_at_period_end",
         "created_at",
         "updated_at",
@@ -60,6 +59,7 @@ class BillingProfileAdmin(admin.ModelAdmin):
         "is_unlimited_flag",
         "current_month_key_display",
         "credits_summary",
+        "onboarding_completed_at",
     )
 
     fieldsets = (
@@ -67,6 +67,18 @@ class BillingProfileAdmin(admin.ModelAdmin):
             "User",
             {
                 "fields": ("user", "firebase_uid"),
+            },
+        ),
+        (
+            "Onboarding & ICP", # Nova Seção
+            {
+                "fields": (
+                    "use_case",
+                    "usage_frequency",
+                    "onboarding_completed_at",
+                    "onboarding_skipped_count",
+                ),
+                "description": "Dados coletados durante o onboarding para perfil de cliente (ICP).",
             },
         ),
         (
@@ -109,7 +121,6 @@ class BillingProfileAdmin(admin.ModelAdmin):
             },
         ),
     )
-
     actions = (
         "reset_free_to_2_now",
         "force_sync_month_key_now",
