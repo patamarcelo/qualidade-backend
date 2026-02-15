@@ -172,6 +172,7 @@ def _save_kml_debug_bundle_storage(
 
     except Exception as e:
         print(f"[KML_DEBUG] Falha ao salvar bundle {request_id}: {e}")
+        
 
 class MeView(APIView):
     authentication_classes = (FirebaseAuthentication,)
@@ -290,6 +291,108 @@ class KMLUnionView(APIView):
         return value
 
     # ---------- helpers namespace-agnostic ----------
+    def _extract_point_placemarks_as_geojson(self, root, fallback_name="Marker"):
+        feats = []
+        idx = 0
+
+        placemarks = list(self._findall_anyns(root, "Placemark"))
+        if not placemarks:
+            placemarks = [root]
+
+        for pm in placemarks:
+            # ignora placemark que já tem Polygon (senão duplica nome)
+            has_poly = any(True for _ in self._findall_anyns(pm, "Polygon"))
+            if has_poly:
+                continue
+
+            pt = self._first_anyns(pm, "Point")
+            if pt is None:
+                continue
+
+            coord_el = self._first_anyns(pt, "coordinates")
+            if coord_el is None or not (coord_el.text and coord_el.text.strip()):
+                continue
+
+            # coordinates: lon,lat[,alt]
+            token = coord_el.text.strip().split()[0]
+            parts = token.split(",")
+            if len(parts) < 2:
+                continue
+
+            try:
+                lon = float(parts[0])
+                lat = float(parts[1])
+            except Exception:
+                continue
+
+            name_el = self._first_anyns(pm, "name")
+            nm = (name_el.text or "").strip() if name_el is not None else ""
+            if not nm:
+                idx += 1
+                nm = f"{fallback_name} {idx}"
+
+            feats.append({
+                "type": "Feature",
+                "properties": {"name": nm, "kind": "marker"},
+                "geometry": {"type": "Point", "coordinates": [lon, lat]},
+            })
+
+        return feats
+
+
+    def _append_marker_placemarks_to_kml(self, kml_str: str, marker_features: list) -> str:
+        """
+        Insere os markers como <Placemark> dentro do <Document>.
+        Não altera o polígono merged.
+        """
+        if not kml_str or not marker_features:
+            return kml_str
+
+        placemarks_xml = []
+        for f in marker_features:
+            g = (f or {}).get("geometry") or {}
+            if g.get("type") != "Point":
+                continue
+            coords = g.get("coordinates") or []
+            if len(coords) < 2:
+                continue
+
+            lon, lat = coords[0], coords[1]
+            name = ((f.get("properties") or {}).get("name") or "Marker").strip()
+
+            placemarks_xml.append(
+                f"""
+        <Placemark>
+        <name>{self._xml_escape(name)}</name>
+        <Point><coordinates>{lon},{lat},0</coordinates></Point>
+        </Placemark>
+                """.rstrip()
+            )
+
+        if not placemarks_xml:
+            return kml_str
+
+        insert_block = "\n" + "\n".join(placemarks_xml) + "\n"
+
+        # tenta inserir antes de </Document>, senão antes de </kml>
+        if "</Document>" in kml_str:
+            return kml_str.replace("</Document>", insert_block + "</Document>", 1)
+        if "</kml>" in kml_str:
+            return kml_str.replace("</kml>", insert_block + "</kml>", 1)
+        return kml_str
+
+
+    def _xml_escape(self, s: str) -> str:
+        return (
+            (s or "")
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace('"', "&quot;")
+            .replace("'", "&apos;")
+        )
+
+
 
     def _coords_latlon_to_geojson_ring(self, coords_latlon):
         ring = []
@@ -596,7 +699,7 @@ class KMLUnionView(APIView):
             info["networklink_error"] = str(e)
             return raw_bytes, info
     
-    def _safe_filename(name: str) -> str:
+    def _safe_filename(self, name: str) -> str:
         name = (name or "").strip()
         if not name:
             return "input.kml"
@@ -667,6 +770,7 @@ class KMLUnionView(APIView):
         debug_files = []
         file_reports = []
         input_storage_paths = []  # paths dos inputs persistidos
+        markers = []   # <-- NOVO: features Point preservadas
 
         try:
             # -----------------------
@@ -745,6 +849,13 @@ class KMLUnionView(APIView):
                 poly_idx_file = 0
                 try:
                     root = ET.fromstring(resolved_bytes)
+                    # ✅ NOVO: extrai markers (Point) e preserva
+                    try:
+                        base_marker_name = os.path.splitext(uploaded.name)[0]
+                        markers.extend(self._extract_point_placemarks_as_geojson(root, fallback_name=base_marker_name))
+                    except Exception as e:
+                        print(f"⚠️ Falha ao extrair markers de {uploaded.name}: {e}")
+
 
                     placemarks = list(self._findall_anyns(root, "Placemark"))
                     if not placemarks:
@@ -818,65 +929,106 @@ class KMLUnionView(APIView):
             print(f"📊 Total de parcelas geradas: {len(parcelas)}")
             print("=" * 60)
 
-            if not parcelas:
+            # ✅ Se não há polígonos, mas há markers, exporta markers-only
+            if not parcelas and markers:
+                # gera KML só com markers (sem merge)
+                kml_str = """<?xml version="1.0" encoding="UTF-8"?>
+                    <kml xmlns="http://www.opengis.net/kml/2.2">
+                        <Document>
+                            <name>KML Unifier — markers</name>
+                        </Document>
+                    </kml>
+                """
+
+                # previews
+                preview_geojson = {"type": "FeatureCollection", "features": markers}
+                input_preview_geojson = {"type": "FeatureCollection", "features": markers}
+
+                metrics = {
+                    "output_polygons": 0,
+                    "merged_polygons": 0,
+                    "input_area_m2": 0,
+                    "input_area_ha": 0,
+                    "output_area_m2": 0,
+                    "output_area_ha": 0,
+                }
+
+                # segue para salvar output e responder (pula merge)
+                goto_merge = False
+            else:
+                goto_merge = True
+
+            # ✅ Se não há nada (nem polygon, nem marker)
+            if not parcelas and not markers:
                 return Response(
                     {
-                        "detail": "Nenhum polígono válido encontrado nos arquivos KML.",
+                        "detail": "Nenhum polígono ou marcador válido encontrado nos arquivos KML.",
                         "request_id": request_id,
                         "files_report": file_reports,
                     },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
+
             ## -----------------------
             # Merge
             # -----------------------
-            try:
-                merge_mode = (mode or "union").lower().strip()
-                print("[MERGE HERE MODE] -", merge_mode)
+            if goto_merge:
+                ## -----------------------
+                # Merge
+                # -----------------------
+                try:
+                    merge_mode = (mode or "union").lower().strip()
+                    print("[MERGE HERE MODE] -", merge_mode)
 
-                debug_geojson = None
+                    debug_geojson = None
 
-                if merge_mode == "no_union":
-                    kml_str, metrics, debug_geojson = merge_no_flood_not_union(
-                        parcelas,
-                        tol_m=tol_m,
-                        corridor_width_m=corridor_width_m,
-                        return_metrics=True,
+                    if merge_mode == "no_union":
+                        kml_str, metrics, debug_geojson = merge_no_flood_not_union(
+                            parcelas,
+                            tol_m=tol_m,
+                            corridor_width_m=corridor_width_m,
+                            return_metrics=True,
+                        )
+                    else:
+                        kml_str, metrics = merge_no_flood(
+                            parcelas,
+                            tol_m=tol_m,
+                            corridor_width_m=corridor_width_m,
+                            return_metrics=True,
+                        )
+
+                    print("[KML_OUT] snippet:", (kml_str or "")[:500])
+
+                    preview_geojson = self._kml_str_to_geojson(kml_str)
+
+                    # ✅ adiciona markers no preview
+                    if markers:
+                        preview_geojson["features"] = (preview_geojson.get("features") or []) + markers
+
+                    # ✅ injeta as linhas se existirem
+                    if debug_geojson:
+                        extra_feats = (debug_geojson.get("features") or [])
+                        if extra_feats:
+                            preview_geojson["features"] = (preview_geojson.get("features") or []) + extra_feats
+
+                    input_preview_geojson = self._parcelas_to_geojson(parcelas)
+                    if markers:
+                        input_preview_geojson["features"] = (input_preview_geojson.get("features") or []) + markers
+
+                except Exception as e:
+                    print(f"❌ Erro interno no merge_no_flood: {e}")
+                    return Response(
+                        {
+                            "detail": "Erro interno ao unificar polígonos.",
+                            "request_id": request_id,
+                            "files_report": file_reports,
+                        },
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     )
-                else:
-                    kml_str, metrics = merge_no_flood(
-                        parcelas,
-                        tol_m=tol_m,
-                        corridor_width_m=corridor_width_m,
-                        return_metrics=True,
-                    )
 
-                print("[KML_OUT] snippet:", (kml_str or "")[:500])
-
-                # ✅ gera preview 1 vez
-                preview_geojson = self._kml_str_to_geojson(kml_str)
-
-                # ✅ injeta as linhas se existirem
-                if debug_geojson:
-                    extra_feats = (debug_geojson.get("features") or [])
-                    if extra_feats:
-                        preview_geojson["features"] = (preview_geojson.get("features") or []) + extra_feats
-
-                print("[PREVIEW] geojson features:", len(preview_geojson.get("features", [])))
-
-                input_preview_geojson = self._parcelas_to_geojson(parcelas)
-
-            except Exception as e:
-                print(f"❌ Erro interno no merge_no_flood: {e}")
-                return Response(
-                    {
-                        "detail": "Erro interno ao unificar polígonos.",
-                        "request_id": request_id,
-                        "files_report": file_reports,
-                    },
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                )
+            # ✅ NOVO: adiciona markers no KML para download
+            kml_str = self._append_marker_placemarks_to_kml(kml_str, markers)
 
             # -----------------------
             # Salvar output
@@ -884,6 +1036,9 @@ class KMLUnionView(APIView):
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"kml_unions/union_{ts}_{uuid.uuid4().hex[:6]}.kml"
             saved_path = default_storage.save(filename, ContentFile((kml_str or "").encode("utf-8")))
+            
+            
+
 
             # URL (fallback)
             try:
@@ -935,6 +1090,7 @@ class KMLUnionView(APIView):
                     "input_filenames": input_filenames,
                     "input_storage_paths": input_storage_paths,
                     "output_storage_path": saved_path,
+                    "total_markers": len([f for f in markers if (f.get("geometry") or {}).get("type") == "Point"])
                 }
 
                 meta_path = f"kml_unions/{request_id}/meta/meta.json"
@@ -1026,6 +1182,8 @@ class KMLUnionView(APIView):
                     "files_report": file_reports,
                     "input_preview_geojson": input_preview_geojson,
                     "preview_geojson": preview_geojson,
+                    "total_markers": len([f for f in markers if (f.get("geometry") or {}).get("type") == "Point"]),
+
                 },
                 status=status.HTTP_200_OK,
             )
