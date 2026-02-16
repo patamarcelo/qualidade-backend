@@ -62,6 +62,9 @@ from django.core.cache import cache
 
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
+from django.db.models import Q
+from rest_framework.exceptions import NotFound
+
 class KMLAnonThrottle(AnonRateThrottle):
     rate = "20/hour"
 
@@ -1220,7 +1223,22 @@ class KMLDownloadView(APIView):
     permission_classes = (IsAuthenticated,)
 
     def post(self, request, job_id):
-        job = get_object_or_404(KMLMergeJob, id=job_id, user=request.user)
+        anon_id = (request.headers.get("X-ANON-ID") or "").strip() or None
+
+        job = (
+            KMLMergeJob.objects
+            .filter(id=job_id)
+            .filter(Q(user=request.user) | (Q(anon_id=anon_id) if anon_id else Q(pk=None)))
+            .first()
+        )
+
+        if not job:
+            raise NotFound("Não encontrado.")
+
+        # ✅ opcional (recomendado): “claim” no primeiro download
+        if job.user_id is None:
+            job.user = request.user
+            job.save(update_fields=["user"])
 
         bp = getattr(request.user, "billing", None)
         if not bp:
