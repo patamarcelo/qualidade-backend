@@ -39,11 +39,21 @@ def geodesic_area_m2(geom_ll: Polygon | MultiPolygon) -> float:
     return 0.0
 
 
-def choose_utm_epsg(polys_ll: List[Polygon]) -> int:
-    all_lons = [x for p in polys_ll for (x, y) in p.exterior.coords]
-    all_lats = [y for p in polys_ll for (x, y) in p.exterior.coords]
+def choose_utm_epsg(polys_ll) -> int:
+    rings = []
+    for g in polys_ll:
+        for p in polygon_parts(g):  # <-- reaproveita seu helper
+            rings.extend(list(p.exterior.coords))
+
+    if not rings:
+        # fallback: default seguro (ou levanta erro)
+        return 3857  # (melhor: levantar ValueError)
+    
+    all_lons = [x for (x, y) in rings]
+    all_lats = [y for (x, y) in rings]
     center_lon = sum(all_lons) / len(all_lons)
     center_lat = sum(all_lats) / len(all_lats)
+
     zone = int(math.floor((center_lon + 180) / 6) + 1)
     south = center_lat < 0
     return 32700 + zone if south else 32600 + zone
@@ -84,7 +94,25 @@ def to_polygons_ll(parcelas: List[Dict]) -> Tuple[List[Polygon], List[str]]:
             parts = [p for p in poly.geoms if (not p.is_empty and p.area > 0)]
             if not parts:
                 continue
-            poly = unary_union(parts)
+
+            # ✅ em vez de unary_union, SPLITA em Polygon
+            for part in parts:
+                polys.append(part)
+                names.append(nome)
+            continue
+        if isinstance(poly, GeometryCollection):
+            parts = []
+            for gg in poly.geoms:
+                parts.extend(polygon_parts(gg))
+            parts = [p for p in parts if (not p.is_empty and p.area > 0)]
+            if not parts:
+                continue
+            for part in parts:
+                polys.append(part)
+                names.append(nome)
+            continue
+
+
 
         if poly.is_empty or poly.area <= 0:
             continue
