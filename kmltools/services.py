@@ -5,9 +5,10 @@ from typing import List, Dict, Tuple
 import math
 from math import isclose
 
-from shapely.geometry import Polygon, MultiPolygon, LineString, GeometryCollection
+from shapely.geometry import Polygon, MultiPolygon, LineString, GeometryCollection, MultiLineString
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import unary_union, transform as shp_transform, nearest_points
+from shapely.ops import polygonize
 
 from pyproj import CRS, Transformer, Geod
 from xml.dom.minidom import Document
@@ -17,6 +18,71 @@ from shapely.geometry.polygon import orient
 
 
 GEOD = Geod(ellps="WGS84")
+
+
+
+
+def _as_closed_ring_coords(coords):
+    """coords: list[(x,y)] ; garante fechado e mínimo 4 pontos."""
+    if not coords or len(coords) < 3:
+        return None
+    if coords[0] != coords[-1]:
+        coords = coords + [coords[0]]
+    if len(coords) < 4:
+        return None
+    return coords
+
+def polygons_from_cad_kml_geoms(geoms, min_area=1e-14):
+    """
+    geoms: lista de geometrias vindas do parse (Polygon/MultiPolygon/LineString/LinearRing-as-LineString etc.)
+    Retorna: List[Polygon]
+    """
+    polys = []
+    lines = []
+
+    def _push_poly(p):
+        if not p or p.is_empty:
+            return
+        if not p.is_valid:
+            p = p.buffer(0)
+        if not p or p.is_empty:
+            return
+        if p.area <= min_area:
+            return
+        # Se buffer(0) virar MultiPolygon/GeometryCollection, reaproveita seu helper:
+        for part in polygon_parts(p):
+            if part and (not part.is_empty) and part.area > min_area:
+                polys.append(part)
+
+    for g in geoms or []:
+        if not g or g.is_empty:
+            continue
+
+        # já é poligonal
+        if isinstance(g, (Polygon, MultiPolygon, GeometryCollection)):
+            for part in polygon_parts(g):
+                _push_poly(part)
+            continue
+
+        # linhas
+        if isinstance(g, LineString):
+            coords = [(float(x), float(y)) for (x, y) in list(g.coords)]
+            closed = _as_closed_ring_coords(coords)
+            if closed:
+                _push_poly(Polygon(closed))
+            else:
+                lines.append(LineString(coords))
+            continue
+
+        # qualquer outra coisa: ignora
+
+    # fallback: polygonize só se ainda não achou nada e tem linhas
+    if not polys and lines:
+        ml = MultiLineString(lines)
+        for p in polygonize(ml):
+            _push_poly(p)
+
+    return polys
 
 
 def geodesic_area_m2(geom_ll: Polygon | MultiPolygon) -> float:
@@ -64,8 +130,18 @@ def to_polygons_ll(parcelas: List[Dict]) -> Tuple[List[Polygon], List[str]]:
 
     for parc in parcelas:
         nome = (parc.get("talhao") or "Sem nome").strip()
-        coords = parc.get("coords") or []
 
+        # ✅ NOVO: se o caller já trouxe geoms shapely (ex: CAD-KML com LinearRing/LineString)
+        geoms = parc.get("geoms")
+        if geoms:
+            cad_polys = polygons_from_cad_kml_geoms(geoms)
+            for p in cad_polys:
+                polys.append(p)
+                names.append(nome)
+            continue
+
+        # ---- fluxo antigo (coords) permanece igual ----
+        coords = parc.get("coords") or []
         ring = []
         last = None
         for p in coords:
@@ -77,7 +153,6 @@ def to_polygons_ll(parcelas: List[Dict]) -> Tuple[List[Polygon], List[str]]:
 
         if len(ring) < 3:
             continue
-
         if ring[0] != ring[-1]:
             ring.append(ring[0])
 
@@ -94,8 +169,6 @@ def to_polygons_ll(parcelas: List[Dict]) -> Tuple[List[Polygon], List[str]]:
             parts = [p for p in poly.geoms if (not p.is_empty and p.area > 0)]
             if not parts:
                 continue
-
-            # ✅ em vez de unary_union, SPLITA em Polygon
             for part in parts:
                 polys.append(part)
                 names.append(nome)
@@ -112,17 +185,10 @@ def to_polygons_ll(parcelas: List[Dict]) -> Tuple[List[Polygon], List[str]]:
                 names.append(nome)
             continue
 
-
-
-        if poly.is_empty or poly.area <= 0:
-            continue
-
         polys.append(poly)
         names.append(nome)
 
     return polys, names
-
-
 def polygon_parts(g: BaseGeometry) -> List[Polygon]:
     if g is None or g.is_empty:
         return []

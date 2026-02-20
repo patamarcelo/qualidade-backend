@@ -29,6 +29,8 @@ from kmltools.services import merge_no_flood, merge_no_flood_not_union
 from kmltools.newservices.credits import reserve_one_credit, refund_one_credit, NoCreditsLeft
 
 
+from shapely.geometry import LineString
+
 from django.utils.text import slugify
 from .newservices.email_async import queue_job_zip_email
 
@@ -480,30 +482,46 @@ class KMLUnionView(APIView):
         idx = 0
 
         for p in parcelas:
-            ring = []
-            for c in p.get("coords", []):
-                try:
-                    ring.append([float(c["longitude"]), float(c["latitude"])])
-                except Exception:
-                    continue
+            # 1) modo normal: coords (list[{lat,lon}])
+            coords = p.get("coords")
+            if coords:
+                ring = []
+                for c in coords:
+                    try:
+                        ring.append([float(c["longitude"]), float(c["latitude"])])
+                    except Exception:
+                        continue
 
-            if len(ring) < 3:
+                if len(ring) >= 3:
+                    if ring[0] != ring[-1]:
+                        ring.append(ring[0])
+
+                    idx += 1
+                    features.append({
+                        "type": "Feature",
+                        "properties": {"name": p.get("talhao"), "idx": idx, "kind": "input_polygon"},
+                        "geometry": {"type": "Polygon", "coordinates": [ring]},
+                    })
                 continue
 
-            if ring[0] != ring[-1]:
-                ring.append(ring[0])
+            # 2) modo CAD: geoms (list[LineString])
+            geoms = p.get("geoms") or []
+            for g in geoms:
+                try:
+                    pts = list(getattr(g, "coords", []) or [])
+                except Exception:
+                    pts = []
+                if len(pts) < 2:
+                    continue
 
-            idx += 1
-            features.append(
-                {
+                idx += 1
+                features.append({
                     "type": "Feature",
-                    "properties": {"name": p.get("talhao"), "idx": idx},
-                    "geometry": {"type": "Polygon", "coordinates": [ring]},
-                }
-            )
+                    "properties": {"name": p.get("talhao"), "idx": idx, "kind": "input_line"},
+                    "geometry": {"type": "LineString", "coordinates": [[float(x), float(y)] for (x, y) in pts]},
+                })
 
         return {"type": "FeatureCollection", "features": features}
-
     def _findall_anyns(self, node, tag: str):
         for el in node.findall(f".//{{*}}{tag}"):
             yield el
@@ -864,6 +882,7 @@ class KMLUnionView(APIView):
                 # Extrair polígonos
                 # -----------------------
                 poly_idx_file = 0
+                cad_lines_file = 0
                 try:
                     root = ET.fromstring(resolved_bytes)
                     # ✅ NOVO: extrai markers (Point) e preserva
@@ -885,7 +904,14 @@ class KMLUnionView(APIView):
                         if not talhao_name_base:
                             talhao_name_base = os.path.splitext(uploaded.name)[0]
 
+                        # ✅ detecta se tem Polygon nesse placemark
+                        has_poly = any(True for _ in self._findall_anyns(placemark, "Polygon"))
+
                         poly_idx_pm = 0
+
+                        # -----------------------
+                        # 1) fluxo atual: Polygon -> coords
+                        # -----------------------
                         for poly in self._findall_anyns(placemark, "Polygon"):
                             outer = self._first_anyns(poly, "outerBoundaryIs")
                             if outer is None:
@@ -910,12 +936,57 @@ class KMLUnionView(APIView):
                             talhao_name = talhao_name_base if poly_idx_pm == 1 else f"{talhao_name_base}_{poly_idx_pm}"
                             parcelas.append({"talhao": talhao_name, "coords": coords})
 
+                        # -----------------------
+                        # 2) ✅ NOVO: fallback CAD (LineString/LinearRing)
+                        #    Só entra se NÃO houver Polygon no placemark.
+                        # -----------------------
+                        if not has_poly:
+                            line_geoms = []
+
+                            # CAD costuma vir como <LineString><coordinates>...</coordinates></LineString>
+                            for ls in self._findall_anyns(placemark, "LineString"):
+                                coord_el = self._first_anyns(ls, "coordinates")
+                                if coord_el is None or not (coord_el.text and coord_el.text.strip()):
+                                    continue
+
+                                coords_ll = self._parse_kml_coordinates_text(coord_el.text)
+                                if len(coords_ll) < 2:
+                                    continue
+
+                                pts = [(float(p["longitude"]), float(p["latitude"])) for p in coords_ll]
+                                if len(pts) >= 2:
+                                    line_geoms.append(LineString(pts))
+                                    cad_lines_file += 1
+
+                            # Às vezes CAD vem como <LinearRing> SOLTO (sem Polygon)
+                            for lr in self._findall_anyns(placemark, "LinearRing"):
+                                coord_el = self._first_anyns(lr, "coordinates")
+                                if coord_el is None or not (coord_el.text and coord_el.text.strip()):
+                                    continue
+
+                                coords_ll = self._parse_kml_coordinates_text(coord_el.text)
+                                if len(coords_ll) < 2:
+                                    continue
+
+                                pts = [(float(p["longitude"]), float(p["latitude"])) for p in coords_ll]
+                                if len(pts) >= 2:
+                                    line_geoms.append(LineString(pts))
+                                    cad_lines_file += 1
+
+                            # ✅ se achou linhas, cria 1 “parcela CAD” para o geo_merge converter em Polygon(s)
+                            if line_geoms:
+                                parcelas.append({"talhao": talhao_name_base, "geoms": line_geoms})
+
+                                # opcional: report (não mexe no total_polygons pq ainda não sabemos quantos polígonos vai gerar)
+                                # você pode contabilizar como "cad_shapes" se quiser debugar:
+                                # poly_idx_file += 0
                     print(f"✅ Polígonos extraídos desse arquivo: {poly_idx_file}")
 
                     file_reports.append(
                         {
                             "filename": uploaded.name,
                             "polygons_extracted": poly_idx_file,
+                            "cad_lines_extracted": cad_lines_file,
                             **netinfo,
                         }
                     )
