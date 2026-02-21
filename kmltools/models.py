@@ -92,16 +92,25 @@ class BillingProfile(models.Model):
         """
         Free: NÃO cumulativo. Quando muda o mês, reseta para monthly_amount.
         """
-        if self.plan != "free":
+        if (self.plan or "").lower() != "free":
             return
 
         today = now or timezone.localdate()
         mk = self._month_key(today)
 
-        if self.free_month_key != mk:
-            self.free_month_key = mk
-            self.free_monthly_credits = monthly_amount
-            self.save(update_fields=["free_month_key", "free_monthly_credits", "updated_at"])
+        if self.free_month_key == mk:
+            return  # nada a fazer
+
+        self.free_month_key = mk
+        self.free_monthly_credits = monthly_amount
+
+        # ✅ Se não tem PK, faz INSERT (sem update_fields)
+        if not self.pk:
+            self.save()
+            return
+
+        # ✅ Se já tem PK, faz UPDATE parcial
+        self.save(update_fields=["free_month_key", "free_monthly_credits", "updated_at"])
 
     def consume_one_merge_credit(self, monthly_free_amount=2) -> str:
         """

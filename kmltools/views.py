@@ -110,6 +110,35 @@ FREE_MONTHLY_CREDITS = 0
 PREPAID_CREDITS_PER_PACK = 10
 
 
+def _get_firebase_uid_from_user(user):
+    # ajuste conforme o seu User model / FirebaseAuthentication
+    return (
+        getattr(user, "firebase_uid", None)
+        or getattr(user, "uid", None)
+        or getattr(user, "firebaseUid", None)
+    )
+
+def ensure_billing_profile(user):
+    """
+    Garante que existe BillingProfile salvo e retorna ele.
+    Se não conseguir inferir firebase_uid, retorna None.
+    """
+    if not user:
+        return None
+
+    bp = getattr(user, "billing", None)
+    if bp and getattr(bp, "pk", None):
+        return bp
+
+    firebase_uid = _get_firebase_uid_from_user(user)
+    if not firebase_uid:
+        return None
+
+    bp, _ = BillingProfile.objects.get_or_create(
+        user=user,
+        defaults={"firebase_uid": firebase_uid},
+    )
+    return bp
 
 def _debug_enabled():
     return str(getattr(settings, "KML_DEBUG_SAVE", "0")).lower() in ("1", "true", "yes")
@@ -190,9 +219,8 @@ class MeView(APIView):
     permission_classes = (IsAuthenticated,)
 
     def get(self, request):
-        bp = getattr(request.user, "billing", None)
         stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
-
+        bp = ensure_billing_profile(request.user)
         if not bp:
             return Response({"email": request.user.email, "plan": "free"})
 
@@ -1311,15 +1339,17 @@ class KMLDownloadView(APIView):
             job.user = request.user
             job.save(update_fields=["user"])
 
-        bp = getattr(request.user, "billing", None)
+        bp = ensure_billing_profile(request.user)
         if not bp:
             return Response(
                 {"detail": "BillingProfile ausente.", "code": "BILLING_PROFILE_MISSING"},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
-        plan = (getattr(bp, "plan", None) or "free").lower().strip()
+        # ✅ agora é seguro: bp.pk existe
+        plan = (bp.plan or "free").lower().strip()
         is_unlimited = bool(getattr(bp, "is_unlimited", False)) or plan in ("pro_monthly", "pro_yearly")
+
 
         consumed = False
         prepaid_after = None
@@ -1400,7 +1430,7 @@ class UsageView(APIView):
             .first()
         ) or 0
 
-        bp = getattr(request.user, "billing", None)
+        bp = ensure_billing_profile(request.user)
         if not bp:
             return Response(
                 {
@@ -1416,12 +1446,12 @@ class UsageView(APIView):
                 },
                 status=status.HTTP_200_OK,
             )
-
-        # UX: se free, reseta mensal ao consultar
-        if bp.plan == "free":
-            bp.reset_free_monthly_if_needed(monthly_amount=FREE_MONTHLY_CREDITS)
-            bp.refresh_from_db()
-
+        try:
+            if bp.plan == "free":
+                bp.reset_free_monthly_if_needed(monthly_amount=FREE_MONTHLY_CREDITS)
+                bp.refresh_from_db()
+        except Exception as e:
+            print("[USAGE] reset_free_monthly_if_needed failed:", e)
         return Response(
             {
                 "plan": bp.plan,
@@ -2061,7 +2091,7 @@ class ProfileOnboardingView(APIView):
     permission_classes = (IsAuthenticated,)
 
     def patch(self, request):
-        bp = getattr(request.user, "billing", None)
+        bp = ensure_billing_profile(request.user)
         if not bp:
             return Response({"detail": "BillingProfile ausente."}, status=status.HTTP_401_UNAUTHORIZED)
 
