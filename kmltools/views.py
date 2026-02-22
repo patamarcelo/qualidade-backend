@@ -24,7 +24,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .authentication import FirebaseAuthentication
-from .models import BillingProfile, WeeklyUsage, KMLMergeJob
+from .models import BillingProfile, WeeklyUsage, KMLMergeJob, UnlockFeedback
 from kmltools.services import merge_no_flood, merge_no_flood_not_union
 from kmltools.newservices.credits import reserve_one_credit, refund_one_credit, NoCreditsLeft
 
@@ -311,6 +311,7 @@ class MeView(APIView):
             "usage_frequency": bp.usage_frequency or "",
             "onboarding_completed_at": bp.onboarding_completed_at.isoformat() if bp.onboarding_completed_at else None,
             "onboarding_skipped_count": int(bp.onboarding_skipped_count or 0),
+            "free_unlock_used": bool(getattr(bp, "free_unlock_used", False)),
 
         })
 
@@ -2152,3 +2153,99 @@ class ClaimJobsView(APIView):
 
         updated = KMLMergeJob.objects.filter(user__isnull=True, anon_id=anon_id).update(user=request.user)
         return Response({"claimed": updated}, status=200)
+
+
+
+class UnlockFreeCreditView(APIView):
+    """
+    Salva o formulário de unlock e concede 1 crédito (prepaid_credits += 1).
+    Requer usuário autenticado, pois crédito vive no BillingProfile.
+    """
+    authentication_classes = (FirebaseAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    def post(self, request):
+        bp = ensure_billing_profile(request.user)
+        if not bp:
+            return Response({"detail": "BillingProfile ausente."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        # anti-abuso
+        if bool(getattr(bp, "free_unlock_used", False)):
+            return Response(
+                {"detail": "Free unlock already used.", "code": "FREE_UNLOCK_ALREADY_USED"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # payload
+        use_case = (request.data.get("use_case") or "").strip()
+        frequency = (request.data.get("frequency") or "").strip()
+        willingness = (request.data.get("willingness") or "").strip()
+        price_expectation = (request.data.get("price_expectation") or "").strip()
+
+        # ✅ NOVO
+        other_use_case_text = (request.data.get("other_use_case_text") or "").strip()
+
+        # validação leve (não trava conversão demais)
+        missing = []
+        if not use_case: missing.append("use_case")
+        if not frequency: missing.append("frequency")
+        if not willingness: missing.append("willingness")
+        if not price_expectation: missing.append("price_expectation")
+
+        # ✅ NOVO: exige texto quando "other"
+        if use_case == "other" and len(other_use_case_text) < 3:
+            return Response(
+                {
+                    "detail": "Missing fields.",
+                    "missing": ["other_use_case_text"],
+                    "code": "MISSING_FIELDS",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # ✅ opcional: limpa quando não é other
+        if use_case != "other":
+            other_use_case_text = ""
+
+        if missing:
+            return Response(
+                {"detail": "Missing fields.", "missing": missing, "code": "MISSING_FIELDS"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        anon_id = (request.headers.get("X-ANON-ID") or "").strip() or None
+
+        with transaction.atomic():
+            # trava BP
+            bp = BillingProfile.objects.select_for_update().get(pk=bp.pk)
+
+            if bool(getattr(bp, "free_unlock_used", False)):
+                return Response(
+                    {"detail": "Free unlock already used.", "code": "FREE_UNLOCK_ALREADY_USED"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # salva feedback
+            UnlockFeedback.objects.create(
+                user=request.user,
+                anon_id=anon_id,
+                use_case=use_case,
+                other_use_case_text=other_use_case_text,  # ✅ NOVO
+                frequency=frequency,
+                willingness=willingness,
+                price_expectation=price_expectation,
+            )
+
+            # concede 1 crédito (compatível com KMLDownloadView que consome prepaid_credits)
+            bp.prepaid_credits = int(getattr(bp, "prepaid_credits", 0) or 0) + 1
+            bp.free_unlock_used = True
+            bp.save(update_fields=["prepaid_credits", "free_unlock_used", "updated_at"])
+
+        return Response(
+            {
+                "credit_granted": True,
+                "prepaid_credits": int(bp.prepaid_credits or 0),
+                "free_unlock_used": True,
+            },
+            status=status.HTTP_200_OK,
+        )

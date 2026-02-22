@@ -8,6 +8,21 @@ from django.db import models
 from django.utils import timezone
 from datetime import date
 
+class UnlockFeedback(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL)
+    anon_id = models.CharField(max_length=120, null=True, blank=True)
+
+    use_case = models.CharField(max_length=100)
+    frequency = models.CharField(max_length=50)
+    willingness = models.CharField(max_length=50)
+    price_expectation = models.CharField(max_length=50)
+    
+    other_use_case_text = models.CharField(max_length=120, blank=True, default="")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"UnlockFeedback {self.id}"
 
 class BillingProfile(models.Model):
     user = models.OneToOneField(
@@ -77,6 +92,8 @@ class BillingProfile(models.Model):
 
     updated_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    
+    free_unlock_used = models.BooleanField(default=False)
 
     def __str__(self):
         return f"{self.user.email} [{self.plan}]"
@@ -268,3 +285,8 @@ class MergeFeedback(models.Model):
 
     def __str__(self):
         return f"MergeFeedback({self.user_id}, job={self.merge_job_id})"
+
+
+
+
+

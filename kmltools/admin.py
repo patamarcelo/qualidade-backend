@@ -4,7 +4,13 @@ from django.utils import timezone
 from django.db.models import Sum
 from django.contrib.auth import get_user_model
 
-from .models import BillingProfile, WeeklyUsage, KMLMergeJob, MergeFeedback
+from .models import BillingProfile, WeeklyUsage, KMLMergeJob, MergeFeedback, UnlockFeedback
+
+from django.db.models import Count
+from django.utils.html import format_html
+
+
+
 
 # =========================
 # Helpers
@@ -343,3 +349,112 @@ class MergeFeedbackAdmin(admin.ModelAdmin):
     list_filter = ("source", "created_at")
     search_fields = ("message", "user__email", "merge_job__id", "merge_job__request_id")
     ordering = ("-created_at",)
+
+
+
+
+
+
+
+
+@admin.register(UnlockFeedback)
+class UnlockFeedbackAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "user_email",
+        "use_case_display",
+        "frequency",
+        "willingness",
+        "price_expectation",
+        "created_at",
+    )
+
+    list_filter = (
+        "use_case",
+        "frequency",
+        "willingness",
+        "price_expectation",
+        "created_at",
+    )
+
+    search_fields = (
+        "user__email",
+        "anon_id",
+        "other_use_case_text",
+    )
+
+    readonly_fields = (
+        "user",
+        "anon_id",
+        "use_case",
+        "other_use_case_text",
+        "frequency",
+        "willingness",
+        "price_expectation",
+        "created_at",
+    )
+
+    ordering = ("-created_at",)
+    date_hierarchy = "created_at"
+    list_per_page = 50
+
+    actions = ["export_as_csv"]
+
+    # -----------------------------
+    # Coluna calculada - email
+    # -----------------------------
+    def user_email(self, obj):
+        return obj.user.email if obj.user else "Anonymous"
+    user_email.short_description = "User Email"
+
+    # -----------------------------
+    # Coluna calculada - use case com "other"
+    # -----------------------------
+    def use_case_display(self, obj):
+        if obj.use_case == "other" and obj.other_use_case_text:
+            return format_html(
+                "<strong>Other:</strong> {}",
+                obj.other_use_case_text
+            )
+        return obj.use_case
+    use_case_display.short_description = "Use Case"
+
+    # -----------------------------
+    # CSV export
+    # -----------------------------
+    def export_as_csv(self, request, queryset):
+        import csv
+        from django.http import HttpResponse
+
+        response = HttpResponse(content_type="text/csv")
+        response["Content-Disposition"] = "attachment; filename=unlock_feedback.csv"
+
+        writer = csv.writer(response)
+        writer.writerow([
+            "ID",
+            "User Email",
+            "Anon ID",
+            "Use Case",
+            "Other Use Case Text",
+            "Frequency",
+            "Willingness",
+            "Price Expectation",
+            "Created At",
+        ])
+
+        for obj in queryset:
+            writer.writerow([
+                obj.id,
+                obj.user.email if obj.user else "",
+                obj.anon_id,
+                obj.use_case,
+                obj.other_use_case_text or "",
+                obj.frequency,
+                obj.willingness,
+                obj.price_expectation,
+                obj.created_at,
+            ])
+
+        return response
+
+    export_as_csv.short_description = "Export selected as CSV"
