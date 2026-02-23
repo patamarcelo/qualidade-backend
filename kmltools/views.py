@@ -1342,10 +1342,11 @@ class KMLDownloadView(APIView):
 
         bp = ensure_billing_profile(request.user)
         if not bp:
-            return Response(
-                {"detail": "BillingProfile ausente.", "code": "BILLING_PROFILE_MISSING"},
-                status=status.HTTP_401_UNAUTHORIZED,
+            bp, created = BillingProfile.objects.get_or_create(
+                user=request.user,
+                defaults={"plan": "free"}
             )
+            print("⚠️ BillingProfile auto-created in download:", created)
 
         # ✅ agora é seguro: bp.pk existe
         plan = (bp.plan or "free").lower().strip()
@@ -2190,7 +2191,12 @@ class UnlockFreeCreditView(APIView):
         if not use_case: missing.append("use_case")
         if not frequency: missing.append("frequency")
         if not willingness: missing.append("willingness")
-        if not price_expectation: missing.append("price_expectation")
+        # ✅ só exige price_expectation se NÃO for "no"
+        if willingness != "no" and not price_expectation:
+            missing.append("price_expectation")
+        
+        if willingness == "no":
+            price_expectation = ""
 
         # ✅ NOVO: exige texto quando "other"
         if use_case == "other" and len(other_use_case_text) < 3:
