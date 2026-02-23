@@ -88,6 +88,7 @@ pytz==2023.3
 PyYAML==6.0.1
 requests==2.31.0
 requests-oauthlib==2.0.0
+resend==2.23.0
 rsa==4.9
 shapely==2.1.2
 six==1.16.0
