@@ -1,3 +1,4 @@
+# diamante/cron.py
 from datetime import datetime
 from .utils import get_date, get_miliseconds
 import time
@@ -9,6 +10,9 @@ from diamante.gmail.gmail_api import send_mail
 from django.conf import settings
 from django.template.loader import render_to_string
 
+
+import logging
+logger = logging.getLogger(__name__)
 
 def get_hour_test():
     current_time = datetime.now()
@@ -60,3 +64,21 @@ def enviar_email_diario():
         print('[feito] - Email enviado com sucesso')
     except Exception as e:
         print('[Problema] - Falha em enviar o email: ', e)
+        
+        
+
+def enviar_email_estoque_farmbox_diario():
+    """
+    Wrapper que executa o report diário Farmbox.
+    """
+    try:
+        from django.core.management import call_command
+
+        logger.info("Iniciando report diário Farmbox...")
+
+        call_command("farmbox_daily_stock_report")
+
+        logger.info("Report Farmbox executado com sucesso.")
+
+    except Exception as e:
+        logger.exception("Erro ao executar report Farmbox diário: %s", e)

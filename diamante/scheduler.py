@@ -6,7 +6,7 @@ from django_apscheduler.models import DjangoJobExecution
 import logging
 from diamante.cron import get_hour_test
 from diamante.utils import finalizar_parcelas_encerradas, enviar_email_alerta_mungo_verde_por_regra
-
+from diamante.cron import enviar_email_estoque_farmbox_diario
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -105,6 +105,17 @@ def start():
                     hour=12,
                     minute=0,
                     id='alerta_mungo_verde_domingo_12h',
+                    replace_existing=True,
+                    misfire_grace_time=3600
+                )
+                
+                scheduler.add_job(
+                    enviar_email_estoque_farmbox_diario,
+                    'cron',
+                    day_of_week="*",
+                    hour="6",
+                    minute="0",
+                    id="farmbox_stock_report_diario_0600",
                     replace_existing=True,
                     misfire_grace_time=3600
                 )
