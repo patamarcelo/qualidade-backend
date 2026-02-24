@@ -37,6 +37,9 @@ class BillingProfileAdmin(admin.ModelAdmin):
         "credits_used_total",
         "onboarding_completed_at", # Útil para ver ativação
         "created_at",
+        "stripe_customer_id",
+        "stripe_subscription_id",
+        "current_period_end"
     )
 
     list_filter = (

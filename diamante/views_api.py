@@ -171,6 +171,8 @@ from .services.generate_kml import create_kml
 from .services.geo_merge import merge_no_flood
 
 import unicodedata
+from django.db import close_old_connections
+
 
 
 # Get a named logger
@@ -5404,13 +5406,24 @@ class DefensivoViewSet(viewsets.ModelViewSet):
     permission_classes = (IsAuthenticated,)
     
     def processar_em_background(self, task_id):
-        
-        task = BackgroundTaskStatus.objects.get(task_id=task_id)
-        
-        try:
-            task.status = "running"
-            task.save()
+        # ✅ threads precisam disso (evita usar conexão herdada do request)
+        close_old_connections()
 
+        # 1) Marca como running (sem depender de get/objeto carregado)
+        updated = BackgroundTaskStatus.objects.filter(task_id=task_id).update(
+            status="running",
+            started_at=timezone.now(),
+            ended_at=None,
+            result=None,
+        )
+
+        if updated == 0:
+            # Se acontecer, é sintoma de race/roteamento/commit
+            print(f"[BG] task_id não encontrado para iniciar: {task_id}")
+            close_old_connections()
+            return
+
+        try:
             number_of_days_before = 10 if DEBUG else 7
             from_date = get_date(number_of_days_before)
             last_up = get_miliseconds(from_date)
@@ -5430,18 +5443,27 @@ class DefensivoViewSet(viewsets.ModelViewSet):
             generate_file_run("Pluvi", data_applications_pluvi)
             print("Pluviometrias Atualizadas.\n")
 
-            task.status = "done"
-            task.ended_at = timezone.now()
-            task.result = {"message": "Atualização concluída com sucesso!"}
-            task.save()
+            # 2) Done
+            BackgroundTaskStatus.objects.filter(task_id=task_id).update(
+                status="done",
+                ended_at=timezone.now(),
+                result={"message": "Atualização concluída com sucesso!"},
+            )
 
         except Exception as e:
-            task.status = "failed"
-            task.ended_at = timezone.now()
-            task.result = {"error": str(e)}
-            task.save()
+            # 3) Failed (grava erro)
+            BackgroundTaskStatus.objects.filter(task_id=task_id).update(
+                status="failed",
+                ended_at=timezone.now(),
+                result={"error": str(e)},
+                # se você tiver um campo extra:
+                # error_message=str(e)[:1000],
+            )
             print("Erro no processamento em segundo plano:", e)
 
+        finally:
+            # ✅ fecha qualquer conexão aberta nessa thread
+            close_old_connections()
 
     @action(detail=True, methods=["POST"])
     def save_defensivo_data(self, request, pk=None):
@@ -5498,41 +5520,39 @@ class DefensivoViewSet(viewsets.ModelViewSet):
 
 # --------------------- ---------------------- FARMBOX APPLICATIONS UPDATE API START  --------------------- ----------------------#
     
-    @action(detail=False, methods=["GET"])
+    @action(detail=False, methods=["POST", "GET"])  # importante: POST, não GET
     def update_farmbox_mongodb_data(self, request, pk=None):
-        
-        # Verifica se já existe uma task pendente ou rodando
+
         exists_running = BackgroundTaskStatus.objects.filter(
             task_name="update_farmbox",
             status__in=["pending", "running"]
         ).exists()
 
         if exists_running:
-            print('Já existe um processo rodando')
             return Response({
                 "msg": "Já existe uma tarefa 'update_farmbox' em andamento.",
                 "status": "locked"
             }, status=status.HTTP_429_TOO_MANY_REQUESTS)
-        
-        # Gera um ID único
+
         task_id = str(uuid.uuid4())
-        
-        # Cria o registro no banco
+
         BackgroundTaskStatus.objects.create(
             task_id=task_id,
             task_name="update_farmbox",
-            status="pending"
+            status="pending",
         )
-        
-        # Inicia a thread, passando o task_id
-        Thread(target=self.processar_em_background, args=(task_id,)).start()
 
-        response = {
-            "msg": f"Processamento iniciado em segundo plano!!",
+        def start_bg():
+            t = Thread(target=self.processar_em_background, args=(task_id,), daemon=True)
+            t.start()
+
+        # ✅ garante que o registro foi commitado antes da thread rodar
+        transaction.on_commit(start_bg)
+
+        return Response({
+            "msg": "Processamento iniciado em segundo plano!",
             "task_id": task_id,
-            "dados": 'dados do banco',
-        }
-        return Response(response, status=status.HTTP_200_OK)
+        }, status=status.HTTP_200_OK)
     
     @action(detail=False, methods=["GET"])
     def get_defensivos_integration_farmbox(self, request):
@@ -6853,22 +6873,16 @@ class BackgroundTaskStatusViewSet(viewsets.ModelViewSet):
 
     
     # @action(detail=True, methods=["GET"])
-    @action(detail=False, methods=["get"], url_path=r"(?P<task_id>[0-9a-f\-]+)/task_status")
+    @action(detail=True, methods=["GET"])
     def task_status(self, request, task_id=None):
-        if not task_id:
-            return Response({"error": "task_id é obrigatório"}, status=400)
-
-        try:
-            task = BackgroundTaskStatus.objects.get(task_id=task_id)
-            return Response({
-                "status": task.status,
-                "name": task.task_name,
-                "result": task.result,
-                "started_at": task.started_at,
-                "ended_at": task.ended_at
-            })
-        except BackgroundTaskStatus.DoesNotExist:
-            return Response({"error": "Task não encontrada"}, status=404)
+        task = self.get_object()  # usa lookup_field automaticamente
+        return Response({
+            "status": task.status,
+            "name": task.task_name,
+            "result": task.result,
+            "started_at": task.started_at,
+            "ended_at": task.ended_at
+        })
     
     @action(detail=False, methods=["GET"])
     def enviar_email_teste(self, request):
