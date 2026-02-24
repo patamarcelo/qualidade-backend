@@ -74,6 +74,7 @@ def _extract_messages_from_meta(payload: dict):
 @csrf_exempt
 def whatsapp_webhook(request):
     # 1) Verificação do webhook (Meta faz GET com hub.challenge)
+    print('chegou a requisição da META:')
     if request.method == "GET":
         mode = request.GET.get("hub.mode")
         token = request.GET.get("hub.verify_token")
