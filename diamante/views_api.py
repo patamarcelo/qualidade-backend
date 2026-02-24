@@ -5418,14 +5418,6 @@ class DefensivoViewSet(viewsets.ModelViewSet):
         # ✅ GATILHO (exemplo): se vier "send_email": true OU se algum campo específico bater
         should_email = True
 
-        if isinstance(payload, dict):
-            # opção A: flag explícita
-            should_email = bool(payload.get("send_email"))
-
-            # opção B: condição de negócio (ajuste pro seu caso)
-            # should_email = (payload.get("evento") == "APLICACAO_CRIADA")
-            # should_email = (payload.get("status") == "ERRO")
-
         if should_email:
             try:
                 send_mail(
