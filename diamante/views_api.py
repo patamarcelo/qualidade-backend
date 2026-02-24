@@ -175,6 +175,7 @@ from django.db import close_old_connections
 
 
 
+
 # Get a named logger
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -5404,6 +5405,32 @@ class DefensivoViewSet(viewsets.ModelViewSet):
     serializer_class = DefensivoSerializer
     authentication_classes = (CachedTokenAuthentication,)
     permission_classes = (IsAuthenticated,)
+    
+    @action(detail=False, methods=["POST"])
+    def payload_from_protheus_to_farmbox(self, request):
+        """
+        Primeiro momento: apenas lê e retorna o payload recebido.
+        Não valida, não processa, não persiste.
+        """
+
+        payload = request.data
+
+        # log completo no console (debug)
+        print("\n================ PAYLOAD RECEBIDO PROTHEUS ================")
+        print(payload)
+        print("===========================================================\n")
+
+        # resposta com info básica
+        response = {
+            "received": True,
+            "received_at": timezone.now(),
+            "payload_type": type(payload).__name__,
+            "keys": list(payload.keys()) if isinstance(payload, dict) else None,
+            "payload": payload,  # retorna completo (remova depois em produção)
+        }
+
+        return Response(response, status=status.HTTP_200_OK)
+    
     
     def processar_em_background(self, task_id):
         # ✅ threads precisam disso (evita usar conexão herdada do request)
