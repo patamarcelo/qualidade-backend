@@ -10,6 +10,9 @@ from django.utils import timezone
 
 from .models import Manager, DailyCheckin, OutboundQuestion
 
+import logging
+
+logger = logging.getLogger("opscheckin.whatsapp")
 
 def _verify_meta_signature(request) -> bool:
     """
@@ -74,7 +77,27 @@ def _extract_messages_from_meta(payload: dict):
 @csrf_exempt
 def whatsapp_webhook(request):
     # 1) Verificação do webhook (Meta faz GET com hub.challenge)
-    print('chegou a requisição da META:')
+    print('chegou a requisição da META:')# DEBUG: log básico de toda chamada
+    try:
+        raw = request.body.decode("utf-8", errors="replace") if request.body else ""
+    except Exception:
+        raw = ""
+
+    logger.warning(
+        "WHATSAPP_WEBHOOK hit method=%s path=%s query=%s content_type=%s len=%s xhub=%s",
+        request.method,
+        request.path,
+        request.META.get("QUERY_STRING", ""),
+        request.META.get("CONTENT_TYPE", ""),
+        len(request.body or b""),
+        request.headers.get("X-Hub-Signature-256", "")[:32],  # só prefixo
+    )
+
+    if raw:
+        # cuidado com tamanho: limita pra não poluir log
+        logger.warning("WHATSAPP_WEBHOOK body=%s", raw[:4000])
+        
+    
     if request.method == "GET":
         mode = request.GET.get("hub.mode")
         token = request.GET.get("hub.verify_token")
