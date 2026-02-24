@@ -92,11 +92,24 @@ def ensure_country_on_bp(bp, request):
     Só seta uma vez (quando estiver vazio).
     Não falha a request se der ruim na geo.
     """
+    # debug temporário (depois remove)
+    print("XFF:", request.META.get("HTTP_X_FORWARDED_FOR"))
+    print("X-REAL:", request.META.get("HTTP_X_REAL_IP"))
+    print("REMOTE:", request.META.get("REMOTE_ADDR"))
+
     if not bp or getattr(bp, "country", None):
         return
 
     ip = get_client_ip(request)
-    if not ip or not is_public_ip(ip):
+    if not ip:
+        return
+
+    # ✅ filtro leve: bloqueia só IPs obviamente inválidos/internos
+    try:
+        addr = ipaddress.ip_address(ip)
+        if addr.is_private or addr.is_loopback or addr.is_unspecified or addr.is_reserved:
+            return
+    except Exception:
         return
 
     cc, cn = geo_country_from_ip(ip)
@@ -108,7 +121,6 @@ def ensure_country_on_bp(bp, request):
     bp.country_source = "ip"
     bp.country_set_at = timezone.now()
     bp.save(update_fields=["country", "country_name", "country_source", "country_set_at"])
-
 class KMLAnonThrottle(AnonRateThrottle):
     rate = "20/hour"
 
