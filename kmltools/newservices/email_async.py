@@ -18,49 +18,147 @@ FROM_EMAIL = os.getenv("KML_DEFAULT_FROM", "KML Unifier <team@kmlunifier.com>")
 REPLY_EMAIL = os.getenv("REPLY_EMAIL", "patamarcelo@gmail.com")
 
 
-def _build_email_html(job: "KMLMergeJob", plan: str, download_url: str | None):
-    # HTML simples, mas “bonito” e consistente
-    btn = ""
+def _fmt(n, digits=0):
+    try:
+        if n is None:
+            return "-"
+        n = float(n)
+        if digits == 0:
+            return f"{int(round(n)):,}".replace(",", ".")
+        return f"{n:,.{digits}f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    except Exception:
+        return "-"
+
+
+def _build_email_html(job, plan: str, download_url: str | None):
+    site_url = os.getenv("KML_SITE_URL", "https://kmlunifier.com").rstrip("/")
+    support_email = os.getenv("REPLY_EMAIL", REPLY_EMAIL)
+
+    # métricas (podem ser None)
+    tol_m = getattr(job, "tol_m", None)
+    corridor = getattr(job, "corridor_width_m", None)
+    total_files = getattr(job, "total_files", None)
+    total_polygons = getattr(job, "total_polygons", None)
+    out_polys = getattr(job, "output_polygons", None)
+    merged_polys = getattr(job, "merged_polygons", None)
+    in_ha = getattr(job, "input_area_ha", None)
+    out_ha = getattr(job, "output_area_ha", None)
+
+    # data local (se quiser)
+    created_txt = ""
+    try:
+        created = job.created_at.astimezone(timezone.get_current_timezone())
+        created_txt = created.strftime("%d/%m/%Y %H:%M")
+    except Exception:
+        pass
+
+    # preheader (texto “oculto” que melhora open-rate)
+    preheader = "Your merged KML is ready — download link + ZIP attached."
+
+    button_block = ""
     if download_url:
-        btn = f"""
-        <p style="margin:18px 0">
-          <a href="{download_url}"
-             style="display:inline-block;padding:12px 16px;border-radius:10px;
-                    background:#4f46e5;color:#fff;text-decoration:none;font-weight:700">
-            Download merged KML
-          </a>
-        </p>
+        button_block = f"""
+          <div style="margin:18px 0 6px">
+            <a href="{download_url}"
+              style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;
+                     padding:12px 16px;border-radius:12px;font-weight:800">
+              Download merged KML
+            </a>
+          </div>
+          <div style="color:#6b7280;font-size:13px">
+            Or open the site: <a href="{site_url}" style="color:#4f46e5;text-decoration:none">{site_url}</a>
+          </div>
         """
 
-    created = ""
-    try:
-        created = job.created_at.astimezone(timezone.get_current_timezone()).strftime("%d/%m/%Y %H:%M")
-    except Exception:
-        created = ""
-
     return f"""
-    <div style="font-family:Arial,sans-serif;line-height:1.45;color:#111;max-width:640px">
-      <h2 style="margin:0 0 6px">Your KML Unifier files are ready</h2>
-      <p style="margin:0 0 14px;color:#444">
-        Job <b>{job.id}</b> {("• " + created) if created else ""}
-      </p>
+<!doctype html>
+<html>
+  <body style="margin:0;background:#f6f7fb;padding:24px">
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent">
+      {preheader}
+    </div>
 
-      {btn}
+    <div style="max-width:680px;margin:0 auto;background:#ffffff;border-radius:16px;
+                border:1px solid #e5e7eb;box-shadow:0 8px 30px rgba(0,0,0,0.06);
+                overflow:hidden;font-family:Arial,sans-serif;color:#111827">
 
-      <div style="padding:12px 14px;border:1px solid #e5e7eb;border-radius:12px;background:#fafafa">
-        <div><b>Plan:</b> {plan}</div>
-        <div><b>Files:</b> {job.total_files or 0}</div>
-        <div><b>Polygons:</b> {job.total_polygons or 0}</div>
+      <div style="padding:18px 20px;background:linear-gradient(90deg,#111827,#1f2937);color:#fff">
+        <div style="font-size:14px;opacity:.92">KML Unifier</div>
+        <div style="font-size:22px;font-weight:900;margin-top:4px">Your files are ready</div>
+        <div style="font-size:13px;opacity:.82;margin-top:6px">
+          Job <b>{job.id}</b>{(" • " + created_txt) if created_txt else ""} • Plan <b>{plan}</b>
+        </div>
       </div>
 
-      <p style="margin:14px 0 0;color:#444">
-        Attached: <b>job_{job.id}.zip</b> (inputs + meta + output).
-      </p>
-      <p style="margin:10px 0 0;color:#666;font-size:13px">
-        Need help? Just reply to this email.
-      </p>
+      <div style="padding:18px 20px">
+        <p style="margin:0 0 12px;color:#374151">
+          Your merged boundary is ready. We attached a ZIP with the original inputs, metadata and the final output.
+        </p>
+
+        {button_block}
+
+        <div style="margin:16px 0 0;padding:14px;border:1px solid #e5e7eb;border-radius:14px;background:#fafafa">
+          <div style="font-weight:800;margin-bottom:10px">Job details</div>
+
+          <table style="width:100%;border-collapse:collapse;font-size:14px;color:#111827">
+            <tr>
+              <td style="padding:6px 0;color:#6b7280;width:48%">Files uploaded</td>
+              <td style="padding:6px 0;font-weight:700">{_fmt(total_files)}</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 0;color:#6b7280">Polygons detected</td>
+              <td style="padding:6px 0;font-weight:700">{_fmt(total_polygons)}</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 0;color:#6b7280">Output polygons</td>
+              <td style="padding:6px 0;font-weight:700">{_fmt(out_polys)}</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 0;color:#6b7280">Merged polygons</td>
+              <td style="padding:6px 0;font-weight:700">{_fmt(merged_polys)}</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 0;color:#6b7280">Tolerance</td>
+              <td style="padding:6px 0;font-weight:700">{_fmt(tol_m)} m</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 0;color:#6b7280">Corridor width</td>
+              <td style="padding:6px 0;font-weight:700">{_fmt(corridor)} m</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 0;color:#6b7280">Input area</td>
+              <td style="padding:6px 0;font-weight:700">{_fmt(in_ha, 2)} ha</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 0;color:#6b7280">Output area</td>
+              <td style="padding:6px 0;font-weight:700">{_fmt(out_ha, 2)} ha</td>
+            </tr>
+          </table>
+        </div>
+
+        <div style="margin:14px 0 0;padding:12px 14px;border-radius:14px;border:1px dashed #c7d2fe;background:#eef2ff">
+          <div style="font-weight:800;color:#3730a3;margin-bottom:6px">Attachment</div>
+          <div style="color:#3730a3;font-size:13px">
+            job_{job.id}.zip (inputs + meta + output.kml)
+          </div>
+        </div>
+
+        <div style="margin-top:16px;color:#6b7280;font-size:13px;line-height:1.5">
+          Need help? Reply to this email or contact:
+          <a href="mailto:{support_email}" style="color:#4f46e5;text-decoration:none">{support_email}</a>
+          <br/>
+          Website:
+          <a href="{site_url}" style="color:#4f46e5;text-decoration:none">{site_url}</a>
+        </div>
+      </div>
+
+      <div style="padding:14px 20px;border-top:1px solid #e5e7eb;background:#fcfcfd;color:#9ca3af;font-size:12px">
+        Sent by KML Unifier • {site_url}
+      </div>
     </div>
-    """
+  </body>
+</html>
+""".strip()
 
 
 def _safe_read_storage(path: str) -> bytes | None:
