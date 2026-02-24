@@ -39,7 +39,8 @@ class BillingProfileAdmin(admin.ModelAdmin):
         "created_at",
         "stripe_customer_id",
         "stripe_subscription_id",
-        "current_period_end"
+        "current_period_end",
+        "country_name", 
     )
 
     list_filter = (

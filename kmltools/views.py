@@ -33,45 +33,88 @@ from shapely.geometry import LineString
 
 from django.utils.text import slugify
 from .newservices.email_async import queue_job_zip_email
-
-
-
-
 from rest_framework.permissions import AllowAny
-
-
 import zipfile
 from io import BytesIO
-
-
-
-
 import re
-
 import zipfile
 from io import BytesIO
-
 from urllib.parse import urlparse
-
-
 import requests
-
-
 from django.core.cache import cache
-
-
-
-
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
 from django.db.models import Q
 from rest_framework.exceptions import NotFound
+
+import ipaddress
+
+
+
+
+
+def get_client_ip(request):
+    # Railway / proxies: pega o primeiro IP real
+    xff = request.META.get("HTTP_X_FORWARDED_FOR")
+    if xff:
+        ip = xff.split(",")[0].strip()
+    else:
+        ip = (request.META.get("HTTP_X_REAL_IP") or request.META.get("REMOTE_ADDR") or "").strip()
+    return ip or None
+
+def is_public_ip(ip: str) -> bool:
+    try:
+        addr = ipaddress.ip_address(ip)
+        return addr.is_global  # evita private/loopback/reserved
+    except Exception:
+        return False
+
+def geo_country_from_ip(ip: str):
+    """
+    Retorna (country_code_iso2, country_name) ou (None, None).
+    ipapi.co é simples e bom o bastante p/ isso.
+    """
+    try:
+        r = requests.get(f"https://ipapi.co/{ip}/json/", timeout=2.0)
+        if r.status_code != 200:
+            return None, None
+        data = r.json() or {}
+        cc = (data.get("country") or "").strip() or None
+        cn = (data.get("country_name") or "").strip() or None
+        if cc and len(cc) == 2:
+            return cc.upper(), cn
+        return None, None
+    except Exception:
+        return None, None
+
+def ensure_country_on_bp(bp, request):
+    """
+    Só seta uma vez (quando estiver vazio).
+    Não falha a request se der ruim na geo.
+    """
+    if not bp or getattr(bp, "country", None):
+        return
+
+    ip = get_client_ip(request)
+    if not ip or not is_public_ip(ip):
+        return
+
+    cc, cn = geo_country_from_ip(ip)
+    if not cc:
+        return
+
+    bp.country = cc
+    bp.country_name = cn
+    bp.country_source = "ip"
+    bp.country_set_at = timezone.now()
+    bp.save(update_fields=["country", "country_name", "country_source", "country_set_at"])
 
 class KMLAnonThrottle(AnonRateThrottle):
     rate = "20/hour"
 
 class KMLUserThrottle(UserRateThrottle):
     rate = "200/hour"
+
 
 
 
@@ -1927,6 +1970,12 @@ class CreateBillingPortalSessionView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # ✅ salva país se ainda não tiver
+        try:
+            ensure_country_on_bp(bp, request)
+        except Exception:
+            pass
+
         # return_url: se vier do front, usa; senão usa APP_URL padrão
         body_return_url = None
         try:
@@ -1943,7 +1992,6 @@ class CreateBillingPortalSessionView(APIView):
                 return_url=return_url,
             )
         except stripe.error.StripeError as e:
-            # Mostra mensagem útil para debug
             msg = getattr(e, "user_message", None) or str(e)
             return Response(
                 {"detail": msg, "code": "STRIPE_PORTAL_ERROR"},
@@ -1951,8 +1999,6 @@ class CreateBillingPortalSessionView(APIView):
             )
 
         return Response({"url": portal_session["url"]}, status=status.HTTP_200_OK)
-
-
 
 class CreatePrepaidCheckoutSessionView(APIView):
     authentication_classes = (FirebaseAuthentication,)

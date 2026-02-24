@@ -94,6 +94,11 @@ class BillingProfile(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     
     free_unlock_used = models.BooleanField(default=False)
+    
+    country = models.CharField(max_length=2, blank=True, null=True)      # ISO-2 (BR, US, IN)
+    country_name = models.CharField(max_length=64, blank=True, null=True)
+    country_source = models.CharField(max_length=16, blank=True, null=True)  # "ip"
+    country_set_at = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):
         return f"{self.user.email} [{self.plan}]"
