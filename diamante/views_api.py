@@ -5408,28 +5408,58 @@ class DefensivoViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=["POST"])
     def payload_from_protheus_to_farmbox(self, request):
-        """
-        Primeiro momento: apenas lê e retorna o payload recebido.
-        Não valida, não processa, não persiste.
-        """
-
         payload = request.data
 
-        # log completo no console (debug)
+        # Debug local
         print("\n================ PAYLOAD RECEBIDO PROTHEUS ================")
         print(payload)
         print("===========================================================\n")
 
-        # resposta com info básica
-        response = {
-            "received": True,
-            "received_at": timezone.now(),
-            "payload_type": type(payload).__name__,
-            "keys": list(payload.keys()) if isinstance(payload, dict) else None,
-            "payload": payload,  # retorna completo (remova depois em produção)
-        }
+        # ✅ GATILHO (exemplo): se vier "send_email": true OU se algum campo específico bater
+        should_email = True
 
-        return Response(response, status=status.HTTP_200_OK)
+        if isinstance(payload, dict):
+            # opção A: flag explícita
+            should_email = bool(payload.get("send_email"))
+
+            # opção B: condição de negócio (ajuste pro seu caso)
+            # should_email = (payload.get("evento") == "APLICACAO_CRIADA")
+            # should_email = (payload.get("status") == "ERRO")
+
+        if should_email:
+            try:
+                send_mail(
+                    subject="Teste de envio Django",
+                    message=(
+                        "Se você recebeu este e-mail, o SMTP está funcionando 🎉\n\n"
+                        f"Recebido em: {timezone.now()}\n"
+                        f"Keys: {list(payload.keys()) if isinstance(payload, dict) else 'N/A'}\n"
+                    ),
+                    from_email=settings.EMAIL_HOST_USER,
+                    recipient_list=["marcelo@gdourado.com.br"],
+                    fail_silently=False,
+                )
+                email_sent = True
+            except Exception as e:
+                # Não derruba o endpoint — só reporta (ou retorne 500 se preferir)
+                email_sent = False
+                email_error = str(e)
+        else:
+            email_sent = False
+            email_error = None
+
+        return Response(
+            {
+                "received": True,
+                "received_at": timezone.now(),
+                "payload_type": type(payload).__name__,
+                "keys": list(payload.keys()) if isinstance(payload, dict) else None,
+                "email_sent": email_sent,
+                "email_error": email_error,
+                "payload": payload,  # em produção você provavelmente remove isso
+            },
+            status=status.HTTP_200_OK,
+        )
     
     
     def processar_em_background(self, task_id):
