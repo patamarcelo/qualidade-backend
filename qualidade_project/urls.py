@@ -36,6 +36,7 @@ urlpatterns = [
     path("talhao/", TalhoesView.as_view()),
     path("aviacao/", include("aviacao.urls")),
     path("kmltools/", include("kmltools.urls")),
+    path("opscheckin/", include("opscheckin.urls")),
 ]
 
 urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

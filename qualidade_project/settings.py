@@ -90,6 +90,7 @@ INSTALLED_APPS = [
     "aviacao",
     "anymail",
     "kmltools",
+    "opscheckin"
 ]
 
 MIDDLEWARE = [
@@ -366,3 +367,8 @@ from corsheaders.defaults import default_headers
 CORS_ALLOW_HEADERS = list(default_headers) + [
     "x-anon-id",
 ]
+
+
+
+WHATSAPP_VERIFY_TOKEN = env("WHATSAPP_VERIFY_TOKEN", default="")
+META_APP_SECRET = env("META_APP_SECRET", default="")  # opcional, mas recomendado
