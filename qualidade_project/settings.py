@@ -371,4 +371,7 @@ CORS_ALLOW_HEADERS = list(default_headers) + [
 
 
 WHATSAPP_VERIFY_TOKEN = env("WHATSAPP_VERIFY_TOKEN", default="")
+WHATSAPP_TOKEN = env("WHATSAPP_TOKEN", default="")
 META_APP_SECRET = env("META_APP_SECRET", default="")  # opcional, mas recomendado
+WHATSAPP_API_VERSION = env("WHATSAPP_API_VERSION", default="")  # opcional, mas recomendado
+WHATSAPP_PHONE_NUMBER_ID = env("WHATSAPP_PHONE_NUMBER_ID", default="")  # opcional, mas recomendado

@@ -2,6 +2,7 @@
 import json
 import hmac
 import hashlib
+import logging
 
 from django.conf import settings
 from django.http import JsonResponse, HttpResponse
@@ -9,19 +10,19 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
 
 from .models import Manager, DailyCheckin, OutboundQuestion
-
-import logging
+from .services.flow import create_and_send_next_question
 
 logger = logging.getLogger("opscheckin.whatsapp")
 
+
 def _verify_meta_signature(request) -> bool:
     """
-    Validação opcional (RECOMENDADA em produção):
-    confere X-Hub-Signature-256 com o APP_SECRET.
+    Recomendado em produção: valida X-Hub-Signature-256 com META_APP_SECRET.
+    Se META_APP_SECRET não estiver setado, não bloqueia (MVP).
     """
     app_secret = getattr(settings, "META_APP_SECRET", "") or ""
     if not app_secret:
-        return True  # se não configurou, não bloqueia (MVP)
+        return True
 
     sig = request.headers.get("X-Hub-Signature-256", "")
     if not sig.startswith("sha256="):
@@ -38,7 +39,7 @@ def _verify_meta_signature(request) -> bool:
 
 def _extract_messages_from_meta(payload: dict):
     """
-    Extrai (from_phone, text) do payload real do WhatsApp Cloud API.
+    Extrai (from_phone, text) do payload do WhatsApp Cloud API.
     Retorna lista de tuplas.
     """
     out = []
@@ -50,14 +51,13 @@ def _extract_messages_from_meta(payload: dict):
                 value = (ch.get("value") or {})
                 messages = value.get("messages") or []
                 for msg in messages:
-                    from_phone = (msg.get("from") or "").strip()  # ex: "5511999999999"
+                    from_phone = (msg.get("from") or "").strip()  # ex: "5551999999999"
                     mtype = msg.get("type")
 
                     text = ""
                     if mtype == "text":
                         text = ((msg.get("text") or {}).get("body") or "").strip()
                     elif mtype == "button":
-                        # se usar botões interativos
                         text = (msg.get("button", {}).get("text") or "").strip()
                     elif mtype == "interactive":
                         inter = msg.get("interactive") or {}
@@ -76,8 +76,7 @@ def _extract_messages_from_meta(payload: dict):
 
 @csrf_exempt
 def whatsapp_webhook(request):
-    # 1) Verificação do webhook (Meta faz GET com hub.challenge)
-    print('chegou a requisição da META:')# DEBUG: log básico de toda chamada
+    # DEBUG básico
     try:
         raw = request.body.decode("utf-8", errors="replace") if request.body else ""
     except Exception:
@@ -90,14 +89,12 @@ def whatsapp_webhook(request):
         request.META.get("QUERY_STRING", ""),
         request.META.get("CONTENT_TYPE", ""),
         len(request.body or b""),
-        request.headers.get("X-Hub-Signature-256", "")[:32],  # só prefixo
+        (request.headers.get("X-Hub-Signature-256", "") or "")[:32],
     )
-
     if raw:
-        # cuidado com tamanho: limita pra não poluir log
         logger.warning("WHATSAPP_WEBHOOK body=%s", raw[:4000])
-        
-    
+
+    # 1) Verificação do webhook (GET hub.challenge)
     if request.method == "GET":
         mode = request.GET.get("hub.mode")
         token = request.GET.get("hub.verify_token")
@@ -121,7 +118,6 @@ def whatsapp_webhook(request):
     except Exception:
         return JsonResponse({"ok": True})
 
-    # Extrai mensagens
     messages = _extract_messages_from_meta(payload)
     if not messages:
         return JsonResponse({"ok": True})
@@ -131,10 +127,12 @@ def whatsapp_webhook(request):
     for from_phone, message_text in messages:
         m = Manager.objects.filter(phone_e164=from_phone, is_active=True).first()
         if not m:
+            logger.warning("Mensagem ignorada: manager não encontrado from=%s", from_phone)
             continue
 
         checkin, _ = DailyCheckin.objects.get_or_create(manager=m, date=today)
 
+        # pega a pergunta pendente mais antiga do dia
         q = (
             OutboundQuestion.objects
             .filter(checkin=checkin, status="pending", answered_at__isnull=True)
@@ -142,10 +140,16 @@ def whatsapp_webhook(request):
             .first()
         )
 
-        if q:
-            q.answered_at = timezone.now()
-            q.answer_text = message_text
-            q.status = "answered"
-            q.save(update_fields=["answered_at", "answer_text", "status"])
+        if not q:
+            logger.warning("Resposta recebida mas sem pergunta pending. manager=%s text=%s", m.id, message_text[:200])
+            continue
+
+        q.answered_at = timezone.now()
+        q.answer_text = message_text
+        q.status = "answered"
+        q.save(update_fields=["answered_at", "answer_text", "status"])
+
+        # MVP: assim que responde, já envia a próxima pergunta automaticamente (fluxo sequencial)
+        create_and_send_next_question(m)
 
     return JsonResponse({"ok": True})
