@@ -1,0 +1,24 @@
+<h2>Check-ins de Hoje</h2>
+
+{% for c in checkins %}
+<div style="border:1px solid #ccc; padding:15px; margin-bottom:20px;">
+    <h3>{{ c.manager.name }}</h3>
+
+    <h4>Perguntas</h4>
+    {% for q in c.questions.all %}
+        <p>
+            <strong>{{ q.step }}</strong> —
+            {{ q.status }} <br>
+            {{ q.answer_text|linebreaksbr }}
+        </p>
+    {% endfor %}
+
+    <h4>Mensagens recebidas</h4>
+    {% for m in c.inbound_messages.all %}
+        <p>
+            <small>{{ m.received_at }}</small><br>
+            {{ m.text|linebreaksbr }}
+        </p>
+    {% endfor %}
+</div>
+{% endfor %}

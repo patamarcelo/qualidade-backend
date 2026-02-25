@@ -1,21 +1,13 @@
 # opscheckin/admin.py
 from django.contrib import admin
-from django.utils import timezone
-from django.db.models import Q
+from django.utils.html import format_html
 
-from .models import Manager, DailyCheckin, OutboundQuestion
-
-
-# ---------- Helpers ----------
-def _local_dt(dt):
-    if not dt:
-        return "-"
-    return timezone.localtime(dt).strftime("%d/%m %H:%M")
+from .models import Manager, DailyCheckin, OutboundQuestion, InboundMessage
 
 
 @admin.register(Manager)
 class ManagerAdmin(admin.ModelAdmin):
-    list_display = ("name", "phone_e164", "is_active")
+    list_display = ("id", "name", "phone_e164", "is_active")
     list_filter = ("is_active",)
     search_fields = ("name", "phone_e164")
     ordering = ("name",)
@@ -24,146 +16,80 @@ class ManagerAdmin(admin.ModelAdmin):
 class OutboundQuestionInline(admin.TabularInline):
     model = OutboundQuestion
     extra = 0
-    fields = (
-        "step",
-        "scheduled_for",
-        "status",
-        "sent_at",
-        "answered_at",
-        "reminder_count",
-        "answer_text",
-    )
-    readonly_fields = ("sent_at", "answered_at")
-    show_change_link = True
+    readonly_fields = ("sent_at", "answered_at", "last_reminder_at")
+    fields = ("step", "status", "scheduled_for", "sent_at", "answered_at", "reminder_count")
+    ordering = ("scheduled_for",)
+
+
+class InboundMessageInline(admin.TabularInline):
+    model = InboundMessage
+    extra = 0
+    readonly_fields = ("received_at", "from_phone", "wa_message_id", "msg_type", "text", "linked_question")
+    fields = ("received_at", "msg_type", "text", "linked_question")
+    ordering = ("-received_at",)
 
 
 @admin.register(DailyCheckin)
 class DailyCheckinAdmin(admin.ModelAdmin):
-    list_display = (
-        "date",
-        "manager",
-        "summary_status",
-        "answered_count",
-        "pending_count",
-        "missed_count",
-        "created_at",
-    )
+    list_display = ("id", "manager", "date", "created_at", "questions_count", "inbound_count")
     list_filter = ("date", "manager")
     search_fields = ("manager__name", "manager__phone_e164")
     date_hierarchy = "date"
-    ordering = ("-date", "manager__name")
-    inlines = [OutboundQuestionInline]
+    ordering = ("-date", "-id")
+    inlines = [OutboundQuestionInline, InboundMessageInline]
 
-    def summary_status(self, obj):
-        qs = obj.questions.all()
-        if qs.filter(status="pending").exists():
-            return "🟡 PENDING"
-        if qs.filter(status="missed").exists():
-            return "🔴 MISSED"
-        if qs.filter(status="answered").exists() and qs.count() > 0:
-            return "🟢 DONE"
-        return "⚪️ EMPTY"
+    def questions_count(self, obj):
+        return obj.questions.count()
 
-    summary_status.short_description = "Status"
-
-    def answered_count(self, obj):
-        return obj.questions.filter(status="answered").count()
-
-    answered_count.short_description = "Answered"
-
-    def pending_count(self, obj):
-        return obj.questions.filter(status="pending").count()
-
-    pending_count.short_description = "Pending"
-
-    def missed_count(self, obj):
-        return obj.questions.filter(status="missed").count()
-
-    missed_count.short_description = "Missed"
-
-    def get_list_display(self, request):
-        base = list(self.list_display)
-        if not hasattr(DailyCheckin, "created_at"):
-            base.remove("created_at")
-        return tuple(base)
+    def inbound_count(self, obj):
+        return obj.inbound_messages.count()
 
 
 @admin.register(OutboundQuestion)
 class OutboundQuestionAdmin(admin.ModelAdmin):
     list_display = (
-        "date",
-        "manager",
-        "step",
-        "status",
-        "scheduled_for",
-        "sent_at_local",
-        "answered_at_local",
-        "reminder_count",
-        "answer_preview",
-    )
-    list_filter = ("status", "step", "checkin__date", "checkin__manager")
-    search_fields = (
-        "checkin__manager__name",
-        "checkin__manager__phone_e164",
-        "answer_text",
-        "step",
-    )
-    ordering = ("-checkin__date", "checkin__manager__name", "scheduled_for")
-    date_hierarchy = "checkin__date"
-    readonly_fields = (
+        "id",
         "checkin",
         "step",
+        "status",
         "scheduled_for",
         "sent_at",
         "answered_at",
         "reminder_count",
-        "last_reminder_at",
+        "short_answer",
     )
-    actions = ("mark_as_missed", "mark_as_pending", "clear_answer")
+    list_filter = ("status", "step", "checkin__date")
+    search_fields = ("checkin__manager__name", "checkin__manager__phone_e164", "answer_text")
+    ordering = ("-scheduled_for", "-id")
+    readonly_fields = ("sent_at", "answered_at", "last_reminder_at")
 
-    def date(self, obj):
-        return obj.checkin.date
-
-    date.admin_order_field = "checkin__date"
-
-    def manager(self, obj):
-        return obj.checkin.manager
-
-    manager.admin_order_field = "checkin__manager__name"
-
-    def sent_at_local(self, obj):
-        return _local_dt(obj.sent_at)
-
-    sent_at_local.short_description = "Sent (local)"
-    sent_at_local.admin_order_field = "sent_at"
-
-    def answered_at_local(self, obj):
-        return _local_dt(obj.answered_at)
-
-    answered_at_local.short_description = "Answered (local)"
-    answered_at_local.admin_order_field = "answered_at"
-
-    def answer_preview(self, obj):
-        if not obj.answer_text:
+    def short_answer(self, obj):
+        a = (obj.answer_text or "").strip()
+        if not a:
             return "-"
-        txt = obj.answer_text.strip().replace("\n", " ")
-        return (txt[:60] + "…") if len(txt) > 60 else txt
+        return (a[:80] + "…") if len(a) > 80 else a
 
-    answer_preview.short_description = "Answer"
 
-    @admin.action(description="Mark selected as MISSED")
-    def mark_as_missed(self, request, queryset):
-        queryset.update(status="missed")
+@admin.register(InboundMessage)
+class InboundMessageAdmin(admin.ModelAdmin):
+    """
+    Inbox do WhatsApp: tudo que chegou, com ou sem pergunta pendente.
+    """
+    list_display = (
+        "id",
+        "received_at",
+        "manager",
+        "from_phone",
+        "msg_type",
+        "linked_question",
+        "short_text",
+        "processed",
+    )
+    list_filter = ("processed", "msg_type", "manager", "received_at")
+    search_fields = ("from_phone", "text", "wa_message_id", "manager__name")
+    ordering = ("-received_at", "-id")
+    readonly_fields = ("received_at",)
 
-    @admin.action(description="Mark selected as PENDING (reopen)")
-    def mark_as_pending(self, request, queryset):
-        queryset.update(status="pending", answered_at=None)
-
-    @admin.action(description="Clear answer (keep status)")
-    def clear_answer(self, request, queryset):
-        queryset.update(answer_text="")
-
-    # Filtro rápido “Hoje”
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        return qs.select_related("checkin", "checkin__manager")
+    def short_text(self, obj):
+        t = (obj.text or "").strip()
+        return (t[:120] + "…") if len(t) > 120 else t
