@@ -263,7 +263,7 @@ class KMLMergeJobAdmin(admin.ModelAdmin):
         "anon_id",
         "plan",
         "status",
-        "visitor_country",
+        "visitor_country_name",
         "tol_m",
         "corridor_width_m",
         "total_files",
