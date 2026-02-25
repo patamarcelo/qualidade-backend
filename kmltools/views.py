@@ -49,17 +49,24 @@ from rest_framework.exceptions import NotFound
 
 import ipaddress
 
+import logging
+logger = logging.getLogger(__name__)
 
 
 
 
 def get_client_ip(request):
-    # Railway / proxies: pega o primeiro IP real
+    # Cloudflare / proxies comuns
+    cf = (request.META.get("HTTP_CF_CONNECTING_IP") or "").strip()
+    if cf:
+        return cf
+
     xff = request.META.get("HTTP_X_FORWARDED_FOR")
     if xff:
-        ip = xff.split(",")[0].strip()
-    else:
-        ip = (request.META.get("HTTP_X_REAL_IP") or request.META.get("REMOTE_ADDR") or "").strip()
+        # pega o primeiro (cliente original)
+        return xff.split(",")[0].strip()
+
+    ip = (request.META.get("HTTP_X_REAL_IP") or request.META.get("REMOTE_ADDR") or "").strip()
     return ip or None
 
 def is_public_ip(ip: str) -> bool:
@@ -93,9 +100,12 @@ def ensure_country_on_bp(bp, request):
     Não falha a request se der ruim na geo.
     """
     # debug temporário (depois remove)
-    print("XFF:", request.META.get("HTTP_X_FORWARDED_FOR"))
-    print("X-REAL:", request.META.get("HTTP_X_REAL_IP"))
-    print("REMOTE:", request.META.get("REMOTE_ADDR"))
+    logger.warning("IP DEBUG xff=%s xreal=%s remote=%s cf=%s",
+        request.META.get("HTTP_X_FORWARDED_FOR"),
+        request.META.get("HTTP_X_REAL_IP"),
+        request.META.get("REMOTE_ADDR"),
+        request.META.get("HTTP_CF_CONNECTING_IP"),
+    )
 
     if not bp or getattr(bp, "country", None):
         return
@@ -107,7 +117,7 @@ def ensure_country_on_bp(bp, request):
     # ✅ filtro leve: bloqueia só IPs obviamente inválidos/internos
     try:
         addr = ipaddress.ip_address(ip)
-        if addr.is_private or addr.is_loopback or addr.is_unspecified or addr.is_reserved:
+        if not addr.is_global:
             return
     except Exception:
         return
@@ -121,6 +131,30 @@ def ensure_country_on_bp(bp, request):
     bp.country_source = "ip"
     bp.country_set_at = timezone.now()
     bp.save(update_fields=["country", "country_name", "country_source", "country_set_at"])
+
+def ensure_country_from_anon_jobs(bp, anon_id: str):
+    if not bp or bp.country or not anon_id:
+        return False
+
+    job = (KMLMergeJob.objects
+            .filter(anon_id=anon_id)
+            .exclude(visitor_country__isnull=True)
+            .exclude(visitor_country="")
+            .order_by("-created_at")
+            .first())
+    if not job:
+        return False
+
+    bp.country = (job.visitor_country or "").upper().strip() or None
+    bp.country_name = (job.visitor_country_name or "").strip() or None
+    if not bp.country:
+        return False
+    bp.country_name = job.visitor_country_name
+    bp.country_source = "anon_ip"
+    bp.country_set_at = timezone.now()
+    bp.save(update_fields=["country","country_name","country_source","country_set_at","updated_at"])
+    return True
+
 class KMLAnonThrottle(AnonRateThrottle):
     rate = "20/hour"
 
@@ -173,7 +207,7 @@ def _get_firebase_uid_from_user(user):
         or getattr(user, "firebaseUid", None)
     )
 
-def ensure_billing_profile(user):
+def ensure_billing_profile(user, request=None):
     """
     Garante que existe BillingProfile salvo e retorna ele.
     Se não conseguir inferir firebase_uid, retorna None.
@@ -183,6 +217,18 @@ def ensure_billing_profile(user):
 
     bp = getattr(user, "billing", None)
     if bp and getattr(bp, "pk", None):
+        if request and not getattr(bp, "country", None):
+            anon_id = (request.headers.get("X-ANON-ID") or "").strip() or None
+            if anon_id:
+                try:
+                    if ensure_country_from_anon_jobs(bp, anon_id):
+                        return bp
+                except Exception:
+                    pass
+            try:
+                ensure_country_on_bp(bp, request)
+            except Exception:
+                pass
         return bp
 
     firebase_uid = _get_firebase_uid_from_user(user)
@@ -193,6 +239,20 @@ def ensure_billing_profile(user):
         user=user,
         defaults={"firebase_uid": firebase_uid},
     )
+    if request:
+        anon_id = (request.headers.get("X-ANON-ID") or "").strip() or None
+        if anon_id:
+            try:
+                if ensure_country_from_anon_jobs(bp, anon_id):
+                    return bp
+            except Exception:
+                pass
+
+        # fallback IP do request autenticado
+        try:
+            ensure_country_on_bp(bp, request)
+        except Exception:
+            pass
     return bp
 
 def _debug_enabled():
@@ -275,7 +335,7 @@ class MeView(APIView):
 
     def get(self, request):
         stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
-        bp = ensure_billing_profile(request.user)
+        bp = ensure_billing_profile(request.user, request=request)
         if not bp:
             return Response({"email": request.user.email, "plan": "free"})
 
@@ -850,9 +910,24 @@ class KMLUnionView(APIView):
             )
 
         user = request.user if getattr(request.user, "is_authenticated", False) else None
-        bp = getattr(user, "billing", None) if user else None
+        bp = ensure_billing_profile(user, request=request) if user else None
 
         anon_id = (request.headers.get("X-ANON-ID") or "").strip() or None
+        visitor_country = None
+        visitor_country_name = None
+        visitor_ip = None
+
+        try:
+            visitor_ip = get_client_ip(request)
+            if visitor_ip:
+                try:
+                    if ipaddress.ip_address(visitor_ip).is_global:
+                        cc, cn = geo_country_from_ip(visitor_ip)
+                        visitor_country, visitor_country_name = cc, cn
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
 
         # Semana (analytics)
@@ -1264,6 +1339,7 @@ class KMLUnionView(APIView):
                     "output_storage_path": saved_path,
                     "total_markers": len([f for f in markers if (f.get("geometry") or {}).get("type") == "Point"])
                 }
+                
 
                 meta_path = f"kml_unions/{request_id}/meta/meta.json"
                 default_storage.save(
@@ -1292,6 +1368,10 @@ class KMLUnionView(APIView):
                     input_filenames=input_filenames,
                     input_storage_paths=input_storage_paths,
                     meta_storage_path=meta_path,
+
+                    visitor_ip=visitor_ip,
+                    visitor_country=visitor_country,
+                    visitor_country_name=visitor_country_name,
                 )
             except Exception as e:
                 print(f"[KML_HISTORY] Falha ao salvar histórico do merge {request_id}: {e}")
@@ -1312,10 +1392,11 @@ class KMLUnionView(APIView):
             # -----------------------
             # Resposta / gating
             # -----------------------
-            try:
-                bp.refresh_from_db()
-            except Exception:
-                pass
+            if bp and getattr(bp, "pk", None):
+                try:
+                    bp.refresh_from_db()
+                except Exception:
+                    pass
 
             plan = (getattr(bp, "plan", None) or "free").lower().strip()
             prepaid_left = int(getattr(bp, "prepaid_credits", 0) or 0)
@@ -1395,7 +1476,7 @@ class KMLDownloadView(APIView):
             job.user = request.user
             job.save(update_fields=["user"])
 
-        bp = ensure_billing_profile(request.user)
+        bp = ensure_billing_profile(request.user, request=request)
         if not bp:
             bp, created = BillingProfile.objects.get_or_create(
                 user=request.user,
@@ -1487,7 +1568,7 @@ class UsageView(APIView):
             .first()
         ) or 0
 
-        bp = ensure_billing_profile(request.user)
+        bp = ensure_billing_profile(request.user, request=request)
         if not bp:
             return Response(
                 {
@@ -1981,12 +2062,6 @@ class CreateBillingPortalSessionView(APIView):
                 {"detail": "Stripe customer inexistente para este usuário.", "code": "STRIPE_CUSTOMER_MISSING"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
-        # ✅ salva país se ainda não tiver
-        try:
-            ensure_country_on_bp(bp, request)
-        except Exception:
-            pass
 
         # return_url: se vier do front, usa; senão usa APP_URL padrão
         body_return_url = None

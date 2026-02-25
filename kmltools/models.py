@@ -247,6 +247,11 @@ class KMLMergeJob(models.Model):
 
     # Auditoria (opcional, mas recomendo)
     download_email_sent_at = models.DateTimeField(blank=True, null=True)
+    
+    
+    visitor_ip = models.GenericIPAddressField(null=True, blank=True)
+    visitor_country = models.CharField(max_length=2, null=True, blank=True, db_index=True)
+    visitor_country_name = models.CharField(max_length=64, null=True, blank=True)
 
     class Meta:
         indexes = [

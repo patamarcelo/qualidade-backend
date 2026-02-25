@@ -260,15 +260,16 @@ class KMLMergeJobAdmin(admin.ModelAdmin):
     list_display = (
         "created_at",
         "user_email",
+        "anon_id",
         "plan",
         "status",
+        "visitor_country",
         "tol_m",
         "corridor_width_m",
         "total_files",
         "total_polygons",
         "output_polygons",
         "merged_polygons",
-        "input_area_ha",
         "output_area_ha",
         "request_id",
     )
@@ -276,11 +277,16 @@ class KMLMergeJobAdmin(admin.ModelAdmin):
     list_filter = (
         "status",
         "plan",
+        "visitor_country",
         "created_at",
     )
 
     search_fields = (
         "request_id",
+        "anon_id",
+        "visitor_ip",
+        "visitor_country",
+        "visitor_country_name",
         "user__email",
         "user__username",
     )
@@ -293,7 +299,13 @@ class KMLMergeJobAdmin(admin.ModelAdmin):
         "request_id",
         "metrics",
         "input_filenames",
+        "input_storage_paths",
+        "meta_storage_path",
         "storage_path",
+        "visitor_ip",
+        "visitor_country",
+        "visitor_country_name",
+        "download_email_sent_at",
     )
 
     ordering = ("-created_at",)
@@ -302,19 +314,45 @@ class KMLMergeJobAdmin(admin.ModelAdmin):
         (
             "Identificação",
             {
-                "fields": ("id", "user", "request_id", "status", "plan", "created_at"),
+                "fields": (
+                    "id",
+                    "user",
+                    "anon_id",
+                    "request_id",
+                    "status",
+                    "plan",
+                    "created_at",
+                ),
+            },
+        ),
+        (
+            "Visitor / Geo",
+            {
+                "fields": (
+                    "visitor_ip",
+                    "visitor_country",
+                    "visitor_country_name",
+                ),
             },
         ),
         (
             "Parâmetros do Merge",
             {
-                "fields": ("tol_m", "corridor_width_m"),
+                "fields": (
+                    "tol_m",
+                    "corridor_width_m",
+                ),
             },
         ),
         (
             "Entrada",
             {
-                "fields": ("total_files", "total_polygons", "input_filenames"),
+                "fields": (
+                    "total_files",
+                    "total_polygons",
+                    "input_filenames",
+                    "input_storage_paths",
+                ),
             },
         ),
         (
@@ -332,20 +370,22 @@ class KMLMergeJobAdmin(admin.ModelAdmin):
             },
         ),
         (
-            "Storage",
+            "Storage / Auditoria",
             {
-                "fields": ("storage_path",),
+                "fields": (
+                    "storage_path",
+                    "meta_storage_path",
+                    "download_email_sent_at",
+                ),
             },
         ),
     )
 
     def user_email(self, obj):
-        return _email(obj)
+        return obj.user.email if obj.user else "—"
 
     user_email.short_description = "Email"
     user_email.admin_order_field = "user__email"
-
-
 
 @admin.register(MergeFeedback)
 class MergeFeedbackAdmin(admin.ModelAdmin):
