@@ -41,6 +41,8 @@ class OutboundQuestion(models.Model):
     scheduled_for = models.DateTimeField(db_index=True)  # horário-alvo
     sent_at = models.DateTimeField(null=True, blank=True)
 
+    prompt_text = models.TextField(blank=True, default="")
+    
     reminder_count = models.PositiveSmallIntegerField(default=0)
     last_reminder_at = models.DateTimeField(null=True, blank=True)
 

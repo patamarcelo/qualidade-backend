@@ -1,96 +1,699 @@
 <!doctype html>
-<html>
+<html lang="pt-br">
+
 <head>
   <meta charset="utf-8" />
-  <title>OpsCheckin Board</title>
-  <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 16px; background:#0b1220; color:#e5e7eb; }
-    .topbar { display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-bottom:16px; }
-    .card { background: rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.10); border-radius:14px; padding:12px; }
-    label { font-size:12px; opacity:0.85; display:block; margin-bottom:6px;}
-    input[type="date"], textarea, select { background: rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); color:#e5e7eb; border-radius:10px; padding:10px; }
-    textarea { width: 520px; height: 88px; }
-    select { min-width: 280px; height: 112px; }
-    button { background:#22c55e; border:none; color:#0b1220; padding:10px 14px; border-radius:10px; font-weight:700; cursor:pointer; }
-    button:hover { filter: brightness(1.05); }
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>OpsCheckin • Board</title>
 
-    .grid { display:grid; grid-auto-flow: column; grid-auto-columns: minmax(280px, 1fr); gap:12px; overflow-x:auto; padding-bottom:8px; }
-    .col { min-height: 240px; }
-    .col h3 { margin:0 0 6px 0; font-size:14px; }
-    .meta { font-size:12px; opacity:0.8; margin-bottom:10px; }
-    .thread { display:flex; flex-direction:column; gap:8px; }
-    .bubble { max-width: 92%; padding:10px 12px; border-radius:14px; line-height:1.25; font-size:13px; white-space:pre-wrap; }
-    .left { align-self:flex-start; background: rgba(255,255,255,0.10); border:1px solid rgba(255,255,255,0.10); }
-    .right { align-self:flex-end; background: rgba(34,197,94,0.20); border:1px solid rgba(34,197,94,0.25); }
-    .bmeta { font-size:11px; opacity:0.75; margin-top:6px; }
-    .empty { opacity:0.7; font-size:12px; }
+  <style>
+    :root {
+      /* Light theme */
+      --bg: #f6f7fb;
+      --surface: #ffffff;
+      --surface2: #f2f4f8;
+      --border: rgba(15, 23, 42, .12);
+      --border2: rgba(15, 23, 42, .08);
+      --text: #0f172a;
+      --muted: rgba(15, 23, 42, .62);
+
+      /* Messages */
+      --inb: #eef2f7;
+      --inbBorder: rgba(15, 23, 42, .10);
+      --outb: rgba(34, 197, 94, .16);
+      --outbBorder: rgba(34, 197, 94, .30);
+
+      /* Status */
+      --ok: #16a34a;
+      --warn: #f59e0b;
+      --danger: #ef4444;
+
+      /* Board sizing */
+      --colW: 340px;
+      --colGap: 12px;
+      --colHeaderH: 76px;
+
+      /* paddings */
+      --pad5: 5px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      height: 100%;
+    }
+
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      color: var(--text);
+      background:
+        radial-gradient(1000px 600px at 15% -10%, rgba(34, 197, 94, .10), transparent 55%),
+        radial-gradient(900px 600px at 90% 0%, rgba(59, 130, 246, .10), transparent 55%),
+        var(--bg);
+    }
+
+    /* Top bar (single-line, compact) */
+    .top {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(246, 247, 251, .90);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      padding: 8px 10px;
+    }
+
+    .topRow {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .title {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      min-width: 220px;
+      white-space: nowrap;
+    }
+
+    .title h1 {
+      margin: 0;
+      font-size: 14px;
+      letter-spacing: .2px;
+    }
+
+    .title .sub {
+      margin: 0;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    /* Compact controls */
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    label {
+      display: block;
+      font-size: 11px;
+      color: var(--muted);
+      margin: 0 0 4px 0;
+    }
+
+    input[type="date"],
+    textarea,
+    select {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 8px 10px;
+      outline: none;
+    }
+
+    .btn {
+      background: #16a34a;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-weight: 800;
+      cursor: pointer;
+      white-space: nowrap;
+      box-shadow: 0 10px 18px rgba(22, 163, 74, .15);
+    }
+
+    .btn:hover {
+      filter: brightness(1.03);
+    }
+
+    .btnGhost {
+      background: rgba(15, 23, 42, .06);
+      border: 1px solid var(--border);
+      color: var(--text);
+      box-shadow: none;
+      font-weight: 800;
+    }
+
+    .pillBtn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, .75);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 800;
+      color: rgba(15, 23, 42, .85);
+      user-select: none;
+      white-space: nowrap;
+    }
+
+    .pillBtn.active {
+      border-color: rgba(22, 163, 74, .30);
+      background: rgba(22, 163, 74, .12);
+      color: #166534;
+    }
+
+    /* Collapsible sender */
+    details.sender {
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, .75);
+      border-radius: 12px;
+      padding: 6px 8px;
+      box-shadow: 0 8px 16px rgba(15, 23, 42, .06);
+    }
+
+    details.sender>summary {
+      cursor: pointer;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      user-select: none;
+      white-space: nowrap;
+    }
+
+    details.sender>summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .chev {
+      width: 26px;
+      height: 26px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      background: rgba(15, 23, 42, .06);
+      border: 1px solid var(--border);
+      font-weight: 900;
+      color: rgba(15, 23, 42, .70);
+    }
+
+    details.sender[open] .chev {
+      transform: rotate(180deg);
+    }
+
+    .senderBody {
+      margin-top: 8px;
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+      flex-wrap: wrap;
+    }
+
+    textarea {
+      width: 420px;
+      max-width: 520px;
+      height: 78px;
+      resize: vertical;
+    }
+
+    select {
+      width: 320px;
+      height: 112px;
+    }
+
+    /* Board should occupy full screen width/height under top bar */
+    .wrap {
+      height: calc(100vh - 54px);
+      /* top bar approx height */
+      padding: var(--pad5);
+    }
+
+    .board {
+      height: 100%;
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: var(--colW);
+      gap: var(--colGap);
+      justify-content: start;
+      align-items: stretch;
+
+      overflow-x: auto;
+      overflow-y: hidden;
+
+      padding: 0;
+      scroll-snap-type: x proximity;
+    }
+
+    .col {
+      scroll-snap-align: start;
+      width: var(--colW);
+      max-width: var(--colW);
+      height: 100%;
+      background: rgba(255, 255, 255, .78);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 10px 22px rgba(15, 23, 42, .06);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    /* Light divider between columns (visual) */
+    .board .col:not(:last-child)::after {
+      content: "";
+      position: absolute;
+      top: 8px;
+      right: calc(var(--colGap) * -0.5);
+      width: 1px;
+      height: calc(100% - 16px);
+      background: rgba(15, 23, 42, .10);
+      opacity: .55;
+      pointer-events: none;
+    }
+
+    .colHeader {
+      position: sticky;
+      top: 54px;
+      /* aligns with top bar */
+      z-index: 20;
+      background: rgba(255, 255, 255, .92);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border2);
+      padding: 8px 9px;
+      /* <= compact */
+    }
+
+    .colHeaderTop {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: flex-start;
+    }
+
+    .mgr {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .mgrName {
+      font-size: 13px;
+      font-weight: 850;
+      line-height: 1.1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .dot {
+      font-size: 12px;
+      line-height: 1;
+    }
+
+    .dotOn {
+      color: #16a34a;
+    }
+
+    .dotOff {
+      color: #ef4444;
+    }
+
+    .state {
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      border: 1px solid var(--border2);
+      background: rgba(15, 23, 42, .03);
+      color: rgba(15, 23, 42, .75);
+      font-weight: 800;
+      flex: 0 0 auto;
+    }
+
+    .stateOn {
+      border-color: rgba(22, 163, 74, .25);
+      background: rgba(22, 163, 74, .10);
+      color: #166534;
+    }
+
+    .stateOff {
+      border-color: rgba(239, 68, 68, .25);
+      background: rgba(239, 68, 68, .10);
+      color: #7f1d1d;
+    }
+
+    .mgrPhone {
+      font-size: 11px;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .badge {
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(15, 23, 42, .04);
+      white-space: nowrap;
+      flex-shrink: 0;
+      font-weight: 800;
+    }
+
+    .b-ok {
+      border-color: rgba(22, 163, 74, .25);
+      background: rgba(22, 163, 74, .10);
+      color: #166534;
+    }
+
+    .b-warn {
+      border-color: rgba(245, 158, 11, .25);
+      background: rgba(245, 158, 11, .10);
+      color: #92400e;
+    }
+
+    .b-danger {
+      border-color: rgba(239, 68, 68, .25);
+      background: rgba(239, 68, 68, .10);
+      color: #7f1d1d;
+    }
+
+    .colMeta {
+      margin-top: 6px;
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .pill {
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--border2);
+      background: rgba(15, 23, 42, .03);
+    }
+
+    .thread {
+      padding: calc(var(--pad5) + var(--colHeaderH)) var(--pad5) var(--pad5);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      overflow-y: auto;
+      flex: 1;
+      min-height: 0;
+      /* important for flex scroll */
+    }
+
+    .msgRow {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      width: 100%;
+    }
+
+    .msgRow.left {
+      align-items: flex-start;
+    }
+
+    .msgRow.right {
+      align-items: flex-end;
+    }
+
+    .bubble {
+      display: inline-block;
+      max-width: 85%;
+      padding: 1px 6px;
+      /* mínimo absoluto */
+      border-radius: 8px;
+      font-size: 12.5px;
+      line-height: 1.05;
+      /* extremamente compacto */
+      border: 1px solid var(--border2);
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin: 0;
+      /* remove qualquer margem */
+    }
+
+    .thread {
+      padding: 5px;
+      /* remove aquele padding grande anterior */
+    }
+
+    .bubble.inb {
+      background: var(--inb);
+      border-color: var(--inbBorder);
+      text-align: left;
+    }
+
+    .bubble.outb {
+      background: var(--outb);
+      border-color: var(--outbBorder);
+    }
+
+    .metaLine {
+      font-size: 10.5px;
+      color: var(--muted);
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .time {
+      font-variant-numeric: tabular-nums;
+      letter-spacing: .2px;
+    }
+
+    .tag {
+      padding: 2px 7px;
+      border-radius: 999px;
+      border: 1px solid var(--border2);
+      background: rgba(15, 23, 42, .03);
+    }
+
+    .empty {
+      padding: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      border: 1px dashed rgba(15, 23, 42, .18);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, .75);
+    }
+
+    /* Mobile */
+    @media (max-width: 900px) {
+      textarea {
+        width: 320px;
+      }
+
+      select {
+        width: 280px;
+      }
+
+      .wrap {
+        height: calc(100vh - 92px);
+      }
+
+      /* top may wrap */
+      .colHeader {
+        top: 92px;
+      }
+    }
+
+    @media (max-width: 420px) {
+      :root {
+        --colW: 300px;
+      }
+    }
+
+    @media (min-width: 1600px) {
+      :root {
+        --colW: 360px;
+      }
+    }
   </style>
 </head>
+
 <body>
+  <div class="top">
+    <div class="topRow">
+      <div class="title">
+        <h1>OpsCheckin • Dashboard</h1>
+        <p class="sub">{{ day|date:"d/m/Y" }}</p>
+      </div>
 
-  <div class="topbar">
-    <div class="card">
-      <form method="get" action="">
-        <label>Data</label>
-        <input type="date" name="date" value="{{ day|date:'Y-m-d' }}" />
-        <button type="submit" style="margin-left:8px;">Filtrar</button>
-      </form>
-    </div>
-
-    <div class="card">
-      <form method="post" action="">
-        {% csrf_token %}
-        <label>Mensagem (envio manual)</label>
-        <textarea name="message">{{ default_msg }}</textarea>
-
-        <div style="display:flex; gap:12px; align-items:flex-end; margin-top:10px;">
-          <div>
-            <label>Managers (Ctrl/Cmd para múltiplos). Se vazio: envia para todos.</label>
-            <select name="manager_ids" multiple>
-              {% for m in managers %}
-                <option value="{{ m.id }}">{{ m.name }} ({{ m.phone_e164 }})</option>
-              {% endfor %}
-            </select>
+      <div class="controls">
+        <!-- Date filter (request only for date) -->
+        <form method="get" action="" class="rowInline" style="margin:0;">
+          <div style="display:flex; flex-direction:column; gap:4px;">
+            <label style="margin:0;">Data</label>
+            <div class="rowInline" style="gap:8px;">
+              <input type="date" name="date" value="{{ day|date:'Y-m-d' }}" />
+              <button class="btn" type="submit">Filtrar</button>
+            </div>
           </div>
-          <button type="submit">Enviar agora</button>
+          <!-- keep existing status param if present (so date request doesn't wipe it) -->
+          {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
+        </form>
+
+        <!-- Client-side filter (no request) -->
+        <div style="display:flex; flex-direction:column; gap:4px;">
+          <label style="margin:0;">Managers</label>
+          <div class="rowInline" style="gap:8px;">
+            <div class="pillBtn active" id="fActive" data-filter="active">Ativos</div>
+            <div class="pillBtn" id="fInactive" data-filter="inactive">Inativos</div>
+            <div class="pillBtn" id="fAll" data-filter="all">Todos</div>
+          </div>
         </div>
-      </form>
+
+        <!-- Collapsible manual sender -->
+        <details class="sender">
+          <summary>
+            <span style="font-size:12px;font-weight:900;">Envio manual</span>
+            <div class="chev">⌄</div>
+          </summary>
+
+          <form method="post" action="" class="senderBody">
+            {% csrf_token %}
+            <div>
+              <label>Mensagem</label>
+              <textarea name="message">{{ default_msg }}</textarea>
+            </div>
+
+            <div>
+              <label>Managers (Ctrl/Cmd p/ múltiplos). Vazio: envia p/ todos.</label>
+              <select name="manager_ids" multiple>
+                {% for m in managers %}
+                <option value="{{ m.id }}">{{ m.name }} ({{ m.phone_e164 }})</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <button class="btn" type="submit">Enviar</button>
+          </form>
+        </details>
+      </div>
     </div>
   </div>
 
-  <div class="grid">
-    {% for col in cols %}
-      <div class="card col">
-        <h3>{{ col.manager.name }}</h3>
-        <div class="meta">
-          {% if col.checkin %}
-            {{ col.manager.phone_e164 }} • checkin {{ day|date:"d/m/Y" }}
+  <div class="wrap">
+    <div class="board" id="board">
+      {% for col in cols %}
+      <div class="col" data-active="{% if col.manager.is_active %}1{% else %}0{% endif %}">
+        <div class="colHeader">
+          <div class="colHeaderTop">
+            <div class="mgr">
+              <div class="mgrName">
+                <span class="dot {% if col.manager.is_active %}dotOn{% else %}dotOff{% endif %}">●</span>
+                {{ col.manager.name }}
+                <span class="state {% if col.manager.is_active %}stateOn{% else %}stateOff{% endif %}">
+                  {% if col.manager.is_active %}ativo{% else %}inativo{% endif %}
+                </span>
+              </div>
+              <div class="mgrPhone">{{ col.manager.phone_e164 }}</div>
+            </div>
+
             {% if col.agenda_q %}
-              • AGENDA: {{ col.agenda_q.status }}
+            {% if col.agenda_q.status == "answered" %}
+            <div class="badge b-ok">answered</div>
+            {% elif col.agenda_q.status == "missed" %}
+            <div class="badge b-danger">missed</div>
+            {% else %}
+            <div class="badge b-warn">pending</div>
             {% endif %}
-          {% else %}
-            {{ col.manager.phone_e164 }} • sem checkin
-          {% endif %}
+            {% else %}
+            <div class="badge">sem agenda</div>
+            {% endif %}
+          </div>
+
+          <div class="colMeta">
+            <div class="pill">Dia: {{ day|date:"d/m" }}</div>
+            {% if col.agenda_q %}
+            <div class="pill">Rem: {{ col.agenda_q.reminder_count }}</div>
+            <div class="pill">Chars: {{ col.agenda_q.answer_text|length }}</div>
+            {% endif %}
+          </div>
         </div>
 
         <div class="thread">
           {% if col.timeline|length == 0 %}
-            <div class="empty">Sem conversa ainda.</div>
+          <div class="empty">Sem conversa ainda.</div>
           {% else %}
-            {% for it in col.timeline %}
-              <div class="bubble {{ it.side }}">
-                <div><strong>{{ it.label }}</strong></div>
-                <div>{{ it.text }}</div>
-                {% if it.meta %}
-                  <div class="bmeta">{{ it.meta }}</div>
-                {% endif %}
-              </div>
-            {% endfor %}
+          {% for it in col.timeline %}
+          <div class="msgRow {{ it.side }}">
+            <div class="bubble {% if it.side == 'right' %}outb{% else %}inb{% endif %}">
+              {{ it.text }}
+            </div>
+            <div class="metaLine">
+              <span class="time">{{ it.label }}</span>
+              {% if it.meta %}
+              <span class="tag">{{ it.meta }}</span>
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
           {% endif %}
         </div>
       </div>
-    {% endfor %}
+      {% endfor %}
+    </div>
   </div>
 
+  <script>
+    (function () {
+      const btnActive = document.getElementById("fActive");
+      const btnInactive = document.getElementById("fInactive");
+      const btnAll = document.getElementById("fAll");
+      const cols = Array.from(document.querySelectorAll(".col"));
+
+      function setActiveBtn(which) {
+        [btnActive, btnInactive, btnAll].forEach(b => b.classList.remove("active"));
+        if (which === "active") btnActive.classList.add("active");
+        if (which === "inactive") btnInactive.classList.add("active");
+        if (which === "all") btnAll.classList.add("active");
+      }
+
+      function applyFilter(which) {
+        cols.forEach(c => {
+          const isActive = c.getAttribute("data-active") === "1";
+          let show = true;
+          if (which === "active") show = isActive;
+          if (which === "inactive") show = !isActive;
+          c.style.display = show ? "" : "none";
+        });
+      }
+
+      btnActive.addEventListener("click", () => {
+        setActiveBtn("active");
+        applyFilter("active");
+      });
+      btnInactive.addEventListener("click", () => {
+        setActiveBtn("inactive");
+        applyFilter("inactive");
+      });
+      btnAll.addEventListener("click", () => {
+        setActiveBtn("all");
+        applyFilter("all");
+      });
+
+      // default: ativos
+      setActiveBtn("active");
+      applyFilter("active");
+    })();
+  </script>
 </body>
+
 </html>
