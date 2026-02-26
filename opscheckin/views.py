@@ -183,8 +183,9 @@ def whatsapp_webhook(request):
                 checkin=checkin,
                 status="pending",
                 answered_at__isnull=True,
+                sent_at__isnull=False,
             )
-            .order_by("-sent_at", "scheduled_for", "id")  # prefere a última enviada
+            .order_by("scheduled_for", "id")  # mais antiga primeiro
             .first()
         )
 

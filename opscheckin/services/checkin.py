@@ -32,24 +32,31 @@ def ensure_slots_for_today(manager, today=None):
 
 def send_due_questions(checkin, now=None):
     """
-    Envia perguntas cujo scheduled_for <= now e sent_at ainda é null.
-    Retorna lista de OutboundQuestion enviadas.
+    Envia no máximo 1 pergunta por execução.
+    Regra: se já existe uma pergunta enviada e ainda não respondida, não envia outra.
     """
     now = now or timezone.now()
 
-    due = (
+    has_open = checkin.questions.filter(
+        status="pending",
+        sent_at__isnull=False,
+        answered_at__isnull=True,
+    ).exists()
+    if has_open:
+        return []
+
+    q = (
         checkin.questions
         .filter(sent_at__isnull=True, scheduled_for__lte=now)
         .order_by("scheduled_for", "id")
+        .first()
     )
+    if not q:
+        return []
 
-    sent = []
-    for q in due:
-        body = slot_text(q.step) or f"[{q.step}]"
-        send_text(checkin.manager.phone_e164, body)
-        q.sent_at = now
-        q.status = "pending"
-        q.save(update_fields=["sent_at", "status"])
-        sent.append(q)
-
-    return sent
+    body = slot_text(q.step) or f"[{q.step}]"
+    send_text(checkin.manager.phone_e164, body)
+    q.sent_at = now
+    q.status = "pending"
+    q.save(update_fields=["sent_at", "status"])
+    return [q]
