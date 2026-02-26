@@ -24,24 +24,16 @@ def _parse_date(s: str):
 
 
 def _build_full_timeline(checkin):
-    """
-    Timeline completa:
-    - OutboundQuestion (sent_at != null)
-    - InboundMessage do dia
-    Misturados por timestamp
-    """
-
     items = []
 
-    # Outbounds enviados
-    for q in checkin.questions.filter(sent_at__isnull=False):
-    
+    # Outbounds logados
+    for om in checkin.outbound_messages.all():
         items.append({
-            "ts": q.sent_at,
+            "ts": om.sent_at,
             "side": "right",
-            "text": q.prompt_text,   # agora sim
+            "text": om.text,
             "is_outbound": True,
-            "meta": q.status,
+            "meta": om.kind,
         })
 
     # Inbounds
@@ -54,14 +46,13 @@ def _build_full_timeline(checkin):
             "meta": "",
         })
 
-    # Ordena cronologicamente
     items.sort(key=lambda x: x["ts"] or timezone.now())
-
-    # Formata horário
     for it in items:
         it["label"] = it["ts"].astimezone().strftime("%H:%M")
 
     return items
+
+
 
 @staff_member_required
 @require_http_methods(["GET", "POST"])
@@ -103,7 +94,7 @@ def board_view(request):
         DailyCheckin.objects
         .filter(date=day)
         .select_related("manager")
-        .prefetch_related("questions", "inbound_messages")
+        .prefetch_related("questions", "inbound_messages", "outbound_messages")
     )
 
     by_manager = {c.manager_id: c for c in checkins}

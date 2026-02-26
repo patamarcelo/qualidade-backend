@@ -1,11 +1,11 @@
 # opscheckin/management/commands/checkin_tick.py
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from opscheckin.models import Manager, DailyCheckin, OutboundQuestion
+from opscheckin.models import Manager, DailyCheckin, OutboundQuestion, OutboundMessage
 from opscheckin.services.whatsapp import send_text
 
 
@@ -25,6 +25,29 @@ def _local_today():
 def _ensure_checkin(manager: Manager, day):
     checkin, _ = DailyCheckin.objects.get_or_create(manager=manager, date=day)
     return checkin
+
+
+def _log_outbound(*, manager: Manager, checkin: DailyCheckin, related_question: OutboundQuestion | None, kind: str, text: str, now, resp: dict | None):
+    """
+    Cria log do que foi ENVIADO para o WhatsApp (espelho do InboundMessage).
+    """
+    provider_id = ""
+    try:
+        provider_id = ((resp or {}).get("messages") or [{}])[0].get("id") or ""
+    except Exception:
+        provider_id = ""
+
+    OutboundMessage.objects.create(
+        manager=manager,
+        checkin=checkin,
+        related_question=related_question,
+        to_phone=manager.phone_e164,
+        provider_message_id=provider_id,
+        kind=kind,
+        text=text,
+        sent_at=now,
+        raw_response=resp,
+    )
 
 
 def _send_agenda_if_needed(
@@ -60,7 +83,19 @@ def _send_agenda_if_needed(
         prompt_text=final_msg,  # requer o campo prompt_text
     )
 
-    send_text(manager.phone_e164, final_msg)
+    resp = send_text(manager.phone_e164, final_msg)
+
+    # log do outbound (para o board espelhar)
+    _log_outbound(
+        manager=manager,
+        checkin=checkin,
+        related_question=q,
+        kind="agenda",
+        text=final_msg,
+        now=now,
+        resp=resp,
+    )
+
     return q
 
 
@@ -70,7 +105,7 @@ def _should_remind(q: OutboundQuestion, *, now, remind_every_min: int, min_chars
       - pending
       - não respondeu
       - reminder_count < max_reminders
-      - tempo desde sent_at >= remind_every_min
+      - tempo desde sent_at/last_reminder_at >= remind_every_min
       - e (sem resposta) OU (resposta curta < min_chars)
     """
     if q.status != "pending":
@@ -94,7 +129,24 @@ def _should_remind(q: OutboundQuestion, *, now, remind_every_min: int, min_chars
 
 
 def _send_reminder(q: OutboundQuestion, *, now, reminder_text: str):
-    send_text(q.checkin.manager.phone_e164, reminder_text)
+    """
+    Envia reminder e registra no log OutboundMessage.
+    """
+    manager = q.checkin.manager
+    if not manager:
+        return
+
+    resp = send_text(manager.phone_e164, reminder_text)
+
+    _log_outbound(
+        manager=manager,
+        checkin=q.checkin,
+        related_question=q,
+        kind="reminder",
+        text=reminder_text,
+        now=now,
+        resp=resp,
+    )
 
     q.reminder_count += 1
     q.last_reminder_at = now
@@ -151,16 +203,23 @@ class Command(BaseCommand):
         min_chars = int(opts["min_chars"] or 15)
         mark_missed_after_min = int(opts["mark_missed_after_min"] or 120)
 
-        managers_qs = Manager.objects.all().order_by("name") if include_inactive else Manager.objects.filter(is_active=True).order_by("name")
+        managers_qs = (
+            Manager.objects.all().order_by("name")
+            if include_inactive
+            else Manager.objects.filter(is_active=True).order_by("name")
+        )
 
-        self.stdout.write(f"[checkin_tick] day={day} now={now.isoformat()} managers={managers_qs.count()} include_inactive={include_inactive}")
-        self.stdout.write(f"[checkin_tick] remind_every_min={remind_every_min} max_reminders={max_reminders} min_chars={min_chars} mark_missed_after_min={mark_missed_after_min}")
+        self.stdout.write(
+            f"[checkin_tick] day={day} now={now.isoformat()} managers={managers_qs.count()} include_inactive={include_inactive}"
+        )
+        self.stdout.write(
+            f"[checkin_tick] remind_every_min={remind_every_min} max_reminders={max_reminders} min_chars={min_chars} mark_missed_after_min={mark_missed_after_min}"
+        )
 
         for m in managers_qs:
             checkin = _ensure_checkin(m, day)
 
-            # 1) Envia AGENDA “agora” se pedido (ou se seu fluxo for sempre garantir agenda)
-            agenda_q = None
+            # 1) Envia AGENDA “agora” se pedido
             if send_agenda_now:
                 agenda_q = _send_agenda_if_needed(manager=m, checkin=checkin, now=now, agenda_text=agenda_text)
             else:
@@ -186,6 +245,8 @@ class Command(BaseCommand):
                 max_reminders=max_reminders,
             ):
                 _send_reminder(agenda_q, now=now, reminder_text=reminder_text)
-                self.stdout.write(f"  - reminder sent to {m.name} ({m.phone_e164}) count={agenda_q.reminder_count}")
+                self.stdout.write(
+                    f"  - reminder sent to {m.name} ({m.phone_e164}) count={agenda_q.reminder_count}"
+                )
 
         self.stdout.write(self.style.SUCCESS("[checkin_tick] done"))

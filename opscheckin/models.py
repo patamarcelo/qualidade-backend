@@ -70,6 +70,53 @@ class OutboundQuestion(models.Model):
         return f"{self.checkin} - {self.step} - {self.status}"
 
 
+class OutboundMessage(models.Model):
+    """
+    Tudo que o sistema ENVIA (log). Isso é o espelho do InboundMessage.
+    """
+    manager = models.ForeignKey(
+        Manager, on_delete=models.SET_NULL, null=True, blank=True, related_name="outbound_messages"
+    )
+    checkin = models.ForeignKey(
+        DailyCheckin, on_delete=models.SET_NULL, null=True, blank=True, related_name="outbound_messages"
+    )
+    related_question = models.ForeignKey(
+        OutboundQuestion, on_delete=models.SET_NULL, null=True, blank=True, related_name="outbound_messages"
+    )
+
+    to_phone = models.CharField(max_length=20, db_index=True)  # e164 sem "+"
+    provider_message_id = models.CharField(max_length=128, blank=True, default="", db_index=True)
+
+    kind = models.CharField(
+        max_length=24,
+        default="text",
+        choices=[
+            ("agenda", "Agenda"),
+            ("reminder", "Reminder"),
+            ("manual", "Manual"),
+            ("other", "Other"),
+        ],
+        db_index=True,
+    )
+
+    text = models.TextField(blank=True, default="")
+    sent_at = models.DateTimeField(default=timezone.now, db_index=True)
+
+    raw_response = models.JSONField(null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["to_phone", "sent_at"]),
+            models.Index(fields=["manager", "sent_at"]),
+            models.Index(fields=["checkin", "sent_at"]),
+            models.Index(fields=["kind", "sent_at"]),
+        ]
+
+    def __str__(self):
+        who = self.manager.name if self.manager else self.to_phone
+        return f"Outbound {who} @ {self.sent_at:%Y-%m-%d %H:%M} - {self.kind}"
+    
+
 class InboundMessage(models.Model):
     """
     Tudo que chega do WhatsApp (sempre gravado).
