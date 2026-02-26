@@ -185,6 +185,9 @@ class Command(BaseCommand):
 
     def handle(self, *args, **opts):
         now = timezone.now()
+        local_now = timezone.localtime(now)
+        start = local_now.replace(hour=6, minute=0, second=0, microsecond=0)
+        end   = local_now.replace(hour=7, minute=0, second=0, microsecond=0)
 
         day = _local_today()
         if opts["date"]:

@@ -16,6 +16,8 @@ from django.conf import settings
 
 from diamante.cron import enviar_email_diario
 
+from opscheckin.cron import opscheckin_tick
+
 def get_formatted_datetime():
     now = datetime.now()
     formatted_datetime = now.strftime("%Y_%m_%d_%H_%M_%S")
@@ -118,6 +120,31 @@ def start():
                     id="farmbox_stock_report_diario_0600",
                     replace_existing=True,
                     misfire_grace_time=3600
+                )
+                scheduler.add_job(
+                    opscheckin_tick,
+                    "cron",
+                    day_of_week="*",
+                    hour="6",
+                    minute="0,15,30,45",
+                    id="opscheckin_tick_morning",
+                    replace_existing=True,
+                    misfire_grace_time=600,  # 10 min de tolerância
+                    coalesce=True,
+                    max_instances=1,
+                )
+
+                scheduler.add_job(
+                    opscheckin_tick,
+                    "cron",
+                    day_of_week="*",
+                    hour="7",
+                    minute="0",
+                    id="opscheckin_tick_0700",
+                    replace_existing=True,
+                    misfire_grace_time=600,
+                    coalesce=True,
+                    max_instances=1,
                 )
                 
             register_events(scheduler)
