@@ -185,7 +185,7 @@ def whatsapp_webhook(request):
                 answered_at__isnull=True,
                 sent_at__isnull=False,
             )
-            .order_by("scheduled_for", "id")  # mais antiga primeiro
+            .order_by("sent_at", "scheduled_for", "id")  # mais antiga enviada primeiro
             .first()
         )
 

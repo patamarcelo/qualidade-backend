@@ -31,10 +31,6 @@ def ensure_slots_for_today(manager, today=None):
 
 
 def send_due_questions(checkin, now=None):
-    """
-    Envia no máximo 1 pergunta por execução.
-    Regra: se já existe uma pergunta enviada e ainda não respondida, não envia outra.
-    """
     now = now or timezone.now()
 
     has_open = checkin.questions.filter(
