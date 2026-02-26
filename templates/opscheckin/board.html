@@ -408,6 +408,7 @@
 
     .thread {
       padding: calc(var(--pad5) + var(--colHeaderH)) var(--pad5) var(--pad5);
+
       display: flex;
       flex-direction: column;
       gap: 8px;
@@ -420,39 +421,33 @@
     .msgRow {
       display: flex;
       flex-direction: column;
-      gap: 2px;
+      gap: 3px;
       width: 100%;
     }
 
     .msgRow.left {
       align-items: flex-start;
+      /* posiciona balão à esquerda */
     }
 
     .msgRow.right {
       align-items: flex-end;
+      /* posiciona balão à direita */
     }
 
     .bubble {
       display: inline-block;
       max-width: 85%;
       padding: 1px 6px;
-      /* mínimo absoluto */
       border-radius: 8px;
       font-size: 12.5px;
-      line-height: 1.05;
-      /* extremamente compacto */
+      line-height: 1.1;
       border: 1px solid var(--border2);
       white-space: pre-wrap;
       word-break: break-word;
-      margin: 0;
-      /* remove qualquer margem */
     }
 
-    .thread {
-      padding: 5px;
-      /* remove aquele padding grande anterior */
-    }
-
+    /* alinhamento interno do texto */
     .bubble.inb {
       background: var(--inb);
       border-color: var(--inbBorder);
@@ -462,6 +457,8 @@
     .bubble.outb {
       background: var(--outb);
       border-color: var(--outbBorder);
+      text-align: left;
+      /* 👈 aqui resolve */
     }
 
     .metaLine {
@@ -576,9 +573,25 @@
             <div>
               <label>Managers (Ctrl/Cmd p/ múltiplos). Vazio: envia p/ todos.</label>
               <select name="manager_ids" multiple>
-                {% for m in managers %}
-                <option value="{{ m.id }}">{{ m.name }} ({{ m.phone_e164 }})</option>
-                {% endfor %}
+                <optgroup label="🟢 Ativos">
+                  {% for m in managers %}
+                  {% if m.is_active %}
+                  <option value="{{ m.id }}">
+                    ● {{ m.name }} ({{ m.phone_e164 }})
+                  </option>
+                  {% endif %}
+                  {% endfor %}
+                </optgroup>
+
+                <optgroup label="🔴 Inativos">
+                  {% for m in managers %}
+                  {% if not m.is_active %}
+                  <option value="{{ m.id }}">
+                    ● {{ m.name }} ({{ m.phone_e164 }})
+                  </option>
+                  {% endif %}
+                  {% endfor %}
+                </optgroup>
               </select>
             </div>
 
@@ -620,7 +633,7 @@
           </div>
 
           <div class="colMeta">
-            <div class="pill">Dia: {{ day|date:"d/m" }}</div>
+            <div class="pill">{{ day|date:"d/m" }}</div>
             {% if col.agenda_q %}
             <div class="pill">Rem: {{ col.agenda_q.reminder_count }}</div>
             <div class="pill">Chars: {{ col.agenda_q.answer_text|length }}</div>

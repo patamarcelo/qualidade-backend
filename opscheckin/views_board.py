@@ -7,6 +7,7 @@ from django.db.models import Prefetch
 from .models import Manager, DailyCheckin, OutboundQuestion, InboundMessage
 from .services.whatsapp import send_text
 from .services.templates import render_message
+from django.contrib.admin.views.decorators import staff_member_required
 
 
 DEFAULT_MSG = (
@@ -62,7 +63,7 @@ def _build_full_timeline(checkin):
 
     return items
 
-
+@staff_member_required
 @require_http_methods(["GET", "POST"])
 def board_view(request):
 
