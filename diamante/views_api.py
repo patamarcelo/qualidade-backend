@@ -5408,37 +5408,62 @@ class DefensivoViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=["POST"])
     def payload_from_protheus_to_farmbox(self, request):
-        payload = request.data
+        # 1. LÊ O CORPO BRUTO PRIMEIRO (Evita o RawPostDataException)
+        try:
+            raw_body = request.body.decode('utf-8') if request.body else ""
+        except Exception as e:
+            raw_body = f"Erro ao tentar ler o body: {e}"
 
-        # Debug local
-        print("\n================ PAYLOAD RECEBIDO PROTHEUS ================")
-        print(payload)
-        print("===========================================================\n")
+        # 2. DEPOIS lê o request.data (O DRF vai usar o cache do body sem reclamar)
+        try:
+            payload_data = request.data
+        except Exception:
+            # Se o Content-Type for totalmente bizarro, o DRF pode falhar aqui
+            payload_data = None
+        
+        # 3. Pega os parâmetros passados na URL (?chave=valor)
+        query_params = request.query_params
 
-        # ✅ GATILHO (exemplo): se vier "send_email": true OU se algum campo específico bater
-        should_email = True
+        print("\n================ INVESTIGAÇÃO PROTHEUS ================")
+        print(f"Content-Type recebido: {request.content_type}")
+        print(f"Headers: {dict(request.headers)}")
+        print("-------------------------------------------------------")
+        print(f"1. request.body (Texto BRUTO lido primeiro): {raw_body}")
+        print(f"2. request.data (Parseado pelo DRF): {payload_data}")
+        print(f"3. request.query_params (URL): {query_params}")
+        print("=======================================================\n")
 
-        if should_email:
+        # Tenta forçar o parse manual caso request.data esteja vazio/falhe, mas o raw_body tenha algo
+        if not payload_data and raw_body:
             try:
-                send_mail(
-                    subject="Teste de envio Django",
-                    message=(
-                        "Se você recebeu este e-mail, o SMTP está funcionando 🎉\n\n"
-                        f"Recebido em: {timezone.now()}\n"
-                        f"Keys: {list(payload.keys()) if isinstance(payload, dict) else 'N/A'}\n"
-                    ),
-                    from_email=settings.EMAIL_HOST_USER,
-                    recipient_list=["marcelo@gdourado.com.br"],
-                    fail_silently=False,
-                )
-                email_sent = True
-            except Exception as e:
-                # Não derruba o endpoint — só reporta (ou retorne 500 se preferir)
-                email_sent = False
-                email_error = str(e)
-        else:
+                payload_data = json.loads(raw_body)
+                print("Conseguimos fazer o parse manual do raw_body usando json.loads()!")
+            except json.JSONDecodeError:
+                print("O raw_body não é um JSON válido.")
+
+        # Se mesmo assim não tiver nada, define um dict vazio para não quebrar seu código abaixo
+        payload = payload_data or {}
+        
+        email_error = ""
+        
+        try:
+            send_mail(
+                subject="Teste de envio Django",
+                message=(
+                    "Se você recebeu este e-mail, o SMTP está funcionando 🎉\n\n"
+                    f"Recebido em: {timezone.now()}\n"
+                    f"Keys: {list(payload.keys()) if isinstance(payload, dict) else 'N/A'}\n"
+                ),
+                from_email=settings.EMAIL_HOST_USER,
+                recipient_list=["marcelo@gdourado.com.br"],
+                fail_silently=False,
+            )
+            email_sent = True
+        except Exception as e:
+            # Não derruba o endpoint — só reporta (ou retorne 500 se preferir)
             email_sent = False
-            email_error = None
+            email_error = str(e)
+    
 
         return Response(
             {
