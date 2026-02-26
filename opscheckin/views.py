@@ -183,21 +183,25 @@ def whatsapp_webhook(request):
                 checkin=checkin,
                 status="pending",
                 answered_at__isnull=True,
-                sent_at__isnull=False,
+                sent_at__isnull=False,  # só linka se foi enviada
             )
-            .order_by("sent_at", "scheduled_for", "id")  # mais antiga enviada primeiro
+            .order_by("sent_at", "scheduled_for", "id")  # mais antiga enviada
             .first()
         )
 
         if pending:
-            pending.answered_at = now
-
+            # append sempre
             prev = (pending.answer_text or "").strip()
             cur = (text or "").strip()
             pending.answer_text = cur if not prev else (prev + "\n" + cur)
 
-            pending.status = "answered"
-            pending.save(update_fields=["answered_at", "answer_text", "status"])
+            # só considera "respondido" se >= 15 chars
+            if len((pending.answer_text or "").strip()) >= 15:
+                pending.answered_at = now
+                pending.status = "answered"
+                pending.save(update_fields=["answered_at", "answer_text", "status"])
+            else:
+                pending.save(update_fields=["answer_text"])
 
             inbound.linked_question = pending
             inbound.processed = True

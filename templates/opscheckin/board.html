@@ -1,0 +1,96 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>OpsCheckin Board</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 16px; background:#0b1220; color:#e5e7eb; }
+    .topbar { display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-bottom:16px; }
+    .card { background: rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.10); border-radius:14px; padding:12px; }
+    label { font-size:12px; opacity:0.85; display:block; margin-bottom:6px;}
+    input[type="date"], textarea, select { background: rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); color:#e5e7eb; border-radius:10px; padding:10px; }
+    textarea { width: 520px; height: 88px; }
+    select { min-width: 280px; height: 112px; }
+    button { background:#22c55e; border:none; color:#0b1220; padding:10px 14px; border-radius:10px; font-weight:700; cursor:pointer; }
+    button:hover { filter: brightness(1.05); }
+
+    .grid { display:grid; grid-auto-flow: column; grid-auto-columns: minmax(280px, 1fr); gap:12px; overflow-x:auto; padding-bottom:8px; }
+    .col { min-height: 240px; }
+    .col h3 { margin:0 0 6px 0; font-size:14px; }
+    .meta { font-size:12px; opacity:0.8; margin-bottom:10px; }
+    .thread { display:flex; flex-direction:column; gap:8px; }
+    .bubble { max-width: 92%; padding:10px 12px; border-radius:14px; line-height:1.25; font-size:13px; white-space:pre-wrap; }
+    .left { align-self:flex-start; background: rgba(255,255,255,0.10); border:1px solid rgba(255,255,255,0.10); }
+    .right { align-self:flex-end; background: rgba(34,197,94,0.20); border:1px solid rgba(34,197,94,0.25); }
+    .bmeta { font-size:11px; opacity:0.75; margin-top:6px; }
+    .empty { opacity:0.7; font-size:12px; }
+  </style>
+</head>
+<body>
+
+  <div class="topbar">
+    <div class="card">
+      <form method="get" action="">
+        <label>Data</label>
+        <input type="date" name="date" value="{{ day|date:'Y-m-d' }}" />
+        <button type="submit" style="margin-left:8px;">Filtrar</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <form method="post" action="">
+        {% csrf_token %}
+        <label>Mensagem (envio manual)</label>
+        <textarea name="message">{{ default_msg }}</textarea>
+
+        <div style="display:flex; gap:12px; align-items:flex-end; margin-top:10px;">
+          <div>
+            <label>Managers (Ctrl/Cmd para múltiplos). Se vazio: envia para todos.</label>
+            <select name="manager_ids" multiple>
+              {% for m in managers %}
+                <option value="{{ m.id }}">{{ m.name }} ({{ m.phone_e164 }})</option>
+              {% endfor %}
+            </select>
+          </div>
+          <button type="submit">Enviar agora</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="grid">
+    {% for col in cols %}
+      <div class="card col">
+        <h3>{{ col.manager.name }}</h3>
+        <div class="meta">
+          {% if col.checkin %}
+            {{ col.manager.phone_e164 }} • checkin {{ day|date:"d/m/Y" }}
+            {% if col.agenda_q %}
+              • AGENDA: {{ col.agenda_q.status }}
+            {% endif %}
+          {% else %}
+            {{ col.manager.phone_e164 }} • sem checkin
+          {% endif %}
+        </div>
+
+        <div class="thread">
+          {% if col.timeline|length == 0 %}
+            <div class="empty">Sem conversa ainda.</div>
+          {% else %}
+            {% for it in col.timeline %}
+              <div class="bubble {{ it.side }}">
+                <div><strong>{{ it.label }}</strong></div>
+                <div>{{ it.text }}</div>
+                {% if it.meta %}
+                  <div class="bmeta">{{ it.meta }}</div>
+                {% endif %}
+              </div>
+            {% endfor %}
+          {% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+
+</body>
+</html>
