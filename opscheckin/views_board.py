@@ -9,8 +9,9 @@ def board_view(request):
     checkins = (
         DailyCheckin.objects
         .select_related("manager")
-        .prefetch_related("questions")
+        .prefetch_related("questions", "inbound_messages")
         .filter(date=today)
+        .order_by("manager__name")
     )
 
     return render(request, "opscheckin/board.html", {"checkins": checkins})

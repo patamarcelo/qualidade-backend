@@ -1,4 +1,3 @@
-# opscheckin/services/whatsapp.py
 import logging
 import requests
 from django.conf import settings
@@ -15,14 +14,13 @@ def _get_phone_number_id():
 
 
 def _get_token():
-    # remove whitespace/newlines que quebram o bearer
     return (getattr(settings, "WHATSAPP_TOKEN", "") or "").strip()
 
 
 def send_text(to_phone_e164: str, body: str) -> dict:
     """
     Envia mensagem de texto via WhatsApp Cloud API.
-    `to_phone_e164`: ex "555197090862" (wa_id / e164 sem +)
+    `to_phone_e164`: ex "5551999999999" (wa_id / e164 sem +)
     """
     token = _get_token()
     phone_id = _get_phone_number_id()
@@ -52,10 +50,9 @@ def send_text(to_phone_e164: str, body: str) -> dict:
         raise
 
     logger.warning(
-        "WAPP_SEND status=%s to=%s url=%s body_len=%s",
+        "WAPP_SEND status=%s to=%s body_len=%s",
         r.status_code,
         to_phone_e164,
-        url,
         len(body or ""),
     )
 

@@ -1,30 +1,55 @@
+from datetime import datetime
 from django.utils import timezone
-from .whatsapp import send_text_message
-from ..models import DailyCheckin, OutboundQuestion
+
+from opscheckin.models import DailyCheckin, OutboundQuestion
+from opscheckin.services.flow import SLOTS, slot_text
+from opscheckin.services.whatsapp import send_text
 
 
-def send_agenda_question(manager):
-    today = timezone.localdate()
+def _local_today():
+    return timezone.localdate()
 
-    checkin, _ = DailyCheckin.objects.get_or_create(
-        manager=manager,
-        date=today,
+
+def _slot_dt(today, slot_time):
+    # cria datetime local para o slot
+    return timezone.make_aware(datetime.combine(today, slot_time))
+
+
+def ensure_slots_for_today(manager, today=None):
+    today = today or _local_today()
+    checkin, _ = DailyCheckin.objects.get_or_create(manager=manager, date=today)
+
+    for step, t, _text in SLOTS:
+        scheduled_for = _slot_dt(today, t)
+        OutboundQuestion.objects.get_or_create(
+            checkin=checkin,
+            step=step,
+            defaults={"scheduled_for": scheduled_for, "status": "pending"},
+        )
+
+    return checkin
+
+
+def send_due_questions(checkin, now=None):
+    """
+    Envia perguntas cujo scheduled_for <= now e sent_at ainda é null.
+    Retorna lista de OutboundQuestion enviadas.
+    """
+    now = now or timezone.now()
+
+    due = (
+        checkin.questions
+        .filter(sent_at__isnull=True, scheduled_for__lte=now)
+        .order_by("scheduled_for", "id")
     )
 
-    question = OutboundQuestion.objects.create(
-        checkin=checkin,
-        step="AGENDA",
-        scheduled_for=timezone.now(),
-    )
+    sent = []
+    for q in due:
+        body = slot_text(q.step) or f"[{q.step}]"
+        send_text(checkin.manager.phone_e164, body)
+        q.sent_at = now
+        q.status = "pending"
+        q.save(update_fields=["sent_at", "status"])
+        sent.append(q)
 
-    message = (
-        f"Bom dia, {manager.name}.\n\n"
-        "Qual é a agenda principal de hoje?"
-    )
-
-    result = send_text_message(manager.phone_e164, message)
-
-    question.sent_at = timezone.now()
-    question.save(update_fields=["sent_at"])
-
-    return result
+    return sent

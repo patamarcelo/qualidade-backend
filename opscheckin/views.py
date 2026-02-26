@@ -1,4 +1,3 @@
-# opscheckin/views.py
 import json
 import hmac
 import hashlib
@@ -48,7 +47,7 @@ def _extract_messages_from_meta(payload: dict):
         for entry in entries:
             changes = entry.get("changes", []) or []
             for ch in changes:
-                value = (ch.get("value") or {})
+                value = ch.get("value") or {}
                 messages = value.get("messages") or []
                 for msg in messages:
                     from_phone = (msg.get("from") or "").strip()
@@ -64,9 +63,13 @@ def _extract_messages_from_meta(payload: dict):
                         inter = msg.get("interactive") or {}
                         itype = inter.get("type")
                         if itype == "button_reply":
-                            text = (inter.get("button_reply", {}).get("title") or "").strip()
+                            text = (
+                                inter.get("button_reply", {}).get("title") or ""
+                            ).strip()
                         elif itype == "list_reply":
-                            text = (inter.get("list_reply", {}).get("title") or "").strip()
+                            text = (
+                                inter.get("list_reply", {}).get("title") or ""
+                            ).strip()
 
                     if from_phone and text:
                         out.append(
@@ -82,6 +85,10 @@ def _extract_messages_from_meta(payload: dict):
         # não derruba webhook
         pass
     return out
+
+
+def _local_today():
+    return timezone.localdate()
 
 
 @csrf_exempt
@@ -132,13 +139,19 @@ def whatsapp_webhook(request):
     if not msgs:
         return JsonResponse({"ok": True})
 
-    today = timezone.localdate()
+    today = _local_today()
+    now = timezone.now()
 
     for msg in msgs:
         from_phone = msg["from_phone"]
         text = msg["text"]
-        msg_id = msg.get("msg_id") or ""
+        msg_id = (msg.get("msg_id") or "").strip()
         msg_type = msg.get("msg_type") or "text"
+
+        # dedupe (Meta pode reenviar o mesmo evento)
+        if msg_id:
+            if InboundMessage.objects.filter(wa_message_id=msg_id).exists():
+                continue
 
         # encontra manager (se existir)
         manager = Manager.objects.filter(phone_e164=from_phone, is_active=True).first()
@@ -154,10 +167,11 @@ def whatsapp_webhook(request):
             wa_message_id=msg_id,
             text=text,
             msg_type=msg_type,
-            received_at=timezone.now(),
+            received_at=now,
             checkin=checkin,
             linked_question=None,
-            raw_payload=payload,  # se ficar pesado, depois trocamos p/ apenas msg["raw_msg"]
+            raw_payload=msg.get("raw_msg"),  # payload leve por mensagem
+            processed=False,
         )
 
         # 2) tenta linkar com pergunta pendente (se tiver manager/checkin)
@@ -170,23 +184,23 @@ def whatsapp_webhook(request):
                 status="pending",
                 answered_at__isnull=True,
             )
-            .order_by("scheduled_for", "id")
+            .order_by("-sent_at", "scheduled_for", "id")  # prefere a última enviada
             .first()
         )
 
         if pending:
-            pending.answered_at = timezone.now()
-            # concatena por segurança (se receber duplicado/variações)
-            pending.answer_text = (pending.answer_text or "").strip()
-            if pending.answer_text:
-                pending.answer_text = pending.answer_text + "\n" + text
-            else:
-                pending.answer_text = text
+            pending.answered_at = now
+
+            prev = (pending.answer_text or "").strip()
+            cur = (text or "").strip()
+            pending.answer_text = cur if not prev else (prev + "\n" + cur)
 
             pending.status = "answered"
             pending.save(update_fields=["answered_at", "answer_text", "status"])
 
             inbound.linked_question = pending
-            inbound.save(update_fields=["linked_question"])
+            inbound.processed = True
+            inbound.processed_at = now
+            inbound.save(update_fields=["linked_question", "processed", "processed_at"])
 
     return JsonResponse({"ok": True})

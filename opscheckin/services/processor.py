@@ -1,31 +1,37 @@
-# opscheckin/services/processor.py
-import logging
 from django.utils import timezone
-
-from opscheckin.models import InboundMessage
-
-logger = logging.getLogger("opscheckin.processor")
+from opscheckin.models import DailyCheckin, OutboundQuestion, InboundMessage
 
 
-def process_inbound_messages(limit: int = 100):
+def link_inbound_to_pending(checkin: DailyCheckin, inbound: InboundMessage, now=None):
     """
-    Esqueleto: processa mensagens inbound NÃO processadas.
-    No futuro: classifica intenção, atualiza estado, dispara próxima pergunta, etc.
+    Linka uma mensagem inbound à pergunta pending mais apropriada.
+    Regra: pending mais recentemente enviada (sent_at desc).
     """
-    qs = (
-        InboundMessage.objects
-        .filter(processed=False)
-        .order_by("received_at")[:limit]
+    now = now or timezone.now()
+
+    pending = (
+        OutboundQuestion.objects.filter(
+            checkin=checkin,
+            status="pending",
+            answered_at__isnull=True,
+        )
+        .order_by("-sent_at", "scheduled_for", "id")
+        .first()
     )
 
-    count = 0
-    for m in qs:
-        # Aqui entra o "cérebro" (regras, LLM, consultas ao banco, etc.)
-        logger.info("PROCESS inbound id=%s from=%s text=%s", m.id, m.from_phone, (m.text or "")[:80])
+    if not pending:
+        return None
 
-        m.processed = True
-        m.processed_at = timezone.now()
-        m.save(update_fields=["processed", "processed_at"])
-        count += 1
+    pending.answered_at = now
+    prev = (pending.answer_text or "").strip()
+    cur = (inbound.text or "").strip()
+    pending.answer_text = cur if not prev else (prev + "\n" + cur)
+    pending.status = "answered"
+    pending.save(update_fields=["answered_at", "answer_text", "status"])
 
-    return count
+    inbound.linked_question = pending
+    inbound.processed = True
+    inbound.processed_at = now
+    inbound.save(update_fields=["linked_question", "processed", "processed_at"])
+
+    return pending
