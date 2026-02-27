@@ -16,9 +16,27 @@ DEFAULT_AGENDA_TEMPLATE = (
 
 DEFAULT_REMINDER_TEXT = "??"
 
+# JANELA OFICIAL
+AGENDA_HOUR = 6
+AGENDA_MINUTE = 0
+
+# Reminders “cravados” (modelo A)
+# (hour, minute, expected_reminder_count)
+REMINDER_SLOTS = [
+    (6, 15, 0),
+    (6, 30, 1),
+    (6, 45, 2),
+    (7, 0, 3),
+]
+
+MIN_CHARS_DEFAULT = 15
+MARK_MISSED_AFTER_MIN_DEFAULT = 120
+
+# tolerância pra “pegar” o slot caso o job rode alguns segundos/minutos atrasado
+SLOT_GRACE_SECONDS_DEFAULT = 120  # 2 min
+
 
 def _local_today():
-    # timezone do Django deve estar configurada p/ America/Sao_Paulo
     return timezone.localdate()
 
 
@@ -27,10 +45,16 @@ def _ensure_checkin(manager: Manager, day):
     return checkin
 
 
-def _log_outbound(*, manager: Manager, checkin: DailyCheckin, related_question: OutboundQuestion | None, kind: str, text: str, now, resp: dict | None):
-    """
-    Cria log do que foi ENVIADO para o WhatsApp (espelho do InboundMessage).
-    """
+def _log_outbound(
+    *,
+    manager: Manager,
+    checkin: DailyCheckin,
+    related_question: OutboundQuestion | None,
+    kind: str,
+    text: str,
+    now,
+    resp: dict | None,
+):
     provider_id = ""
     try:
         provider_id = ((resp or {}).get("messages") or [{}])[0].get("id") or ""
@@ -50,16 +74,10 @@ def _log_outbound(*, manager: Manager, checkin: DailyCheckin, related_question: 
     )
 
 
-def _send_agenda_if_needed(
-    *,
-    manager: Manager,
-    checkin: DailyCheckin,
-    now,
-    agenda_text: str,
-):
+def _send_agenda_if_needed(*, manager: Manager, checkin: DailyCheckin, now, agenda_text: str):
     """
-    Garante que existe UMA pergunta AGENDA enviada hoje.
-    Se não existe pergunta AGENDA enviada, cria e envia agora.
+    Garante que existe UMA pergunta AGENDA enviada no dia.
+    Só cria/envia se ainda não tiver AGENDA com sent_at.
     """
     q = (
         checkin.questions
@@ -68,7 +86,6 @@ def _send_agenda_if_needed(
         .first()
     )
 
-    # se já tem AGENDA enviada hoje, não reenviar
     if q and q.sent_at:
         return q
 
@@ -80,12 +97,11 @@ def _send_agenda_if_needed(
         scheduled_for=now,
         sent_at=now,
         status="pending",
-        prompt_text=final_msg,  # requer o campo prompt_text
+        prompt_text=final_msg,  # requer campo prompt_text
     )
 
     resp = send_text(manager.phone_e164, final_msg)
 
-    # log do outbound (para o board espelhar)
     _log_outbound(
         manager=manager,
         checkin=checkin,
@@ -99,27 +115,29 @@ def _send_agenda_if_needed(
     return q
 
 
-def _should_remind(q: OutboundQuestion, *, now, remind_every_min: int, min_chars: int, max_reminders: int) -> bool:
+def _mark_missed_if_needed(q: OutboundQuestion, *, now, mark_missed_after_min: int):
+    if q.status != "pending":
+        return
+    if not q.sent_at:
+        return
+    if q.answered_at:
+        return
+
+    age_min = (now - q.sent_at).total_seconds() / 60.0
+    if age_min >= mark_missed_after_min:
+        q.status = "missed"
+        q.save(update_fields=["status"])
+
+
+def _needs_followup(q: OutboundQuestion, *, min_chars: int) -> bool:
     """
-    Remind se:
-      - pending
-      - não respondeu
-      - reminder_count < max_reminders
-      - tempo desde sent_at/last_reminder_at >= remind_every_min
-      - e (sem resposta) OU (resposta curta < min_chars)
+    Se não respondeu ou respondeu curto demais, continua cobrando.
     """
     if q.status != "pending":
         return False
     if not q.sent_at:
         return False
     if q.answered_at:
-        return False
-    if q.reminder_count >= max_reminders:
-        return False
-
-    base = q.last_reminder_at or q.sent_at
-    age_min = (now - base).total_seconds() / 60.0
-    if age_min < remind_every_min:
         return False
 
     txt = (q.answer_text or "").strip()
@@ -128,10 +146,35 @@ def _should_remind(q: OutboundQuestion, *, now, remind_every_min: int, min_chars
     return len(txt) < min_chars
 
 
+def _slot_window(local_now, hour: int, minute: int, grace_seconds: int):
+    """
+    Retorna (slot_start, slot_end) em timezone local.
+    """
+    start = local_now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    end = start + timezone.timedelta(seconds=grace_seconds)
+    return start, end
+
+
+def _is_in_slot(local_now, hour: int, minute: int, grace_seconds: int) -> bool:
+    start, end = _slot_window(local_now, hour, minute, grace_seconds)
+    return start <= local_now < end
+
+
+def _already_sent_in_this_slot(q: OutboundQuestion, *, local_now, hour: int, minute: int, grace_seconds: int) -> bool:
+    """
+    Evita duplicar reminder se o job rodar mais de uma vez dentro do grace window.
+    Usamos last_reminder_at (ou sent_at) para ver se já “caiu” nesse slot.
+    """
+    anchor = q.last_reminder_at or q.sent_at
+    if not anchor:
+        return False
+
+    anchor_local = timezone.localtime(anchor)
+    start, end = _slot_window(local_now, hour, minute, grace_seconds)
+    return start <= anchor_local < end
+
+
 def _send_reminder(q: OutboundQuestion, *, now, reminder_text: str):
-    """
-    Envia reminder e registra no log OutboundMessage.
-    """
     manager = q.checkin.manager
     if not manager:
         return
@@ -153,41 +196,24 @@ def _send_reminder(q: OutboundQuestion, *, now, reminder_text: str):
     q.save(update_fields=["reminder_count", "last_reminder_at"])
 
 
-def _mark_missed_if_needed(q: OutboundQuestion, *, now, mark_missed_after_min: int):
-    if q.status != "pending":
-        return
-    if not q.sent_at:
-        return
-    if q.answered_at:
-        return
-
-    age_min = (now - q.sent_at).total_seconds() / 60.0
-    if age_min >= mark_missed_after_min:
-        q.status = "missed"
-        q.save(update_fields=["status"])
-
-
 class Command(BaseCommand):
-    help = "Dispara AGENDA e faz reminders/missed. Suporta modo DEV rápido."
+    help = "Dispara AGENDA e faz reminders/missed (modelo A: horários cravados)."
 
     def add_arguments(self, parser):
         parser.add_argument("--date", type=str, default="", help="YYYY-MM-DD (padrão: hoje local)")
         parser.add_argument("--include-inactive", action="store_true", help="Inclui managers inativos (padrão: False)")
         parser.add_argument("--send-agenda-now", action="store_true", help="Força criar/enviar AGENDA agora (se não enviada ainda)")
-        parser.add_argument("--agenda-text", type=str, default=DEFAULT_AGENDA_TEMPLATE, help="Template da mensagem AGENDA (usa {name})")
+        parser.add_argument("--agenda-text", type=str, default=DEFAULT_AGENDA_TEMPLATE, help="Template da AGENDA (usa {name})")
 
-        # DEV/test knobs
-        parser.add_argument("--remind-every-min", type=int, default=15, help="Intervalo mínimo entre reminders (min)")
-        parser.add_argument("--max-reminders", type=int, default=4, help="Máximo de reminders")
-        parser.add_argument("--min-chars", type=int, default=15, help="Se resposta < min-chars, continua cobrando")
-        parser.add_argument("--mark-missed-after-min", type=int, default=120, help="Marca missed após X min pendente")
+        parser.add_argument("--min-chars", type=int, default=MIN_CHARS_DEFAULT, help="Se resposta < min-chars, continua cobrando")
+        parser.add_argument("--max-reminders", type=int, default=4, help="Máximo reminders (default: 4)")
+        parser.add_argument("--mark-missed-after-min", type=int, default=MARK_MISSED_AFTER_MIN_DEFAULT, help="Marca missed após X min pendente")
         parser.add_argument("--reminder-text", type=str, default=DEFAULT_REMINDER_TEXT, help="Texto do reminder (ex: ??)")
+        parser.add_argument("--slot-grace-seconds", type=int, default=SLOT_GRACE_SECONDS_DEFAULT, help="Janela de tolerância do slot")
 
     def handle(self, *args, **opts):
         now = timezone.now()
         local_now = timezone.localtime(now)
-        start = local_now.replace(hour=6, minute=0, second=0, microsecond=0)
-        end   = local_now.replace(hour=7, minute=0, second=0, microsecond=0)
 
         day = _local_today()
         if opts["date"]:
@@ -201,10 +227,10 @@ class Command(BaseCommand):
         agenda_text = (opts["agenda_text"] or DEFAULT_AGENDA_TEMPLATE).strip()
         reminder_text = (opts["reminder_text"] or DEFAULT_REMINDER_TEXT).strip() or "??"
 
-        remind_every_min = int(opts["remind_every_min"] or 15)
+        min_chars = int(opts["min_chars"] or MIN_CHARS_DEFAULT)
         max_reminders = int(opts["max_reminders"] or 4)
-        min_chars = int(opts["min_chars"] or 15)
-        mark_missed_after_min = int(opts["mark_missed_after_min"] or 120)
+        mark_missed_after_min = int(opts["mark_missed_after_min"] or MARK_MISSED_AFTER_MIN_DEFAULT)
+        grace_seconds = int(opts["slot_grace_seconds"] or SLOT_GRACE_SECONDS_DEFAULT)
 
         managers_qs = (
             Manager.objects.all().order_by("name")
@@ -213,43 +239,63 @@ class Command(BaseCommand):
         )
 
         self.stdout.write(
-            f"[checkin_tick] day={day} now={now.isoformat()} managers={managers_qs.count()} include_inactive={include_inactive}"
+            f"[checkin_tick] day={day} now={now.isoformat()} local_now={local_now.isoformat()} managers={managers_qs.count()} include_inactive={include_inactive}"
         )
-        self.stdout.write(
-            f"[checkin_tick] remind_every_min={remind_every_min} max_reminders={max_reminders} min_chars={min_chars} mark_missed_after_min={mark_missed_after_min}"
-        )
+
+        # Descobre se AGORA é um slot de reminder e qual expected_count
+        current_slot = None
+        for (hh, mm, expected_count) in REMINDER_SLOTS:
+            if _is_in_slot(local_now, hh, mm, grace_seconds):
+                current_slot = (hh, mm, expected_count)
+                break
 
         for m in managers_qs:
             checkin = _ensure_checkin(m, day)
 
-            # 1) Envia AGENDA “agora” se pedido
+            # 1) AGENDA às 06:00 (ou forçado)
+            agenda_q = (
+                checkin.questions
+                .filter(step="AGENDA")
+                .order_by("-scheduled_for", "-id")
+                .first()
+            )
+
             if send_agenda_now:
                 agenda_q = _send_agenda_if_needed(manager=m, checkin=checkin, now=now, agenda_text=agenda_text)
             else:
-                agenda_q = (
-                    checkin.questions
-                    .filter(step="AGENDA")
-                    .order_by("-scheduled_for", "-id")
-                    .first()
-                )
+                # se estamos exatamente em 06:00 (com grace) e ainda não enviou, envia
+                if _is_in_slot(local_now, AGENDA_HOUR, AGENDA_MINUTE, grace_seconds):
+                    agenda_q = _send_agenda_if_needed(manager=m, checkin=checkin, now=now, agenda_text=agenda_text)
 
             if not agenda_q:
                 continue
 
-            # 2) Marca missed se estourou
+            # 2) missed
             _mark_missed_if_needed(agenda_q, now=now, mark_missed_after_min=mark_missed_after_min)
 
-            # 3) Reminder se necessário (sem resposta ou resposta curta)
-            if _should_remind(
-                agenda_q,
-                now=now,
-                remind_every_min=remind_every_min,
-                min_chars=min_chars,
-                max_reminders=max_reminders,
-            ):
-                _send_reminder(agenda_q, now=now, reminder_text=reminder_text)
-                self.stdout.write(
-                    f"  - reminder sent to {m.name} ({m.phone_e164}) count={agenda_q.reminder_count}"
-                )
+            # 3) reminders cravados por reminder_count
+            if not current_slot:
+                continue  # não é horário de reminder
+
+            hh, mm, expected_count = current_slot
+
+            # só até max_reminders-1 (0..3)
+            if agenda_q.reminder_count >= max_reminders:
+                continue
+
+            # só dispara no slot “correto” pro reminder_count atual
+            if agenda_q.reminder_count != expected_count:
+                continue
+
+            # não duplica dentro do mesmo slot
+            if _already_sent_in_this_slot(agenda_q, local_now=local_now, hour=hh, minute=mm, grace_seconds=grace_seconds):
+                continue
+
+            # só cobra se ainda precisa (sem resposta ou curta)
+            if not _needs_followup(agenda_q, min_chars=min_chars):
+                continue
+
+            _send_reminder(agenda_q, now=now, reminder_text=reminder_text)
+            self.stdout.write(f"  - reminder sent slot={hh:02d}:{mm:02d} to {m.name} count={agenda_q.reminder_count}")
 
         self.stdout.write(self.style.SUCCESS("[checkin_tick] done"))
