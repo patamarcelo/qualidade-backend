@@ -26,7 +26,6 @@ def _parse_date(s: str):
 def _build_full_timeline(checkin):
     items = []
 
-    # Outbounds logados
     for om in checkin.outbound_messages.all():
         items.append({
             "ts": om.sent_at,
@@ -36,7 +35,6 @@ def _build_full_timeline(checkin):
             "meta": om.kind,
         })
 
-    # Inbounds
     for im in checkin.inbound_messages.all():
         items.append({
             "ts": im.received_at,
@@ -47,11 +45,13 @@ def _build_full_timeline(checkin):
         })
 
     items.sort(key=lambda x: x["ts"] or timezone.now())
+
     for it in items:
-        it["label"] = it["ts"].astimezone().strftime("%H:%M")
+        ts = it["ts"] or timezone.now()
+        # ✅ converte para o timezone “corrente” do Django (settings.TIME_ZONE ou ativado)
+        it["label"] = timezone.localtime(ts).strftime("%H:%M")
 
     return items
-
 
 
 @staff_member_required
