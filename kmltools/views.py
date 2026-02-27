@@ -196,7 +196,8 @@ class NetworkLinkResolveError(Exception):
 
 
 FREE_MONTHLY_CREDITS = 0
-PREPAID_CREDITS_PER_PACK = 10
+PREPAID_CREDITS_PER_PACK = 5
+PREPAID_SINGLE_CREDIT=1
 
 
 def _get_firebase_uid_from_user(user):
@@ -1960,14 +1961,46 @@ class StripeWebhookView(APIView):
                 bp.save(update_fields=["stripe_customer_id", "updated_at"])
                 print("[stripe] updated bp.stripe_customer_id from checkout -> bp_id:", bp.id, "customer:", customer_id)
 
-            # PREPAID
-            if mode == "payment" and kind == "prepaid_10":
+            # PREPAID (single / pack_5 / futuros packs)
+            if mode == "payment" and kind.startswith("prepaid_"):
+                metadata = obj.get("metadata") or {}
+
+                # 1️⃣ tenta pegar credits direto da metadata (preferido)
+                credits_from_meta = metadata.get("credits")
+
+                try:
+                    credits_to_add = int(credits_from_meta)
+                except (TypeError, ValueError):
+                    credits_to_add = 0
+
+                # 2️⃣ fallback defensivo (caso metadata falhe)
+                if credits_to_add <= 0:
+                    if kind == "prepaid_1":
+                        credits_to_add = PREPAID_SINGLE_CREDIT
+                    elif kind == "prepaid_5":
+                        credits_to_add = PREPAID_CREDITS_PER_PACK
+                    else:
+                        print("[stripe] invalid prepaid kind:", kind)
+                        return HttpResponse(status=200)
+
+                print(
+                    "[stripe] prepaid purchase:",
+                    "kind:", kind,
+                    "credits:", credits_to_add,
+                    "bp_id:", bp.id
+                )
+
                 with transaction.atomic():
                     bp = BillingProfile.objects.select_for_update().get(pk=bp.pk)
-                    bp.prepaid_credits += PREPAID_CREDITS_PER_PACK
+
+                    bp.prepaid_credits += credits_to_add
+
+                    # só muda para prepaid se não for pro ilimitado
                     if not bp.is_unlimited:
                         bp.plan = "prepaid"
+
                     bp.save(update_fields=["prepaid_credits", "plan", "updated_at"])
+
                 return HttpResponse(status=200)
 
             # SUBSCRIPTION
@@ -2087,6 +2120,12 @@ class CreateBillingPortalSessionView(APIView):
 
         return Response({"url": portal_session["url"]}, status=status.HTTP_200_OK)
 
+import os
+import stripe
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+
 class CreatePrepaidCheckoutSessionView(APIView):
     authentication_classes = (FirebaseAuthentication,)
     permission_classes = (IsAuthenticated,)
@@ -2101,10 +2140,26 @@ class CreatePrepaidCheckoutSessionView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
-        price_id = os.getenv("STRIPE_PRICE_ID_PREPAID_10")
+        pack = (request.data.get("pack") or "pack_5").strip()
+
+        # ✅ packs suportados
+        if pack == "single":
+            price_id = os.getenv("STRIPE_PRICE_ID_SINGLE_1")
+            kind = "prepaid_1"
+            credits = 1
+        elif pack == "pack_5":
+            price_id = os.getenv("STRIPE_PRICE_ID_PREPAID_5")
+            kind = "prepaid_5"
+            credits = 5
+        else:
+            return Response(
+                {"detail": "Pack inválido.", "code": "INVALID_PACK", "pack": pack},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         if not price_id:
             return Response(
-                {"detail": "Stripe price_id prepaid não configurado.", "code": "STRIPE_PRICE_ID_MISSING"},
+                {"detail": "Stripe price_id não configurado.", "code": "STRIPE_PRICE_ID_MISSING", "pack": pack},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
@@ -2128,7 +2183,9 @@ class CreatePrepaidCheckoutSessionView(APIView):
             success_url=success_url,
             cancel_url=cancel_url,
             metadata={
-                "kind": "prepaid_10",
+                "kind": kind,                  # ✅ prepaid_1 | prepaid_5
+                "credits": str(credits),       # ✅ pra webhook/fulfillment
+                "pack": pack,                  # ✅ single | pack_5
                 "firebase_uid": bp.firebase_uid,
                 "django_user_id": str(request.user.id),
             },
