@@ -16,7 +16,7 @@ from django.conf import settings
 
 from diamante.cron import enviar_email_diario
 
-from opscheckin.cron import opscheckin_tick
+from opscheckin.cron import run_opscheckin_reminders, run_opscheckin_agenda_0600
 
 def get_formatted_datetime():
     now = datetime.now()
@@ -121,13 +121,15 @@ def start():
                     replace_existing=True,
                     misfire_grace_time=3600
                 )
+                
+                
                 scheduler.add_job(
-                    opscheckin_tick,
+                    run_opscheckin_agenda_0600,
                     "cron",
                     day_of_week="*",
-                    hour="6",
-                    minute="0,15,30,45",
-                    id="opscheckin_tick_morning",
+                    hour="7",
+                    minute="0",
+                    id="opscheckin_tick_morning_agenda",
                     replace_existing=True,
                     misfire_grace_time=600,  # 10 min de tolerância
                     coalesce=True,
@@ -135,12 +137,25 @@ def start():
                 )
 
                 scheduler.add_job(
-                    opscheckin_tick,
+                    run_opscheckin_reminders,
                     "cron",
                     day_of_week="*",
                     hour="7",
+                    minute="15,30,45",
+                    id="opscheckin_tick_agenda_reminders",
+                    replace_existing=True,
+                    misfire_grace_time=600,
+                    coalesce=True,
+                    max_instances=1,
+                )
+                
+                scheduler.add_job(
+                    run_opscheckin_reminders,
+                    "cron",
+                    day_of_week="*",
+                    hour="8",
                     minute="0",
-                    id="opscheckin_tick_0700",
+                    id="opscheckin_tick_agenda_reminders_0700",
                     replace_existing=True,
                     misfire_grace_time=600,
                     coalesce=True,
