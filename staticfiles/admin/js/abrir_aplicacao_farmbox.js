@@ -16,10 +16,23 @@ document.addEventListener('DOMContentLoaded', function () {
         { tipo: "Operacão", color: "grey" }
     ];
 
+    function iniciarSelectAvancado(elemento) {
+        if (elemento.tomselect) return; 
+        new TomSelect(elemento, {
+            create: false,
+            sortField: {
+                field: "text",
+                direction: "asc"
+            },
+            placeholder: "-- Selecione um defensivo --",
+            normalize: true,
+        });
+    }
+
     function normalizeText(str) {
         return (str || "")
-            .normalize("NFD")                   // separa letras e acentos
-            .replace(/[\u0300-\u036f]/g, "")    // remove acentos
+            .normalize("NFD")                   
+            .replace(/[\u0300-\u036f]/g, "")    
             .toLowerCase()
             .trim();
     }
@@ -27,26 +40,22 @@ document.addEventListener('DOMContentLoaded', function () {
     function getColorByTipo(tipo) {
         const normalizedTipo = normalizeText(tipo);
         const found = colorDict.find(c => normalizeText(c.tipo) === normalizedTipo);
-        return found ? found.color : "rgb(200,200,200)"; // cor padrão caso não encontre
+        return found ? found.color : "rgb(200,200,200)"; 
     }
 
-    // versão aprimorada da função atualizarTipo
     function atualizarTipo(selectEl) {
         const unidade = selectEl.selectedOptions[0]?.getAttribute("data-tipo") || "";
         const inputTipo = selectEl.parentElement.querySelector('input[name="tipo_defensivo"]');
 
         if (inputTipo) {
             inputTipo.value = unidade;
-
-            // aplica cor dinâmica
             const cor = getColorByTipo(unidade);
             inputTipo.style.backgroundColor = cor;
-            inputTipo.style.color = "white"; // melhora contraste
+            inputTipo.style.color = "white"; 
             inputTipo.style.fontWeight = "600";
             inputTipo.style.textAlign = "center";
         }
     }
-
 
     function formatarNumeroBR(valor) {
         return valor.toLocaleString('pt-BR', {
@@ -54,14 +63,6 @@ document.addEventListener('DOMContentLoaded', function () {
             maximumFractionDigits: 2,
         });
     }
-
-    // function obterAreaTotal() {
-    //     const inputTotal = document.getElementById("total-area-display");
-    //     if (!inputTotal) return 0;
-    //     let val = inputTotal.value.replace(' ha', '').replace(/\./g, '').replace(',', '.');
-    //     let numero = parseFloat(val);
-    //     return isNaN(numero) ? 0 : numero;
-    // }
 
     function obterAreaTotal() {
         let total = 0;
@@ -75,25 +76,11 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function calcularAreaTotal() {
-        const total = obterAreaTotal(); // usar mesma lógica
+        const total = obterAreaTotal(); 
         const inputTotal = document.getElementById("total-area-display");
         if (inputTotal) inputTotal.value = formatarNumeroBR(total) + " Há";
         return total;
     }
-
-    // function calcularAreaTotal() {
-    //     const areas = document.querySelectorAll(".area-input");
-    //     let total = 0;
-    //     areas.forEach(input => {
-    //         const val = parseFloat(input.value);
-    //         if (!isNaN(val)) {
-    //             total += val;
-    //         }
-    //     });
-    //     const inputTotal = document.getElementById("total-area-display");
-    //     if (inputTotal) inputTotal.value = formatarNumeroBR(total) + " Há";
-    //     return total;
-    // }
 
     function getUnidadeFormatada(unidadeRaw) {
         if (!unidadeRaw) return "";
@@ -109,7 +96,7 @@ document.addEventListener('DOMContentLoaded', function () {
             case "l_ha":
                 return " - L/Há";
             default:
-                return unidadeRaw;  // fallback
+                return unidadeRaw;  
         }
     }
 
@@ -175,40 +162,71 @@ document.addEventListener('DOMContentLoaded', function () {
             wrapper.remove();
             calcularAreaTotal();
             atualizarEstadoBotoesRemoverPlantio();
-            atualizarDoseResultados();  // ← adicione aqui
+            atualizarDoseResultados();
         }
     }
 
     function duplicarLinha(botao) {
         const container = document.getElementById("defensivos-container");
         const linhaAtual = botao.closest(".defensivo-group");
+        
+        // Clona a linha inteira
         const novaLinha = linhaAtual.cloneNode(true);
 
-        const novoSelect = novaLinha.querySelector("select");
+        // ==== LIMPEZA PROFUNDA DOS RESÍDUOS DO TOM SELECT ====
+        // Remove as divs "falsas" (wrappers) criadas pelo Tom Select
+        const wrappers = novaLinha.querySelectorAll(".ts-wrapper");
+        wrappers.forEach(w => w.remove());
+
+        // Pega o <select> original clonado
+        const novoSelect = novaLinha.querySelector("select[name='input_id']");
+        
+        // Restaura todas as classes e limpa os atributos de "escondido" que o Tom Select aplicou
+        novoSelect.className = "form-select form-select-sm select-busca-avancada"; 
+        novoSelect.removeAttribute("hidden");
+        novoSelect.removeAttribute("id"); 
+        novoSelect.removeAttribute("tabindex");
+        novoSelect.style.display = ""; 
+        novoSelect.style.visibility = "visible";
+        novoSelect.style.opacity = "1";
+        if (novoSelect.tomselect) delete novoSelect.tomselect; // Apaga o rastro do objeto JS antigo
+        
+        // Limpa os valores
+        novoSelect.value = "";
+        
         const novoInputDose = novaLinha.querySelector("input[name='dosage_value']");
+        if (novoInputDose) novoInputDose.value = "";
+        
+        const inputTipo = novaLinha.querySelector("input[name='tipo_defensivo']");
+        if (inputTipo) {
+            inputTipo.value = "";
+            inputTipo.style.backgroundColor = ""; 
+        }
+        
         const divResultado = novaLinha.querySelector(".dose-result");
-        const inputTipo = novaLinha.querySelector("input[name='tipo_defensivo']"); // ← novo
-
-
-        // Limpa os campos
-        novoSelect.selectedIndex = 0;
-        novoInputDose.value = "";
-        if (inputTipo) inputTipo.value = "";      // ← limpa o “Tipo”
         if (divResultado) divResultado.textContent = "0,00";
 
+        // Insere a linha nova limpa no container
         container.appendChild(novaLinha);
 
-        // Foca no novo select de defensivo
-        novoSelect.focus();
+        // Reinicializa o Tom Select de forma nativa nesta nova linha limpa
+        iniciarSelectAvancado(novoSelect);
 
         verificaDefensivosSelecionados();
         atualizarDoseResultados();
 
         const novoBtnRemover = novaLinha.querySelector('.remove-defensivo-btn');
-        novoBtnRemover.disabled = false;     // o clone herda "disabled"; reabilite aqui
-        novoBtnRemover.title = "";           // limpa o tooltip
+        novoBtnRemover.disabled = false;
+        novoBtnRemover.title = "";
 
-        atualizarEstadoBotoesRemoverDefensivo(); // reavalia estado após adicionar linha
+        atualizarEstadoBotoesRemoverDefensivo();
+
+        // Foca automaticamente no campo do defensivo recém criado
+        setTimeout(() => {
+            if (novoSelect.tomselect) {
+                novoSelect.tomselect.focus();
+            }
+        }, 50);
     }
 
     function removerLinha(botao) {
@@ -216,6 +234,9 @@ document.addEventListener('DOMContentLoaded', function () {
         const linha = botao.closest(".defensivo-group");
 
         if (container.children.length > 1) {
+            const sel = linha.querySelector("select");
+            if (sel && sel.tomselect) sel.tomselect.destroy();
+
             container.removeChild(linha);
             verificaDefensivosSelecionados();
             atualizarDoseResultados();
@@ -244,11 +265,19 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // Evento para selects defensivo
+    // Evento para selects defensivo (com foco automático na dose)
     document.getElementById("defensivos-container").addEventListener("change", function (event) {
         if (event.target.matches("select[name='input_id']")) {
             atualizarTipo(event.target);
             verificaDefensivosSelecionados();
+
+            if (event.target.value) {
+                const linha = event.target.closest('.defensivo-group');
+                const doseInput = linha.querySelector("input[name='dosage_value']");
+                if (doseInput) {
+                    setTimeout(() => doseInput.focus(), 50);
+                }
+            }
         }
     });
 
@@ -272,19 +301,15 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-
     // =========== PARTE NOVA: Programa → Estágio → Itens ===========
     const programasRaw = document.getElementById('programas-json')?.textContent || '[]';
-    /** @type {{id:number,nome:string,safra?:string,ciclo?:string,cultura?:string,estagios:{nome:string,itens:{produto:string,tipo:string,id_farmbox:number,dose:number|null}[]}[]}[]} */
     const PROGRAMAS = JSON.parse(programasRaw);
 
     const selPrograma = document.getElementById('select-programa');
     const selEstagio = document.getElementById('select-estagio');
     const programaMeta = document.getElementById('programa-meta');
 
-    // Preenche select de Programa
     function montarSelectPrograma() {
-        // limpa (mantém placeholder)
         [...selPrograma.options].slice(1).forEach(() => selPrograma.remove(1));
         PROGRAMAS.forEach(p => {
             const opt = document.createElement('option');
@@ -294,7 +319,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Ao escolher programa, popula estágios
     function onProgramaChange() {
         const id = selPrograma.value.trim();
         selEstagio.innerHTML = '<option value="">-- Selecione um estágio --</option>';
@@ -306,7 +330,6 @@ document.addEventListener('DOMContentLoaded', function () {
         const prog = PROGRAMAS.find(p => String(p.id) === id);
         if (!prog) return;
 
-        // meta
         const metas = [
             prog.cultura ? `Cultura: ${prog.cultura}` : null,
             prog.safra ? `Safra: ${prog.safra}` : null,
@@ -314,11 +337,9 @@ document.addEventListener('DOMContentLoaded', function () {
         ].filter(Boolean).join(' • ');
         programaMeta.textContent = metas;
 
-        // estágios
         prog.estagios.forEach(e => {
             const opt = document.createElement('option');
             opt.value = e.nome;
-            // exibe o prazo junto, se quiser:
             opt.textContent = (e.ord ?? e.ord === 0) ? `${e.nome} (DAP: ${e.ord})` : e.nome;
             selEstagio.appendChild(opt);
         });
@@ -329,32 +350,37 @@ document.addEventListener('DOMContentLoaded', function () {
     selPrograma?.addEventListener('change', onProgramaChange);
     montarSelectPrograma();
 
-    // Utilitários para injetar linhas de defensivo/dose:
     function setSelectByValue(selectEl, value) {
-        // tenta achar a option com o value (id farmbox)
         const valStr = String(value);
+        let found = false;
         for (let i = 0; i < selectEl.options.length; i++) {
             if (String(selectEl.options[i].value) === valStr) {
-                selectEl.selectedIndex = i;
-                return true;
+                found = true;
+                break;
             }
+        }
+        
+        if (found) {
+            if (selectEl.tomselect) {
+                selectEl.tomselect.setValue(valStr);
+            } else {
+                selectEl.value = valStr;
+            }
+            return true;
         }
         return false;
     }
 
     function ensureRowCount(count) {
         const container = document.getElementById("defensivos-container");
-        // cria linhas a mais, se necessário
         while (container.children.length < count) {
             const lastAddBtn = container.lastElementChild?.querySelector('button.btn.btn-outline-primary.btn-sm');
-            if (lastAddBtn) lastAddBtn.click(); // usa seu próprio duplicarLinha
+            if (lastAddBtn) lastAddBtn.click();
             else {
-                // fallback: duplica manualmente a última linha
                 const base = container.lastElementChild || container.querySelector('.defensivo-group');
                 container.appendChild(base.cloneNode(true));
             }
         }
-        // remove linhas excedentes
         while (container.children.length > count && container.children.length > 1) {
             container.lastElementChild.querySelector('.remove-defensivo-btn')?.click();
         }
@@ -365,14 +391,18 @@ document.addEventListener('DOMContentLoaded', function () {
             g.querySelector("input[name='dosage_value']").value = "";
             const res = g.querySelector(".dose-result");
             if (res) res.textContent = "0,00";
+            
             const sel = g.querySelector("select[name='input_id']");
-            sel.selectedIndex = 0;
+            if (sel.tomselect) {
+                sel.tomselect.clear();
+            } else {
+                sel.selectedIndex = 0;
+            }
             atualizarTipo(sel);
         });
         atualizarDoseResultados();
     }
 
-    // Ao escolher estágio, injeta os itens no grid
     function onEstagioChange() {
         const progId = selPrograma.value.trim();
         const estagioNome = selEstagio.value.trim();
@@ -391,35 +421,26 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         const itens = estagio.itens || [];
-        // garante número de linhas = qtd itens
         ensureRowCount(itens.length);
 
-        // preenche cada linha
         const grupos = document.querySelectorAll("#defensivos-container .defensivo-group");
-        // Função para normalizar comparações (remove acentos + lowercase)
         const norm = s => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
-        // Marca cada item com índice original para preservar a ordem secundária
         const itensOrdenados = itens
             .map((it, i) => ({ ...it, __idx: i }))
             .sort((a, b) => {
-
-                // 1) "Operação" SEMPRE primeiro
                 const isAOperacao = norm(a.tipo) === 'operacao';
                 const isBOperacao = norm(b.tipo) === 'operacao';
-                if (isAOperacao && !isBOperacao) return -1; // a vem antes
-                if (!isAOperacao && isBOperacao) return 1;  // b vem antes
+                if (isAOperacao && !isBOperacao) return -1;
+                if (!isAOperacao && isBOperacao) return 1;
 
-                // 2) Caso não seja operação, ordenar pelos demais tipos alfabeticamente
                 const ta = norm(a.tipo);
                 const tb = norm(b.tipo);
                 if (ta !== tb) return ta.localeCompare(tb, 'pt-BR', { sensitivity: 'base' });
 
-                // 3) Critério secundário → mantém ordem original dentro do tipo
                 return a.__idx - b.__idx;
             });
 
-        // Agora popula os inputs, mantendo tudo como estava
         itensOrdenados.forEach((it, idx) => {
             const grupo = grupos[idx];
             const select = grupo.querySelector("select[name='input_id']");
@@ -428,24 +449,25 @@ document.addEventListener('DOMContentLoaded', function () {
             if (setSelectByValue(select, it.id_farmbox)) {
                 atualizarTipo(select);
             } else {
-                select.selectedIndex = 0;
+                if (select.tomselect) select.tomselect.clear();
+                else select.selectedIndex = 0;
             }
 
-            // Mantém dose com ponto ( <input type="number"> exige ponto )
             doseInput.value = (it.dose ?? "").toString();
         });
 
-        // se tiver mais linhas do que itens (p.ex., restou 1 linha “sobrando” e só veio 0 itens)
         for (let i = itens.length; i < grupos.length; i++) {
             const grupo = grupos[i];
             const select = grupo.querySelector("select[name='input_id']");
             const doseInput = grupo.querySelector("input[name='dosage_value']");
-            select.selectedIndex = 0;
+            
+            if (select.tomselect) select.tomselect.clear();
+            else select.selectedIndex = 0;
+            
             doseInput.value = "";
             atualizarTipo(select);
         }
 
-        // recalc dos totais/resultado
         atualizarDoseResultados();
         verificaDefensivosSelecionados();
         atualizarEstadoBotoesRemoverDefensivo();
@@ -454,7 +476,6 @@ document.addEventListener('DOMContentLoaded', function () {
     selEstagio?.addEventListener('change', onEstagioChange);
 
     function resetProgramaEstagio() {
-        // limpa selects e meta
         const selPrograma = document.getElementById('select-programa');
         const selEstagio = document.getElementById('select-estagio');
         const programaMeta = document.getElementById('programa-meta');
@@ -466,14 +487,18 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         if (programaMeta) programaMeta.textContent = '';
 
-        // deixa somente 1 linha de defensivo, limpa tudo
         ensureRowCount(1);
         const unica = document.querySelector("#defensivos-container .defensivo-group");
         if (unica) {
             const select = unica.querySelector("select[name='input_id']");
             const doseInput = unica.querySelector("input[name='dosage_value']");
             const res = unica.querySelector(".dose-result");
-            if (select) { select.selectedIndex = 0; atualizarTipo(select); }
+            
+            if (select) { 
+                if (select.tomselect) select.tomselect.clear();
+                else select.selectedIndex = 0;
+                atualizarTipo(select); 
+            }
             if (doseInput) doseInput.value = "";
             if (res) res.textContent = "0,00";
         }
@@ -484,9 +509,6 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     document.getElementById('btn-reset-programa')?.addEventListener('click', resetProgramaEstagio);
-
-
-    // ========= FIM DA PARTE NOVA =========
 
     function enviarAplicacao() {
         const btn = document.getElementById("btn-submit");
@@ -589,13 +611,15 @@ document.addEventListener('DOMContentLoaded', function () {
             });
     }
 
-
     // Inicializações
     calcularAreaTotal();
     verificaDefensivosSelecionados();
     atualizarEstadoBotoesRemoverPlantio();
     atualizarEstadoBotoesRemoverDefensivo();
     atualizarDoseResultados();
+
+    // Inicializa os selects avançados na carga da página
+    document.querySelectorAll('.select-busca-avancada').forEach(iniciarSelectAvancado);
 
     // Expor funções para chamadas inline
     window.removerPlantio = removerPlantio;

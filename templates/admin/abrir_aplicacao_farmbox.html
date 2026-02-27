@@ -5,7 +5,28 @@
 {% block extrahead %}
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
+
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
+
+<style>
+    /* Tamanho reduzido do Tom Select (Defensivo) */
+    .defensivo-group .ts-wrapper {
+        width: 300px !important; /* Trava o tamanho exato */
+        min-width: 300px !important;
+    }
+    /* Força o tamanho exato da Dose */
+    .defensivo-group input[name="dosage_value"] {
+        width: 180px !important;
+        min-width: 180px !important;
+    }
+    /* Força o tamanho do input de Tipo */
+    .defensivo-group input[name="tipo_defensivo"] {
+        width: 200px !important;
+        min-width: 200px !important;
+    }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -65,7 +86,6 @@
                         </div>
                     </div>
 
-                    <!-- Botão remover -->
                     <button type="button" class="btn btn-sm btn-outline-danger remove-plantio-btn"
                         onclick="removerPlantio(this)">
                         Remover
@@ -78,7 +98,6 @@
 
     <hr />
 
-    <!-- Guarda o JSON dos programas -->
     <script id="programas-json" type="application/json">{{ programa_data_json|safe }}</script>
 
     <div class="row g-3 mb-3">
@@ -87,7 +106,6 @@
         <label class="form-label"><strong>Programa</strong></label>
         <select id="select-programa" class="form-select">
         <option value="">-- Selecione um programa --</option>
-        <!-- opções montadas via JS -->
         </select>
     </div>
 
@@ -99,7 +117,6 @@
     </select>
   </div>
 
-  <!-- Botão Lixeira -->
   <button type="button" id="btn-reset-programa" class="btn btn-outline-danger" title="Limpar programa/estágio/itens">
     <span class="me-1">Limpar</span> 🗑️
   </button>
@@ -112,7 +129,8 @@
     <h5>Adicionar Defensivos</h5>
     <div id="defensivos-container" class="mb-3">
         <div class="defensivo-group d-flex align-items-center gap-2 mb-2">
-            <select name="input_id" class="form-select form-select-sm w-auto" style="min-width: 220px;" required>
+            
+            <select name="input_id" class="form-select form-select-sm select-busca-avancada" required>
                 <option value="">-- Selecione um defensivo --</option>
                 {% for d in defensivos %}
                 <option value="{{ d.id_farmbox_str|stringformat:'d' }}" data-unidade="{{ d.unidade_medida }}" data-tipo="{{ d.tipo_display}}" data-formulacao="{{d.formulacao}}">
@@ -121,17 +139,16 @@
                 {% endfor %}
             </select>
 
-            <input type="text" name="tipo_defensivo" class="form-control form-control-sm w-auto" 
-                placeholder=" - " style="width: 100px;" disabled>
+            <input type="text" name="tipo_defensivo" class="form-control form-control-sm" 
+                placeholder=" - " disabled>
 
-            <input type="number" step="0.01" name="dosage_value" class="form-control form-control-sm w-auto"
-                placeholder="Dose (ex: 0.2)" style="width: 100px;" required>
+            <input type="number" step="0.01" name="dosage_value" class="form-control form-control-sm"
+                placeholder="Dose (ex: 0.2)" required>
 
             <button type="button" class="btn btn-outline-primary btn-sm" onclick="duplicarLinha(this)">+</button>
             <button type="button" class="btn btn-outline-danger btn-sm remove-defensivo-btn"
                 onclick="removerLinha(this)">−</button>
 
-            <!-- Nova coluna para resultado -->
             <div class="dose-result" style="min-width: 80px; text-align: right; font-weight: 600;">
                 0,00
             </div>

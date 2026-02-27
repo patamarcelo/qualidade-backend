@@ -1,0 +1,11 @@
+/* linha inteira */
+tr.row-plantio-descontinuado > td,
+tr.row-plantio-descontinuado > th {
+  background-color: rgba(255, 0, 0, 0.18) !important;
+}
+
+/* opcional: manter o hover visível sem “sumir” o vermelho */
+tr.row-plantio-descontinuado:hover > td,
+tr.row-plantio-descontinuado:hover > th {
+  background-color: rgba(255, 0, 0, 0.26) !important;
+}

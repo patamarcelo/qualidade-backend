@@ -1217,6 +1217,9 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         ]
     
     class Media:
+        css = {
+            "all": ("admin/css/plantio_changelist.css",)
+        }
         js = ('admin/js/colapsar-mapdetails.js',)
 
     def get_urls(self):

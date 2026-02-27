@@ -1,6 +1,21 @@
 {% load i18n admin_urls adminlte_helpers static admin_list %}
+
 {% block extrahead %}
 <link rel="stylesheet" type="text/css" href="{% static 'admin-lte/plugins/datatables-bs4/css/dataTables.bootstrap4.css' %}">
+
+<style>
+/* Linha inteira quando a célula do boolean tem alt="True" */
+#result_list tbody tr:has(td.field-get_description_descontinuado_plantio img[alt="True"]) > td,
+#result_list tbody tr:has(td.field-get_description_descontinuado_plantio img[alt="True"]) > th {
+  background-color: rgba(255, 0, 0, 0.10) !important;
+}
+
+/* opcional: hover um pouco mais forte */
+#result_list tbody tr:has(td.field-get_description_descontinuado_plantio img[alt="True"]):hover > td,
+#result_list tbody tr:has(td.field-get_description_descontinuado_plantio img[alt="True"]):hover > th {
+  background-color: rgba(255, 0, 0, 0.16) !important;
+}
+</style>
 {% endblock %}
 
 {% if result_hidden_fields %}
@@ -17,8 +32,8 @@
           <thead>
             <tr>
               {% for header in result_headers %}
-              <th >
-                  <span>{{ header.text|capfirst }}</span>
+              <th>
+                <span>{{ header.text|capfirst }}</span>
               </th>{% endfor %}
             </tr>
           </thead>
@@ -29,16 +44,19 @@
               <td colspan="{{ result|length }}">{{ result.form.non_field_errors }}</td>
             </tr>
             {% endif %}
-            <tr class="{% cycle 'row1' 'row2' %}">{% for item in result %}{{ item }}{% endfor %}</tr>
+            <tr
+              class="{% cycle 'row1' 'row2' %}{% if result.plantio_descontinuado %} row-plantio-descontinuado{% endif %}">
+              {% for item in result %}{{ item }}{% endfor %}
+            </tr>
             {% endfor %}
           </tbody>
           <tfoot>
-              <tr>
-                {% for header in result_headers %}
-                <th>
-                    <span>{{ header.text|capfirst }}</span>
-                </th>{% endfor %}
-              </tr>
+            <tr>
+              {% for header in result_headers %}
+              <th>
+                <span>{{ header.text|capfirst }}</span>
+              </th>{% endfor %}
+            </tr>
           </tfoot>
         </table>
       </div>
@@ -47,4 +65,3 @@
 </div>
 
 {% endif %}
-
