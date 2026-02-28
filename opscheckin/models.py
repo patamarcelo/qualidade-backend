@@ -1,12 +1,39 @@
 # opscheckin/models.py
+import re
 from django.db import models
 from django.utils import timezone
+from django.core.exceptions import ValidationError
 
+
+def only_digits(v: str) -> str:
+    return re.sub(r"\D+", "", str(v or ""))
 
 class Manager(models.Model):
     name = models.CharField(max_length=80)
     phone_e164 = models.CharField(max_length=20, unique=True)  # ex: 5551999999999
     is_active = models.BooleanField(default=True)
+    
+    def clean(self):
+        super().clean()
+        s = only_digits(self.phone_e164)
+
+        # aceita salvar já normalizado
+        if s.startswith("55") and len(s) in (12, 13):
+            self.phone_e164 = s
+            return
+
+        # se alguém tentar salvar sem 55, tenta prefixar (fallback)
+        if len(s) in (10, 11):  # DDD + numero
+            s = "55" + s
+
+        if not (s.startswith("55") and len(s) in (12, 13)):
+            raise ValidationError({"phone_e164": "Telefone inválido. Use DDD + número."})
+
+        self.phone_e164 = s
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.name} ({self.phone_e164})"

@@ -6,13 +6,77 @@ from django.utils import timezone
 
 from .models import Manager, DailyCheckin, OutboundQuestion, InboundMessage
 
+import re
+from django import forms
+
+
+
+# opscheckin/admin.py
+BR_DDDS = [
+  "11","12","13","14","15","16","17","18","19",
+  "21","22","24","27","28",
+  "31","32","33","34","35","37","38",
+  "41","42","43","44","45","46",
+  "47","48","49",
+  "51","53","54","55",
+  "61","62","63","64","65","66","67","68","69",
+  "71","73","74","75","77","79",
+  "81","82","83","84","85","86","87","88","89",
+  "91","92","93","94","95","96","97","98","99",
+]
+
+
+def only_digits(v: str) -> str:
+    return re.sub(r"\D+", "", str(v or ""))
+
+class ManagerAdminForm(forms.ModelForm):
+    country = forms.CharField(initial="55", required=False, disabled=True, label="DDI")
+    ddd = forms.ChoiceField(choices=[(d, d) for d in BR_DDDS], label="DDD", required=True)
+    number = forms.CharField(label="Número", required=True, widget=forms.TextInput(attrs={"placeholder": "91234-5678"}))
+
+    class Meta:
+        model = Manager
+        fields = ("name", "country", "ddd", "number", "is_active")  # phone_e164 fica oculto
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk and self.instance.phone_e164:
+            s = only_digits(self.instance.phone_e164)
+            if s.startswith("55") and len(s) >= 4:
+                self.fields["ddd"].initial = s[2:4]
+                self.fields["number"].initial = s[4:]
+
+    def clean(self):
+        cleaned = super().clean()
+
+        ddd = cleaned.get("ddd")
+        number_raw = cleaned.get("number")
+        number = only_digits(number_raw)
+
+        if not ddd:
+            return cleaned
+
+        if len(number) not in (8, 9):
+            self.add_error("number", "Número deve ter 8 (fixo) ou 9 (celular) dígitos.")
+            return cleaned
+
+        phone_e164 = f"55{ddd}{number}"
+
+        # ✅ CRÍTICO: injeta no instance ANTES do _post_clean do Django
+        self.instance.phone_e164 = phone_e164
+
+        return cleaned
 
 @admin.register(Manager)
 class ManagerAdmin(admin.ModelAdmin):
+    form = ManagerAdminForm
     list_display = ("id", "name", "phone_e164", "is_active", "last_checkin_link")
     list_filter = ("is_active",)
     search_fields = ("name", "phone_e164")
     ordering = ("name",)
+    
+    class Media:
+        js = ("opscheckin/admin_phone_mask.js",)
 
     def last_checkin_link(self, obj):
         last = obj.checkins.order_by("-date", "-id").first()
