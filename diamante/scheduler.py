@@ -60,7 +60,7 @@ def start():
         return
     
     try:
-        scheduler = BackgroundScheduler()
+        scheduler = BackgroundScheduler(timezone=settings.TIME_ZONE)
         # remove all runing jobs
         scheduler.remove_all_jobs()
         if settings.DEBUG == False:
