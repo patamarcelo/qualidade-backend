@@ -188,21 +188,34 @@ DATABASES = {
     #     'ATOMIC_REQUESTS': True,
     # },
     "default": {
-        'ENGINE': 'django.db.backends.postgresql',
+        "ENGINE": "dj_db_conn_pool.backends.postgresql",
         "NAME": env("DB_EL_NAME"),
         "USER": env("DB_EL_USER"),
         "PASSWORD": env("DB_EL_PASSWORD"),
         "HOST": env("DB_EL_HOST"),
         "PORT": env("DB_EL_PORT"),
-        # 'CONN_MAX_AGE': 10,  # Keep connections alive for 5 minutes
-        "CONN_HEALTH_CHECKS": True,  # check connection before using
-        'ATOMIC_REQUESTS': True,
-        'POOL_OPTIONS': {
-            'POOL_SIZE': 10,        # Increase from 5
-            'MAX_OVERFLOW': 20,     # Increase from 10
-            'RECYCLE': 300,
-            'PRE_PING': True,
-        }
+
+        "CONN_MAX_AGE": 60,
+        "CONN_HEALTH_CHECKS": True,
+        "ATOMIC_REQUESTS": True,
+
+        "OPTIONS": {
+            "sslmode": "require",
+            "connect_timeout": 10,
+
+            # keepalive (libpq / psycopg2)
+            "keepalives": 1,
+            "keepalives_idle": 30,
+            "keepalives_interval": 10,
+            "keepalives_count": 5,
+        },
+
+        "POOL_OPTIONS": {
+            "POOL_SIZE": 10,
+            "MAX_OVERFLOW": 20,
+            "RECYCLE": 300,
+            "PRE_PING": True,
+        },
     },
     # "dev": {
     #     'ENGINE': 'dj_db_conn_pool.backends.postgresql',

@@ -18,6 +18,12 @@ from diamante.cron import enviar_email_diario
 
 from opscheckin.cron import run_opscheckin_reminders, run_opscheckin_agenda_0600
 
+from django.db import close_old_connections
+from .scheduler_lock import acquire_scheduler_lock
+from .scheduler_utils import safe_job
+
+
+
 def get_formatted_datetime():
     now = datetime.now()
     formatted_datetime = now.strftime("%Y_%m_%d_%H_%M_%S")
@@ -47,6 +53,12 @@ def get_active_jobs(scheduler, old_id):
 
 
 def start():
+    close_old_connections()
+
+    if not acquire_scheduler_lock():
+        logger.info("Scheduler não iniciado (lock já está com outro processo).")
+        return
+    
     try:
         scheduler = BackgroundScheduler()
         # remove all runing jobs
@@ -79,7 +91,7 @@ def start():
             if settings.ENABLE_CRON_REGISTER:
                 # Novo job: Finalizar parcelas encerradas (rodar 1 vez por dia, às 06:00 por exemplo)
                 scheduler.add_job(
-                    finalizar_parcelas_encerradas,
+                    safe_job(finalizar_parcelas_encerradas),
                     'cron',
                     day_of_week="*",
                     hour="5",
@@ -90,7 +102,7 @@ def start():
                 )
                 
                 scheduler.add_job(
-                    enviar_email_diario,
+                    safe_job(enviar_email_diario),
                     'cron',
                     day_of_week="mon-fri",   # Segunda a sexta-feira
                     hour="6",
@@ -101,7 +113,7 @@ def start():
                 )
                 
                 scheduler.add_job(
-                    enviar_email_alerta_mungo_verde_por_regra,
+                    safe_job(enviar_email_alerta_mungo_verde_por_regra),
                     'cron',
                     day_of_week='sun',    # Domingo
                     hour=12,
@@ -112,7 +124,7 @@ def start():
                 )
                 
                 scheduler.add_job(
-                    enviar_email_estoque_farmbox_diario,
+                    safe_job(enviar_email_estoque_farmbox_diario),
                     'cron',
                     day_of_week="*",
                     hour="6",
@@ -124,7 +136,7 @@ def start():
                 
                 
                 scheduler.add_job(
-                    run_opscheckin_agenda_0600,
+                    safe_job(run_opscheckin_agenda_0600),
                     "cron",
                     day_of_week="*",
                     hour="6",
@@ -137,7 +149,7 @@ def start():
                 )
 
                 scheduler.add_job(
-                    run_opscheckin_reminders,
+                    safe_job(run_opscheckin_reminders),
                     "cron",
                     day_of_week="*",
                     hour="6",
@@ -150,7 +162,7 @@ def start():
                 )
 
                 scheduler.add_job(
-                    run_opscheckin_reminders,
+                    safe_job(run_opscheckin_reminders),
                     "cron",
                     day_of_week="*",
                     hour="7",
