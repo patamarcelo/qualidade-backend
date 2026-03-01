@@ -388,3 +388,12 @@ WHATSAPP_TOKEN = env("WHATSAPP_TOKEN", default="")
 META_APP_SECRET = env("META_APP_SECRET", default="")  # opcional, mas recomendado
 WHATSAPP_API_VERSION = env("WHATSAPP_API_VERSION", default="")  # opcional, mas recomendado
 WHATSAPP_PHONE_NUMBER_ID = env("WHATSAPP_PHONE_NUMBER_ID", default="")  # opcional, mas recomendado
+
+
+WHATSAPP_TEMPLATE_LANGUAGE = "pt_BR"
+
+# Template Utility para a primeira mensagem (agenda)
+WHATSAPP_TEMPLATE_AGENDA_NAME = "ops_agenda_01"
+
+# Template Utility para reminder (opcional, mas recomendado)
+WHATSAPP_TEMPLATE_REMINDER_NAME = "ops_reminder_01"
