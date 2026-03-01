@@ -20,9 +20,9 @@ from opscheckin.cron import run_opscheckin_reminders, run_opscheckin_agenda_0600
 
 from django.db import close_old_connections
 from .scheduler_lock import acquire_scheduler_lock
-from .scheduler_utils import safe_job
+from .scheduler_utils import safe_job  # Mantido o import caso seja usado em outro lugar, mas removido dos jobs
 
-import pytz  # <-- ADICIONADO: Necessário para instanciar o fuso horário corretamente
+import pytz
 
 
 def get_formatted_datetime():
@@ -60,7 +60,7 @@ def start():
         return
     
     try:
-        # CORREÇÃO 1: Instancia o timezone de forma segura antes de passar para o scheduler
+        # Fuso horário configurado corretamente
         fuso_horario = pytz.timezone(settings.TIME_ZONE)
         scheduler = BackgroundScheduler(timezone=fuso_horario)
         
@@ -70,47 +70,48 @@ def start():
             func = getattr(module, func_name)
             print(f"Funcao encontrada: {func}")
             
-            # CORREÇÃO 2: Conecta o banco de dados ANTES de limpar os jobs
+            # Conecta o banco de dados ANTES de limpar os jobs
             scheduler.add_jobstore(DjangoJobStore(), "default")
             
-            # CORREÇÃO 3: Agora o remove_all_jobs vai limpar a tabela correta do banco
+            # Limpa a tabela do banco com segurança
             scheduler.remove_all_jobs()
             
             print('agendando funcao para rodar no servidor:')
-            # Register the job with a textual reference
             date_now = get_formatted_datetime()
             job_id = f'Update_farmbox_apps_Hourly-{date_now}'
             get_active_jobs(scheduler, job_id)
             
             print('job not exists yet, registering....', job_id)
             if settings.ENABLE_CRON_REGISTER:
-                # Novo job: Finalizar parcelas encerradas (rodar 1 vez por dia, às 06:00 por exemplo)
+                
+                # CORREÇÃO: safe_job removido de todos os add_job para o pickle conseguir salvar no banco
+                
                 scheduler.add_job(
-                    safe_job(finalizar_parcelas_encerradas),
+                    finalizar_parcelas_encerradas,
                     'cron',
                     day_of_week="*",
                     hour="5",
                     minute="30",
                     id="finalizar_parcelas_diario",
                     replace_existing=True,
-                    misfire_grace_time=3600  # tolerância de 1 hora caso haja atraso
+                    misfire_grace_time=3600
                 )
                 
                 scheduler.add_job(
-                    safe_job(enviar_email_diario),
+                    enviar_email_diario,
                     'cron',
-                    day_of_week="mon-fri",   # Segunda a sexta-feira
+                    day_of_week="mon-fri",
                     hour="6",
                     minute="20",
                     id="enviar_email_diario_0630",
                     replace_existing=True,
-                    misfire_grace_time=3600  # tolerância de 1 hora caso haja atraso
+                    misfire_grace_time=3600
                 )
                 
                 scheduler.add_job(
-                    safe_job(enviar_email_alerta_mungo_verde_por_regra),
+                    enviar_email_alerta_mungo_verde_por_regra,
                     'cron',
-                    day_of_week='sun',    # Domingo
+                    day_of_week='sun',
                     hour=12,
                     minute=0,
                     id='alerta_mungo_verde_domingo_12h',
@@ -119,7 +120,7 @@ def start():
                 )
                 
                 scheduler.add_job(
-                    safe_job(enviar_email_estoque_farmbox_diario),
+                    enviar_email_estoque_farmbox_diario,
                     'cron',
                     day_of_week="*",
                     hour="6",
@@ -130,11 +131,11 @@ def start():
                 )
                 
                 scheduler.add_job(
-                    safe_job(run_opscheckin_agenda_0600),
+                    run_opscheckin_agenda_0600,
                     "cron",
                     day_of_week="*",
                     hour="8",
-                    minute="0",
+                    minute="3",
                     id="opscheckin_agenda_0600",
                     replace_existing=True,
                     misfire_grace_time=600,
@@ -143,7 +144,7 @@ def start():
                 )
 
                 scheduler.add_job(
-                    safe_job(run_opscheckin_reminders),
+                    run_opscheckin_reminders,
                     "cron",
                     day_of_week="*",
                     hour="8",
@@ -156,10 +157,10 @@ def start():
                 )
 
                 scheduler.add_job(
-                    safe_job(run_opscheckin_reminders),
+                    run_opscheckin_reminders,
                     "cron",
                     day_of_week="*",
-                    hour="9",
+                    hour="8",
                     minute="0",
                     id="opscheckin_agenda_reminders_0700",
                     replace_existing=True,
@@ -175,6 +176,5 @@ def start():
             print('funcionando, vai rodar somente no servidor')
             
     except Exception as e:
-        # CORREÇÃO 4: Adiciona exc_info=True para imprimir o rastro completo do erro no console, se algo falhar
         logger.error(f"Erro fatal ao iniciar o scheduler: {e}", exc_info=True)
         print(f"Erro ao resolver/iniciar as funções do scheduler: {e}")
