@@ -60,7 +60,7 @@ def start():
         return
     
     try:
-        scheduler = BackgroundScheduler(timezone=settings.TIME_ZONE)
+        scheduler = BackgroundScheduler()
         # remove all runing jobs
         scheduler.remove_all_jobs()
         if settings.DEBUG == False:
@@ -139,7 +139,7 @@ def start():
                     safe_job(run_opscheckin_agenda_0600),
                     "cron",
                     day_of_week="*",
-                    hour="6",
+                    hour="8",
                     minute="0",
                     id="opscheckin_agenda_0600",
                     replace_existing=True,
@@ -152,7 +152,7 @@ def start():
                     safe_job(run_opscheckin_reminders),
                     "cron",
                     day_of_week="*",
-                    hour="6",
+                    hour="8",
                     minute="15,30,45",
                     id="opscheckin_agenda_reminders_0615_0630_0645",
                     replace_existing=True,
@@ -165,7 +165,7 @@ def start():
                     safe_job(run_opscheckin_reminders),
                     "cron",
                     day_of_week="*",
-                    hour="7",
+                    hour="9",
                     minute="0",
                     id="opscheckin_agenda_reminders_0700",
                     replace_existing=True,
