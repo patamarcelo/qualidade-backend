@@ -135,7 +135,7 @@ def start():
                     "cron",
                     day_of_week="*",
                     hour="8",
-                    minute="22",
+                    minute="26",
                     id="opscheckin_agenda_0600",
                     replace_existing=True,
                     misfire_grace_time=600,
