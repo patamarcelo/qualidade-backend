@@ -22,6 +22,7 @@ from django.db import close_old_connections
 from .scheduler_lock import acquire_scheduler_lock
 from .scheduler_utils import safe_job
 
+import pytz  # <-- ADICIONADO: Necessário para instanciar o fuso horário corretamente
 
 
 def get_formatted_datetime():
@@ -30,12 +31,11 @@ def get_formatted_datetime():
     return formatted_datetime
 
 
-
-
 def delete_old_job_executions(max_age=604_800):
     """This job deletes APScheduler job execution entries older than `max_age` from the database."""
     DjangoJobExecution.objects.delete_old_job_executions(max_age)
     
+
 def get_active_jobs(scheduler, old_id):
     jobs = scheduler.get_jobs()
     logger.info(f"Total active jobs: {len(jobs)}")
@@ -60,33 +60,28 @@ def start():
         return
     
     try:
-        scheduler = BackgroundScheduler()
-        # remove all runing jobs
-        scheduler.remove_all_jobs()
+        # CORREÇÃO 1: Instancia o timezone de forma segura antes de passar para o scheduler
+        fuso_horario = pytz.timezone(settings.TIME_ZONE)
+        scheduler = BackgroundScheduler(timezone=fuso_horario)
+        
         if settings.DEBUG == False:
             module_name, func_name = 'diamante.cron.update_farmbox_mongodb_app'.rsplit('.', 1)
             module = import_module(module_name)
             func = getattr(module, func_name)
             print(f"Funcao encontrada: {func}")
+            
+            # CORREÇÃO 2: Conecta o banco de dados ANTES de limpar os jobs
             scheduler.add_jobstore(DjangoJobStore(), "default")
+            
+            # CORREÇÃO 3: Agora o remove_all_jobs vai limpar a tabela correta do banco
+            scheduler.remove_all_jobs()
+            
             print('agendando funcao para rodar no servidor:')
             # Register the job with a textual reference
             date_now = get_formatted_datetime()
-            job_id=f'Update_farmbox_apps_Hourly-{date_now}'
+            job_id = f'Update_farmbox_apps_Hourly-{date_now}'
             get_active_jobs(scheduler, job_id)
-            # if existing_job:
-            #     print('job already registered', job_id)
-            #     existing_job.modify(
-            #         func,
-            #         'cron',
-            #         # day_of_week="*",
-            #         day_of_week="mon-sat",
-            #         hour="5-19",  # From 5 AM to 7:59 PM
-            #         # minute="15,30,45,58",  # At 15, 30, 45 and 58 minutes of each hour
-            #         minute="59",  # At 15, 30, 45 and 58 minutes of each hour
-            #         id=job_id
-            #     )
-            # else:
+            
             print('job not exists yet, registering....', job_id)
             if settings.ENABLE_CRON_REGISTER:
                 # Novo job: Finalizar parcelas encerradas (rodar 1 vez por dia, às 06:00 por exemplo)
@@ -134,7 +129,6 @@ def start():
                     misfire_grace_time=3600
                 )
                 
-                
                 scheduler.add_job(
                     safe_job(run_opscheckin_agenda_0600),
                     "cron",
@@ -176,8 +170,11 @@ def start():
                 
             register_events(scheduler)
             scheduler.start()
-            logger.info("Scheduler started!")
+            logger.info("Scheduler started successfully with timezone!")
         else:
             print('funcionando, vai rodar somente no servidor')
+            
     except Exception as e:
-        print(f"Error resolving function: {e}")
+        # CORREÇÃO 4: Adiciona exc_info=True para imprimir o rastro completo do erro no console, se algo falhar
+        logger.error(f"Erro fatal ao iniciar o scheduler: {e}", exc_info=True)
+        print(f"Erro ao resolver/iniciar as funções do scheduler: {e}")
