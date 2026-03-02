@@ -2242,6 +2242,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["GET", "POST"])
     def get_plantio_operacoes_detail(self, request):
+        print('pega aqui::::')
         if request.user.is_authenticated:
             try:
                 safra_filter = request.data["safra"]
@@ -2468,77 +2469,67 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 # max_day = 50
                 today_check = datetime.datetime.now().date()
                 # PROGRAMA PARA GERAR DATAS FUTURAS DE ACORDO COM A LÓGICA PARA
+
+
                 for k, v in final_result.items():
-                    prev_date.update(
-                        {
-                            k: {
-                                "area": 0,
-                                "dias_necessários": 0,
-                                "data_inicial": None,
-                                "data_final": None,
-                            }
-                        }
-                    )
-                    # print("inside loop : ", k)
                     filtered_planner = qs_planejamento.filter(projeto__nome=k)
                     planner_date = False
                     if filtered_planner:
-                        # print("aqui temos planejamneto: , ", filtered_planner)
                         current_planner = filtered_planner[0]
                         inital_date_planner = current_planner["start_date"]
                         planner_date = True
 
-                    for kk, vv in v.items():
-                        # print("VVV :", vv)
-                        # print("\n")
-                        projeto_id = vv["projeto_id"]
+                    # ✅ estado por fazenda
+                    current_date = None
+                    remaining_capacity = None
 
+                    # ✅ ordem determinística
+                    items = list(v.items())
+                    items.sort(key=lambda it: (it[1].get("data_prevista_plantio") or datetime.date(1900,1,1), it[0]))
+
+                    for kk, vv in items:
                         data_plantio = vv["data_plantio"]
                         data_prevista_plantio = vv["data_prevista_plantio"]
-                        area_colheita = vv["area_colheita"]
+                        area_colheita = vv["area_colheita"] or 0
+                        capacidade_dia = vv["capacidade_plantio_dia"] or 0
                         start_date = vv["programa_start_date"]
-                        end_date = vv["programa_end_date"]
-                        cronograma = vv["cronograma"]
-                        capacidade_dia = vv["capacidade_plantio_dia"]
 
-                        prev_date[k]["area"] += vv["area_colheita"]
-                        prev_date[k]["dias_necessários"] = round(
-                            prev_date[k]["area"] / capacidade_dia
-                        )
-                        if planner_date:
-                            prev_date[k]["data_inicial"] = get_base_date(
-                                inital_date_planner
-                            )
-                        else:
-                            prev_date[k]["data_inicial"] = get_base_date(start_date)
-                        prev_date[k]["data_final"] = prev_date[k][
-                            "data_inicial"
-                        ] + datetime.timedelta(days=prev_date[k]["dias_necessários"])
-                        # ------------HERE is the challenge-------------------#
-                        # print('data Prevista: ', data_prevista_plantio)
-                        # print('data Prevista: ', type(data_prevista_plantio))
-                        # print('data Prevista check: ', today_check)
-                        # print('data Prevista check: ', type(today_check))
-                        # print(data_prevista_plantio > today_check)
-                        # print('\n')
+                        # ✅ inicializa base e capacidade do “dia corrente”
+                        if current_date is None:
+                            if planner_date:
+                                current_date = get_base_date(inital_date_planner)
+                            else:
+                                current_date = get_base_date(start_date)
+                            remaining_capacity = capacidade_dia
+
+                        # ✅ se tiver prevista futura, pula pra ela (e reseta capacidade)
+                        if data_prevista_plantio and data_prevista_plantio > today_check:
+                            if data_prevista_plantio > current_date:
+                                current_date = data_prevista_plantio
+                                remaining_capacity = capacidade_dia
+
                         if data_plantio is None:
-                            final_result[k][kk].update(
-                                {
-                                    "data_plantio": data_prevista_plantio if data_prevista_plantio and data_prevista_plantio > today_check else  prev_date[k]["data_inicial"]
-                                    + datetime.timedelta(
-                                        days=prev_date[k]["dias_necessários"]
-                                    )
-                                }
-                            )
-                        prev_date[k]["dias_necessários"] = round(
-                            prev_date[k]["area"] / capacidade_dia
-                        )
-                        index = 0
-                        for vvv in final_result[k][kk]["cronograma"]:
+                            if not capacidade_dia or capacidade_dia <= 0:
+                                final_result[k][kk]["data_plantio"] = current_date
+                            else:
+                                if area_colheita <= remaining_capacity:
+                                    final_result[k][kk]["data_plantio"] = current_date
+                                    remaining_capacity -= area_colheita
+                                else:
+                                    faltando = area_colheita - remaining_capacity
+                                    dias = math.ceil(faltando / capacidade_dia)
+                                    current_date = current_date + datetime.timedelta(days=dias)
+
+                                    consumido_no_dia = faltando % capacidade_dia
+                                    remaining_capacity = capacidade_dia - consumido_no_dia if consumido_no_dia else capacidade_dia
+
+                                    final_result[k][kk]["data_plantio"] = current_date
+
+                        # ✅ cronograma (o seu trecho pode ficar igual)
+                        for index, vvv in enumerate(final_result[k][kk]["cronograma"]):
                             final_result[k][kk]["cronograma"][index].update(
                                 {
-                                    "data prevista": final_result[k][kk]["data_plantio"]
-                                    + datetime.timedelta(days=vvv["dap"] - 1),
+                                    "data prevista": final_result[k][kk]["data_plantio"] + datetime.timedelta(days=vvv["dap"] - 1),
                                     "aplicado": False,
                                 }
                             )
