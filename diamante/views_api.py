@@ -5397,78 +5397,142 @@ class DefensivoViewSet(viewsets.ModelViewSet):
     authentication_classes = (CachedTokenAuthentication,)
     permission_classes = (IsAuthenticated,)
     
+    def _mask_sensitive_headers(self, headers: dict) -> dict:
+        """
+        Remove/mascara coisas sensíveis antes de enviar por e-mail/log.
+        """
+        masked = {}
+        for k, v in (headers or {}).items():
+            lk = str(k).lower()
+
+            # mascara authorization/token/cookie etc
+            if lk in ("authorization", "cookie", "set-cookie", "x-api-key"):
+                if isinstance(v, str) and len(v) > 14:
+                    masked[k] = v[:10] + "..." + v[-4:]
+                else:
+                    masked[k] = "***"
+            else:
+                masked[k] = v
+        return masked
+
+
+    def _dict_to_rows(self, obj, prefix=""):
+        """
+        Flatteia dict/list em linhas (key, value) para tabela.
+        """
+        rows = []
+
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                key = f"{prefix}{k}" if prefix else str(k)
+                if isinstance(v, (dict, list)):
+                    rows.extend(self._dict_to_rows(v, prefix=key + "."))
+                else:
+                    rows.append((key, v))
+            return rows
+
+        if isinstance(obj, list):
+            for i, v in enumerate(obj):
+                key = f"{prefix}[{i}]"
+                if isinstance(v, (dict, list)):
+                    rows.extend(self._dict_to_rows(v, prefix=key + "."))
+                else:
+                    rows.append((key, v))
+            return rows
+
+        rows.append((prefix or "value", obj))
+        return rows
+
+
+    
     @action(detail=False, methods=["POST"])
     def payload_from_protheus_to_farmbox(self, request):
-        # 1. LÊ O CORPO BRUTO PRIMEIRO (Evita o RawPostDataException)
+        # 1) Lê o body bruto primeiro
         try:
-            raw_body = request.body.decode('utf-8') if request.body else ""
+            raw_body = request.body.decode("utf-8") if request.body else ""
         except Exception as e:
             raw_body = f"Erro ao tentar ler o body: {e}"
 
-        # 2. DEPOIS lê o request.data (O DRF vai usar o cache do body sem reclamar)
+        # 2) Depois request.data (DRF)
         try:
             payload_data = request.data
         except Exception:
-            # Se o Content-Type for totalmente bizarro, o DRF pode falhar aqui
             payload_data = None
-        
-        # 3. Pega os parâmetros passados na URL (?chave=valor)
+
         query_params = request.query_params
 
+        # 3) Fallback: parse manual se request.data vier vazio/None mas raw_body tiver conteúdo
+        if (payload_data is None or payload_data == "" or payload_data == {} or payload_data == []) and raw_body:
+            try:
+                payload_data = json.loads(raw_body)
+            except json.JSONDecodeError:
+                payload_data = None
+
+        payload = payload_data or {}
+
+        received_at = timezone.now()
+
+        # ⚠️ cuidado: headers podem ter token; vamos mascarar pro e-mail
+        headers_dict = dict(request.headers) if hasattr(request, "headers") else {}
+
+        # DEBUG opcional (evite print em produção — prefira logger)
         print("\n================ INVESTIGAÇÃO PROTHEUS ================")
         print(f"Content-Type recebido: {request.content_type}")
-        print(f"Headers: {dict(request.headers)}")
+        print(f"Headers: {headers_dict}")
         print("-------------------------------------------------------")
         print(f"1. request.body (Texto BRUTO lido primeiro): {raw_body}")
         print(f"2. request.data (Parseado pelo DRF): {payload_data}")
         print(f"3. request.query_params (URL): {query_params}")
         print("=======================================================\n")
 
-        # Tenta forçar o parse manual caso request.data esteja vazio/falhe, mas o raw_body tenha algo
-        if not payload_data and raw_body:
-            try:
-                payload_data = json.loads(raw_body)
-                print("Conseguimos fazer o parse manual do raw_body usando json.loads()!")
-            except json.JSONDecodeError:
-                print("O raw_body não é um JSON válido.")
-
-        # Se mesmo assim não tiver nada, define um dict vazio para não quebrar seu código abaixo
-        payload = payload_data or {}
-        
+        email_sent = False
         email_error = ""
-        
+
         try:
-            send_mail(
-                subject="Teste de envio Django",
-                message=(
-                    "Se você recebeu este e-mail, o SMTP está funcionando 🎉\n\n"
-                    f"Recebido em: {timezone.now()}\n"
-                    f"Keys: {list(payload.keys()) if isinstance(payload, dict) else 'N/A'}\n"
-                ),
-                from_email=settings.EMAIL_HOST_USER,
-                recipient_list=["marcelo@gdourado.com.br"],
-                fail_silently=False,
+            html = render_to_string(
+                "email/protheus_payload.html",
+                {
+                    "received_at": received_at,
+                    "content_type": request.content_type,
+                    "query_params": dict(request.query_params),
+                    "headers": self._mask_sensitive_headers(headers_dict),
+                    "raw_body": raw_body,
+                    "payload_rows": self._dict_to_rows(payload) if isinstance(payload, (dict, list)) else [("payload", payload)],
+                },
             )
+
+            subject = f"[Protheus] Payload recebido ({received_at.strftime('%Y-%m-%d %H:%M:%S')})"
+            to_emails = ["marcelo@gdourado.com.br"]
+
+            msg = EmailMultiAlternatives(
+                subject=subject,
+                body="Seu cliente de e-mail não suporta HTML. Abra em um cliente com HTML.",
+                from_email=getattr(settings, "DEFAULT_FROM_EMAIL", settings.EMAIL_HOST_USER),
+                to=to_emails,
+            )
+            msg.attach_alternative(html, "text/html")
+            msg.send(fail_silently=False)
+
             email_sent = True
+
         except Exception as e:
-            # Não derruba o endpoint — só reporta (ou retorne 500 se preferir)
             email_sent = False
             email_error = str(e)
-    
 
         return Response(
             {
                 "received": True,
-                "received_at": timezone.now(),
+                "received_at": received_at,
                 "payload_type": type(payload).__name__,
                 "keys": list(payload.keys()) if isinstance(payload, dict) else None,
                 "email_sent": email_sent,
                 "email_error": email_error,
-                "payload": payload,  # em produção você provavelmente remove isso
+                # em produção, recomendo NÃO devolver payload/raw_body
+                "payload": payload,
             },
             status=status.HTTP_200_OK,
         )
-    
+        
     
     def processar_em_background(self, task_id):
         # ✅ threads precisam disso (evita usar conexão herdada do request)

@@ -22,27 +22,27 @@ DEFAULT_AGENDA_TEMPLATE = (
 DEFAULT_REMINDER_TEXT = "??"
 
 # JANELA OFICIAL
-# AGENDA_HOUR = 6
-# AGENDA_MINUTE = 0
-AGENDA_HOUR = 9
+AGENDA_HOUR = 6
 AGENDA_MINUTE = 0
+# AGENDA_HOUR = 9
+# AGENDA_MINUTE = 0
 
 # Reminders “cravados” (modelo A)
 # (hour, minute, expected_reminder_count)
-# REMINDER_SLOTS = [
-#     (6, 15, 0),
-#     (6, 30, 1),
-#     (6, 45, 2),
-#     (7, 0, 3),
-# ]
-
-
 REMINDER_SLOTS = [
-    (9, 15, 0),
-    (9, 30, 1),
-    (9, 45, 2),
-    (10, 0, 3),
+    (6, 15, 0),
+    (6, 30, 1),
+    (6, 45, 2),
+    (7, 0, 3),
 ]
+
+
+# REMINDER_SLOTS = [
+#     (9, 15, 0),
+#     (9, 30, 1),
+#     (9, 45, 2),
+#     (10, 0, 3),
+# ]
 
 
 MIN_CHARS_DEFAULT = 15

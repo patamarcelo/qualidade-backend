@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <title>Payload Protheus</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f4f6f9;font-family:Arial,Helvetica,sans-serif;">
+
+  <div style="max-width:1000px;margin:30px auto;background:#ffffff;border-radius:10px;padding:28px;box-shadow:0 4px 12px rgba(0,0,0,0.08);">
+
+    <!-- HEADER -->
+    <h2 style="margin:0 0 8px 0;color:#111827;">
+      📦 Payload recebido do Protheus
+    </h2>
+
+    <p style="margin:0 0 18px 0;color:#4b5563;font-size:14px;line-height:1.5;">
+      <strong>Recebido em:</strong> {{ received_at }}<br />
+      <strong>Content-Type:</strong> {{ content_type }}<br />
+      <strong>Query Params:</strong> {{ query_params }}
+    </p>
+
+    <!-- RESUMO EXECUTIVO -->
+    <div style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;margin:0 0 22px 0;">
+      <div style="background:#f9fafb;padding:12px 14px;border-bottom:1px solid #e5e7eb;">
+        <h3 style="margin:0;color:#111827;font-size:15px;">✅ Resumo</h3>
+        <p style="margin:6px 0 0 0;color:#6b7280;font-size:12px;">
+          Campos principais (se existirem no payload).
+        </p>
+      </div>
+
+      <table style="border-collapse:collapse;width:100%;font-size:14px;">
+        <tbody>
+          <tr>
+            <td style="width:200px;padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;background:#ffffff;">
+              <strong>input_id</strong>
+            </td>
+            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;font-family:monospace;color:#111827;">
+              {% if payload_rows %}
+                {% for k,v in payload_rows %}{% if k == "input_id" %}{{ v }}{% endif %}{% endfor %}
+              {% else %}-{% endif %}
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;background:#ffffff;">
+              <strong>storage_id</strong>
+            </td>
+            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;font-family:monospace;color:#111827;">
+              {% if payload_rows %}
+                {% for k,v in payload_rows %}{% if k == "storage_id" %}{{ v }}{% endif %}{% endfor %}
+              {% else %}-{% endif %}
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;background:#ffffff;">
+              <strong>movimentation_type</strong>
+            </td>
+            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;font-family:monospace;color:#111827;">
+              {% if payload_rows %}
+                {% for k,v in payload_rows %}{% if k == "movimentation_type" %}{{ v }}{% endif %}{% endfor %}
+              {% else %}-{% endif %}
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;background:#ffffff;">
+              <strong>quantity</strong>
+            </td>
+            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;font-family:monospace;color:#111827;">
+              {% if payload_rows %}
+                {% for k,v in payload_rows %}{% if k == "quantity" %}{{ v }}{% endif %}{% endfor %}
+              {% else %}-{% endif %}
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:10px 12px;color:#374151;background:#ffffff;">
+              <strong>date</strong>
+            </td>
+            <td style="padding:10px 12px;font-family:monospace;color:#111827;">
+              {% if payload_rows %}
+                {% for k,v in payload_rows %}{% if k == "date" %}{{ v }}{% endif %}{% endfor %}
+              {% else %}-{% endif %}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- TABELA COMPLETA DO PAYLOAD -->
+    <h3 style="margin:0 0 10px 0;color:#111827;">🔎 Payload completo</h3>
+
+    <table style="border-collapse:collapse;width:100%;font-size:14px;margin-bottom:22px;">
+      <thead>
+        <tr style="background:#f3f4f6;">
+          <th style="text-align:left;padding:10px;border:1px solid #e5e7eb;">Campo</th>
+          <th style="text-align:left;padding:10px;border:1px solid #e5e7eb;">Valor</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if payload_rows %}
+          {% for key, value in payload_rows %}
+            <tr>
+              <td style="padding:8px;border:1px solid #e5e7eb;font-family:monospace;">
+                {{ key }}
+              </td>
+              <td style="padding:8px;border:1px solid #e5e7eb;font-family:monospace;white-space:pre-wrap;word-break:break-word;">
+                {{ value }}
+              </td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="2" style="padding:10px;border:1px solid #e5e7eb;text-align:center;">
+              Nenhum dado recebido
+            </td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+
+    <!-- HEADERS -->
+    <h3 style="margin:0 0 10px 0;color:#111827;">🧾 Headers (sensíveis mascarados)</h3>
+
+    <table style="border-collapse:collapse;width:100%;font-size:13px;margin-bottom:22px;">
+      <thead>
+        <tr style="background:#f3f4f6;">
+          <th style="text-align:left;padding:8px;border:1px solid #e5e7eb;">Header</th>
+          <th style="text-align:left;padding:8px;border:1px solid #e5e7eb;">Valor</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for key, value in headers.items %}
+          <tr>
+            <td style="padding:6px;border:1px solid #e5e7eb;font-family:monospace;">
+              {{ key }}
+            </td>
+            <td style="padding:6px;border:1px solid #e5e7eb;font-family:monospace;word-break:break-all;">
+              {{ value }}
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="2" style="padding:8px;border:1px solid #e5e7eb;text-align:center;">
+              Nenhum header disponível
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <!-- RAW BODY -->
+    <h3 style="margin:0 0 10px 0;color:#111827;">📄 Raw Body</h3>
+
+    <div style="
+      background:#111827;
+      color:#f9fafb;
+      padding:15px;
+      border-radius:8px;
+      font-family:monospace;
+      font-size:13px;
+      white-space:pre-wrap;
+      word-break:break-word;
+    ">
+      {{ raw_body }}
+    </div>
+
+    <p style="margin:20px 0 0 0;font-size:12px;color:#9ca3af;">
+      Este e-mail foi gerado automaticamente pelo endpoint <strong>payload_from_protheus_to_farmbox</strong>.
+    </p>
+
+  </div>
+
+</body>
+</html>
