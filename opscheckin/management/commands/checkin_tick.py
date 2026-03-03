@@ -217,7 +217,7 @@ def _send_with_fallback(
     kind: str,
     text_body: str,
     template_name: str,
-    template_params: list[str],
+    template_params,
 ):
     """
     Estratégia:
@@ -299,8 +299,11 @@ def _send_agenda_if_needed(*, manager: Manager, checkin: DailyCheckin, now, agen
         manager=manager,
         kind="agenda",
         text_body=final_msg,
-        template_name="",  # usa settings WHATSAPP_TEMPLATE_AGENDA_NAME
-        template_params=[manager.name, "Por favor, poderia me mandar a sua agenda do dia?"],
+        template_name="",
+        template_params={  # <- dict nomeado
+            "manager_name": manager.name,
+            "agenda_text": "Por favor, poderia me mandar a sua agenda do dia?",
+        },
     )
 
     if resp:
@@ -332,8 +335,11 @@ def _send_reminder(q: OutboundQuestion, *, now, reminder_text: str):
         manager=manager,
         kind="reminder",
         text_body=reminder_text,
-        template_name="",  # usa settings WHATSAPP_TEMPLATE_REMINDER_NAME
-        template_params=[manager.name, reminder_text],
+        template_name="",
+        template_params={
+            "manager_name": manager.name,
+            "reminder_text": reminder_text,
+        },
     )
 
     if not resp:

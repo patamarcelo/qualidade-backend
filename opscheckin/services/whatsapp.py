@@ -58,26 +58,42 @@ def send_text(to_phone_e164: str, body: str) -> dict:
     }
     return _post(payload, to_phone_e164=to_phone_e164)
 
-
 def send_template(
     to_phone_e164: str,
     *,
     template_name: str,
     language_code: str = "pt_BR",
-    body_params: list[str] | None = None,
+    body_params=None,  # pode ser list[str] (posicional) OU dict[str,str] (nomeado)
 ) -> dict:
     """
-    Envia template aprovado para re-engagement (fora da janela de 24h).
-    body_params vira parâmetros do componente BODY ({{1}}, {{2}}...).
+    Envia template aprovado.
+    - Se body_params for list -> envia parâmetros posicionais ({{1}}, {{2}}...)
+    - Se body_params for dict -> envia parâmetros nomeados ({{manager_name}}, etc.) usando parameter_name
     """
     components = []
+
     if body_params:
-        components.append(
-            {
-                "type": "body",
-                "parameters": [{"type": "text", "text": str(x)} for x in body_params],
-            }
-        )
+        # dict => nomeado
+        if isinstance(body_params, dict):
+            params = []
+            for k, v in body_params.items():
+                params.append(
+                    {
+                        "type": "text",
+                        "parameter_name": str(k),  # <- ESSENCIAL p/ variáveis nomeadas
+                        "text": str(v),
+                    }
+                )
+            components.append({"type": "body", "parameters": params})
+
+        # list/tuple => posicional
+        else:
+            components.append(
+                {
+                    "type": "body",
+                    "parameters": [{"type": "text", "text": str(x)} for x in body_params],
+                }
+            )
 
     payload = {
         "messaging_product": "whatsapp",
