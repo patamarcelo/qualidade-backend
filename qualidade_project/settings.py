@@ -397,3 +397,5 @@ WHATSAPP_TEMPLATE_AGENDA_NAME = "ops_agenda_01"
 
 # Template Utility para reminder (opcional, mas recomendado)
 WHATSAPP_TEMPLATE_REMINDER_NAME = "ops_reminder_01"
+
+WHATSAPP_TEMPLATE_REMINDER_NAME="ops_reminder_01"
