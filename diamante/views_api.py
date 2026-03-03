@@ -34,7 +34,7 @@ from rest_framework import generics
 
 
 import json
-from django.http import JsonResponse, HttpResponse
+from django.http import JsonResponse, HttpResponse, QueryDict
 from django.core.serializers import serialize
 from django.db.models import Q, Sum, DecimalField, Count, FilteredRelation
 import datetime
@@ -5462,7 +5462,7 @@ class DefensivoViewSet(viewsets.ModelViewSet):
         query_params = request.query_params
 
         # 3) Fallback: parse manual se request.data vier vazio/None mas raw_body tiver conteúdo
-        if (payload_data is None or payload_data == "" or payload_data == {} or payload_data == []) and raw_body:
+        if (payload_data is None or payload_data == "" or payload_data == {} or payload_data == [] ) and raw_body:
             try:
                 payload_data = json.loads(raw_body)
             except json.JSONDecodeError:
@@ -5470,15 +5470,20 @@ class DefensivoViewSet(viewsets.ModelViewSet):
 
         payload = payload_data or {}
 
+        # ✅ multipart/form-data vem QueryDict → normaliza pra dict simples
+        if isinstance(payload, QueryDict):
+            payload = payload.dict()
+
         received_at = timezone.now()
 
-        # ⚠️ cuidado: headers podem ter token; vamos mascarar pro e-mail
+        # ⚠️ headers podem ter token; mascarar SEMPRE (inclusive no print)
         headers_dict = dict(request.headers) if hasattr(request, "headers") else {}
+        safe_headers = self._mask_sensitive_headers(headers_dict)
 
-        # DEBUG opcional (evite print em produção — prefira logger)
+        # DEBUG opcional
         print("\n================ INVESTIGAÇÃO PROTHEUS ================")
         print(f"Content-Type recebido: {request.content_type}")
-        print(f"Headers: {headers_dict}")
+        print(f"Headers (masked): {safe_headers}")
         print("-------------------------------------------------------")
         print(f"1. request.body (Texto BRUTO lido primeiro): {raw_body}")
         print(f"2. request.data (Parseado pelo DRF): {payload_data}")
@@ -5487,6 +5492,7 @@ class DefensivoViewSet(viewsets.ModelViewSet):
 
         email_sent = False
         email_error = ""
+        gmail_result = None
 
         try:
             html = render_to_string(
@@ -5495,23 +5501,27 @@ class DefensivoViewSet(viewsets.ModelViewSet):
                     "received_at": received_at,
                     "content_type": request.content_type,
                     "query_params": dict(request.query_params),
-                    "headers": self._mask_sensitive_headers(headers_dict),
+                    "headers": safe_headers,
                     "raw_body": raw_body,
-                    "payload_rows": self._dict_to_rows(payload) if isinstance(payload, (dict, list)) else [("payload", payload)],
+                    "payload_rows": self._dict_to_rows(payload)
+                    if isinstance(payload, (dict, list))
+                    else [("payload", payload)],
                 },
             )
 
             subject = f"[Protheus] Payload recebido ({received_at.strftime('%Y-%m-%d %H:%M:%S')})"
             to_emails = ["marcelo@gdourado.com.br"]
 
-            msg = EmailMultiAlternatives(
+            # ✅ usa sua Gmail API
+            gmail_result = send_mail_gmail_api(
                 subject=subject,
-                body="Seu cliente de e-mail não suporta HTML. Abra em um cliente com HTML.",
-                from_email=getattr(settings, "DEFAULT_FROM_EMAIL", settings.EMAIL_HOST_USER),
-                to=to_emails,
+                body_html=html,
+                from_email=getattr(settings, "DEFAULT_FROM_EMAIL", ""),
+                to_emails=to_emails,
+                cc_emails=[],
+                attachments=[],
+                fail_silently=False,
             )
-            msg.attach_alternative(html, "text/html")
-            msg.send(fail_silently=False)
 
             email_sent = True
 
@@ -5527,12 +5537,12 @@ class DefensivoViewSet(viewsets.ModelViewSet):
                 "keys": list(payload.keys()) if isinstance(payload, dict) else None,
                 "email_sent": email_sent,
                 "email_error": email_error,
+                "gmail_result": gmail_result,  # ✅ ajuda a debugar (id, threadId etc)
                 # em produção, recomendo NÃO devolver payload/raw_body
                 "payload": payload,
             },
             status=status.HTTP_200_OK,
         )
-        
     
     def processar_em_background(self, task_id):
         # ✅ threads precisam disso (evita usar conexão herdada do request)

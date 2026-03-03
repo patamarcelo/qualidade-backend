@@ -3891,8 +3891,43 @@ class ColheitaPlantioExtratoAreaAdmin(admin.ModelAdmin):
     
 @admin.register(HeaderPlanejamentoAgricola)
 class HeaderPlanejamentoAgricolaAdmin(admin.ModelAdmin):
-    list_display = ("criados", "projeto", "codigo_planejamento", "safra", "ciclo")
+    # Exibição na listagem
+    list_display = (
+        "codigo_planejamento", 
+        "projeto", 
+        "safra", 
+        "ciclo", 
+        "criados",  # Assumindo que vem da classe Base
+    )
+    
+    # Filtros laterais (essencial para dados agrícolas)
+    list_filter = ("safra", "ciclo", "projeto", "criados")
+    
+    # Campo de busca (busca por código ou nome do projeto relacionado)
+    
+    
+    # Ordenação padrão
+    ordering = ("-criados",)
+    
+    
+    
+    
+    # Organização dentro do formulário de edição
+    fieldsets = (
+        ("Informações Identificadoras", {
+            "fields": ("codigo_planejamento", "projeto")
+        }),
+        ("Sazonalidade", {
+            "fields": ("safra", "ciclo")
+        }),
+        ("Metadados", {
+            "fields": ("criados", "modificado"), # Assumindo campos da classe Base
+            "classes": ("collapse",), # Deixa recolhido por padrão
+        }),
+    )
 
+    readonly_fields = ("criados", "modificado")
+    
 @admin.register(BuyProducts)
 class BuyProductsAdmin(admin.ModelAdmin):
     filter_horizontal = ('projeto',) 
