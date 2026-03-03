@@ -246,13 +246,12 @@ def _send_with_fallback(
         chosen_template = agenda_name if kind == "agenda" else reminder_name
 
     # se estiver dentro da janela 24h, manda texto direto
-    if _can_send_freeform(now, last_in):
-        try:
-            return send_text(manager.phone_e164, text_body)
-        except Exception as e:
-            # mesmo dentro de 24h, não queremos quebrar o tick
-            logger.exception("WAPP_SEND_TEXT_FAIL kind=%s to=%s err=%s", kind, manager.phone_e164, str(e))
-            return None
+    # FORÇAR SEMPRE TEMPLATE (debug/produção determinística)
+    can_freeform = _can_send_freeform(now, last_in)
+    logger.warning(
+        "WA_DEBUG kind=%s FORCE_TEMPLATE=1 can_freeform=%s last_in=%s now=%s",
+        kind, can_freeform, last_in, now
+    )
 
     # fora da janela: tentar template
     if not chosen_template:
@@ -261,14 +260,40 @@ def _send_with_fallback(
             kind, manager.name, manager.phone_e164,
         )
         return None
+    
+    logger.warning(
+            "WA_DEBUG kind=%s can_freeform=%s last_in=%s now=%s",
+            kind, _can_send_freeform(now, last_in), last_in, now
+        )
 
+    logger.warning(
+        "WA_TEMPLATE_SEND kind=%s to=%s tpl=%s lang=%s params_type=%s params=%s",
+        kind,
+        manager.phone_e164,
+        chosen_template,
+        lang,
+        type(template_params).__name__,
+        template_params,
+    )
     try:
-        return send_template(
+        resp = send_template(
             manager.phone_e164,
             template_name=chosen_template,
             language_code=lang,
             body_params=template_params,
         )
+
+        wamid = ""
+        try:
+            wamid = (resp.get("messages") or [{}])[0].get("id") or ""
+        except Exception:
+            pass
+
+        logger.warning(
+            "WA_TEMPLATE_OK kind=%s to=%s tpl=%s wamid=%s",
+            kind, manager.phone_e164, chosen_template, wamid
+        )
+        return resp
     except Exception as e:
         logger.exception(
             "WAPP_SEND_TEMPLATE_FAIL kind=%s tpl=%s to=%s err=%s",
@@ -291,6 +316,8 @@ def _send_agenda_if_needed(*, manager: Manager, checkin: DailyCheckin, now, agen
         .first()
     )
     if q and q.sent_at:
+        logger.warning("AGENDA_SKIP_ALREADY_SENT manager=%s to=%s sent_at=%s qid=%s",
+                    manager.name, manager.phone_e164, q.sent_at, q.id)
         return q
 
     final_msg = agenda_text.format(name=manager.name)
@@ -436,7 +463,10 @@ class Command(BaseCommand):
                 .order_by("-scheduled_for", "-id")
                 .first()
             )
-
+            if not send_agenda_now and not _is_in_slot(local_now, AGENDA_HOUR, AGENDA_MINUTE, grace_seconds):
+                logger.warning("AGENDA_SKIP_NOT_IN_SLOT manager=%s now_local=%s slot=%02d:%02d grace=%ss",
+                            m.name, local_now.isoformat(), AGENDA_HOUR, AGENDA_MINUTE, grace_seconds)
+    
             if send_agenda_now:
                 agenda_q = _send_agenda_if_needed(manager=m, checkin=checkin, now=now, agenda_text=agenda_text)
             else:
