@@ -19,7 +19,7 @@ DEFAULT_AGENDA_TEMPLATE = (
     "Por favor poderia me mandar a sua agenda do dia?"
 )
 
-DEFAULT_REMINDER_TEXT = "??"
+DEFAULT_REMINDER_TEXT = ""
 
 # JANELA OFICIAL
 AGENDA_HOUR = 6
@@ -78,7 +78,7 @@ def _log_outbound(
     except Exception:
         provider_id = ""
 
-    OutboundMessage.objects.create(
+    data = dict(
         manager=manager,
         checkin=checkin,
         related_question=related_question,
@@ -89,6 +89,13 @@ def _log_outbound(
         sent_at=now,
         raw_response=resp,
     )
+
+    # ✅ se já tem wamid, assume "sent" imediatamente
+    if provider_id:
+        data["wa_status"] = "sent"
+        data["wa_sent_at"] = now
+
+    OutboundMessage.objects.create(**data)
 
 
 def _mark_missed_if_needed(q: OutboundQuestion, *, now, mark_missed_after_min: int):
@@ -374,13 +381,23 @@ def _send_reminder(q: OutboundQuestion, *, now, reminder_text: str):
         kind="reminder",
         text_body=reminder_text,
         template_name="",
-        template_params={
-            "manager_name": manager.name,
-            "reminder_text": reminder_text,
-        },
+        template_params={"manager_name": manager.name}
     )
 
     if not resp:
+        _log_outbound(
+            manager=manager,
+            checkin=q.checkin,
+            related_question=q,
+            kind="reminder",
+            text=reminder_text,
+            now=now,
+            resp={"error": "send_template_failed"},  # payload mínimo
+        )
+        # e marcar status failed manualmente (se seu model tiver)
+        OutboundMessage.objects.filter(
+            manager=manager, checkin=q.checkin, kind="reminder"
+        ).order_by("-id").update(wa_status="failed")
         logger.warning("REMINDER_NOT_SENT manager=%s to=%s", manager.name, manager.phone_e164)
         return
 
@@ -428,7 +445,7 @@ class Command(BaseCommand):
         include_inactive = bool(opts["include_inactive"])
         send_agenda_now = bool(opts["send_agenda_now"])
         agenda_text = (opts["agenda_text"] or DEFAULT_AGENDA_TEMPLATE).strip()
-        reminder_text = (opts["reminder_text"] or DEFAULT_REMINDER_TEXT).strip() or "??"
+        reminder_text = (opts["reminder_text"] or DEFAULT_REMINDER_TEXT).strip()
 
         min_chars = int(opts["min_chars"] or MIN_CHARS_DEFAULT)
         max_reminders = int(opts["max_reminders"] or 4)

@@ -130,6 +130,25 @@ class OutboundMessage(models.Model):
     sent_at = models.DateTimeField(default=timezone.now, db_index=True)
 
     raw_response = models.JSONField(null=True, blank=True)
+    
+    wa_status = models.CharField(
+        max_length=16,
+        blank=True,
+        default="",
+        choices=[
+            ("", "Unknown"),
+            ("sent", "Sent"),
+            ("delivered", "Delivered"),
+            ("read", "Read"),
+            ("failed", "Failed"),
+        ],
+        db_index=True,
+    )
+    wa_sent_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    wa_delivered_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    wa_read_at = models.DateTimeField(null=True, blank=True, db_index=True)
+
+    wa_last_status_payload = models.JSONField(null=True, blank=True)
 
     class Meta:
         indexes = [

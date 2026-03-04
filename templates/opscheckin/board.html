@@ -8,7 +8,6 @@
 
   <style>
     :root {
-      /* Light theme */
       --bg: #f6f7fb;
       --surface: #ffffff;
       --surface2: #f2f4f8;
@@ -17,24 +16,24 @@
       --text: #0f172a;
       --muted: rgba(15, 23, 42, .62);
 
-      /* Messages */
       --inb: #eef2f7;
       --inbBorder: rgba(15, 23, 42, .10);
       --outb: rgba(34, 197, 94, .16);
       --outbBorder: rgba(34, 197, 94, .30);
 
-      /* Status */
       --ok: #16a34a;
       --warn: #f59e0b;
       --danger: #ef4444;
 
-      /* Board sizing */
       --colW: 340px;
       --colGap: 12px;
       --colHeaderH: 76px;
 
-      /* paddings */
       --pad5: 5px;
+
+      /* WhatsApp-ish ticks */
+      --tickGrey: rgba(15, 23, 42, .45);
+      --tickBlue: #3b82f6;
     }
 
     * {
@@ -56,7 +55,6 @@
         var(--bg);
     }
 
-    /* Top bar (single-line, compact) */
     .top {
       position: sticky;
       top: 0;
@@ -95,7 +93,6 @@
       color: var(--muted);
     }
 
-    /* Compact controls */
     .controls {
       display: flex;
       align-items: center;
@@ -138,14 +135,6 @@
       filter: brightness(1.03);
     }
 
-    .btnGhost {
-      background: rgba(15, 23, 42, .06);
-      border: 1px solid var(--border);
-      color: var(--text);
-      box-shadow: none;
-      font-weight: 800;
-    }
-
     .pillBtn {
       display: inline-flex;
       align-items: center;
@@ -168,7 +157,6 @@
       color: #166534;
     }
 
-    /* Collapsible sender */
     details.sender {
       border: 1px solid var(--border);
       background: rgba(255, 255, 255, .75);
@@ -228,10 +216,8 @@
       height: 112px;
     }
 
-    /* Board should occupy full screen width/height under top bar */
     .wrap {
-      height: calc(100vh - 54px);
-      /* top bar approx height */
+      height: calc(100vh - 74px);
       padding: var(--pad5);
     }
 
@@ -243,10 +229,8 @@
       gap: var(--colGap);
       justify-content: start;
       align-items: stretch;
-
       overflow-x: auto;
       overflow-y: hidden;
-
       padding: 0;
       scroll-snap-type: x proximity;
     }
@@ -255,7 +239,7 @@
       scroll-snap-align: start;
       width: var(--colW);
       max-width: var(--colW);
-      height: 100%;
+      height: 95%;
       background: rgba(255, 255, 255, .78);
       border: 1px solid var(--border);
       border-radius: 14px;
@@ -264,9 +248,9 @@
       display: flex;
       flex-direction: column;
       position: relative;
+      margin-top: 10px;
     }
 
-    /* Light divider between columns (visual) */
     .board .col:not(:last-child)::after {
       content: "";
       position: absolute;
@@ -282,13 +266,11 @@
     .colHeader {
       position: sticky;
       top: 54px;
-      /* aligns with top bar */
       z-index: 20;
       background: rgba(255, 255, 255, .92);
       backdrop-filter: blur(8px);
       border-bottom: 1px solid var(--border2);
       padding: 8px 9px;
-      /* <= compact */
     }
 
     .colHeaderTop {
@@ -406,16 +388,14 @@
       background: rgba(15, 23, 42, .03);
     }
 
+    /* thread scroll, leaving space for composer at bottom */
     .thread {
-      padding: calc(var(--pad5) + var(--colHeaderH)) var(--pad5) var(--pad5);
-
       display: flex;
       flex-direction: column;
       gap: 8px;
       overflow-y: auto;
       flex: 1;
       min-height: 0;
-      /* important for flex scroll */
     }
 
     .msgRow {
@@ -427,27 +407,24 @@
 
     .msgRow.left {
       align-items: flex-start;
-      /* posiciona balão à esquerda */
     }
 
     .msgRow.right {
       align-items: flex-end;
-      /* posiciona balão à direita */
     }
 
     .bubble {
       display: inline-block;
       max-width: 85%;
-      padding: 1px 6px;
-      border-radius: 8px;
+      padding: 6px 8px;
+      border-radius: 10px;
       font-size: 12.5px;
-      line-height: 1.1;
+      line-height: 1.25;
       border: 1px solid var(--border2);
       white-space: pre-wrap;
       word-break: break-word;
     }
 
-    /* alinhamento interno do texto */
     .bubble.inb {
       background: var(--inb);
       border-color: var(--inbBorder);
@@ -458,7 +435,6 @@
       background: var(--outb);
       border-color: var(--outbBorder);
       text-align: left;
-      /* 👈 aqui resolve */
     }
 
     .metaLine {
@@ -467,6 +443,11 @@
       display: flex;
       gap: 6px;
       align-items: center;
+      justify-content: flex-end;
+    }
+
+    .msgRow.left .metaLine {
+      justify-content: flex-start;
     }
 
     .time {
@@ -481,6 +462,28 @@
       background: rgba(15, 23, 42, .03);
     }
 
+    /* ticks */
+    .ticks {
+      font-weight: 900;
+      letter-spacing: -1px;
+    }
+
+    .ticksSent {
+      color: var(--tickGrey);
+    }
+
+    .ticksDel {
+      color: var(--tickGrey);
+    }
+
+    .ticksRead {
+      color: var(--tickBlue);
+    }
+
+    .ticksFail {
+      color: #ef4444;
+    }
+
     .empty {
       padding: 10px;
       color: var(--muted);
@@ -490,7 +493,55 @@
       background: rgba(255, 255, 255, .75);
     }
 
-    /* Mobile */
+    /* Composer per-column (sticky bottom) */
+    .composer {
+      position: sticky;
+      bottom: 0;
+      z-index: 25;
+      padding: 8px;
+      border-top: 1px solid var(--border2);
+      background: rgba(255, 255, 255, .92);
+      backdrop-filter: blur(8px);
+    }
+
+    .composerRow {
+      display: flex;
+      gap: 8px;
+      align-items: flex-end;
+    }
+
+    .composerText {
+      flex: 1;
+      width: 100%;
+      min-height: 38px;
+      max-height: 140px;
+      resize: none;
+      /* auto-grow via JS */
+      border-radius: 999px;
+      /* cara WhatsApp */
+      padding: 10px 12px;
+      line-height: 1.2;
+      overflow: hidden;
+    }
+
+    .sendBtn {
+      width: 40px;
+      height: 40px;
+      border-radius: 999px;
+      border: 1px solid rgba(22, 163, 74, .25);
+      background: rgba(22, 163, 74, .14);
+      color: #166534;
+      font-weight: 900;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      flex: 0 0 auto;
+    }
+
+    .sendBtn:hover {
+      filter: brightness(1.03);
+    }
+
     @media (max-width: 900px) {
       textarea {
         width: 320px;
@@ -504,7 +555,6 @@
         height: calc(100vh - 92px);
       }
 
-      /* top may wrap */
       .colHeader {
         top: 92px;
       }
@@ -521,6 +571,118 @@
         --colW: 360px;
       }
     }
+
+    html,
+    body {
+      height: 100%;
+      overflow: hidden;
+      /* ✅ trava scroll global */
+    }
+
+    .wrap {
+      height: calc(100vh - 54px);
+      padding: var(--pad5);
+      overflow: hidden;
+      /* ✅ nada de scroll aqui */
+    }
+
+    .board {
+      height: 100%;
+      overflow-x: auto;
+      overflow-y: hidden;
+      margin-left: 30px;
+      /* ✅ só horizontal */
+    }
+
+    .col {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      /* ✅ nada de scroll na coluna */
+    }
+
+    .colHeader {
+      position: sticky;
+      top: 44px;
+      z-index: 20;
+    }
+
+    /* ✅ thread vira a única área rolável */
+    .thread {
+      flex: 1;
+      min-height: 0;
+      /* ✅ essencial no flex */
+      overflow-y: auto;
+      /* ✅ só aqui rola */
+      overflow-x: hidden;
+      padding: calc(var(--pad5) + var(--colHeaderH)) var(--pad5) var(--pad5);
+    }
+
+    /* ✅ composer NÃO precisa ser sticky se a coluna é flex;
+   mas pode manter sticky também. Eu prefiro "flex" fixo. */
+    .composer {
+      flex: 0 0 auto;
+      border-top: 1px solid var(--border2);
+      background: rgba(255, 255, 255, .92);
+      backdrop-filter: blur(8px);
+      padding: 10px;
+      /* ✅ padding “da caixa de texto de baixo” */
+    }
+
+    .composerRow {
+      display: flex;
+      gap: 8px;
+      align-items: flex-end;
+    }
+
+    .composerText {
+      flex: 1;
+      width: 100%;
+      min-height: 32px;
+      max-height: 140px;
+
+      resize: none;
+      overflow: hidden;
+
+      border-radius: 0;
+      /* ✅ sem border radius */
+      border: 1px solid var(--border);
+
+      padding: 6px 8px;
+      /* ✅ pequeno */
+      line-height: 1.2;
+      font-size: 12.5px;
+
+      background: #fff;
+    }
+
+    .sendBtn {
+      width: 34px;
+      height: 34px;
+      border-radius: 0;
+      /* ✅ sem radius */
+      border: 1px solid rgba(22, 163, 74, .25);
+      background: rgba(22, 163, 74, .14);
+      color: #166534;
+      font-weight: 900;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      flex: 0 0 auto;
+    }
+
+    .thread::-webkit-scrollbar {
+      width: 10px;
+    }
+
+    .thread::-webkit-scrollbar-thumb {
+      background: rgba(15, 23, 42, .18);
+      border-radius: 8px;
+    }
+
+    .thread::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, .06);
+    }
   </style>
 </head>
 
@@ -533,7 +695,7 @@
       </div>
 
       <div class="controls">
-        <!-- Date filter (request only for date) -->
+        <!-- Date filter -->
         <form method="get" action="" class="rowInline" style="margin:0;">
           <div style="display:flex; flex-direction:column; gap:4px;">
             <label style="margin:0;">Data</label>
@@ -542,11 +704,10 @@
               <button class="btn" type="submit">Filtrar</button>
             </div>
           </div>
-          <!-- keep existing status param if present (so date request doesn't wipe it) -->
           {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
         </form>
 
-        <!-- Client-side filter (no request) -->
+        <!-- Client-side filter -->
         <div style="display:flex; flex-direction:column; gap:4px;">
           <label style="margin:0;">Managers</label>
           <div class="rowInline" style="gap:8px;">
@@ -556,7 +717,7 @@
           </div>
         </div>
 
-        <!-- Collapsible manual sender -->
+        <!-- Collapsible manual sender (bulk) -->
         <details class="sender">
           <summary>
             <span style="font-size:12px;font-weight:900;">Envio manual</span>
@@ -565,9 +726,11 @@
 
           <form method="post" action="" class="senderBody">
             {% csrf_token %}
+            <input type="hidden" name="mode" value="bulk" />
+
             <div>
               <label>Mensagem</label>
-              <textarea name="message">{{ default_msg }}</textarea>
+              <textarea name="message_bulk">{{ default_msg }}</textarea>
             </div>
 
             <div>
@@ -576,9 +739,7 @@
                 <optgroup label="🟢 Ativos">
                   {% for m in managers %}
                   {% if m.is_active %}
-                  <option value="{{ m.id }}">
-                    ● {{ m.name }} ({{ m.phone_e164 }})
-                  </option>
+                  <option value="{{ m.id }}">● {{ m.name }} ({{ m.phone_e164 }})</option>
                   {% endif %}
                   {% endfor %}
                 </optgroup>
@@ -586,9 +747,7 @@
                 <optgroup label="🔴 Inativos">
                   {% for m in managers %}
                   {% if not m.is_active %}
-                  <option value="{{ m.id }}">
-                    ● {{ m.name }} ({{ m.phone_e164 }})
-                  </option>
+                  <option value="{{ m.id }}">● {{ m.name }} ({{ m.phone_e164 }})</option>
                   {% endif %}
                   {% endfor %}
                 </optgroup>
@@ -652,6 +811,11 @@
             </div>
             <div class="metaLine">
               <span class="time">{{ it.label }}</span>
+
+              {% if it.is_outbound and it.ticks %}
+              <span class="ticks {{ it.ticks_class }}">{{ it.ticks }}</span>
+              {% endif %}
+
               {% if it.meta %}
               <span class="tag">{{ it.meta }}</span>
               {% endif %}
@@ -660,6 +824,21 @@
           {% endfor %}
           {% endif %}
         </div>
+
+        <!-- ✅ Composer por coluna (conversa direta) -->
+        <div class="composer">
+          <form method="post" action="">
+            {% csrf_token %}
+            <input type="hidden" name="mode" value="single" />
+            <input type="hidden" name="manager_id" value="{{ col.manager.id }}" />
+            <div class="composerRow">
+              <textarea class="composerText" name="message_single" rows="1"
+                placeholder="Mensagem para {{ col.manager.name }}…" data-autogrow="1"></textarea>
+              <button class="sendBtn" type="submit" title="Enviar">➤</button>
+            </div>
+          </form>
+        </div>
+
       </div>
       {% endfor %}
     </div>
@@ -685,6 +864,7 @@
           let show = true;
           if (which === "active") show = isActive;
           if (which === "inactive") show = !isActive;
+          if (which === "all") show = true;
           c.style.display = show ? "" : "none";
         });
       }
@@ -702,9 +882,33 @@
         applyFilter("all");
       });
 
-      // default: ativos
       setActiveBtn("active");
       applyFilter("active");
+    })();
+
+    // ✅ Textarea auto-grow + Enter para enviar (Shift+Enter quebra linha)
+    (function () {
+      function autoGrow(el) {
+        el.style.height = "auto";
+        const h = Math.min(el.scrollHeight, 140);
+        el.style.height = h + "px";
+      }
+
+      document.querySelectorAll("textarea[data-autogrow='1']").forEach((ta) => {
+        autoGrow(ta);
+        ta.addEventListener("input", () => autoGrow(ta));
+
+        ta.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            const form = ta.closest("form");
+            if (!form) return;
+            // evita enviar vazio
+            if (!String(ta.value || "").trim()) return;
+            form.submit();
+          }
+        });
+      });
     })();
   </script>
 </body>

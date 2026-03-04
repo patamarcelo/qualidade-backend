@@ -7,8 +7,9 @@ from django.conf import settings
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
+from django.db import transaction
 
-from .models import Manager, DailyCheckin, OutboundQuestion, InboundMessage
+from .models import Manager, DailyCheckin, OutboundQuestion, InboundMessage, OutboundMessage
 
 logger = logging.getLogger("opscheckin.whatsapp")
 
@@ -33,6 +34,100 @@ def _verify_meta_signature(request) -> bool:
     ).hexdigest()
 
     return hmac.compare_digest(sig.replace("sha256=", ""), expected)
+
+
+def _extract_statuses_from_meta(payload: dict):
+    """
+    Extrai status updates do payload WhatsApp Cloud API.
+    Retorna lista de dicts:
+      {wamid, status, timestamp, recipient_id, raw_status}
+    """
+    out = []
+    try:
+        entries = payload.get("entry", []) or []
+        for entry in entries:
+            changes = entry.get("changes", []) or []
+            for ch in changes:
+                value = ch.get("value") or {}
+                statuses = value.get("statuses") or []
+                for st in statuses:
+                    wamid = (st.get("id") or "").strip()
+                    status = (st.get("status") or "").strip()  # sent/delivered/read/failed
+                    ts = (st.get("timestamp") or "").strip()    # epoch string
+                    recipient_id = (st.get("recipient_id") or "").strip()
+                    if wamid and status:
+                        out.append(
+                            {
+                                "wamid": wamid,
+                                "status": status,
+                                "timestamp": ts,
+                                "recipient_id": recipient_id,
+                                "raw_status": st,
+                            }
+                        )
+    except Exception:
+        # não derruba webhook
+        pass
+    return out
+
+
+def _wa_epoch_to_dt(ts_str: str):
+    try:
+        return timezone.datetime.fromtimestamp(int(ts_str), tz=timezone.utc)
+    except Exception:
+        return None
+
+
+STATUS_ORDER = {"": 0, "sent": 1, "delivered": 2, "read": 3, "failed": 99}
+
+
+def _apply_status_to_outbound(st: dict) -> bool:
+    """
+    Atualiza OutboundMessage (espelho do que enviamos) a partir de status callback.
+    Idempotente e tolerante a eventos duplicados / fora de ordem.
+    """
+    wamid = (st.get("wamid") or "").strip()
+    status = (st.get("status") or "").strip()
+    if not wamid or not status:
+        return False
+
+    dt = _wa_epoch_to_dt(st.get("timestamp") or "")
+
+    msg = (
+        OutboundMessage.objects.select_for_update()
+        .filter(provider_message_id=wamid)
+        .order_by("-sent_at", "-id")
+        .first()
+    )
+    if not msg:
+        return False
+
+    cur = (msg.wa_status or "").strip()
+    if STATUS_ORDER.get(status, 0) < STATUS_ORDER.get(cur, 0):
+        # não retrocede (eventos podem chegar fora de ordem)
+        return True
+
+    msg.wa_status = status
+    msg.wa_last_status_payload = st.get("raw_status")
+
+    # timestamps (só preenche se vazio)
+    if status == "sent" and msg.wa_sent_at is None:
+        msg.wa_sent_at = dt or timezone.now()
+    elif status == "delivered" and msg.wa_delivered_at is None:
+        msg.wa_delivered_at = dt or timezone.now()
+    elif status == "read" and msg.wa_read_at is None:
+        msg.wa_read_at = dt or timezone.now()
+
+    msg.save(
+        update_fields=[
+            "wa_status",
+            "wa_sent_at",
+            "wa_delivered_at",
+            "wa_read_at",
+            "wa_last_status_payload",
+        ]
+    )
+    return True
 
 
 def _extract_messages_from_meta(payload: dict):
@@ -63,13 +158,9 @@ def _extract_messages_from_meta(payload: dict):
                         inter = msg.get("interactive") or {}
                         itype = inter.get("type")
                         if itype == "button_reply":
-                            text = (
-                                inter.get("button_reply", {}).get("title") or ""
-                            ).strip()
+                            text = (inter.get("button_reply", {}).get("title") or "").strip()
                         elif itype == "list_reply":
-                            text = (
-                                inter.get("list_reply", {}).get("title") or ""
-                            ).strip()
+                            text = (inter.get("list_reply", {}).get("title") or "").strip()
 
                     if from_phone and text:
                         out.append(
@@ -123,7 +214,7 @@ def whatsapp_webhook(request):
 
         return HttpResponse("forbidden", status=403)
 
-    # 2) Recebimento de mensagens (POST)
+    # 2) Recebimento de eventos (POST)
     if request.method != "POST":
         return JsonResponse({"ok": True})
 
@@ -135,6 +226,21 @@ def whatsapp_webhook(request):
     except Exception:
         return JsonResponse({"ok": True})
 
+    # ✅ 1) Processa STATUS callbacks (sent/delivered/read/failed) mesmo quando não há "messages"
+    statuses = _extract_statuses_from_meta(payload)
+    if statuses:
+        try:
+            with transaction.atomic():
+                applied = 0
+                for st in statuses:
+                    if _apply_status_to_outbound(st):
+                        applied += 1
+            logger.warning("WHATSAPP_WEBHOOK statuses_received=%s statuses_applied=%s", len(statuses), applied)
+        except Exception:
+            # não derruba webhook
+            logger.exception("WHATSAPP_WEBHOOK failed to apply statuses")
+
+    # ✅ 2) Processa mensagens inbound (se houver)
     msgs = _extract_messages_from_meta(payload)
     if not msgs:
         return JsonResponse({"ok": True})
@@ -149,9 +255,8 @@ def whatsapp_webhook(request):
         msg_type = msg.get("msg_type") or "text"
 
         # dedupe (Meta pode reenviar o mesmo evento)
-        if msg_id:
-            if InboundMessage.objects.filter(wa_message_id=msg_id).exists():
-                continue
+        if msg_id and InboundMessage.objects.filter(wa_message_id=msg_id).exists():
+            continue
 
         # encontra manager (se existir)
         manager = Manager.objects.filter(phone_e164=from_phone, is_active=True).first()
