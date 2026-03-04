@@ -206,3 +206,17 @@ class InboundMessage(models.Model):
     def __str__(self):
         who = self.manager.name if self.manager else self.from_phone
         return f"Inbound {who} @ {self.received_at:%Y-%m-%d %H:%M} - {self.text[:40]}"
+    
+
+class AgendaItem(models.Model):
+    checkin = models.ForeignKey(DailyCheckin, on_delete=models.CASCADE, related_name="agenda_items")
+    idx = models.IntegerField()  # ordem
+    text = models.CharField(max_length=280)
+    status = models.CharField(max_length=16, default="open", choices=[
+        ("open","Open"),
+        ("done","Done"),
+        ("skip","Skip"),
+    ])
+    done_at = models.DateTimeField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)

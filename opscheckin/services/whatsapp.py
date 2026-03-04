@@ -106,3 +106,37 @@ def send_template(
         },
     }
     return _post(payload, to_phone_e164=to_phone_e164)
+
+def send_buttons(
+    to_phone_e164: str,
+    *,
+    header: str | None = None,
+    body: str,
+    footer: str | None = None,
+    buttons: list[dict],  # [{"id":"AI:123:done","title":"✅ Feito"}, ...]
+) -> dict:
+    """
+    Envia mensagem interativa com botões (reply buttons).
+    """
+    interactive = {
+        "type": "button",
+        "body": {"text": body},
+        "action": {
+            "buttons": [
+                {"type": "reply", "reply": {"id": b["id"], "title": b["title"]}}
+                for b in buttons
+            ]
+        },
+    }
+    if header:
+        interactive["header"] = {"type": "text", "text": header}
+    if footer:
+        interactive["footer"] = {"text": footer}
+
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": str(to_phone_e164),
+        "type": "interactive",
+        "interactive": interactive,
+    }
+    return _post(payload, to_phone_e164=to_phone_e164)
