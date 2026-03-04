@@ -1,0 +1,141 @@
+{
+    "storages": [{
+            "id": 12746,
+            "updated_at": "2022-10-18T17:25:43.000-03:00",
+            "storage_type": 1,
+            "disabled_at": null,
+            "name": "Almoxarifado UBS",
+            "farm_id": null,
+            "default_storage": false
+        },
+        {
+            "id": 12743,
+            "updated_at": "2022-10-18T17:24:16.000-03:00",
+            "storage_type": 0,
+            "disabled_at": null,
+            "name": "Almoxarifado Fazenda Santa Maria",
+            "farm_id": 11947,
+            "default_storage": true
+        },
+        {
+            "id": 12747,
+            "updated_at": "2022-10-18T17:32:54.000-03:00",
+            "storage_type": 0,
+            "disabled_at": null,
+            "name": "Almoxarifado Fazenda Fazendinha",
+            "farm_id": 11949,
+            "default_storage": true
+        },
+        {
+            "id": 12748,
+            "updated_at": "2022-10-18T17:33:14.000-03:00",
+            "storage_type": 0,
+            "disabled_at": null,
+            "name": "Almoxarifado Fazenda Novo Acordo",
+            "farm_id": 11950,
+            "default_storage": true
+        },
+        {
+            "id": 12749,
+            "updated_at": "2022-10-18T17:33:30.000-03:00",
+            "storage_type": 0,
+            "disabled_at": null,
+            "name": "Almoxarifado Fazenda Ouro Verde",
+            "farm_id": 11951,
+            "default_storage": true
+        },
+        {
+            "id": 12942,
+            "updated_at": "2022-11-10T17:02:23.000-03:00",
+            "storage_type": 0,
+            "disabled_at": null,
+            "name": "Almoxarifado Fazenda 5 Estrelas ",
+            "farm_id": 12103,
+            "default_storage": true
+        },
+        {
+            "id": 12944,
+            "updated_at": "2022-11-10T17:03:12.000-03:00",
+            "storage_type": 0,
+            "disabled_at": null,
+            "name": "Almoxarifado Fazenda Biguá",
+            "farm_id": 12105,
+            "default_storage": true
+        },
+        {
+            "id": 12741,
+            "updated_at": "2022-10-18T17:16:33.000-03:00",
+            "storage_type": 0,
+            "disabled_at": null,
+            "name": "Almoxarifado Fazenda Campo Guapo",
+            "farm_id": 11936,
+            "default_storage": true
+        },
+        {
+            "id": 12744,
+            "updated_at": "2022-10-18T17:24:43.000-03:00",
+            "storage_type": 0,
+            "disabled_at": null,
+            "name": "Almoxarifado Fazenda Lago Verde ",
+            "farm_id": 11942,
+            "default_storage": true
+        },
+        {
+            "id": 12745,
+            "updated_at": "2022-10-18T17:25:02.000-03:00",
+            "storage_type": 0,
+            "disabled_at": null,
+            "name": "Almoxarifado Fazenda Eldorado",
+            "farm_id": 11948,
+            "default_storage": true
+        },
+        {
+            "id": 12733,
+            "updated_at": "2022-10-18T17:16:05.000-03:00",
+            "storage_type": 0,
+            "disabled_at": null,
+            "name": "Almoxarifado Fazenda Diamante",
+            "farm_id": 11937,
+            "default_storage": true
+        },
+        {
+            "id": 12742,
+            "updated_at": "2022-10-18T17:17:04.000-03:00",
+            "storage_type": 0,
+            "disabled_at": null,
+            "name": "Almoxarifado Fazenda Benção de Deus",
+            "farm_id": 11946,
+            "default_storage": true
+        },
+        {
+            "id": 18196,
+            "updated_at": "2024-09-26T14:31:56.000-03:00",
+            "storage_type": 0,
+            "disabled_at": null,
+            "name": "Almoxarifado testeeee",
+            "farm_id": null,
+            "default_storage": false
+        },
+        {
+            "id": 21825,
+            "updated_at": "2025-09-13T17:49:06.000-03:00",
+            "storage_type": 0,
+            "disabled_at": null,
+            "name": "Almoxarifado Fazenda Joao de Barro",
+            "farm_id": 19713,
+            "default_storage": true
+        }
+    ],
+    "next_page_url": null,
+    "pagination": {
+        "total_entries": 14,
+        "total_pages": 1,
+        "per_page": 15,
+        "current_page": 1
+    },
+    "deleted_since": [
+        12751,
+        12750,
+        12943
+    ]
+}

@@ -1,12 +1,15 @@
 <!DOCTYPE html>
 <html lang="pt-br">
+
 <head>
   <meta charset="UTF-8" />
   <title>Payload Protheus</title>
 </head>
+
 <body style="margin:0;padding:0;background-color:#f4f6f9;font-family:Arial,Helvetica,sans-serif;">
 
-  <div style="max-width:1000px;margin:30px auto;background:#ffffff;border-radius:10px;padding:28px;box-shadow:0 4px 12px rgba(0,0,0,0.08);">
+  <div
+    style="max-width:1000px;margin:30px auto;background:#ffffff;border-radius:10px;padding:28px;box-shadow:0 4px 12px rgba(0,0,0,0.08);">
 
     <!-- HEADER -->
     <h2 style="margin:0 0 8px 0;color:#111827;">
@@ -36,8 +39,20 @@
             </td>
             <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;font-family:monospace;color:#111827;">
               {% if payload_rows %}
-                {% for k,v in payload_rows %}{% if k == "input_id" %}{{ v }}{% endif %}{% endfor %}
+              {% for k,v in payload_rows %}{% if k == "input_id" %}{{ v }}{% endif %}{% endfor %}
               {% else %}-{% endif %}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;background:#ffffff;">
+              <strong>produto</strong>
+            </td>
+            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;font-family:monospace;color:#111827;">
+              {% if defensivo_nome %}
+              {{ defensivo_nome }}
+              {% else %}
+              -
+              {% endif %}
             </td>
           </tr>
 
@@ -47,10 +62,26 @@
             </td>
             <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;font-family:monospace;color:#111827;">
               {% if payload_rows %}
-                {% for k,v in payload_rows %}{% if k == "storage_id" %}{{ v }}{% endif %}{% endfor %}
+              {% for k,v in payload_rows %}{% if k == "storage_id" %}{{ v }}{% endif %}{% endfor %}
               {% else %}-{% endif %}
             </td>
           </tr>
+
+          <tr>
+            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;background:#ffffff;">
+              <strong>storage_name</strong>
+            </td>
+            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;font-family:monospace;color:#111827;">
+              {% if storage_name %}
+              {{ storage_name }}
+              {% else %}
+              {% if payload_rows %}
+              {% for k,v in payload_rows %}{% if k == "storage_name" %}{{ v }}{% endif %}{% endfor %}
+              {% else %}-{% endif %}
+              {% endif %}
+            </td>
+          </tr>
+
 
           <tr>
             <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;background:#ffffff;">
@@ -58,7 +89,7 @@
             </td>
             <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;font-family:monospace;color:#111827;">
               {% if payload_rows %}
-                {% for k,v in payload_rows %}{% if k == "movimentation_type" %}{{ v }}{% endif %}{% endfor %}
+              {% for k,v in payload_rows %}{% if k == "movimentation_type" %}{{ v }}{% endif %}{% endfor %}
               {% else %}-{% endif %}
             </td>
           </tr>
@@ -69,7 +100,7 @@
             </td>
             <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;font-family:monospace;color:#111827;">
               {% if payload_rows %}
-                {% for k,v in payload_rows %}{% if k == "quantity" %}{{ v }}{% endif %}{% endfor %}
+              {% for k,v in payload_rows %}{% if k == "quantity" %}{{ v }}{% endif %}{% endfor %}
               {% else %}-{% endif %}
             </td>
           </tr>
@@ -80,7 +111,7 @@
             </td>
             <td style="padding:10px 12px;font-family:monospace;color:#111827;">
               {% if payload_rows %}
-                {% for k,v in payload_rows %}{% if k == "date" %}{{ v }}{% endif %}{% endfor %}
+              {% for k,v in payload_rows %}{% if k == "date" %}{{ v }}{% endif %}{% endfor %}
               {% else %}-{% endif %}
             </td>
           </tr>
@@ -100,22 +131,23 @@
       </thead>
       <tbody>
         {% if payload_rows %}
-          {% for key, value in payload_rows %}
-            <tr>
-              <td style="padding:8px;border:1px solid #e5e7eb;font-family:monospace;">
-                {{ key }}
-              </td>
-              <td style="padding:8px;border:1px solid #e5e7eb;font-family:monospace;white-space:pre-wrap;word-break:break-word;">
-                {{ value }}
-              </td>
-            </tr>
-          {% endfor %}
+        {% for key, value in payload_rows %}
+        <tr>
+          <td style="padding:8px;border:1px solid #e5e7eb;font-family:monospace;">
+            {{ key }}
+          </td>
+          <td
+            style="padding:8px;border:1px solid #e5e7eb;font-family:monospace;white-space:pre-wrap;word-break:break-word;">
+            {{ value }}
+          </td>
+        </tr>
+        {% endfor %}
         {% else %}
-          <tr>
-            <td colspan="2" style="padding:10px;border:1px solid #e5e7eb;text-align:center;">
-              Nenhum dado recebido
-            </td>
-          </tr>
+        <tr>
+          <td colspan="2" style="padding:10px;border:1px solid #e5e7eb;text-align:center;">
+            Nenhum dado recebido
+          </td>
+        </tr>
         {% endif %}
       </tbody>
     </table>
@@ -132,20 +164,20 @@
       </thead>
       <tbody>
         {% for key, value in headers.items %}
-          <tr>
-            <td style="padding:6px;border:1px solid #e5e7eb;font-family:monospace;">
-              {{ key }}
-            </td>
-            <td style="padding:6px;border:1px solid #e5e7eb;font-family:monospace;word-break:break-all;">
-              {{ value }}
-            </td>
-          </tr>
+        <tr>
+          <td style="padding:6px;border:1px solid #e5e7eb;font-family:monospace;">
+            {{ key }}
+          </td>
+          <td style="padding:6px;border:1px solid #e5e7eb;font-family:monospace;word-break:break-all;">
+            {{ value }}
+          </td>
+        </tr>
         {% empty %}
-          <tr>
-            <td colspan="2" style="padding:8px;border:1px solid #e5e7eb;text-align:center;">
-              Nenhum header disponível
-            </td>
-          </tr>
+        <tr>
+          <td colspan="2" style="padding:8px;border:1px solid #e5e7eb;text-align:center;">
+            Nenhum header disponível
+          </td>
+        </tr>
         {% endfor %}
       </tbody>
     </table>
@@ -173,4 +205,5 @@
   </div>
 
 </body>
+
 </html>

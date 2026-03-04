@@ -173,6 +173,9 @@ from .services.geo_merge import merge_no_flood
 import unicodedata
 from django.db import close_old_connections
 
+from .utils_new.storages_lookup import resolve_storage_name
+from .utils_new.defensivos_lookup import resolve_defensivo_nome
+
 
 
 
@@ -5473,6 +5476,21 @@ class DefensivoViewSet(viewsets.ModelViewSet):
         # ✅ multipart/form-data vem QueryDict → normaliza pra dict simples
         if isinstance(payload, QueryDict):
             payload = payload.dict()
+        # ✅ Enriquecimento: storage_id -> storage_name (via JSON local)
+        storage_id = payload.get("storage_id") if isinstance(payload, dict) else None
+        storage_name = resolve_storage_name(storage_id) if storage_id is not None else None
+
+        payload_enriched = dict(payload) if isinstance(payload, dict) else payload
+        if isinstance(payload_enriched, dict):
+            payload_enriched["storage_name"] = storage_name
+        
+        # buscar nome do defensivo pelo input_id
+        input_id = payload.get("input_id") if isinstance(payload, dict) else None
+        defensivo_nome = resolve_defensivo_nome(input_id) if input_id is not None else None
+
+        if isinstance(payload_enriched, dict):
+            payload_enriched["defensivo_nome"] = defensivo_nome
+        
 
         received_at = timezone.now()
 
@@ -5503,9 +5521,11 @@ class DefensivoViewSet(viewsets.ModelViewSet):
                     "query_params": dict(request.query_params),
                     "headers": safe_headers,
                     "raw_body": raw_body,
-                    "payload_rows": self._dict_to_rows(payload)
-                    if isinstance(payload, (dict, list))
-                    else [("payload", payload)],
+                    "payload_rows": self._dict_to_rows(payload_enriched)
+                    if isinstance(payload_enriched, (dict, list))
+                    else [("payload", payload_enriched)],
+                    "defensivo_nome": defensivo_nome,
+                    "storage_name": storage_name,  # opcional pro resumo
                 },
             )
 
@@ -5533,13 +5553,13 @@ class DefensivoViewSet(viewsets.ModelViewSet):
             {
                 "received": True,
                 "received_at": received_at,
-                "payload_type": type(payload).__name__,
-                "keys": list(payload.keys()) if isinstance(payload, dict) else None,
+                "payload_type": type(payload_enriched).__name__,
+                "keys": list(payload_enriched.keys()) if isinstance(payload_enriched, dict) else None,
                 "email_sent": email_sent,
                 "email_error": email_error,
-                "gmail_result": gmail_result,  # ✅ ajuda a debugar (id, threadId etc)
-                # em produção, recomendo NÃO devolver payload/raw_body
-                "payload": payload,
+                "gmail_result": gmail_result,
+                "storage_name": storage_name,
+                "payload": payload_enriched,
             },
             status=status.HTTP_200_OK,
         )
