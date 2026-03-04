@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Any
 from django.contrib import admin
 from django import forms
@@ -124,6 +125,8 @@ from django.contrib.admin import helpers
 from django.template.response import TemplateResponse
 
 from django.db import close_old_connections
+
+
 
 main_path = (
     "http://127.0.0.1:8000"
@@ -2957,26 +2960,134 @@ def is_valid_uuid(val):
     except ValueError:
         return False
 
+
+
+# =========================================================
+# ✅ MAQUINA ADMIN (completo)
+# =========================================================
+@admin.register(Maquina)
+class MaquinaAdmin(admin.ModelAdmin):
+    save_on_top = True
+    show_full_result_count = False
+    list_per_page = 50
+    date_hierarchy = "modificado"
+
+    # performance
+    list_select_related = ("fazenda",)
+
+    # UX
+    list_display = (
+        "nome",
+        "tipo",
+        "referencia",
+        "patrimonio",
+        "chassi",
+        "get_fazenda",
+        "ativo",
+        "modificado",
+    )
+
+    list_filter = (
+        "tipo",
+        "ativo",
+        "fazenda",
+        "modificado",
+    )
+
+    search_fields = (
+        "nome",
+        "tipo",
+        "referencia",
+        "patrimonio",
+        "chassi",
+        "fazenda__nome",
+    )
+
+    ordering = ("nome",)
+
+    # se FazendaAdmin tiver search_fields, autocomplete fica ótimo
+    autocomplete_fields = ("fazenda",)
+
+    fieldsets = (
+        ("Identificação", {
+            "fields": ("nome", "tipo", "ativo"),
+        }),
+        ("Referências", {
+            "fields": ("referencia", "patrimonio", "chassi"),
+        }),
+        ("Localização (opcional)", {
+            "fields": ("fazenda",),
+            "description": "Use para mapear onde a máquina normalmente fica. Pode deixar em branco.",
+        }),
+        ("Observações", {
+            "fields": ("observacao",),
+        }),
+        ("Auditoria", {
+            "fields": ("criados", "modificado"),
+        }),
+    )
+
+    readonly_fields = ("criados", "modificado")
+
+    actions = ("marcar_ativo", "marcar_inativo")
+
+    @admin.action(description="Marcar selecionadas como ATIVAS")
+    def marcar_ativo(self, request, queryset):
+        n = queryset.update(ativo=True)
+        self.message_user(
+            request,
+            f"{n} máquina(s) marcada(s) como ativa(s).",
+            level=messages.SUCCESS,
+        )
+
+    @admin.action(description="Marcar selecionadas como INATIVAS")
+    def marcar_inativo(self, request, queryset):
+        n = queryset.update(ativo=False)
+        self.message_user(
+            request,
+            f"{n} máquina(s) marcada(s) como inativa(s).",
+            level=messages.WARNING,
+        )
+
+    def get_fazenda(self, obj):
+        return obj.fazenda.nome if obj.fazenda else "—"
+    get_fazenda.short_description = "Fazenda"
+    
+    
+# =========================================================
+# ✅ OPERACAO ADMIN (ajustada p/ máquina)
+# =========================================================
 @admin.register(Operacao)
 class OperacaoAdmin(admin.ModelAdmin):
-    
+
     class Media:
         css = {
-            'all': ('admin/css/highlight_deleted_inlines.css',)
+            "all": ("admin/css/highlight_deleted_inlines.css",)
         }
-        js = ('admin/js/highlight_deleted_inlines.js',"https://cdn.jsdelivr.net/npm/sweetalert2@11")
-    # class Media:
-    #     js = ('admin/js/highlight_deleted_inlines.js',)
-    def get_queryset(self, request):
-        return (
-            super(OperacaoAdmin, self)
-            .get_queryset(request)
-            .filter(programa__ativo=True)
-            .select_related("programa", "programa__cultura")
+        js = (
+            "admin/js/highlight_deleted_inlines.js",
+            "https://cdn.jsdelivr.net/npm/sweetalert2@11",
         )
 
     show_full_result_count = False
+    save_on_top = True
+    list_per_page = 50
+    date_hierarchy = "modificado"
 
+    inlines = [AplicacoesProgramaInline]
+
+    # ✅ melhora performance do changelist (evita N+1)
+    list_select_related = (
+        "programa",
+        "programa__cultura",
+        "maquina",
+        "maquina__fazenda",
+    )
+
+    # ✅ autocomplete pra programa e máquina (bom demais no admin)
+    autocomplete_fields = ("programa", "maquina")
+
+    # ✅ inclui máquina nas buscas
     search_fields = [
         "programa__nome",
         "programa__nome_fantasia",
@@ -2984,99 +3095,173 @@ class OperacaoAdmin(admin.ModelAdmin):
         "estagio",
         "prazo_dap",
         "obs",
+        "maquina__nome",
+        "maquina__tipo",
+        "maquina__placa",
+        "maquina__patrimonio",
+        "maquina__fazenda__nome",
     ]
 
-    inlines = [AplicacoesProgramaInline]
-    
-    from django.db import close_old_connections
-    from django.utils import timezone
+    list_display = (
+        "estagio",
+        "programa",
+        "get_prazo_dap",
+        "get_cultura_description",
+        "get_maquina_display",
+        "get_obs_description",
+        "ativo",
+    )
 
+    list_filter = [
+        ProgramaFilter,
+        "programa__safra",
+        "programa__ciclo",
+        "maquina",
+        "maquina__tipo",
+        "modificado",
+        "ativo",
+    ]
+
+    ordering = (
+        "programa",
+        "prazo_dap",
+    )
+
+    fieldsets = (
+        ("Programa / Estágio", {
+            "fields": ("programa", "estagio", "operacao_numero", "ativo"),
+        }),
+        ("Prazos", {
+            "fields": ("prazo_dap", "prazo_emergencia", "base_dap", "base_emergencia"),
+        }),
+        ("Base operação anterior", {
+            "fields": ("base_operacao_anterior", "dias_base_operacao_anterior"),
+        }),
+        ("Máquina (1 por estágio)", {
+            "fields": ("maquina",),
+            "description": "Opcional. Define qual máquina executa esta operação/estágio.",
+        }),
+        ("Visual / Observações", {
+            "fields": ("map_color", "obs", "observacao"),
+        }),
+    )
+
+    def get_queryset(self, request):
+        return (
+            super()
+            .get_queryset(request)
+            .filter(programa__ativo=True)
+            .select_related("programa", "programa__cultura", "maquina", "maquina__fazenda")
+        )
+
+    # =========================
+    # THREAD/TASK (mantido, só organizado)
+    # =========================
     @staticmethod
-    def processar_operacao_em_background(task_id, query, current_op, produtos, changed_dap, newDap, nome_estagio_alterado, estagio_alterado):
-        close_old_connections()  # <-- fundamental em thread
-
+    def processar_operacao_em_background(
+        task_id,
+        query,
+        current_op,
+        produtos,
+        changed_dap,
+        newDap,
+        nome_estagio_alterado,
+        estagio_alterado,
+    ):
+        close_old_connections()  # fundamental em thread
         task = None
         started_at = timezone.now()
 
         try:
             task = BackgroundTaskStatus.objects.get(task_id=task_id)
             task.status = "running"
-            task.started_at = started_at  # se você tiver esse campo
-            task.save(update_fields=["status", "started_at"] if hasattr(task, "started_at") else ["status"])
+            if hasattr(task, "started_at"):
+                task.started_at = started_at
+            task.save(update_fields=["status"] + (["started_at"] if hasattr(task, "started_at") else []))
 
             admin_form_alter_programa_and_save(
-                query, current_op, produtos, changed_dap, newDap, nome_estagio_alterado, estagio_alterado
+                query,
+                current_op,
+                produtos,
+                changed_dap,
+                newDap,
+                nome_estagio_alterado,
+                estagio_alterado,
             )
 
             task.status = "done"
-            task.result = {"ok": True}
+            if hasattr(task, "result"):
+                task.result = {"ok": True}
         except Exception as e:
             if task:
                 task.status = "failed"
-                task.result = {"error": str(e)}
+                if hasattr(task, "result"):
+                    task.result = {"error": str(e)}
         finally:
             if task:
-                task.ended_at = timezone.now()
-                task.save(update_fields=["status", "result", "ended_at"] if hasattr(task, "result") else ["status", "ended_at"])
+                if hasattr(task, "ended_at"):
+                    task.ended_at = timezone.now()
+                    task.save(update_fields=["status"] + (["result"] if hasattr(task, "result") else []) + (["ended_at"] if hasattr(task, "ended_at") else []))
+                else:
+                    task.save(update_fields=["status"] + (["result"] if hasattr(task, "result") else []))
             close_old_connections()
 
-    
     def changelist_view(self, request, extra_context=None):
         extra_context = extra_context or {}
-
-        print('formulário salvo, vamos começar o monitoramento')
         if request.session.get("executou_task") and "task_id" in request.session:
             task_id = request.session.pop("task_id", None)
-            print('aqui::::', task_id)
             extra_context["task_id"] = task_id
             request.session.pop("executou_task", None)
             request.session.modified = True
-
         return super().changelist_view(request, extra_context=extra_context)
 
+    # ⚠️ mantém seu padrão: salvar “pai” via save_formset
     def save_model(self, request, obj, form, change):
-        print(self)
-        print(self.form)
-        pass  # don't actually save the parent instance
+        # não salva aqui, salva no save_formset
+        pass
 
     def save_formset(self, request, form, formset, change):
         programa_nome = form.instance.programa.nome
 
-        # Verifica se já existe task pendente ou rodando para esse programa
+        # evita rodar duas tasks ao mesmo tempo pro mesmo programa
         exists_running = BackgroundTaskStatus.objects.filter(
             task_name=programa_nome,
-            status__in=["pending", "running"]
+            status__in=["pending", "running"],
         ).exists()
-
         if exists_running:
-            raise ValidationError(f"Já existe uma tarefa em andamento para o programa '{programa_nome}'. Por favor, aguarde a finalização antes de salvar novamente.")
+            raise ValidationError(
+                f"Já existe uma tarefa em andamento para o programa '{programa_nome}'. "
+                f"Aguarde a finalização antes de salvar novamente."
+            )
 
-        form.instance.save()  # form.instance is the parent
-        formset.save()  # this will save the children
-        # print("Prazo antigo DAp: ", form.initial["prazo_dap"])
-        # print("Novo Prazo", form.instance.prazo_dap)
-        changed_dap = None
-        
-        # Alterando o nome do estagio do programa
-        nome_estagio_alterado = False
-        estagio_alterado = 'Novo Nome'
+        # salva pai + filhos
+        form.instance.save()
+        formset.save()
+
+        # detecta mudança de DAP
+        changed_dap = False
         if form.initial:
-            estagio_original = form.instance.estagio.strip()
-            estagio_alterado = form.initial['estagio'].strip()
-            print('nome alterado:', estagio_original)
-            print('nome original: ', estagio_alterado)
-            print('estagios sao diferentes: ', estagio_original != estagio_alterado) 
-            if estagio_original != estagio_alterado:
-                nome_estagio_alterado = True
-                
-        if form.initial:
-            changed_dap = form.initial["prazo_dap"] != form.instance.prazo_dap
+            changed_dap = form.initial.get("prazo_dap") != form.instance.prazo_dap
         newDap = form.instance.prazo_dap
-        if changed_dap == True:
-            print("funcao pra alterar o prazo dap")
-        if form.instance.ativo == True:
+
+        # detecta mudança do nome do estágio
+        nome_estagio_alterado = False
+        estagio_alterado = ""
+        current_op = form.instance.estagio
+
+        if form.initial and "estagio" in form.initial:
+            estagio_original = (form.initial.get("estagio") or "").strip()
+            estagio_novo = (form.instance.estagio or "").strip()
+            if estagio_original and estagio_novo and estagio_original != estagio_novo:
+                nome_estagio_alterado = True
+                current_op = estagio_original
+                estagio_alterado = estagio_novo
+
+        # quando ativo, dispara task de recalcular indices/agenda
+        if form.instance.ativo is True:
             query = Aplicacao.objects.select_related("operacao").filter(
-                ativo=True, operacao=form.instance
+                ativo=True,
+                operacao=form.instance,
             )
             produtos = [
                 {
@@ -3089,89 +3274,75 @@ class OperacaoAdmin(admin.ModelAdmin):
                 }
                 for dose_produto in query
             ]
-            if nome_estagio_alterado == True:
-                current_op = form.initial['estagio']
-                estagio_alterado = form.instance.estagio
-            else:
-                current_op = form.instance.estagio
+
             current_program = form.instance.programa
             current_query = Plantio.objects.filter(
-                programa=current_program, inicializado_plantio=True
+                programa=current_program,
+                inicializado_plantio=True,
             )
-            
-            # ✅ Criar task no banco
+
             task_id = str(uuid.uuid4())
             BackgroundTaskStatus.objects.create(
                 task_id=task_id,
                 task_name=programa_nome,
-                status="pending"
+                status="pending",
             )
 
-            # ✅ Iniciar thread
             Thread(
                 target=self.processar_operacao_em_background,
                 args=(
-                    task_id, current_query, current_op, produtos,
-                    changed_dap, newDap, nome_estagio_alterado, estagio_alterado
-                )
+                    task_id,
+                    current_query,
+                    current_op,
+                    produtos,
+                    changed_dap,
+                    newDap,
+                    nome_estagio_alterado,
+                    estagio_alterado,
+                ),
+                daemon=True,
             ).start()
-            # admin_form_alter_programa_and_save(
-            #     current_query, current_op, produtos, changed_dap, newDap, nome_estagio_alterado, estagio_alterado
-            # )
 
             request.session["task_id"] = str(task_id)
             request.session["executou_task"] = True
             request.session.modified = True
 
-        if form.instance.ativo == False:
-            print("Estagio desativado: ", form.instance)
+        # quando desativa, remove índices
+        if form.instance.ativo is False:
             current_op = form.instance.estagio
             current_program = form.instance.programa
             current_query = Plantio.objects.filter(
-                programa=current_program, inicializado_plantio=True
+                programa=current_program,
+                inicializado_plantio=True,
             )
             admin_form_remove_index(current_query, current_op)
 
-    list_display = (
-        "estagio",
-        "programa",
-        "get_prazo_dap",
-        "get_cultura_description",
-        "get_obs_description",
-        "ativo",
-    )
-    list_filter = [
-        ProgramaFilter,
-        "programa__safra",
-        "programa__ciclo",
-        "modificado",
-        "ativo",
-    ]
-
-    ordering = (
-        "programa",
-        "prazo_dap",
-    )
-
+    # =========================
+    # helpers display
+    # =========================
     def get_cultura_description(self, obj):
-        return obj.programa.cultura.cultura
-
+        return obj.programa.cultura.cultura if obj.programa and obj.programa.cultura else "—"
     get_cultura_description.short_description = "Cultura"
 
     def get_prazo_dap(self, obj):
         return obj.prazo_dap
-
     get_prazo_dap.short_description = "DAP"
 
     def get_obs_description(self, obj):
         if obj.observacao or obj.obs:
-            return f"{obj.obs[:20] }..."
-        else:
-            return " - "
-
+            base = obj.obs or obj.observacao or ""
+            base = str(base)
+            return f"{base[:20]}..."
+        return " - "
     get_obs_description.short_description = "Obs"
 
-
+    def get_maquina_display(self, obj):
+        if not getattr(obj, "maquina", None):
+            return "—"
+        if getattr(obj.maquina, "fazenda", None):
+            return f"{obj.maquina.nome} ({obj.maquina.fazenda.nome})"
+        return obj.maquina.nome
+    get_maquina_display.short_description = "Máquina"
 @admin.register(Defensivo)
 class DefensivoAdmin(admin.ModelAdmin):
     list_display = ("produto", "tipo", 'id_farmbox', 'unidade_medida')

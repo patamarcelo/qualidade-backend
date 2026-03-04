@@ -307,6 +307,32 @@ class Ciclo(Base):
     def __str__(self):
         return str(self.ciclo)
 
+class Maquina(Base):
+    nome       = models.CharField("Nome", max_length=120)
+    tipo       = models.CharField("Tipo", max_length=120, blank=True, default="")  # trator, pulverizador, drone...
+    referencia = models.CharField("Referencia", max_length=100, blank=True, default="")
+    patrimonio = models.CharField("Patrimônio", max_length=40, blank=True, default="")
+    chassi     = models.CharField("Chassi", max_length=150, blank=True, default="")
+
+    # ✅ onde ela está (opcional)
+    fazenda = models.ForeignKey(
+        Fazenda,
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+        related_name="maquinas",
+        help_text="Fazenda onde esta máquina normalmente fica (opcional).",
+    )
+
+    class Meta:
+        ordering = ["nome"]
+        verbose_name = "Máquina"
+        verbose_name_plural = "Máquinas"
+
+    def __str__(self):
+        if self.fazenda:
+            return f"{self.nome} ({self.fazenda.nome})"
+        return self.nome
 
 class Programa(Base):
     nome = models.CharField(
@@ -415,6 +441,14 @@ class Operacao(Base):
     obs = models.TextField("Observação", max_length=500, blank=True)
 
     map_color = models.CharField("Cor no Mapa", max_length=150, null=True, blank=True)
+    
+    maquina = models.ForeignKey(
+        Maquina,
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+        related_name="operacoes",
+    )
 
     @property
     def operation_to_dict(self):
