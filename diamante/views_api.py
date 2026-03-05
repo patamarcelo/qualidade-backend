@@ -2352,8 +2352,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     qs_plantio = qs_plantio.filter(safra=s_dict[safra_filter], ciclo=c_dict[cicle_filter])
                     # cache.set(cache_key_qs_plantio_get_plantio_operacoes_detail, qs_plantio, timeout=60*5*6)  # cache for 5 minutes
 
-                qs_programas = Operacao.objects.values(
-                    "estagio", "programa_id", "prazo_dap", "id"
+                qs_programas = Operacao.objects.select_related("maquina").values(
+                    "estagio", "programa_id", "prazo_dap", "id","maquina__nome"
                 ).filter(ativo=True)
 
                 cache_key_qs_aplicacoes = f"get_plantio_operacoes_detail_qs_aplicacoes_{safra_filter}_{cicle_filter}"
@@ -2374,6 +2374,9 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         "defensivo__tipo",
                         "defensivo__id_farmbox",
                         "dose",
+                        "preco",
+                        "valor_final",
+                        "valor_aplicacao",
                         "operacao",
                         "operacao__estagio",
                         "operacao__prazo_dap",
@@ -2441,11 +2444,15 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                             "data prevista": get_prev_app_date(
                                                 i["data_plantio"], x["prazo_dap"]
                                             ),
+                                            "equipamento": x["maquina__nome"],
                                             "produtos": [
                                                 {
                                                     "produto": y["defensivo__produto"],
                                                     "tipo": y["defensivo__tipo"],
                                                     "dose": y["dose"],
+                                                    "preco" : y["preco"],
+                                                    "valor_final": y["valor_final"],
+                                                    "valor_aplicacao": y["valor_aplicacao"],
                                                     "id_farmbox": y["defensivo__id_farmbox"],
                                                     "quantidade aplicar": get_quantidade_aplicar(
                                                         y["dose"], i["area_colheita"]

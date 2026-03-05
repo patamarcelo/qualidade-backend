@@ -189,10 +189,13 @@ def get_prev_app_date(data_plantio, prazo_dap):
 
 def get_quantidade_aplicar(dose, area_colehita):
     total = 0
-    if dose and area_colehita:
-        total = dose * area_colehita
-    else:
-        print("problema em calcular o total a aplicar")
+    try:
+        if dose and area_colehita:
+            total = dose * area_colehita
+        else:
+            print("problema em calcular o total a aplicar")
+    except Exception as e:
+        print('erro em calcular a quantidade a plicar', e)
     return total
 
 
