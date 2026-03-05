@@ -3,26 +3,29 @@
 from apscheduler.schedulers.background import BackgroundScheduler
 from django_apscheduler.jobstores import DjangoJobStore, register_events
 from django_apscheduler.models import DjangoJobExecution
+
 import logging
-from diamante.utils import finalizar_parcelas_encerradas, enviar_email_alerta_mungo_verde_por_regra
-from diamante.cron import enviar_email_estoque_farmbox_diario, enviar_email_diario
 from datetime import datetime
 
-logger = logging.getLogger(__name__)
-
-from importlib import import_module
 from django.conf import settings
-
-from opscheckin.cron import (
-    run_opscheckin_agenda_0600,      # ✅ pergunta de agenda (template) 06:00
-    run_opscheckin_reminders,        # ✅ reminders cravados 06:15/06:30/06:45/07:00
-    run_opscheckin_agenda_followups, # ✅ follow-up itens (botões) 09/11/13/15/17
-)
-
 from django.db import close_old_connections
-from .scheduler_lock import acquire_scheduler_lock
 
 import pytz
+
+from diamante.utils import finalizar_parcelas_encerradas, enviar_email_alerta_mungo_verde_por_regra
+from diamante.cron import enviar_email_estoque_farmbox_diario, enviar_email_diario
+
+from opscheckin.cron import (
+    run_opscheckin_agenda_0600,       # ✅ pergunta de agenda (template) 06:00
+    run_opscheckin_reminders,         # ✅ reminders cravados 06:15/06:30/06:45/07:00
+    run_opscheckin_agenda_followups,  # ✅ follow-up (tick) itens/agenda durante o dia
+    run_opscheckin_agenda_confirm,   # ✅ ADD
+
+)
+
+from .scheduler_lock import acquire_scheduler_lock
+
+logger = logging.getLogger(__name__)
 
 
 def get_formatted_datetime():
@@ -31,43 +34,32 @@ def get_formatted_datetime():
 
 
 def delete_old_job_executions(max_age=604_800):
-    """Apaga logs antigos de execuções do APScheduler (default: 7 dias)."""
+    """
+    Apaga logs antigos de execuções do APScheduler (default: 7 dias).
+    Mantém a tabela django_apscheduler mais leve.
+    """
     DjangoJobExecution.objects.delete_old_job_executions(max_age)
-
-
-def get_active_jobs(scheduler, old_id):
-    jobs = scheduler.get_jobs()
-    logger.info(f"Total active jobs: {len(jobs)}")
-    for job in jobs:
-        logger.info(f"Job ID: {job.id}, Next Run Time: {job.next_run_time}, Function: {job.func_ref}")
-        try:
-            name_old = old_id.replace("_", "")
-            job_id_name = str(job.id)
-            logger.info("job id founded? %s", name_old in job_id_name)
-        except Exception as e:
-            logger.warning("error trying to print job id: %s", e)
 
 
 def start():
     close_old_connections()
 
+    # Evita múltiplos schedulers em múltiplas instâncias/processos
     if not acquire_scheduler_lock():
         logger.info("Scheduler não iniciado (lock já está com outro processo).")
         return
 
     try:
-        # ✅ Fuso horário correto do Django (ex: America/Sao_Paulo)
-        fuso_horario = pytz.timezone(settings.TIME_ZONE)
+        fuso_horario = pytz.timezone(settings.TIME_ZONE)  # ex: America/Sao_Paulo
         scheduler = BackgroundScheduler(timezone=fuso_horario)
 
         if settings.DEBUG is False:
-            # Conecta o banco de dados ANTES de mexer nos jobs
+            # Conecta jobstore no banco antes de cadastrar jobs
             scheduler.add_jobstore(DjangoJobStore(), "default")
 
-            # Limpa jobs existentes (você já optou por sempre recriar)
+            # Você optou por sempre recriar tudo
             scheduler.remove_all_jobs()
-
-            logger.info("Agendando jobs no servidor…")
+            logger.info("Agendando jobs no servidor… timezone=%s", settings.TIME_ZONE)
 
             # =====================================================================
             # GRUPO A — ROTINAS FINANCEIRAS / PARCELAS (Diamante)
@@ -130,7 +122,7 @@ def start():
             # =====================================================================
             # GRUPO C — OPSCHECKIN (WhatsApp) — AGENDA + REMINDERS (Templates)
             # =====================================================================
-            # 06:00 — dispara a pergunta de agenda (template "AGENDA")
+            # 06:00 — dispara a pergunta de agenda (TEMPLATE "AGENDA")
             scheduler.add_job(
                 run_opscheckin_agenda_0600,
                 "cron",
@@ -144,7 +136,7 @@ def start():
                 max_instances=1,
             )
 
-            # 06:15 / 06:30 / 06:45 — reminders (template "REMINDER")
+            # 06:15 / 06:30 / 06:45 — reminders (TEMPLATE "REMINDER")
             scheduler.add_job(
                 run_opscheckin_reminders,
                 "cron",
@@ -158,7 +150,7 @@ def start():
                 max_instances=1,
             )
 
-            # 07:00 — reminder final
+            # 07:00 — reminder final (TEMPLATE "REMINDER")
             scheduler.add_job(
                 run_opscheckin_reminders,
                 "cron",
@@ -173,18 +165,23 @@ def start():
             )
 
             # =====================================================================
-            # GRUPO D — OPSCHECKIN (WhatsApp) — FOLLOW-UP DOS ITENS (Botões)
+            # GRUPO D — OPSCHECKIN (WhatsApp) — FOLLOW-UP DO DIA (tick “inteligente”)
             # =====================================================================
-            # A cada 2 horas (até 17:00) — acompanha itens "open" com botões:
-            # 09:00, 11:00, 13:00, 15:00, 17:00
-            # (lembrando: botões/interactive exigem janela de 24h aberta)
+            # Aqui NÃO tentamos “90 em 90” no cron.
+            # Rodamos um tick em janelas fixas (ex: a cada 30 min),
+            # e o comando decide por manager:
+            #  - mandar confirmação 10min após receber agenda (se pendente)
+            #  - mandar follow-up a cada 90min até 17h
+            #  - respeitar cooldown (não spammar)
+            #
+            # Se quiser mais responsivo: minute="*/10" (a cada 10 min).
             scheduler.add_job(
                 run_opscheckin_agenda_followups,
                 "cron",
                 day_of_week="*",
-                hour="9",
-                minute="0",
-                id="opscheckin_agenda_followup_0900",
+                hour="9-17",
+                minute="*/10",
+                id="opscheckin_agenda_followups_tick_0917_10min",
                 replace_existing=True,
                 misfire_grace_time=600,
                 coalesce=True,
@@ -192,59 +189,19 @@ def start():
             )
 
             scheduler.add_job(
-                run_opscheckin_agenda_followups,
+                run_opscheckin_agenda_confirm,
                 "cron",
                 day_of_week="*",
-                hour="11",
-                minute="0",
-                id="opscheckin_agenda_followup_1100",
+                hour="6-18",
+                minute="*/2",  # a cada 2 min (pode ser */1 se quiser bem responsivo)
+                id="opscheckin_agenda_confirm_tick",
                 replace_existing=True,
                 misfire_grace_time=600,
                 coalesce=True,
                 max_instances=1,
             )
-
-            scheduler.add_job(
-                run_opscheckin_agenda_followups,
-                "cron",
-                day_of_week="*",
-                hour="13",
-                minute="0",
-                id="opscheckin_agenda_followup_1300",
-                replace_existing=True,
-                misfire_grace_time=600,
-                coalesce=True,
-                max_instances=1,
-            )
-
-            scheduler.add_job(
-                run_opscheckin_agenda_followups,
-                "cron",
-                day_of_week="*",
-                hour="15",
-                minute="0",
-                id="opscheckin_agenda_followup_1500",
-                replace_existing=True,
-                misfire_grace_time=600,
-                coalesce=True,
-                max_instances=1,
-            )
-
-            scheduler.add_job(
-                run_opscheckin_agenda_followups,
-                "cron",
-                day_of_week="*",
-                hour="17",
-                minute="0",
-                id="opscheckin_agenda_followup_1700",
-                replace_existing=True,
-                misfire_grace_time=600,
-                coalesce=True,
-                max_instances=1,
-            )
-
             # =====================================================================
-            # GRUPO E — MANUTENÇÃO APSCHEDULER (limpeza de logs)
+            # GRUPO E — MANUTENÇÃO APSCHEDULER
             # =====================================================================
             scheduler.add_job(
                 delete_old_job_executions,
@@ -259,7 +216,7 @@ def start():
                 max_instances=1,
             )
 
-            # Eventos do APScheduler (executions, errors, etc)
+            # Eventos do APScheduler (logs / erros)
             register_events(scheduler)
 
             scheduler.start()

@@ -778,24 +778,42 @@
               <div class="mgrPhone">{{ col.manager.phone_e164 }}</div>
             </div>
 
-            {% if col.agenda_q %}
-            {% if col.agenda_q.status == "answered" %}
-            <div class="badge b-ok">answered</div>
-            {% elif col.agenda_q.status == "missed" %}
-            <div class="badge b-danger">missed</div>
-            {% else %}
-            <div class="badge b-warn">pending</div>
-            {% endif %}
-            {% else %}
-            <div class="badge">sem agenda</div>
-            {% endif %}
+            <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;">
+              <div class="{{ col.agenda_badge.1 }}">AGENDA: {{ col.agenda_badge.0 }}</div>
+              <div class="{{ col.confirm_badge.1 }}">CONF: {{ col.confirm_badge.0 }}</div>
+
+              {% if col.items.total > 0 %}
+              {% if col.items.open == 0 and col.items.done > 0 %}
+              <div class="badge b-ok">ITENS: ok</div>
+              {% elif col.items.open > 0 %}
+              <div class="badge b-warn">ITENS: {{ col.items.open }} abertos</div>
+              {% else %}
+              <div class="badge">ITENS: {{ col.items.total }}</div>
+              {% endif %}
+              {% else %}
+              <div class="badge">ITENS: —</div>
+              {% endif %}
+            </div>
+
           </div>
 
           <div class="colMeta">
             <div class="pill">{{ day|date:"d/m" }}</div>
+
             {% if col.agenda_q %}
-            <div class="pill">Rem: {{ col.agenda_q.reminder_count }}</div>
-            <div class="pill">Chars: {{ col.agenda_q.answer_text|length }}</div>
+            <div class="pill">AgendaRem: {{ col.agenda_q.reminder_count }}</div>
+            <div class="pill">AgendaChars: {{ col.agenda_q.answer_text|length }}</div>
+            {% endif %}
+
+            {% if col.confirm_q %}
+            <div class="pill">ConfAt:
+              {% if col.confirm_q.sent_at %}{{ col.confirm_q.sent_at|date:"H:i" }}{% else %}—{% endif %}</div>
+            {% endif %}
+
+            {% if col.items.total > 0 %}
+            <div class="pill">Open: {{ col.items.open }}</div>
+            <div class="pill">Done: {{ col.items.done }}</div>
+            <div class="pill">Skip: {{ col.items.skip }}</div>
             {% endif %}
           </div>
         </div>

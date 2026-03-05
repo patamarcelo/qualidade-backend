@@ -58,35 +58,28 @@ def send_text(to_phone_e164: str, body: str) -> dict:
     }
     return _post(payload, to_phone_e164=to_phone_e164)
 
+
 def send_template(
     to_phone_e164: str,
     *,
     template_name: str,
     language_code: str = "pt_BR",
-    body_params=None,  # pode ser list[str] (posicional) OU dict[str,str] (nomeado)
+    body_params=None,  # list[str] posicional OU dict[str,str] nomeado (parameter_name)
 ) -> dict:
-    """
-    Envia template aprovado.
-    - Se body_params for list -> envia parâmetros posicionais ({{1}}, {{2}}...)
-    - Se body_params for dict -> envia parâmetros nomeados ({{manager_name}}, etc.) usando parameter_name
-    """
     components = []
 
     if body_params:
-        # dict => nomeado
         if isinstance(body_params, dict):
             params = []
             for k, v in body_params.items():
                 params.append(
                     {
                         "type": "text",
-                        "parameter_name": str(k),  # <- ESSENCIAL p/ variáveis nomeadas
+                        "parameter_name": str(k),
                         "text": str(v),
                     }
                 )
             components.append({"type": "body", "parameters": params})
-
-        # list/tuple => posicional
         else:
             components.append(
                 {
@@ -107,6 +100,7 @@ def send_template(
     }
     return _post(payload, to_phone_e164=to_phone_e164)
 
+
 def send_buttons(
     to_phone_e164: str,
     *,
@@ -116,7 +110,7 @@ def send_buttons(
     buttons: list[dict],  # [{"id":"AI:123:done","title":"✅ Feito"}, ...]
 ) -> dict:
     """
-    Envia mensagem interativa com botões (reply buttons).
+    Reply buttons: limite prático do WhatsApp é 3 botões.
     """
     interactive = {
         "type": "button",
@@ -127,6 +121,40 @@ def send_buttons(
                 for b in buttons
             ]
         },
+    }
+    if header:
+        interactive["header"] = {"type": "text", "text": header}
+    if footer:
+        interactive["footer"] = {"text": footer}
+
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": str(to_phone_e164),
+        "type": "interactive",
+        "interactive": interactive,
+    }
+    return _post(payload, to_phone_e164=to_phone_e164)
+
+
+def send_list(
+    to_phone_e164: str,
+    *,
+    body: str,
+    button_text: str,
+    sections: list[dict],
+    header: str | None = None,
+    footer: str | None = None,
+) -> dict:
+    """
+    Interactive List: ideal para selecionar 1 item dentre N.
+    sections = [
+      {"title": "Seção", "rows": [{"id":"X:1","title":"Item", "description":"..."}]}
+    ]
+    """
+    interactive = {
+        "type": "list",
+        "body": {"text": body},
+        "action": {"button": button_text, "sections": sections},
     }
     if header:
         interactive["header"] = {"type": "text", "text": header}

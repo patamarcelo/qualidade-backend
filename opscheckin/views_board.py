@@ -1,10 +1,18 @@
+# opscheckin/board.py (ou onde estiver essa view)
 from datetime import datetime
 from django.shortcuts import render, redirect
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 from django.contrib.admin.views.decorators import staff_member_required
+from django.db.models import Count, Q
 
-from .models import Manager, DailyCheckin, OutboundQuestion, InboundMessage, OutboundMessage
+from .models import (
+    Manager,
+    DailyCheckin,
+    OutboundQuestion,
+    InboundMessage,
+    OutboundMessage,
+)
 from .services.whatsapp import send_text
 from .services.templates import render_message
 
@@ -14,18 +22,13 @@ DEFAULT_MSG = (
     "Por favor poderia me mandar a sua agenda do dia?"
 )
 
-
 def _parse_date(s: str):
     try:
         return datetime.strptime(s, "%Y-%m-%d").date()
     except Exception:
         return None
 
-
 def _ticks_from_wa_status(wa_status: str):
-    """
-    Retorna (glyph, cssClass)
-    """
     s = (wa_status or "").strip().lower()
     if s == "read":
         return ("✓✓", "ticksRead")
@@ -36,7 +39,6 @@ def _ticks_from_wa_status(wa_status: str):
     if s == "failed":
         return ("⚠", "ticksFail")
     return ("", "")
-
 
 def _build_full_timeline(checkin):
     items = []
@@ -50,7 +52,7 @@ def _build_full_timeline(checkin):
             "side": "right",
             "text": om.text,
             "is_outbound": True,
-            "meta": om.kind,
+            "meta": (om.kind or ""),
             "ticks": glyph,
             "ticks_class": cls,
         })
@@ -62,19 +64,33 @@ def _build_full_timeline(checkin):
             "side": "left",
             "text": im.text,
             "is_outbound": False,
-            "meta": "",
+            "meta": (im.msg_type or ""),  # útil p/ ver "interactive" etc
             "ticks": "",
             "ticks_class": "",
         })
 
     items.sort(key=lambda x: x["ts"] or timezone.now())
-
     for it in items:
         ts = it["ts"] or timezone.now()
         it["label"] = timezone.localtime(ts).strftime("%H:%M")
-
     return items
 
+def _badge_for_q(q):
+    """
+    Retorna (label, cssClass) para OutboundQuestion.
+    """
+    if not q:
+        return ("—", "badge")
+    s = (q.status or "").strip().lower()
+    if s == "answered":
+        # se foi auto: texto "ok (auto)" ou "ok(auto)" etc
+        at = (q.answer_text or "").lower()
+        if "auto" in at:
+            return ("answered(auto)", "badge b-ok")
+        return ("answered", "badge b-ok")
+    if s == "missed":
+        return ("missed", "badge b-danger")
+    return ("pending", "badge b-warn")
 
 @staff_member_required
 @require_http_methods(["GET", "POST"])
@@ -84,15 +100,14 @@ def board_view(request):
 
     managers = Manager.objects.all().order_by("name")
 
-    # POST envio manual (massa OU por coluna)
+    # POST envio manual
     if request.method == "POST":
         now = timezone.now()
 
-        mode = (request.POST.get("mode") or "").strip()  # "bulk" | "single"
+        mode = (request.POST.get("mode") or "").strip()  # bulk | single
         msg_bulk = (request.POST.get("message_bulk") or "").strip()
         msg_single = (request.POST.get("message_single") or "").strip()
 
-        # fallback para evitar vazio
         if mode == "bulk":
             msg_tpl = msg_bulk or DEFAULT_MSG
             ids = request.POST.getlist("manager_ids")
@@ -106,7 +121,6 @@ def board_view(request):
             checkin, _ = DailyCheckin.objects.get_or_create(manager=m, date=day)
             final_msg = render_message(msg_tpl, m)
 
-            # opcional: manter um OutboundQuestion "MANUAL" (fica bom para auditoria)
             q = OutboundQuestion.objects.create(
                 checkin=checkin,
                 step="MANUAL",
@@ -116,12 +130,10 @@ def board_view(request):
                 prompt_text=final_msg,
             )
 
-            # envia e captura wamid
             resp = None
             try:
                 resp = send_text(m.phone_e164, final_msg)
             except Exception as e:
-                # registra outbound failed mesmo assim
                 OutboundMessage.objects.create(
                     manager=m,
                     checkin=checkin,
@@ -136,7 +148,6 @@ def board_view(request):
                 )
                 continue
 
-            # extrai wamid
             wamid = ""
             try:
                 wamid = ((resp or {}).get("messages") or [{}])[0].get("id") or ""
@@ -154,7 +165,6 @@ def board_view(request):
                 sent_at=now,
                 raw_response=resp,
             )
-
             if wamid:
                 data["wa_status"] = "sent"
                 data["wa_sent_at"] = now
@@ -163,7 +173,9 @@ def board_view(request):
 
         return redirect(f"{request.path}?date={day.isoformat()}")
 
-    # Pré-carrega tudo
+    # =========================
+    # Pré-carrega checkins
+    # =========================
     checkins = (
         DailyCheckin.objects
         .filter(date=day)
@@ -172,20 +184,64 @@ def board_view(request):
     )
     by_manager = {c.manager_id: c for c in checkins}
 
+    # stats dos AgendaItem (1 query)
+    # se não existir AgendaItem no app, comente esse bloco
+    try:
+        from .models import AgendaItem
+        item_stats = (
+            AgendaItem.objects
+            .filter(checkin__date=day)
+            .values("checkin_id")
+            .annotate(
+                total=Count("id"),
+                open=Count("id", filter=Q(status="open")),
+                done=Count("id", filter=Q(status="done")),
+                skip=Count("id", filter=Q(status="skip")),
+            )
+        )
+        stats_by_checkin = {x["checkin_id"]: x for x in item_stats}
+    except Exception:
+        stats_by_checkin = {}
+
     cols = []
     for m in managers:
         c = by_manager.get(m.id)
         if not c:
-            cols.append({"manager": m, "timeline": [], "agenda_q": None})
+            cols.append({
+                "manager": m,
+                "timeline": [],
+                "agenda_q": None,
+                "confirm_q": None,
+                "agenda_badge": ("—", "badge"),
+                "confirm_badge": ("—", "badge"),
+                "items": {"total": 0, "open": 0, "done": 0, "skip": 0},
+            })
             continue
 
         timeline = _build_full_timeline(c)
+
         agenda_q = c.questions.filter(step="AGENDA").order_by("-id").first()
+        confirm_q = c.questions.filter(step="AGENDA_CONFIRM").order_by("-id").first()
+
+        agenda_badge = _badge_for_q(agenda_q)
+        confirm_badge = _badge_for_q(confirm_q)
+
+        st = stats_by_checkin.get(c.id) or {}
+        items = {
+            "total": int(st.get("total") or 0),
+            "open": int(st.get("open") or 0),
+            "done": int(st.get("done") or 0),
+            "skip": int(st.get("skip") or 0),
+        }
 
         cols.append({
             "manager": m,
             "timeline": timeline,
             "agenda_q": agenda_q,
+            "confirm_q": confirm_q,
+            "agenda_badge": agenda_badge,
+            "confirm_badge": confirm_badge,
+            "items": items,
         })
 
     return render(request, "opscheckin/board.html", {
