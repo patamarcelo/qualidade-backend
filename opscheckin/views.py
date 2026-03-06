@@ -19,7 +19,7 @@ from .models import (
     OutboundMessage,
 )
 
-from opscheckin.services.whatsapp import send_buttons, send_text
+from opscheckin.services.whatsapp import send_buttons, send_text, send_list
 
 logger = logging.getLogger("opscheckin.whatsapp")
 
@@ -40,19 +40,37 @@ CMD_ADD2 = re.compile(r"^(adicionar|add)\s*[:\-]\s*(.+)$", re.I)
 CMD_LIST = re.compile(r"^(listar|status|lista)\s*$", re.I)
 
 
+def _mark_inbound_processed(inbound, now, *, linked_question=None):
+    fields = ["processed", "processed_at"]
+    inbound.processed = True
+    inbound.processed_at = now
+
+    if linked_question is not None:
+        inbound.linked_question = linked_question
+        fields.append("linked_question")
+
+    inbound.save(update_fields=fields)
+
+
+def _wa_row_title(idx: int, text: str, prefix: str = "") -> str:
+    raw = f"{prefix}{idx}) {(text or '').strip()}".strip()
+    return raw[:24].rstrip()
+
+
+def _wa_row_desc(text: str) -> str:
+    s = (text or "").strip()
+    return (s[:72] + "…") if len(s) > 72 else s
 
 
 def _handle_director_action(*, manager, reply_id: str, now) -> bool:
     from django.utils import timezone
     from opscheckin.services.recipients import managers_subscribed
     from opscheckin.services.director_agenda_summary import build_director_agenda_summary
-    from opscheckin.services.whatsapp import send_buttons
 
     rid = (reply_id or "").strip().upper()
     if rid != "DIR:REFRESH":
         return False
 
-    # só deixa executar se a pessoa estiver inscrita como diretor
     is_director = manager.notification_subscriptions.filter(
         notification_type__code="agenda_summary_director",
         notification_type__is_active=True,
@@ -64,7 +82,7 @@ def _handle_director_action(*, manager, reply_id: str, now) -> bool:
         return True
 
     day = timezone.localdate()
-    managers = list(managers_subscribed("agenda_prompt"))
+    managers = list(managers_subscribed("agenda_prompt").order_by("name"))
 
     if not managers:
         send_text(manager.phone_e164, "Não encontrei managers inscritos para montar o resumo.")
@@ -80,7 +98,6 @@ def _handle_director_action(*, manager, reply_id: str, now) -> bool:
         ],
     )
 
-    # reaproveita seu logger/outbound do arquivo
     _log_outbound_interactive(
         manager=manager,
         checkin=None,
@@ -90,18 +107,6 @@ def _handle_director_action(*, manager, reply_id: str, now) -> bool:
     )
 
     return True
-
-
-def _mark_inbound_processed(inbound, now, *, linked_question=None):
-    fields = ["processed", "processed_at"]
-    inbound.processed = True
-    inbound.processed_at = now
-
-    if linked_question is not None:
-        inbound.linked_question = linked_question
-        fields.append("linked_question")
-
-    inbound.save(update_fields=fields)
 
 
 def _agenda_reply_text(checkin):
@@ -117,6 +122,7 @@ def _agenda_reply_text(checkin):
         lines.append(f"{mark} {it.idx}) {it.text}")
 
     return "Agenda de hoje:\n" + "\n".join(lines)
+
 
 def _send_agenda_snapshot(manager, checkin, header: str = "") -> bool:
     """
@@ -138,6 +144,161 @@ def _send_agenda_snapshot(manager, checkin, header: str = "") -> bool:
         return False
 
 
+def _send_agenda_action_menu(manager, checkin):
+    body = "O que você quer fazer agora na agenda?"
+
+    resp = send_buttons(
+        manager.phone_e164,
+        body=body,
+        buttons=[
+            {"id": "AM:MENU:DONE", "title": "✅ Concluir"},
+            {"id": "AM:MENU:UNDO", "title": "↩️ Desmarcar"},
+            {"id": "AM:MENU:REMOVE", "title": "🗑️ Remover"},
+        ],
+    )
+
+    _log_outbound_interactive(
+        manager=manager,
+        checkin=checkin,
+        body=body,
+        resp=resp,
+        kind="agenda_actions",
+    )
+
+    return True
+
+
+def _send_agenda_done_picker(manager, checkin):
+    from .models import AgendaItem
+
+    items = list(
+        AgendaItem.objects.filter(checkin=checkin, status="open")
+        .order_by("idx")[:10]
+    )
+
+    if not items:
+        send_text(manager.phone_e164, "Não há itens pendentes para concluir.")
+        _send_agenda_action_menu(manager, checkin)
+        return True
+
+    sections = [{
+        "title": "Itens pendentes",
+        "rows": [
+            {
+                "id": f"AM:DONE:{it.id}",
+                "title": _wa_row_title(it.idx, it.text),
+                "description": _wa_row_desc(it.text),
+            }
+            for it in items
+        ],
+    }]
+
+    body = "Selecione o item concluído:"
+    resp = send_list(
+        manager.phone_e164,
+        body=body,
+        button_text="Selecionar",
+        sections=sections,
+    )
+
+    _log_outbound_interactive(
+        manager=manager,
+        checkin=checkin,
+        body=body,
+        resp=resp,
+        kind="agenda_done_picker",
+    )
+
+    return True
+
+
+def _send_agenda_undo_picker(manager, checkin):
+    from .models import AgendaItem
+
+    items = list(
+        AgendaItem.objects.filter(checkin=checkin, status="done")
+        .order_by("idx")[:10]
+    )
+
+    if not items:
+        send_text(manager.phone_e164, "Nenhum item concluído para desmarcar.")
+        _send_agenda_action_menu(manager, checkin)
+        return True
+
+    sections = [{
+        "title": "Itens concluídos",
+        "rows": [
+            {
+                "id": f"AM:UNDO:{it.id}",
+                "title": _wa_row_title(it.idx, it.text),
+                "description": _wa_row_desc(it.text),
+            }
+            for it in items
+        ],
+    }]
+
+    body = "Selecione o item para reabrir:"
+    resp = send_list(
+        manager.phone_e164,
+        body=body,
+        button_text="Selecionar",
+        sections=sections,
+    )
+
+    _log_outbound_interactive(
+        manager=manager,
+        checkin=checkin,
+        body=body,
+        resp=resp,
+        kind="agenda_undo_picker",
+    )
+
+    return True
+
+
+def _send_agenda_remove_picker(manager, checkin):
+    from .models import AgendaItem
+
+    items = list(
+        AgendaItem.objects.filter(checkin=checkin)
+        .order_by("idx")[:10]
+    )
+
+    if not items:
+        send_text(manager.phone_e164, "Agenda vazia.")
+        return True
+
+    sections = [{
+        "title": "Remover item",
+        "rows": [
+            {
+                "id": f"AM:REMOVE:{it.id}",
+                "title": _wa_row_title(it.idx, it.text),
+                "description": _wa_row_desc(it.text),
+            }
+            for it in items
+        ],
+    }]
+
+    body = "Selecione o item para remover:"
+    resp = send_list(
+        manager.phone_e164,
+        body=body,
+        button_text="Selecionar",
+        sections=sections,
+    )
+
+    _log_outbound_interactive(
+        manager=manager,
+        checkin=checkin,
+        body=body,
+        resp=resp,
+        kind="agenda_remove_picker",
+    )
+
+    return True
+
+
 def _agenda_next_idx(checkin):
     from .models import AgendaItem
 
@@ -148,6 +309,98 @@ def _agenda_next_idx(checkin):
         .first()
     )
     return int(last or 0) + 1
+
+
+def _handle_agenda_menu_action(*, manager, checkin, reply_id: str, now):
+    from .models import AgendaItem
+
+    if reply_id == "AM:MENU:DONE":
+        return _send_agenda_done_picker(manager, checkin)
+
+    if reply_id == "AM:MENU:UNDO":
+        return _send_agenda_undo_picker(manager, checkin)
+
+    if reply_id == "AM:MENU:REMOVE":
+        return _send_agenda_remove_picker(manager, checkin)
+
+    if reply_id.startswith("AM:DONE:"):
+        try:
+            item_id = int(reply_id.split(":")[2])
+        except Exception:
+            return False
+
+        it = AgendaItem.objects.filter(id=item_id, checkin=checkin).first()
+        if not it:
+            send_text(manager.phone_e164, "Não achei esse item.")
+            return True
+
+        if it.status == "done":
+            logger.warning(
+                "AGENDA_MENU_DUPLICATE_DONE_IGNORED manager=%s checkin_id=%s item_id=%s idx=%s",
+                getattr(manager, "name", ""),
+                getattr(checkin, "id", None),
+                it.id,
+                it.idx,
+            )
+            return True
+
+        it.status = "done"
+        it.done_at = now
+        it.save(update_fields=["status", "done_at"])
+
+        _send_agenda_snapshot(manager, checkin, header=f"✅ Item concluído: {it.idx}) {it.text}")
+        _send_agenda_action_menu(manager, checkin)
+        return True
+
+    if reply_id.startswith("AM:UNDO:"):
+        try:
+            item_id = int(reply_id.split(":")[2])
+        except Exception:
+            return False
+
+        it = AgendaItem.objects.filter(id=item_id, checkin=checkin).first()
+        if not it:
+            send_text(manager.phone_e164, "Não achei esse item.")
+            return True
+
+        if it.status == "open":
+            logger.warning(
+                "AGENDA_MENU_DUPLICATE_UNDO_IGNORED manager=%s checkin_id=%s item_id=%s idx=%s",
+                getattr(manager, "name", ""),
+                getattr(checkin, "id", None),
+                it.id,
+                it.idx,
+            )
+            return True
+
+        it.status = "open"
+        it.done_at = None
+        it.save(update_fields=["status", "done_at"])
+
+        _send_agenda_snapshot(manager, checkin, header=f"↩️ Item reaberto: {it.idx}) {it.text}")
+        _send_agenda_action_menu(manager, checkin)
+        return True
+
+    if reply_id.startswith("AM:REMOVE:"):
+        try:
+            item_id = int(reply_id.split(":")[2])
+        except Exception:
+            return False
+
+        it = AgendaItem.objects.filter(id=item_id, checkin=checkin).first()
+        if not it:
+            send_text(manager.phone_e164, "Não achei esse item.")
+            return True
+
+        txt = it.text
+        idx = it.idx
+        it.delete()
+
+        _send_agenda_snapshot(manager, checkin, header=f"🗑️ Item removido: {idx}) {txt}")
+        _send_agenda_action_menu(manager, checkin)
+        return True
+
+    return False
 
 
 def _handle_agenda_text_command(manager, checkin, text, now):
@@ -176,10 +429,21 @@ def _handle_agenda_text_command(manager, checkin, text, now):
         if not it:
             send_text(manager.phone_e164, f"Não achei o item {idx}. Envie 'listar' para ver.")
             return True
+
+        if it.status == "done":
+            logger.warning(
+                "AGENDA_TEXT_DUPLICATE_DONE_IGNORED manager=%s checkin_id=%s idx=%s",
+                getattr(manager, "name", ""),
+                getattr(checkin, "id", None),
+                it.idx,
+            )
+            return True
+
         it.status = "done"
         it.done_at = now
         it.save(update_fields=["status", "done_at"])
         _send_agenda_snapshot(manager, checkin, header=f"✅ Item concluído: {it.idx}) {it.text}")
+        _send_agenda_action_menu(manager, checkin)
         return True
 
     m = CMD_SKIP.match(t)
@@ -193,6 +457,7 @@ def _handle_agenda_text_command(manager, checkin, text, now):
         it.done_at = now
         it.save(update_fields=["status", "done_at"])
         _send_agenda_snapshot(manager, checkin, header=f"⛔ Item pulado: {it.idx}) {it.text}")
+        _send_agenda_action_menu(manager, checkin)
         return True
 
     m = CMD_REMOVE.match(t)
@@ -202,8 +467,10 @@ def _handle_agenda_text_command(manager, checkin, text, now):
         if not it:
             send_text(manager.phone_e164, f"Não achei o item {idx}.")
             return True
+        txt = it.text
         it.delete()
-        send_text(manager.phone_e164, f"Item {idx} removido. Envie 'listar' para ver a agenda.")
+        _send_agenda_snapshot(manager, checkin, header=f"🗑️ Item removido: {idx}) {txt}")
+        _send_agenda_action_menu(manager, checkin)
         return True
 
     m = CMD_EDIT.match(t)
@@ -216,7 +483,8 @@ def _handle_agenda_text_command(manager, checkin, text, now):
             return True
         it.text = new_text
         it.save(update_fields=["text"])
-        send_text(manager.phone_e164, f"Item {idx} atualizado ✅")
+        _send_agenda_snapshot(manager, checkin, header=f"✏️ Item {idx} atualizado")
+        _send_agenda_action_menu(manager, checkin)
         return True
 
     m = CMD_ADD1.match(t) or CMD_ADD2.match(t)
@@ -227,7 +495,8 @@ def _handle_agenda_text_command(manager, checkin, text, now):
             return True
         idx = _agenda_next_idx(checkin)
         AgendaItem.objects.create(checkin=checkin, idx=idx, text=new_text, status="open")
-        send_text(manager.phone_e164, f"Adicionado como item {idx} ✅")
+        _send_agenda_snapshot(manager, checkin, header=f"➕ Adicionado como item {idx}")
+        _send_agenda_action_menu(manager, checkin)
         return True
 
     return False
@@ -354,6 +623,7 @@ def _handle_agenda_item_action(*, manager, checkin, reply_id: str, now):
         return False
 
     _send_agenda_snapshot(manager, checkin, header=header)
+    _send_agenda_action_menu(manager, checkin)
     return True
 
 
@@ -364,10 +634,6 @@ def _handle_agenda_item_action(*, manager, checkin, reply_id: str, now):
 # - progresso:   AP:DONE:<agenda_item_id>
 
 def _get_or_create_confirm_q(checkin, *, now):
-    """
-    Segurança: se por qualquer motivo não existir AGENDA_CONFIRM,
-    cria e mantém auditoria.
-    """
     q = checkin.questions.filter(step="AGENDA_CONFIRM").order_by("-id").first()
     if q:
         return q
@@ -388,7 +654,6 @@ def _append_confirm_answer(q: OutboundQuestion, line: str):
 
 def _handle_confirm_action(*, manager, checkin, reply_id: str, now) -> bool:
     from .models import AgendaItem
-    from opscheckin.services.whatsapp import send_text, send_list
 
     if reply_id == "AC:OK":
         q = checkin.questions.filter(step="AGENDA_CONFIRM").order_by("-id").first()
@@ -399,6 +664,7 @@ def _handle_confirm_action(*, manager, checkin, reply_id: str, now) -> bool:
             q.save(update_fields=["status", "answered_at", "answer_text"])
 
         send_text(manager.phone_e164, "Perfeito ✅ Vou acompanhar durante o dia.")
+        _send_agenda_action_menu(manager, checkin)
         return True
 
     if reply_id.startswith("AC:RM:"):
@@ -415,16 +681,11 @@ def _handle_confirm_action(*, manager, checkin, reply_id: str, now) -> bool:
         removed_label = f"{it.idx}) {it.text[:80]}"
         it.delete()
 
-        # 1) confirma remoção
-        send_text(manager.phone_e164, f"Item removido ✅ ({removed_label})")
-
-        # 2) reenviar lista atualizada (mesma confirmação)
         items = list(AgendaItem.objects.filter(checkin=checkin).order_by("idx")[:20])
         if not items:
             send_text(manager.phone_e164, "Agenda ficou vazia. Se quiser, envie + texto para adicionar itens.")
             return True
 
-        # preview curtinha
         preview_lines = [f"{x.idx}) {x.text}" for x in items[:12]]
         if len(items) > 12:
             preview_lines.append("…")
@@ -449,23 +710,32 @@ def _handle_confirm_action(*, manager, checkin, reply_id: str, now) -> bool:
                 "rows": [
                     {
                         "id": f"AC:RM:{x.id}",
-                        "title": f"⛔ Remover {x.idx})",
-                        "description": (x.text[:60] + "…") if len(x.text) > 60 else x.text,
+                        "title": f"⛔ Remover {x.idx})"[:24],
+                        "description": _wa_row_desc(x.text),
                     }
-                    for x in items
+                    for x in items[:10]
                 ],
             },
         ]
 
-        send_list(
+        resp = send_list(
             manager.phone_e164,
             body=body,
             button_text="Abrir opções",
             sections=sections,
         )
+
+        _log_outbound_interactive(
+            manager=manager,
+            checkin=checkin,
+            body=body,
+            resp=resp,
+            kind="agenda_confirm_refresh",
+        )
         return True
 
     return False
+
 
 def _handle_progress_action(*, manager, checkin, reply_id: str, now) -> bool:
     from .models import AgendaItem
@@ -491,7 +761,6 @@ def _handle_progress_action(*, manager, checkin, reply_id: str, now) -> bool:
             )
         return True
 
-    # idempotência: se já está done, não manda snapshot de novo
     if it.status == "done":
         logger.warning(
             "PROGRESS_DUPLICATE_IGNORED manager=%s checkin_id=%s item_id=%s idx=%s",
@@ -508,8 +777,8 @@ def _handle_progress_action(*, manager, checkin, reply_id: str, now) -> bool:
 
     header = f"✅ Item concluído: {it.idx}) {it.text}"
     _send_agenda_snapshot(manager, checkin, header=header)
+    _send_agenda_action_menu(manager, checkin)
     return True
-
 
 
 # =========================
@@ -709,7 +978,6 @@ def _parse_agenda_lines(text: str) -> list[str]:
         if not s:
             continue
 
-        # remove bullets / numeração
         s = re.sub(r"^\s*(?:[-•*]+|\d{1,2}\s*[.)-]?)\s*", "", s).strip()
         if not s:
             continue
@@ -722,7 +990,6 @@ def _parse_agenda_lines(text: str) -> list[str]:
 
         lines.append(s[:280])
 
-    # dedupe preservando ordem
     seen = set()
     out = []
     for s in lines:
@@ -762,7 +1029,6 @@ def whatsapp_webhook(request):
         if raw:
             logger.warning("WHATSAPP_WEBHOOK body=%s", raw[:4000])
 
-        # GET verify
         if request.method == "GET":
             mode = request.GET.get("hub.mode")
             token = request.GET.get("hub.verify_token")
@@ -785,7 +1051,6 @@ def whatsapp_webhook(request):
             logger.exception("WHATSAPP_WEBHOOK_INVALID_JSON")
             return JsonResponse({"ok": True})
 
-        # 1) status callbacks
         statuses = _extract_statuses_from_meta(payload)
         if statuses:
             try:
@@ -802,7 +1067,6 @@ def whatsapp_webhook(request):
             except Exception:
                 logger.exception("WHATSAPP_WEBHOOK failed to apply statuses")
 
-        # 2) inbound messages
         msgs = _extract_messages_from_meta(payload)
         if not msgs:
             return JsonResponse({"ok": True})
@@ -819,7 +1083,6 @@ def whatsapp_webhook(request):
                 msg_type = (msg.get("msg_type") or "text").strip() or "text"
                 reply_id = (msg.get("reply_id") or "").strip()
 
-                
                 manager = Manager.objects.filter(phone_e164=from_phone, is_active=True).first()
                 checkin = None
                 if manager:
@@ -854,7 +1117,6 @@ def whatsapp_webhook(request):
                         **inbound_defaults,
                     )
 
-                # sem manager/checkin: só registra inbound
                 if not manager or not checkin:
                     _mark_inbound_processed(inbound, now)
                     continue
@@ -865,6 +1127,16 @@ def whatsapp_webhook(request):
 
                 if reply_id.startswith("DIR:"):
                     if _handle_director_action(manager=manager, reply_id=reply_id, now=now):
+                        _mark_inbound_processed(inbound, now)
+                        continue
+
+                if reply_id.startswith("AM:"):
+                    if _handle_agenda_menu_action(
+                        manager=manager,
+                        checkin=checkin,
+                        reply_id=reply_id,
+                        now=now,
+                    ):
                         _mark_inbound_processed(inbound, now)
                         continue
 
@@ -919,7 +1191,6 @@ def whatsapp_webhook(request):
                 pending.answer_text = cur if not prev else (prev + "\n" + cur)
 
                 became_answered = False
-
                 combined = (pending.answer_text or "").strip()
                 parsed_items = _parse_agenda_lines(combined)
 
@@ -940,9 +1211,6 @@ def whatsapp_webhook(request):
                     else:
                         pending.save(update_fields=["answer_text"])
 
-                # ==========
-                # 4) se AGENDA virou answered -> cria itens
-                # ==========
                 if became_answered and pending.step == "AGENDA":
                     from .models import AgendaItem
 
@@ -973,8 +1241,6 @@ def whatsapp_webhook(request):
                         _mark_inbound_processed(inbound, now)
                 except Exception:
                     logger.exception("WHATSAPP_WEBHOOK_MSG_FAILED_MARK_PROCESSED")
-
-                # importante: segue o loop e no final devolve 200
                 continue
 
         return JsonResponse({"ok": True})
