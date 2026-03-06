@@ -8,10 +8,61 @@ from django.core.exceptions import ValidationError
 def only_digits(v: str) -> str:
     return re.sub(r"\D+", "", str(v or ""))
 
+class NotificationType(models.Model):
+    code = models.CharField(max_length=60, unique=True)
+    name = models.CharField(max_length=120)
+    description = models.CharField(max_length=255, blank=True, default="")
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["code"]
+        verbose_name = "Tipo de notificação"
+        verbose_name_plural = "Tipos de notificação"
+
+    def __str__(self):
+        return f"{self.name} - {self.code}"
+
+
+class ManagerNotificationSubscription(models.Model):
+    manager = models.ForeignKey(
+        "Manager",
+        on_delete=models.CASCADE,
+        related_name="notification_subscriptions",
+    )
+    notification_type = models.ForeignKey(
+        "NotificationType",
+        on_delete=models.CASCADE,
+        related_name="subscriptions",
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = [("manager", "notification_type")]
+        indexes = [
+            models.Index(fields=["manager", "is_active"]),
+            models.Index(fields=["notification_type", "is_active"]),
+        ]
+        verbose_name = "Assinatura de notificação"
+        verbose_name_plural = "Assinaturas de notificações"
+
+    def __str__(self):
+        return f"{self.manager.name} -> {self.notification_type.code}"
+
+
+
+
 class Manager(models.Model):
     name = models.CharField(max_length=80)
     phone_e164 = models.CharField(max_length=20, unique=True)  # ex: 5551999999999
     is_active = models.BooleanField(default=True)
+    
+    notification_types = models.ManyToManyField(
+        "NotificationType",
+        through="ManagerNotificationSubscription",
+        blank=True,
+        related_name="managers",
+    )
     
     def clean(self):
         super().clean()

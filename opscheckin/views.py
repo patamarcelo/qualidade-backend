@@ -40,6 +40,58 @@ CMD_ADD2 = re.compile(r"^(adicionar|add)\s*[:\-]\s*(.+)$", re.I)
 CMD_LIST = re.compile(r"^(listar|status|lista)\s*$", re.I)
 
 
+
+
+def _handle_director_action(*, manager, reply_id: str, now) -> bool:
+    from django.utils import timezone
+    from opscheckin.services.recipients import managers_subscribed
+    from opscheckin.services.director_agenda_summary import build_director_agenda_summary
+    from opscheckin.services.whatsapp import send_buttons
+
+    rid = (reply_id or "").strip().upper()
+    if rid != "DIR:REFRESH":
+        return False
+
+    # só deixa executar se a pessoa estiver inscrita como diretor
+    is_director = manager.notification_subscriptions.filter(
+        notification_type__code="agenda_summary_director",
+        notification_type__is_active=True,
+        is_active=True,
+    ).exists()
+
+    if not is_director:
+        send_text(manager.phone_e164, "Você não está habilitado para receber o resumo das agendas.")
+        return True
+
+    day = timezone.localdate()
+    managers = list(managers_subscribed("agenda_prompt"))
+
+    if not managers:
+        send_text(manager.phone_e164, "Não encontrei managers inscritos para montar o resumo.")
+        return True
+
+    body = build_director_agenda_summary(day=day, managers=managers)
+
+    resp = send_buttons(
+        manager.phone_e164,
+        body=body,
+        buttons=[
+            {"id": "DIR:REFRESH", "title": "🔄 Atualizar agendas"},
+        ],
+    )
+
+    # reaproveita seu logger/outbound do arquivo
+    _log_outbound_interactive(
+        manager=manager,
+        checkin=None,
+        body=body,
+        resp=resp,
+        kind="agenda_summary_director",
+    )
+
+    return True
+
+
 def _agenda_reply_text(checkin):
     from .models import AgendaItem
 
@@ -746,6 +798,14 @@ def whatsapp_webhook(request):
         # ==========
         # 1) actions via reply_id (ordem importa)
         # ==========
+        
+        if reply_id.startswith("DIR:"):
+            if _handle_director_action(manager=manager, reply_id=reply_id, now=now):
+                inbound.processed = True
+                inbound.processed_at = now
+                inbound.save(update_fields=["processed", "processed_at"])
+                continue
+
 
         if reply_id.startswith("AI:"):
             _handle_agenda_item_action(manager=manager, checkin=checkin, reply_id=reply_id, now=now)

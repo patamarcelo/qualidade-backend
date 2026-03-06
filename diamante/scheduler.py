@@ -20,6 +20,7 @@ from opscheckin.cron import (
     run_opscheckin_reminders,         # ✅ reminders cravados 06:15/06:30/06:45/07:00
     run_opscheckin_agenda_followups,  # ✅ follow-up (tick) itens/agenda durante o dia
     run_opscheckin_agenda_confirm,   # ✅ ADD
+    run_opscheckin_director_agenda_summary
 
 )
 
@@ -195,6 +196,18 @@ def start():
                 hour="6-18",
                 minute="*/2",  # a cada 2 min (pode ser */1 se quiser bem responsivo)
                 id="opscheckin_agenda_confirm_tick",
+                replace_existing=True,
+                misfire_grace_time=600,
+                coalesce=True,
+                max_instances=1,
+            )
+            scheduler.add_job(
+                run_opscheckin_director_agenda_summary,
+                "cron",
+                day_of_week="*",
+                hour="7",
+                minute="30",
+                id="opscheckin_director_agenda_summary_0730",
                 replace_existing=True,
                 misfire_grace_time=600,
                 coalesce=True,

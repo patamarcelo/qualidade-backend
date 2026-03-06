@@ -8,7 +8,8 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 from django.db.models import Q
 
-from opscheckin.models import Manager, DailyCheckin, InboundMessage, OutboundMessage
+from opscheckin.models import  DailyCheckin, InboundMessage, OutboundMessage
+from opscheckin.services.recipients import managers_subscribed
 from opscheckin.services.whatsapp import send_list
 
 logger = logging.getLogger("opscheckin.agenda_tick")
@@ -114,6 +115,25 @@ def _log_outbound_interactive(*, manager, checkin, body, resp, kind="agenda_foll
         data["wa_sent_at"] = now
 
     OutboundMessage.objects.create(**data)
+    
+
+
+def _wa_list_row_title(idx: int, text: str) -> str:
+    """
+    WhatsApp list row title: máximo 24 chars.
+    Ex.: '✅ 3) Ajuste cronogr'
+    """
+    raw = f"✅ {idx}) {(text or '').strip()}"
+    return raw[:24].rstrip()
+
+
+def _wa_list_row_description(text: str) -> str:
+    """
+    Description pode ser maior; mantemos curta para leitura.
+    """
+    s = (text or "").strip()
+    return (s[:72] + "…") if len(s) > 72 else s
+
 
 
 def _send_followup_list(manager, checkin):
@@ -138,8 +158,8 @@ def _send_followup_list(manager, checkin):
             "rows": [
                 {
                     "id": f"AP:DONE:{it.id}",
-                    "title": f"✅ {it.idx}) {it.text[:60]}",
-                    "description": (it.text[:60] + "…") if len(it.text) > 60 else it.text,
+                    "title": _wa_list_row_title(it.idx, it.text),
+                    "description": _wa_list_row_description(it.text),
                 }
                 for it in open_items
             ],
@@ -191,9 +211,11 @@ class Command(BaseCommand):
             self.stdout.write("[agenda_tick] out of operational window")
             return
 
-        qs = Manager.objects.all().order_by("name")
-        if not opts.get("include_inactive", False):
-            qs = qs.filter(is_active=True)
+        qs = managers_subscribed(
+            "agenda_followup",
+            include_inactive=opts.get("include_inactive", False),
+        )
+        
 
         from opscheckin.models import AgendaItem
 
@@ -238,4 +260,8 @@ class Command(BaseCommand):
             if ok:
                 sent += 1
 
-        self.stdout.write(self.style.SUCCESS(f"[agenda_tick] sent={sent} skipped={skipped}"))
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"[agenda_tick] managers={qs.count()} sent={sent} skipped={skipped}"
+            )
+        )

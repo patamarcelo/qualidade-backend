@@ -7,7 +7,8 @@ from datetime import datetime
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from opscheckin.models import Manager, DailyCheckin, OutboundQuestion, OutboundMessage
+from opscheckin.models import  DailyCheckin, OutboundQuestion, OutboundMessage
+from opscheckin.services.recipients import managers_subscribed
 from opscheckin.services.whatsapp import send_list
 
 logger = logging.getLogger("opscheckin.agenda_confirm_tick")
@@ -154,9 +155,11 @@ class Command(BaseCommand):
         send_after = int(opts["send_after_min"] or SEND_CONFIRM_AFTER_MINUTES)
         auto_ok_min = int(opts["auto_ok_min"] or AUTO_OK_MINUTES)
 
-        qs = Manager.objects.all().order_by("name")
-        if not opts.get("include_inactive", False):
-            qs = qs.filter(is_active=True)
+        qs = managers_subscribed(
+            "agenda_confirm",
+            include_inactive=opts.get("include_inactive", False),
+        )
+        
 
         sent = 0
         auto_ok = 0
@@ -205,4 +208,8 @@ class Command(BaseCommand):
                     conf_q.save(update_fields=["status", "answered_at", "answer_text"])
                     auto_ok += 1
 
-        self.stdout.write(self.style.SUCCESS(f"[agenda_confirm_tick] sent={sent} auto_ok={auto_ok}"))
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"[agenda_confirm_tick] managers={qs.count()} sent={sent} auto_ok={auto_ok}"
+            )
+        )

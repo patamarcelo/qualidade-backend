@@ -9,7 +9,8 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 from django.conf import settings
 
-from opscheckin.models import Manager, DailyCheckin, OutboundQuestion, OutboundMessage
+from opscheckin.models import  DailyCheckin, OutboundQuestion, OutboundMessage, Manager
+from opscheckin.services.recipients import managers_subscribed
 from opscheckin.services.whatsapp import send_text, send_template
 
 logger = logging.getLogger("opscheckin.checkin_tick")
@@ -452,69 +453,85 @@ class Command(BaseCommand):
         mark_missed_after_min = int(opts["mark_missed_after_min"] or MARK_MISSED_AFTER_MIN_DEFAULT)
         grace_seconds = int(opts["slot_grace_seconds"] or SLOT_GRACE_SECONDS_DEFAULT)
 
-        managers_qs = (
-            Manager.objects.all().order_by("name")
-            if include_inactive
-            else Manager.objects.filter(is_active=True).order_by("name")
+        agenda_managers_qs = managers_subscribed(
+            "agenda_prompt",
+            include_inactive=include_inactive,
+        )
+
+        reminder_managers_qs = managers_subscribed(
+            "agenda_reminder",
+            include_inactive=include_inactive,
         )
 
         self.stdout.write(
             f"[checkin_tick] day={day} now={now.isoformat()} local_now={local_now.isoformat()} "
-            f"managers={managers_qs.count()} include_inactive={include_inactive}"
+            f"agenda_managers={agenda_managers_qs.count()} "
+            f"reminder_managers={reminder_managers_qs.count()} "
+            f"include_inactive={include_inactive}"
         )
 
-        # Descobre se AGORA é um slot de reminder e qual expected_count
         current_slot = None
         for (hh, mm, expected_count) in REMINDER_SLOTS:
             if _is_in_slot(local_now, hh, mm, grace_seconds):
                 current_slot = (hh, mm, expected_count)
                 break
 
-        for m in managers_qs:
+        # 1) envio da agenda
+        for m in agenda_managers_qs:
             checkin = _ensure_checkin(m, day)
 
-            # 1) AGENDA às 06:00 (ou forçado)
-            agenda_q = (
-                checkin.questions
-                .filter(step="AGENDA")
-                .order_by("-scheduled_for", "-id")
-                .first()
-            )
             if not send_agenda_now and not _is_in_slot(local_now, AGENDA_HOUR, AGENDA_MINUTE, grace_seconds):
-                logger.warning("AGENDA_SKIP_NOT_IN_SLOT manager=%s now_local=%s slot=%02d:%02d grace=%ss",
-                            m.name, local_now.isoformat(), AGENDA_HOUR, AGENDA_MINUTE, grace_seconds)
-    
+                logger.warning(
+                    "AGENDA_SKIP_NOT_IN_SLOT manager=%s now_local=%s slot=%02d:%02d grace=%ss",
+                    m.name, local_now.isoformat(), AGENDA_HOUR, AGENDA_MINUTE, grace_seconds
+                )
+
             if send_agenda_now:
-                agenda_q = _send_agenda_if_needed(manager=m, checkin=checkin, now=now, agenda_text=agenda_text)
+                _send_agenda_if_needed(manager=m, checkin=checkin, now=now, agenda_text=agenda_text)
             else:
                 if _is_in_slot(local_now, AGENDA_HOUR, AGENDA_MINUTE, grace_seconds):
-                    agenda_q = _send_agenda_if_needed(manager=m, checkin=checkin, now=now, agenda_text=agenda_text)
+                    _send_agenda_if_needed(manager=m, checkin=checkin, now=now, agenda_text=agenda_text)
 
-            if not agenda_q:
-                continue
-
-            # 2) missed
-            _mark_missed_if_needed(agenda_q, now=now, mark_missed_after_min=mark_missed_after_min)
-
-            # 3) reminders cravados por reminder_count
-            if not current_slot:
-                continue
-
+        # 2) reminders
+        if current_slot:
             hh, mm, expected_count = current_slot
 
-            if agenda_q.reminder_count >= max_reminders:
-                continue
+            for m in reminder_managers_qs:
+                checkin = _ensure_checkin(m, day)
 
-            if agenda_q.reminder_count != expected_count:
-                continue
+                agenda_q = (
+                    checkin.questions
+                    .filter(step="AGENDA")
+                    .order_by("-scheduled_for", "-id")
+                    .first()
+                )
 
-            if _already_sent_in_this_slot(agenda_q, local_now=local_now, hour=hh, minute=mm, grace_seconds=grace_seconds):
-                continue
+                if not agenda_q:
+                    continue
 
-            if not _needs_followup(agenda_q, min_chars=min_chars):
-                continue
+                _mark_missed_if_needed(agenda_q, now=now, mark_missed_after_min=mark_missed_after_min)
 
-            _send_reminder(agenda_q, now=now, reminder_text=reminder_text)
-            self.stdout.write(f"  - reminder attempted slot={hh:02d}:{mm:02d} to {m.name} count={agenda_q.reminder_count}")
+                if agenda_q.reminder_count >= max_reminders:
+                    continue
+
+                if agenda_q.reminder_count != expected_count:
+                    continue
+
+                if _already_sent_in_this_slot(
+                    agenda_q,
+                    local_now=local_now,
+                    hour=hh,
+                    minute=mm,
+                    grace_seconds=grace_seconds,
+                ):
+                    continue
+
+                if not _needs_followup(agenda_q, min_chars=min_chars):
+                    continue
+
+                _send_reminder(agenda_q, now=now, reminder_text=reminder_text)
+                self.stdout.write(
+                    f"  - reminder attempted slot={hh:02d}:{mm:02d} to {m.name} count={agenda_q.reminder_count}"
+                )
 
         self.stdout.write(self.style.SUCCESS("[checkin_tick] done"))
