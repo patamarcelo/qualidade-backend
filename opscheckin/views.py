@@ -106,6 +106,25 @@ def _agenda_reply_text(checkin):
 
     return "Agenda de hoje:\n" + "\n".join(lines)
 
+def _send_agenda_snapshot(manager, checkin, header: str = "") -> bool:
+    """
+    Envia a agenda consolidada com ícones de status.
+    Nunca levanta exceção para não quebrar o webhook.
+    """
+    try:
+        body = _agenda_reply_text(checkin)
+        if header:
+            body = f"{header}\n\n{body}"
+        send_text(manager.phone_e164, body)
+        return True
+    except Exception:
+        logger.exception(
+            "SEND_AGENDA_SNAPSHOT_FAILED manager=%s checkin_id=%s",
+            getattr(manager, "name", ""),
+            getattr(checkin, "id", None),
+        )
+        return False
+
 
 def _agenda_next_idx(checkin):
     from .models import AgendaItem
@@ -148,7 +167,7 @@ def _handle_agenda_text_command(manager, checkin, text, now):
         it.status = "done"
         it.done_at = now
         it.save(update_fields=["status", "done_at"])
-        _send_next_agenda_item_prompt(manager, checkin)
+        _send_agenda_snapshot(manager, checkin, header=f"✅ Item concluído: {it.idx}) {it.text}")
         return True
 
     m = CMD_SKIP.match(t)
@@ -161,7 +180,7 @@ def _handle_agenda_text_command(manager, checkin, text, now):
         it.status = "skip"
         it.done_at = now
         it.save(update_fields=["status", "done_at"])
-        _send_next_agenda_item_prompt(manager, checkin)
+        _send_agenda_snapshot(manager, checkin, header=f"⛔ Item pulado: {it.idx}) {it.text}")
         return True
 
     m = CMD_REMOVE.match(t)
@@ -284,23 +303,38 @@ def _handle_agenda_item_action(*, manager, checkin, reply_id: str, now):
     if not it:
         return False
 
+    header = ""
+
     if action == "done":
         if it.status != "done":
             it.status = "done"
             it.done_at = now
             it.save(update_fields=["status", "done_at"])
+            header = f"✅ Item concluído: {it.idx}) {it.text}"
+        else:
+            header = f"ℹ️ Esse item já estava concluído: {it.idx}) {it.text}"
+
     elif action == "skip":
         if it.status != "skip":
             it.status = "skip"
             it.done_at = now
             it.save(update_fields=["status", "done_at"])
+            header = f"⛔ Item pulado: {it.idx}) {it.text}"
+        else:
+            header = f"ℹ️ Esse item já estava pulado: {it.idx}) {it.text}"
+
     elif action == "open":
         if it.status != "open":
             it.status = "open"
             it.done_at = None
             it.save(update_fields=["status", "done_at"])
+            header = f"⏳ Item reaberto: {it.idx}) {it.text}"
+        else:
+            header = f"ℹ️ Esse item já estava em aberto: {it.idx}) {it.text}"
+    else:
+        return False
 
-    _send_next_agenda_item_prompt(manager, checkin)
+    _send_agenda_snapshot(manager, checkin, header=header)
     return True
 
 
@@ -417,10 +451,10 @@ def _handle_confirm_action(*, manager, checkin, reply_id: str, now) -> bool:
 
 def _handle_progress_action(*, manager, checkin, reply_id: str, now) -> bool:
     from .models import AgendaItem
-    from opscheckin.services.whatsapp import send_text, send_list
 
     if not reply_id.startswith("AP:DONE:"):
         return False
+
     try:
         item_id = int(reply_id.split(":")[2])
     except Exception:
@@ -428,40 +462,31 @@ def _handle_progress_action(*, manager, checkin, reply_id: str, now) -> bool:
 
     it = AgendaItem.objects.filter(id=item_id, checkin=checkin).first()
     if not it:
-        return False
+        try:
+            send_text(manager.phone_e164, "Não achei esse item na agenda de hoje.")
+        except Exception:
+            logger.exception(
+                "PROGRESS_ITEM_NOT_FOUND_SEND_FAILED manager=%s checkin_id=%s item_id=%s",
+                getattr(manager, "name", ""),
+                getattr(checkin, "id", None),
+                item_id,
+            )
+        return True
 
+    changed = False
     if it.status != "done":
         it.status = "done"
         it.done_at = now
         it.save(update_fields=["status", "done_at"])
+        changed = True
 
-    # ✅ feedback imediato
-    send_text(manager.phone_e164, f"✅ Fechado: {it.idx}) {it.text[:80]}")
+    header = (
+        f"✅ Item concluído: {it.idx}) {it.text}"
+        if changed
+        else f"ℹ️ Esse item já estava concluído: {it.idx}) {it.text}"
+    )
 
-    # ✅ se ainda houver itens open, manda outra lista pra marcar outro
-    open_items = list(AgendaItem.objects.filter(checkin=checkin, status="open").order_by("idx")[:10])
-    if open_items:
-        body = "Quer marcar mais algum como concluído?"
-        sections = [{
-            "title": "Marcar como concluído",
-            "rows": [
-                {
-                    "id": f"AP:DONE:{x.id}",
-                    "title": f"✅ {x.idx}) {x.text[:60]}",
-                    "description": (x.text[:60] + "…") if len(x.text) > 60 else x.text,
-                }
-                for x in open_items
-            ],
-        }]
-        send_list(
-            manager.phone_e164,
-            body=body,
-            button_text="Selecionar item",
-            sections=sections,
-        )
-    else:
-        send_text(manager.phone_e164, "🎉 Agenda do dia finalizada! Se precisar, envie + para adicionar item.")
-
+    _send_agenda_snapshot(manager, checkin, header=header)
     return True
 
 
