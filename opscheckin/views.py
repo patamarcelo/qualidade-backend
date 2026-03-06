@@ -92,6 +92,18 @@ def _handle_director_action(*, manager, reply_id: str, now) -> bool:
     return True
 
 
+def _mark_inbound_processed(inbound, now, *, linked_question=None):
+    fields = ["processed", "processed_at"]
+    inbound.processed = True
+    inbound.processed_at = now
+
+    if linked_question is not None:
+        inbound.linked_question = linked_question
+        fields.append("linked_question")
+
+    inbound.save(update_fields=fields)
+
+
 def _agenda_reply_text(checkin):
     from .models import AgendaItem
 
@@ -723,216 +735,229 @@ def _local_today():
 @csrf_exempt
 def whatsapp_webhook(request):
     try:
-        raw = request.body.decode("utf-8", errors="replace") if request.body else ""
-    except Exception:
-        raw = ""
-
-    logger.warning(
-        "WHATSAPP_WEBHOOK hit method=%s path=%s query=%s content_type=%s len=%s xhub=%s",
-        request.method,
-        request.path,
-        request.META.get("QUERY_STRING", ""),
-        request.META.get("CONTENT_TYPE", ""),
-        len(request.body or b""),
-        (request.headers.get("X-Hub-Signature-256", "") or "")[:32],
-    )
-    if raw:
-        logger.warning("WHATSAPP_WEBHOOK body=%s", raw[:4000])
-
-    # GET verify
-    if request.method == "GET":
-        mode = request.GET.get("hub.mode")
-        token = request.GET.get("hub.verify_token")
-        challenge = request.GET.get("hub.challenge")
-
-        verify_token = getattr(settings, "WHATSAPP_VERIFY_TOKEN", "")
-        if mode == "subscribe" and token and token == verify_token and challenge:
-            return HttpResponse(challenge, status=200)
-        return HttpResponse("forbidden", status=403)
-
-    if request.method != "POST":
-        return JsonResponse({"ok": True})
-
-    if not _verify_meta_signature(request):
-        return HttpResponse("invalid signature", status=403)
-
-    try:
-        payload = json.loads(request.body.decode("utf-8") or "{}")
-    except Exception:
-        return JsonResponse({"ok": True})
-
-    # 1) status callbacks
-    statuses = _extract_statuses_from_meta(payload)
-    if statuses:
         try:
-            with transaction.atomic():
-                applied = 0
-                for st in statuses:
-                    if _apply_status_to_outbound(st):
-                        applied += 1
-            logger.warning(
-                "WHATSAPP_WEBHOOK statuses_received=%s statuses_applied=%s",
-                len(statuses),
-                applied,
-            )
+            raw = request.body.decode("utf-8", errors="replace") if request.body else ""
         except Exception:
-            logger.exception("WHATSAPP_WEBHOOK failed to apply statuses")
+            raw = ""
 
-    # 2) inbound messages
-    msgs = _extract_messages_from_meta(payload)
-    if not msgs:
-        return JsonResponse({"ok": True})
-
-    today = _local_today()
-    now = timezone.now()
-
-    for msg in msgs:
-        from_phone = msg["from_phone"]
-        text = msg["text"]
-        msg_id = (msg.get("msg_id") or "").strip()
-        msg_type = (msg.get("msg_type") or "text").strip() or "text"
-        reply_id = (msg.get("reply_id") or "").strip()
-
-        # dedupe por msg_id
-        if msg_id and InboundMessage.objects.filter(wa_message_id=msg_id).exists():
-            continue
-
-        manager = Manager.objects.filter(phone_e164=from_phone, is_active=True).first()
-
-        checkin = None
-        if manager:
-            checkin, _ = DailyCheckin.objects.get_or_create(manager=manager, date=today)
-
-        inbound = InboundMessage.objects.create(
-            manager=manager,
-            from_phone=from_phone,
-            wa_message_id=msg_id,
-            text=text,
-            msg_type=msg_type,
-            received_at=now,
-            checkin=checkin,
-            linked_question=None,
-            raw_payload=msg.get("raw_msg"),
-            processed=False,
+        logger.warning(
+            "WHATSAPP_WEBHOOK hit method=%s path=%s query=%s content_type=%s len=%s xhub=%s",
+            request.method,
+            request.path,
+            request.META.get("QUERY_STRING", ""),
+            request.META.get("CONTENT_TYPE", ""),
+            len(request.body or b""),
+            (request.headers.get("X-Hub-Signature-256", "") or "")[:32],
         )
+        if raw:
+            logger.warning("WHATSAPP_WEBHOOK body=%s", raw[:4000])
 
-        # sem manager/checkin: só registra inbound
-        if not manager or not checkin:
-            continue
+        # GET verify
+        if request.method == "GET":
+            mode = request.GET.get("hub.mode")
+            token = request.GET.get("hub.verify_token")
+            challenge = request.GET.get("hub.challenge")
 
-        # ==========
-        # 1) actions via reply_id (ordem importa)
-        # ==========
-        
-        if reply_id.startswith("DIR:"):
-            if _handle_director_action(manager=manager, reply_id=reply_id, now=now):
-                inbound.processed = True
-                inbound.processed_at = now
-                inbound.save(update_fields=["processed", "processed_at"])
-                continue
+            verify_token = getattr(settings, "WHATSAPP_VERIFY_TOKEN", "")
+            if mode == "subscribe" and token and token == verify_token and challenge:
+                return HttpResponse(challenge, status=200)
+            return HttpResponse("forbidden", status=403)
 
+        if request.method != "POST":
+            return JsonResponse({"ok": True})
 
-        if reply_id.startswith("AI:"):
-            _handle_agenda_item_action(manager=manager, checkin=checkin, reply_id=reply_id, now=now)
-            inbound.processed = True
-            inbound.processed_at = now
-            inbound.save(update_fields=["processed", "processed_at"])
-            continue
+        if not _verify_meta_signature(request):
+            return HttpResponse("invalid signature", status=403)
 
-        if reply_id.startswith("AC:"):
-            if _handle_confirm_action(manager=manager, checkin=checkin, reply_id=reply_id, now=now):
-                inbound.processed = True
-                inbound.processed_at = now
-                inbound.save(update_fields=["processed", "processed_at"])
-                continue
+        try:
+            payload = json.loads(request.body.decode("utf-8") or "{}")
+        except Exception:
+            logger.exception("WHATSAPP_WEBHOOK_INVALID_JSON")
+            return JsonResponse({"ok": True})
 
-        if reply_id.startswith("AP:"):
-            if _handle_progress_action(manager=manager, checkin=checkin, reply_id=reply_id, now=now):
-                inbound.processed = True
-                inbound.processed_at = now
-                inbound.save(update_fields=["processed", "processed_at"])
-                continue
-
-        # ==========
-        # 2) comandos por texto
-        # ==========
-        if msg_type == "text":
-            if _handle_agenda_text_command(manager, checkin, text, now):
-                inbound.processed = True
-                inbound.processed_at = now
-                inbound.save(update_fields=["processed", "processed_at"])
-                continue
-
-        # ==========
-        # 3) link com pergunta pendente
-        # ==========
-        pending = (
-            OutboundQuestion.objects.filter(
-                checkin=checkin,
-                status="pending",
-                answered_at__isnull=True,
-                sent_at__isnull=False,
-            )
-            .order_by("sent_at", "scheduled_for", "id")
-            .first()
-        )
-        if not pending:
-            continue
-
-        prev = (pending.answer_text or "").strip()
-        cur = (text or "").strip()
-        pending.answer_text = cur if not prev else (prev + "\n" + cur)
-
-        became_answered = False
-
-        # ✅ critério real: parse gerar pelo menos 1 item
-        # (anti-“Bom dia”, anti-vazio, etc.)
-        combined = (pending.answer_text or "").strip()
-        parsed_items = _parse_agenda_lines(combined)
-
-        if pending.step == "AGENDA":
-            # “anti-ruído”: também exige um mínimo de caracteres no total,
-            # pra não disparar por mensagens curtíssimas (mas o parse manda).
-            if parsed_items and len(combined) >= MIN_AGENDA_CHARS:
-                pending.answered_at = now
-                pending.status = "answered"
-                became_answered = True
-                pending.save(update_fields=["answered_at", "answer_text", "status"])
-            else:
-                pending.save(update_fields=["answer_text"])
-        else:
-            # outros steps: mantém comportamento simples por texto
-            if len(combined) >= MIN_AGENDA_CHARS:
-                pending.answered_at = now
-                pending.status = "answered"
-                became_answered = True
-                pending.save(update_fields=["answered_at", "answer_text", "status"])
-            else:
-                pending.save(update_fields=["answer_text"])
-
-        # ==========
-        # 4) se AGENDA virou answered -> cria itens (uma vez)
-        #    confirmação 10min depois: agenda_confirm_tick
-        # ==========
-        if became_answered and pending.step == "AGENDA":
-            from .models import AgendaItem
-
-            if parsed_items:
-                if not AgendaItem.objects.filter(checkin=checkin).exists():
-                    bulk = [
-                        AgendaItem(checkin=checkin, idx=i, text=t, status="open")
-                        for i, t in enumerate(parsed_items, start=1)
-                    ]
-                    AgendaItem.objects.bulk_create(bulk)
-
+        # 1) status callbacks
+        statuses = _extract_statuses_from_meta(payload)
+        if statuses:
+            try:
+                with transaction.atomic():
+                    applied = 0
+                    for st in statuses:
+                        if _apply_status_to_outbound(st):
+                            applied += 1
                 logger.warning(
-                    "AGENDA_PARSED_ITEMS count=%s manager=%s checkin_id=%s",
-                    len(parsed_items), manager.name, checkin.id
+                    "WHATSAPP_WEBHOOK statuses_received=%s statuses_applied=%s",
+                    len(statuses),
+                    applied,
+                )
+            except Exception:
+                logger.exception("WHATSAPP_WEBHOOK failed to apply statuses")
+
+        # 2) inbound messages
+        msgs = _extract_messages_from_meta(payload)
+        if not msgs:
+            return JsonResponse({"ok": True})
+
+        today = _local_today()
+        now = timezone.now()
+
+        for msg in msgs:
+            inbound = None
+            try:
+                from_phone = msg["from_phone"]
+                text = msg["text"]
+                msg_id = (msg.get("msg_id") or "").strip()
+                msg_type = (msg.get("msg_type") or "text").strip() or "text"
+                reply_id = (msg.get("reply_id") or "").strip()
+
+                # dedupe por msg_id
+                if msg_id and InboundMessage.objects.filter(wa_message_id=msg_id).exists():
+                    logger.warning("WHATSAPP_WEBHOOK_DUPLICATE msg_id=%s from=%s", msg_id, from_phone)
+                    continue
+
+                manager = Manager.objects.filter(phone_e164=from_phone, is_active=True).first()
+
+                checkin = None
+                if manager:
+                    checkin, _ = DailyCheckin.objects.get_or_create(manager=manager, date=today)
+
+                inbound = InboundMessage.objects.create(
+                    manager=manager,
+                    from_phone=from_phone,
+                    wa_message_id=msg_id,
+                    text=text,
+                    msg_type=msg_type,
+                    received_at=now,
+                    checkin=checkin,
+                    linked_question=None,
+                    raw_payload=msg.get("raw_msg"),
+                    processed=False,
                 )
 
-        inbound.linked_question = pending
-        inbound.processed = True
-        inbound.processed_at = now
-        inbound.save(update_fields=["linked_question", "processed", "processed_at"])
+                # sem manager/checkin: só registra inbound
+                if not manager or not checkin:
+                    _mark_inbound_processed(inbound, now)
+                    continue
 
-    return JsonResponse({"ok": True})
+                # ==========
+                # 1) actions via reply_id (ordem importa)
+                # ==========
+
+                if reply_id.startswith("DIR:"):
+                    if _handle_director_action(manager=manager, reply_id=reply_id, now=now):
+                        _mark_inbound_processed(inbound, now)
+                        continue
+
+                if reply_id.startswith("AI:"):
+                    if _handle_agenda_item_action(
+                        manager=manager, checkin=checkin, reply_id=reply_id, now=now
+                    ):
+                        _mark_inbound_processed(inbound, now)
+                        continue
+
+                if reply_id.startswith("AC:"):
+                    if _handle_confirm_action(
+                        manager=manager, checkin=checkin, reply_id=reply_id, now=now
+                    ):
+                        _mark_inbound_processed(inbound, now)
+                        continue
+
+                if reply_id.startswith("AP:"):
+                    if _handle_progress_action(
+                        manager=manager, checkin=checkin, reply_id=reply_id, now=now
+                    ):
+                        _mark_inbound_processed(inbound, now)
+                        continue
+
+                # ==========
+                # 2) comandos por texto
+                # ==========
+                if msg_type == "text":
+                    if _handle_agenda_text_command(manager, checkin, text, now):
+                        _mark_inbound_processed(inbound, now)
+                        continue
+
+                # ==========
+                # 3) link com pergunta pendente
+                # ==========
+                pending = (
+                    OutboundQuestion.objects.filter(
+                        checkin=checkin,
+                        status="pending",
+                        answered_at__isnull=True,
+                        sent_at__isnull=False,
+                    )
+                    .order_by("sent_at", "scheduled_for", "id")
+                    .first()
+                )
+                if not pending:
+                    _mark_inbound_processed(inbound, now)
+                    continue
+
+                prev = (pending.answer_text or "").strip()
+                cur = (text or "").strip()
+                pending.answer_text = cur if not prev else (prev + "\n" + cur)
+
+                became_answered = False
+
+                combined = (pending.answer_text or "").strip()
+                parsed_items = _parse_agenda_lines(combined)
+
+                if pending.step == "AGENDA":
+                    if parsed_items and len(combined) >= MIN_AGENDA_CHARS:
+                        pending.answered_at = now
+                        pending.status = "answered"
+                        became_answered = True
+                        pending.save(update_fields=["answered_at", "answer_text", "status"])
+                    else:
+                        pending.save(update_fields=["answer_text"])
+                else:
+                    if len(combined) >= MIN_AGENDA_CHARS:
+                        pending.answered_at = now
+                        pending.status = "answered"
+                        became_answered = True
+                        pending.save(update_fields=["answered_at", "answer_text", "status"])
+                    else:
+                        pending.save(update_fields=["answer_text"])
+
+                # ==========
+                # 4) se AGENDA virou answered -> cria itens
+                # ==========
+                if became_answered and pending.step == "AGENDA":
+                    from .models import AgendaItem
+
+                    if parsed_items:
+                        if not AgendaItem.objects.filter(checkin=checkin).exists():
+                            bulk = [
+                                AgendaItem(checkin=checkin, idx=i, text=t, status="open")
+                                for i, t in enumerate(parsed_items, start=1)
+                            ]
+                            AgendaItem.objects.bulk_create(bulk)
+
+                        logger.warning(
+                            "AGENDA_PARSED_ITEMS count=%s manager=%s checkin_id=%s",
+                            len(parsed_items), manager.name, checkin.id
+                        )
+
+                _mark_inbound_processed(inbound, now, linked_question=pending)
+
+            except Exception:
+                logger.exception(
+                    "WHATSAPP_WEBHOOK_MSG_FAILED from=%s msg_id=%s reply_id=%s",
+                    msg.get("from_phone"),
+                    msg.get("msg_id"),
+                    msg.get("reply_id"),
+                )
+                try:
+                    if inbound and not inbound.processed:
+                        _mark_inbound_processed(inbound, now)
+                except Exception:
+                    logger.exception("WHATSAPP_WEBHOOK_MSG_FAILED_MARK_PROCESSED")
+
+                # importante: segue o loop e no final devolve 200
+                continue
+
+        return JsonResponse({"ok": True})
+
+    except Exception:
+        logger.exception("WHATSAPP_WEBHOOK_FATAL")
+        return JsonResponse({"ok": True})
