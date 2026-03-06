@@ -113,7 +113,7 @@ def _agenda_reply_text(checkin):
 
     lines = []
     for it in items:
-        mark = "✅" if it.status == "done" else ("⛔" if it.status == "skip" else "☐")
+        mark = "✅" if it.status == "done" else ("⛔" if it.status == "skip" else "⏳")
         lines.append(f"{mark} {it.idx}) {it.text}")
 
     return "Agenda de hoje:\n" + "\n".join(lines)
