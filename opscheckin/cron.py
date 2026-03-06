@@ -15,6 +15,11 @@ def run_opscheckin_agenda_confirm():
 
 # Grupo: followups 90/90 até 17h (perguntar qual item foi concluído)
 def run_opscheckin_agenda_followups():
+    from django.utils import timezone
+    import logging
+    logger = logging.getLogger("opscheckin.followups")
+
+    logger.warning("FOLLOWUP_TICK %s", timezone.now())
     call_command("agenda_tick")
 
 def run_opscheckin_director_agenda_summary():

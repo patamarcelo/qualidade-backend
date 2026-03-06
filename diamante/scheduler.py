@@ -180,7 +180,7 @@ def start():
                 run_opscheckin_agenda_followups,
                 "cron",
                 day_of_week="*",
-                hour="9-17",
+                hour="9-18",
                 minute="*/10",
                 id="opscheckin_agenda_followups_tick_0917_10min",
                 replace_existing=True,
