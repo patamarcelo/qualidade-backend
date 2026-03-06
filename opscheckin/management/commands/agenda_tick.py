@@ -192,7 +192,7 @@ class Command(BaseCommand):
             return
 
         qs = Manager.objects.all().order_by("name")
-        if not opts["include-inactive"]:
+        if not opts.get("include_inactive", False):
             qs = qs.filter(is_active=True)
 
         from opscheckin.models import AgendaItem

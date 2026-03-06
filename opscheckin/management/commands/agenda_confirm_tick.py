@@ -155,7 +155,7 @@ class Command(BaseCommand):
         auto_ok_min = int(opts["auto_ok_min"] or AUTO_OK_MINUTES)
 
         qs = Manager.objects.all().order_by("name")
-        if not opts["include-inactive"]:
+        if not opts.get("include_inactive", False):
             qs = qs.filter(is_active=True)
 
         sent = 0
