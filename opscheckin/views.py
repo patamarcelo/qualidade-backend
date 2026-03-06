@@ -318,13 +318,20 @@ def _handle_agenda_item_action(*, manager, checkin, reply_id: str, now):
     header = ""
 
     if action == "done":
-        if it.status != "done":
-            it.status = "done"
-            it.done_at = now
-            it.save(update_fields=["status", "done_at"])
-            header = f"✅ Item concluído: {it.idx}) {it.text}"
-        else:
-            header = f"ℹ️ Esse item já estava concluído: {it.idx}) {it.text}"
+        if it.status == "done":
+            logger.warning(
+                "AGENDA_ITEM_DUPLICATE_DONE_IGNORED manager=%s checkin_id=%s item_id=%s idx=%s",
+                getattr(manager, "name", ""),
+                getattr(checkin, "id", None),
+                it.id,
+                it.idx,
+            )
+            return True
+
+        it.status = "done"
+        it.done_at = now
+        it.save(update_fields=["status", "done_at"])
+        header = f"✅ Item concluído: {it.idx}) {it.text}"
 
     elif action == "skip":
         if it.status != "skip":
@@ -460,7 +467,6 @@ def _handle_confirm_action(*, manager, checkin, reply_id: str, now) -> bool:
 
     return False
 
-
 def _handle_progress_action(*, manager, checkin, reply_id: str, now) -> bool:
     from .models import AgendaItem
 
@@ -485,21 +491,25 @@ def _handle_progress_action(*, manager, checkin, reply_id: str, now) -> bool:
             )
         return True
 
-    changed = False
-    if it.status != "done":
-        it.status = "done"
-        it.done_at = now
-        it.save(update_fields=["status", "done_at"])
-        changed = True
+    # idempotência: se já está done, não manda snapshot de novo
+    if it.status == "done":
+        logger.warning(
+            "PROGRESS_DUPLICATE_IGNORED manager=%s checkin_id=%s item_id=%s idx=%s",
+            getattr(manager, "name", ""),
+            getattr(checkin, "id", None),
+            it.id,
+            it.idx,
+        )
+        return True
 
-    header = (
-        f"✅ Item concluído: {it.idx}) {it.text}"
-        if changed
-        else f"ℹ️ Esse item já estava concluído: {it.idx}) {it.text}"
-    )
+    it.status = "done"
+    it.done_at = now
+    it.save(update_fields=["status", "done_at"])
 
+    header = f"✅ Item concluído: {it.idx}) {it.text}"
     _send_agenda_snapshot(manager, checkin, header=header)
     return True
+
 
 
 # =========================
@@ -809,21 +819,15 @@ def whatsapp_webhook(request):
                 msg_type = (msg.get("msg_type") or "text").strip() or "text"
                 reply_id = (msg.get("reply_id") or "").strip()
 
-                # dedupe por msg_id
-                if msg_id and InboundMessage.objects.filter(wa_message_id=msg_id).exists():
-                    logger.warning("WHATSAPP_WEBHOOK_DUPLICATE msg_id=%s from=%s", msg_id, from_phone)
-                    continue
-
+                
                 manager = Manager.objects.filter(phone_e164=from_phone, is_active=True).first()
-
                 checkin = None
                 if manager:
                     checkin, _ = DailyCheckin.objects.get_or_create(manager=manager, date=today)
 
-                inbound = InboundMessage.objects.create(
+                inbound_defaults = dict(
                     manager=manager,
                     from_phone=from_phone,
-                    wa_message_id=msg_id,
                     text=text,
                     msg_type=msg_type,
                     received_at=now,
@@ -832,6 +836,23 @@ def whatsapp_webhook(request):
                     raw_payload=msg.get("raw_msg"),
                     processed=False,
                 )
+
+                if msg_id:
+                    inbound, created = InboundMessage.objects.get_or_create(
+                        wa_message_id=msg_id,
+                        defaults=inbound_defaults,
+                    )
+                    if not created:
+                        logger.warning(
+                            "WHATSAPP_WEBHOOK_DUPLICATE msg_id=%s from=%s reply_id=%s",
+                            msg_id, from_phone, reply_id
+                        )
+                        continue
+                else:
+                    inbound = InboundMessage.objects.create(
+                        wa_message_id="",
+                        **inbound_defaults,
+                    )
 
                 # sem manager/checkin: só registra inbound
                 if not manager or not checkin:
