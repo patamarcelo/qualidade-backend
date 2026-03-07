@@ -225,15 +225,39 @@ class Command(BaseCommand):
         for m in qs:
             checkin = DailyCheckin.objects.filter(manager=m, date=day).first()
             if not checkin:
+                logger.warning("AGENDA_FOLLOWUP_SKIP_NO_CHECKIN manager=%s day=%s", m.name, day)
+                skipped += 1
+                continue
+
+            # precisa ter pelo menos 1 item de agenda no dia
+            if not AgendaItem.objects.filter(checkin=checkin).exists():
+                logger.warning(
+                    "AGENDA_FOLLOWUP_SKIP_NO_ITEMS manager=%s checkin_id=%s",
+                    m.name,
+                    checkin.id,
+                )
+                skipped += 1
                 continue
 
             # precisa ter agenda confirmada (manual ou auto)
             anchor = _agenda_confirm_anchor_at(checkin)
             if not anchor:
+                logger.warning(
+                    "AGENDA_FOLLOWUP_SKIP_NO_CONFIRM manager=%s checkin_id=%s",
+                    m.name,
+                    checkin.id,
+                )
+                skipped += 1
                 continue
 
             # precisa ter itens abertos
             if not AgendaItem.objects.filter(checkin=checkin, status="open").exists():
+                logger.warning(
+                    "AGENDA_FOLLOWUP_SKIP_NO_OPEN_ITEMS manager=%s checkin_id=%s",
+                    m.name,
+                    checkin.id,
+                )
+                skipped += 1
                 continue
 
             # cooldown por atividade recente
