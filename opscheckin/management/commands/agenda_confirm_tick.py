@@ -87,6 +87,29 @@ def _ensure_confirm_question(checkin, *, now):
     return q
 
 
+def _trim_list_sections(sections, max_rows=10):
+    total = 0
+    out = []
+
+    for section in sections:
+        rows = section.get("rows") or []
+        room = max_rows - total
+        if room <= 0:
+            break
+
+        clipped = rows[:room]
+        if not clipped:
+            continue
+
+        out.append({
+            **section,
+            "rows": clipped,
+        })
+        total += len(clipped)
+
+    return out
+
+
 def _send_confirm(manager, checkin):
     from opscheckin.models import AgendaItem
 
@@ -108,7 +131,11 @@ def _send_confirm(manager, checkin):
         {
             "title": "Está OK",
             "rows": [
-                {"id": "AC:OK", "title": "✅ OK (manter agenda)", "description": "Confirma sem remover itens"},
+                {
+                    "id": "AC:OK",
+                    "title": "✅ OK (manter agenda)",
+                    "description": "Confirma sem remover itens",
+                },
             ],
         },
         {
@@ -116,13 +143,15 @@ def _send_confirm(manager, checkin):
             "rows": [
                 {
                     "id": f"AC:RM:{it.id}",
-                    "title": f"⛔ Remover {it.idx})",
+                    "title": f"⛔ Remover {it.idx})"[:24],
                     "description": (it.text[:60] + "…") if len(it.text) > 60 else it.text,
                 }
-                for it in items[:20]  # limite do WhatsApp; se passar, a gente pagina depois
+                for it in items[:9]
             ],
         },
     ]
+
+    sections = _trim_list_sections(sections, max_rows=10)
 
     resp = send_list(
         manager.phone_e164,
@@ -130,10 +159,14 @@ def _send_confirm(manager, checkin):
         button_text="Abrir opções",
         sections=sections,
     )
-    _log_outbound_interactive(manager=manager, checkin=checkin, body=body, resp=resp, kind="agenda_confirm")
+    _log_outbound_interactive(
+        manager=manager,
+        checkin=checkin,
+        body=body,
+        resp=resp,
+        kind="agenda_confirm",
+    )
     return True
-
-
 class Command(BaseCommand):
     help = "Envia confirmação da agenda (10 min após resposta) e aplica OK automático por silêncio."
 
