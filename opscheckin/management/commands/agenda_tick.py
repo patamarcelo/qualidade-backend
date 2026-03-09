@@ -10,7 +10,7 @@ from django.db.models import Q
 
 from opscheckin.models import  DailyCheckin, InboundMessage, OutboundMessage
 from opscheckin.services.recipients import managers_subscribed
-from opscheckin.services.whatsapp import send_list
+from opscheckin.services.whatsapp import send_list, send_buttons
 
 logger = logging.getLogger("opscheckin.agenda_tick")
 
@@ -135,42 +135,40 @@ def _wa_list_row_description(text: str) -> str:
     return (s[:72] + "…") if len(s) > 72 else s
 
 
-
-def _send_followup_list(manager, checkin):
+def _agenda_reply_text(checkin):
     from opscheckin.models import AgendaItem
 
-    open_items = list(
-        AgendaItem.objects.filter(checkin=checkin, status="open")
-        .order_by("idx")[:MAX_ROWS]
-    )
-    if not open_items:
-        return False
+    items = AgendaItem.objects.filter(checkin=checkin).order_by("idx")
+    if not items.exists():
+        return "Ainda não tenho itens de agenda para hoje."
 
+    lines = []
+    for it in items:
+        mark = "✅" if it.status == "done" else ("⛔" if it.status == "skip" else "⏳")
+        lines.append(f"{mark} {it.idx}) {it.text}")
+
+    return "Agenda de hoje:\n" + "\n".join(lines)
+
+
+
+def _send_followup_buttons(manager, checkin):
     body = (
         "Atualização da agenda 🕘\n\n"
-        "Algum item foi concluído?\n"
-        "Selecione abaixo o que foi feito:"
+        f"{_agenda_reply_text(checkin)}\n\n"
+        "Se quiser incluir um item, escreva:\n"
+        "+ exemplo de item\n\n"
+        "Ou, se deseja alterar alguma coisa na agenda,\n"
+        "basta selecionar uma das opções abaixo:"
     )
 
-    sections = [
-        {
-            "title": "Marcar como concluído",
-            "rows": [
-                {
-                    "id": f"AP:DONE:{it.id}",
-                    "title": _wa_list_row_title(it.idx, it.text),
-                    "description": _wa_list_row_description(it.text),
-                }
-                for it in open_items
-            ],
-        }
-    ]
-
-    resp = send_list(
+    resp = send_buttons(
         manager.phone_e164,
         body=body,
-        button_text="Selecionar item",
-        sections=sections,
+        buttons=[
+            {"id": "AM:MENU:DONE", "title": "✅ Concluir"},
+            {"id": "AM:MENU:UNDO", "title": "↩️ Desmarcar"},
+            {"id": "AM:MENU:REMOVE", "title": "🗑️ Remover"},
+        ],
     )
 
     _log_outbound_interactive(
@@ -181,8 +179,6 @@ def _send_followup_list(manager, checkin):
         kind="agenda_followup",
     )
     return True
-
-
 class Command(BaseCommand):
     help = "Follow-up real 90/90 (relativo) após confirmação da agenda, com Interactive List."
 
@@ -280,7 +276,7 @@ class Command(BaseCommand):
             if now < due_at:
                 continue
 
-            ok = _send_followup_list(m, checkin)
+            ok = _send_followup_buttons(m, checkin)
             if ok:
                 sent += 1
 

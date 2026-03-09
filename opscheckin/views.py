@@ -169,7 +169,12 @@ def _send_agenda_snapshot(manager, checkin, header: str = "") -> bool:
 
 
 def _send_agenda_action_menu(manager, checkin):
-    body = "O que você quer fazer agora na agenda?"
+    body = (
+        "O que você quer fazer agora na agenda?\n\n"
+        "Se quiser adicionar um item, envie:\n"
+        "+ texto do item\n\n"
+        "Ou selecione uma das opções abaixo:"
+    )
 
     resp = send_buttons(
         manager.phone_e164,
