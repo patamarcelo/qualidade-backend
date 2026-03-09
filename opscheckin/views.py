@@ -39,6 +39,30 @@ CMD_ADD1 = re.compile(r"^\+\s*(.+)$", re.I)
 CMD_ADD2 = re.compile(r"^(adicionar|add)\s*[:\-]\s*(.+)$", re.I)
 CMD_LIST = re.compile(r"^(listar|status|lista)\s*$", re.I)
 
+WA_LIST_MAX_ROWS = 10
+WA_CONFIRM_FIXED_ROWS = 1  # AC:OK
+
+def _trim_list_sections(sections, max_rows=WA_LIST_MAX_ROWS):
+    total = 0
+    out = []
+
+    for section in sections:
+        rows = section.get("rows") or []
+        room = max_rows - total
+        if room <= 0:
+            break
+
+        clipped = rows[:room]
+        if not clipped:
+            continue
+
+        out.append({
+            **section,
+            "rows": clipped,
+        })
+        total += len(clipped)
+
+    return out
 
 def _mark_inbound_processed(inbound, now, *, linked_question=None):
     fields = ["processed", "processed_at"]
@@ -713,10 +737,12 @@ def _handle_confirm_action(*, manager, checkin, reply_id: str, now) -> bool:
                         "title": f"⛔ Remover {x.idx})"[:24],
                         "description": _wa_row_desc(x.text),
                     }
-                    for x in items[:10]
+                    for x in items[:9]
                 ],
             },
         ]
+        
+        sections = _trim_list_sections(sections, max_rows=10)
 
         resp = send_list(
             manager.phone_e164,
