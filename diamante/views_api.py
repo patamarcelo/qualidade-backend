@@ -3498,29 +3498,44 @@ class PlantioViewSet(viewsets.ModelViewSet):
 
     # --------------------- ---------------------- PLANTIO PRODUTIVIDADE MAP API END --------------------- ----------------------#
     @staticmethod
-    def run_plantio_update_task(task_id, user, params):
-        task = BackgroundTaskStatus.objects.get(task_id=task_id)
-        task.status = 'running'
-        task.save()
+    def run_plantio_update_task(task_id, user_id, params):
+
+        task = None
 
         try:
+            task = BackgroundTaskStatus.objects.get(task_id=task_id)
+
+            task.status = "running"
+            task.started_at = dateTimeTask.now()
+            task.save(update_fields=["status", "started_at"])
+
             id_list = [x["id"] for x in params]
+
             plantios_dict = {
-                p.id: p for p in Plantio.objects.select_related('talhao__fazenda').filter(id__in=id_list)
+                p.id: p for p in Plantio.objects.select_related("talhao__fazenda").filter(id__in=id_list)
             }
 
             list_updated = []
             updated_instances = []
 
             for i in params:
+
                 plantio = plantios_dict.get(i["id"])
+
                 if not plantio:
                     continue
 
-                index = get_index_dict_estagio(plantio.cronograma_programa, i["estagio"])
+                index = get_index_dict_estagio(
+                    plantio.cronograma_programa,
+                    i["estagio"]
+                )
+
                 new_value = not plantio.cronograma_programa[index]["aplicado"]
+
                 plantio.cronograma_programa[index]["aplicado"] = new_value
+
                 plantio.save()
+
                 updated_instances.append(plantio)
 
                 updated = {
@@ -3528,66 +3543,117 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "estagio": plantio.cronograma_programa[index]["estagio"],
                     "situacao": plantio.cronograma_programa[index]["aplicado"]
                 }
-                print('updated at: ', updated)
+
+                print("updated at:", updated)
+
                 list_updated.append(updated)
-                
 
+            # disparar signal apenas 1x
             with transaction.atomic():
-                for instance in updated_instances[0:1]:
-                    post_save.send(sender=Plantio, instance=instance, created=False)
 
-            task.status = 'done'
+                for instance in updated_instances[0:1]:
+                    post_save.send(
+                        sender=Plantio,
+                        instance=instance,
+                        created=False
+                    )
+
+            task.status = "done"
             task.ended_at = dateTimeTask.now()
             task.result = {"updated": list_updated}
-            task.save()
+
+            task.save(update_fields=["status", "ended_at", "result"])
+
         except Exception as e:
-            task.status = 'failed'
+
+            if task is None:
+                try:
+                    task = BackgroundTaskStatus.objects.get(task_id=task_id)
+                except BackgroundTaskStatus.DoesNotExist:
+                    print("Task não encontrada:", task_id, e)
+                    return
+
+            task.status = "failed"
             task.ended_at = dateTimeTask.now()
-            task.result = {"error": str(e)}
-            task.save()
-    
+
+            task.result = {
+                **(task.result or {}),
+                "error": str(e)
+            }
+
+            task.save(update_fields=["status", "ended_at", "result"])
+            
+        
     @action(detail=False, methods=["GET", "POST", "PUT"])
     def update_aplication_plantio(self, request, pk=None):
+
         if not request.user.is_authenticated:
-            return Response({"message": "Você precisa estar logado!"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"message": "Você precisa estar logado!"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         try:
-            params = request.data["data"]
-            id_list = [x["id"] for x in params]
+            params = request.data.get("data", [])
+
+            if not isinstance(params, list) or not params:
+                return Response(
+                    {"message": "Payload inválido"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            id_list = [x["id"] for x in params if x.get("id")]
 
             # ⚠️ Verificar concorrência para os mesmos plantios
             conflict_tasks = BackgroundTaskStatus.objects.filter(
                 Q(status="pending") | Q(status="running"),
                 task_name="update_aplication_plantio",
-                result__ids__overlap=id_list  # Para isso funcionar, você deve salvar 'ids' em 'result'
+                result__ids__overlap=id_list
             )
 
             if conflict_tasks.exists():
-                return Response({
-                    "message": "Já existe uma tarefa em andamento para esses Plantios. Aguarde sua conclusão antes de iniciar uma nova."
-                }, status=status.HTTP_409)
+                return Response(
+                    {
+                        "message": "Já existe uma tarefa em andamento para esses Plantios. Aguarde sua conclusão antes de iniciar uma nova."
+                    },
+                    status=status.HTTP_409_CONFLICT
+                )
 
             # 🆕 Criar task
             task_id = str(uuid.uuid4())
+
             BackgroundTaskStatus.objects.create(
                 task_id=task_id,
                 task_name="update_aplication_plantio",
                 status="pending",
-                result={"ids": id_list},  # Armazenar para validação futura
+                result={"ids": id_list},
             )
 
-            # ▶️ Iniciar a thread
-            thread = Thread(target=self.run_plantio_update_task, args=(task_id, request.user, params))
-            thread.start()
+            user_id = request.user.id
 
-            return Response({
-                "message": "Tarefa iniciada com sucesso!",
-                "task_id": task_id
-            }, status=status.HTTP_202_ACCEPTED)
+            # ▶️ Iniciar a thread SOMENTE após commit
+            transaction.on_commit(
+                lambda: Thread(
+                    target=self.run_plantio_update_task,
+                    args=(task_id, user_id, params),
+                    daemon=True
+                ).start()
+            )
+
+            return Response(
+                {
+                    "message": "Tarefa iniciada com sucesso!",
+                    "task_id": task_id
+                },
+                status=status.HTTP_202_ACCEPTED
+            )
 
         except Exception as e:
-            return Response({"message": f"Erro ao iniciar a tarefa: {e}"}, status=status.HTTP_400_BAD_REQUEST)
-    
+            return Response(
+                {"message": f"Erro ao iniciar a tarefa: {e}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
     # @action(detail=False, methods=["GET", "POST", "PUT"])
     # def update_aplication_plantio(sef, request, pk=None):
     #     if request.user.is_authenticated:
