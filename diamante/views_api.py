@@ -176,6 +176,9 @@ from django.db import close_old_connections
 from .utils_new.storages_lookup import resolve_storage_name
 from .utils_new.defensivos_lookup import resolve_defensivo_nome
 
+from django.db import close_old_connections, connection
+from django.db.utils import OperationalError
+
 
 
 
@@ -3499,12 +3502,12 @@ class PlantioViewSet(viewsets.ModelViewSet):
     # --------------------- ---------------------- PLANTIO PRODUTIVIDADE MAP API END --------------------- ----------------------#
     @staticmethod
     def run_plantio_update_task(task_id, user_id, params):
-
         task = None
 
         try:
-            task = BackgroundTaskStatus.objects.get(task_id=task_id)
+            close_old_connections()
 
+            task = BackgroundTaskStatus.objects.get(task_id=task_id)
             task.status = "running"
             task.started_at = dateTimeTask.now()
             task.save(update_fields=["status", "started_at"])
@@ -3512,16 +3515,15 @@ class PlantioViewSet(viewsets.ModelViewSet):
             id_list = [x["id"] for x in params]
 
             plantios_dict = {
-                p.id: p for p in Plantio.objects.select_related("talhao__fazenda").filter(id__in=id_list)
+                p.id: p
+                for p in Plantio.objects.select_related("talhao__fazenda").filter(id__in=id_list)
             }
 
             list_updated = []
             updated_instances = []
 
             for i in params:
-
                 plantio = plantios_dict.get(i["id"])
-
                 if not plantio:
                     continue
 
@@ -3531,9 +3533,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 )
 
                 new_value = not plantio.cronograma_programa[index]["aplicado"]
-
                 plantio.cronograma_programa[index]["aplicado"] = new_value
-
                 plantio.save()
 
                 updated_instances.append(plantio)
@@ -3541,49 +3541,60 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 updated = {
                     "talhao": plantio.talhao.id_talhao,
                     "estagio": plantio.cronograma_programa[index]["estagio"],
-                    "situacao": plantio.cronograma_programa[index]["aplicado"]
+                    "situacao": plantio.cronograma_programa[index]["aplicado"],
                 }
-
-                print("updated at:", updated)
-
                 list_updated.append(updated)
 
-            # disparar signal apenas 1x
-            with transaction.atomic():
-
-                for instance in updated_instances[0:1]:
-                    post_save.send(
-                        sender=Plantio,
-                        instance=instance,
-                        created=False
-                    )
+            for instance in updated_instances[:1]:
+                post_save.send(sender=Plantio, instance=instance, created=False)
 
             task.status = "done"
             task.ended_at = dateTimeTask.now()
             task.result = {"updated": list_updated}
-
             task.save(update_fields=["status", "ended_at", "result"])
+
+        except OperationalError as e:
+            try:
+                close_old_connections()
+                task = task or BackgroundTaskStatus.objects.filter(task_id=task_id).first()
+                if task:
+                    task.status = "failed"
+                    task.ended_at = dateTimeTask.now()
+                    task.result = {
+                        **(task.result or {}),
+                        "error": f"Erro de conexão com banco: {str(e)}"
+                    }
+                    task.save(update_fields=["status", "ended_at", "result"])
+            except Exception:
+                pass
+
+            print("Erro de conexão com banco na thread:", e)
 
         except Exception as e:
+            try:
+                close_old_connections()
+                task = task or BackgroundTaskStatus.objects.filter(task_id=task_id).first()
+                if task:
+                    task.status = "failed"
+                    task.ended_at = dateTimeTask.now()
+                    task.result = {
+                        **(task.result or {}),
+                        "error": str(e)
+                    }
+                    task.save(update_fields=["status", "ended_at", "result"])
+            except Exception:
+                pass
 
-            if task is None:
-                try:
-                    task = BackgroundTaskStatus.objects.get(task_id=task_id)
-                except BackgroundTaskStatus.DoesNotExist:
-                    print("Task não encontrada:", task_id, e)
-                    return
+            print("Erro na run_plantio_update_task:", e)
 
-            task.status = "failed"
-            task.ended_at = dateTimeTask.now()
-
-            task.result = {
-                **(task.result or {}),
-                "error": str(e)
-            }
-
-            task.save(update_fields=["status", "ended_at", "result"])
+        finally:
+            close_old_connections()
+            try:
+                connection.close()
+            except Exception:
+                pass
             
-        
+    
     @action(detail=False, methods=["GET", "POST", "PUT"])
     def update_aplication_plantio(self, request, pk=None):
 
