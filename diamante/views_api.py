@@ -5454,6 +5454,108 @@ class DefensivoViewSet(viewsets.ModelViewSet):
         return rows
 
 
+    @action(detail=False, methods=["POST"])
+    def payload_from_protheus_delete_nf(self, request):
+
+        # 1) Lê o body bruto primeiro
+        try:
+            raw_body = request.body.decode("utf-8") if request.body else ""
+        except Exception as e:
+            raw_body = f"Erro ao tentar ler o body: {e}"
+
+        # 2) Depois request.data (DRF)
+        try:
+            payload_data = request.data
+        except Exception:
+            payload_data = None
+
+        query_params = request.query_params
+
+        # 3) Fallback se request.data vier vazio
+        if (payload_data is None or payload_data == "" or payload_data == {} or payload_data == []) and raw_body:
+            try:
+                payload_data = json.loads(raw_body)
+            except json.JSONDecodeError:
+                payload_data = None
+
+        payload = payload_data or {}
+
+        # multipart/form-data pode vir como QueryDict
+        if isinstance(payload, QueryDict):
+            payload = payload.dict()
+
+        received_at = timezone.now()
+
+        headers_dict = dict(request.headers) if hasattr(request, "headers") else {}
+        safe_headers = self._mask_sensitive_headers(headers_dict)
+
+        print("\n================ DELETE NF PROTHEUS ================")
+        print(f"Content-Type recebido: {request.content_type}")
+        print(f"Headers (masked): {safe_headers}")
+        print("---------------------------------------------------")
+        print(f"request.body: {raw_body}")
+        print(f"request.data: {payload_data}")
+        print(f"query_params: {query_params}")
+        print("===================================================\n")
+
+        email_sent = False
+        email_error = ""
+        gmail_result = None
+
+        try:
+
+            body = f"""
+                DELETE NF - PAYLOAD RECEBIDO
+
+                Received at:
+                {received_at}
+
+                Content-Type:
+                {request.content_type}
+
+                Query Params:
+                {json.dumps(dict(query_params), indent=2, ensure_ascii=False)}
+
+                Headers (masked):
+                {json.dumps(safe_headers, indent=2, ensure_ascii=False)}
+
+                Raw Body:
+                {raw_body}
+
+                Parsed Payload:
+                {json.dumps(payload, indent=2, ensure_ascii=False)}
+            """
+
+            subject = f"[Protheus][Delete NF] Payload recebido ({received_at.strftime('%Y-%m-%d %H:%M:%S')})"
+
+            gmail_result = send_mail_gmail_api(
+                subject=subject,
+                body_html=f"<pre>{body}</pre>",
+                from_email=getattr(settings, "DEFAULT_FROM_EMAIL", ""),
+                to_emails=["marcelo@gdourado.com.br"],
+                cc_emails=[],
+                attachments=[],
+                fail_silently=False,
+            )
+
+            email_sent = True
+
+        except Exception as e:
+            email_error = str(e)
+
+        return Response(
+            {
+                "received": True,
+                "received_at": received_at,
+                "payload_type": type(payload).__name__,
+                "keys": list(payload.keys()) if isinstance(payload, dict) else None,
+                "email_sent": email_sent,
+                "email_error": email_error,
+                "gmail_result": gmail_result,
+                "payload": payload,
+            },
+            status=status.HTTP_200_OK,
+        )
     
     @action(detail=False, methods=["POST"])
     def payload_from_protheus_to_farmbox(self, request):
