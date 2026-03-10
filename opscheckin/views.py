@@ -1009,7 +1009,7 @@ def _parse_agenda_lines(text: str) -> list[str]:
         if not s:
             continue
 
-        s = re.sub(r"^\s*(?:[-•*]+|\d{1,2}\s*[.)-]?)\s*", "", s).strip()
+        s = re.sub(r"^\s*(?:[✅⏳⛔]\s*)?(?:[-•*]+|\d{1,2}\s*[.)-]?)\s*", "", s).strip()
         if not s:
             continue
 
