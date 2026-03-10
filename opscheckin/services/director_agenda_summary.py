@@ -112,7 +112,7 @@ def build_director_agenda_summary(*, day, managers):
     lines = [f"📋 Resumo das agendas — {day_br}", ""]
 
     for idx, entry in enumerate(entries, start=1):
-        lines.append(f"{idx}) {entry['manager'].name}")
+        lines.append(f"{idx}) 👤 *{entry['manager'].name}")
         lines.append(f"Status: {entry['status_label']}")
 
         if entry["total_count"] > 0:
