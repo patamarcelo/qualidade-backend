@@ -32,7 +32,7 @@ MIN_AGENDA_CHARS = 10
 # =========================
 
 CMD_DONE = re.compile(r"^(feito|done)\s+(\d{1,3})\s*$", re.I)
-CMD_SKIP = re.compile(r"^(pular|skip)\s+(\d{1,3})\s*$", re.I)
+CMD_SKIP = re.compile(r"^(pular|skip|desmarcar|reabrir)\s+(\d{1,3})\s*$", re.I)
 CMD_REMOVE = re.compile(r"^(remover|delete)\s+(\d{1,3})\s*$", re.I)
 CMD_EDIT = re.compile(r"^(editar|edit)\s+(\d{1,3})\s*[:\-]\s*(.+)$", re.I)
 CMD_ADD1 = re.compile(r"^\+\s*(.+)$", re.I)
@@ -197,134 +197,221 @@ def _send_agenda_action_menu(manager, checkin):
     return True
 
 
-def _send_agenda_done_picker(manager, checkin):
+def _set_agenda_pending_action(checkin, action: str, now):
+    """
+    Guarda um estado leve de ação pendente sem precisar criar model novo.
+    Usa OutboundQuestion com step próprio e sem sent_at para não interferir
+    no vínculo normal das perguntas pendentes.
+    """
+    OutboundQuestion.objects.filter(
+        checkin=checkin,
+        step="AGENDA_ACTION",
+        status="pending",
+        answered_at__isnull=True,
+    ).update(status="answered", answered_at=now, answer_text="superseded")
+
+    return OutboundQuestion.objects.create(
+        checkin=checkin,
+        step="AGENDA_ACTION",
+        scheduled_for=now,
+        status="pending",
+        prompt_text=(action or "").strip().lower(),
+        answer_text="",
+    )
+
+
+def _get_agenda_pending_action(checkin):
+    q = (
+        OutboundQuestion.objects.filter(
+            checkin=checkin,
+            step="AGENDA_ACTION",
+            status="pending",
+            answered_at__isnull=True,
+        )
+        .order_by("-id")
+        .first()
+    )
+    if not q:
+        return None
+    return (q.prompt_text or "").strip().lower() or None
+
+
+def _clear_agenda_pending_action(checkin, now):
+    OutboundQuestion.objects.filter(
+        checkin=checkin,
+        step="AGENDA_ACTION",
+        status="pending",
+        answered_at__isnull=True,
+    ).update(status="answered", answered_at=now, answer_text="resolved")
+
+
+def _normalize_agenda_search_text(s: str) -> str:
+    s = (s or "").strip().lower()
+    s = re.sub(r"\s+", " ", s)
+    return s
+
+
+def _find_agenda_matches_by_number_or_text(checkin, raw_value: str):
     from .models import AgendaItem
 
-    items = list(
-        AgendaItem.objects.filter(checkin=checkin, status="open")
-        .order_by("idx")[:10]
-    )
+    value = (raw_value or "").strip()
+    if not value:
+        return []
 
-    if not items:
-        send_text(manager.phone_e164, "Não há itens pendentes para concluir.")
-        _send_agenda_action_menu(manager, checkin)
-        return True
+    if re.fullmatch(r"\d{1,3}", value):
+        idx = int(value)
+        item = AgendaItem.objects.filter(checkin=checkin, idx=idx).first()
+        return [item] if item else []
 
-    sections = [{
-        "title": "Itens pendentes",
-        "rows": [
-            {
-                "id": f"AM:DONE:{it.id}",
-                "title": _wa_row_title(it.idx, it.text),
-                "description": _wa_row_desc(it.text),
-            }
-            for it in items
-        ],
-    }]
+    q = _normalize_agenda_search_text(value)
+    if len(q) < 2:
+        return []
 
-    body = "Selecione o item concluído:"
-    resp = send_list(
-        manager.phone_e164,
-        body=body,
-        button_text="Selecionar",
-        sections=sections,
-    )
+    items = list(AgendaItem.objects.filter(checkin=checkin).order_by("idx"))
 
-    _log_outbound_interactive(
-        manager=manager,
-        checkin=checkin,
-        body=body,
-        resp=resp,
-        kind="agenda_done_picker",
-    )
+    exact = []
+    contains = []
 
+    for it in items:
+        txt = _normalize_agenda_search_text(it.text)
+        if txt == q:
+            exact.append(it)
+        elif q in txt:
+            contains.append(it)
+
+    return exact if exact else contains
+
+
+def _send_agenda_pending_action_prompt(manager, checkin, action: str, now):
+    _set_agenda_pending_action(checkin, action, now)
+
+    if action == "done":
+        body = (
+            "Me diga o número ou parte do nome do item que foi concluído.\n"
+            "Ex.: 3 ou irrigação"
+        )
+    elif action == "undo":
+        body = (
+            "Me diga o número ou parte do nome do item para desmarcar.\n"
+            "Ex.: 2 ou biguá"
+        )
+    elif action == "remove":
+        body = (
+            "Me diga o número ou parte do nome do item para remover.\n"
+            "Ex.: 5 ou plantadeiras"
+        )
+    else:
+        return False
+
+    send_text(manager.phone_e164, body)
     return True
 
 
-def _send_agenda_undo_picker(manager, checkin):
+def _handle_agenda_pending_action_text(manager, checkin, text, now):
+    action = _get_agenda_pending_action(checkin)
+    if not action:
+        return False
+
     from .models import AgendaItem
 
-    items = list(
-        AgendaItem.objects.filter(checkin=checkin, status="done")
-        .order_by("idx")[:10]
-    )
-
-    if not items:
-        send_text(manager.phone_e164, "Nenhum item concluído para desmarcar.")
-        _send_agenda_action_menu(manager, checkin)
+    raw = (text or "").strip()
+    if not raw:
+        send_text(
+            manager.phone_e164,
+            "Responda com o número da agenda ou parte do nome do item."
+        )
         return True
 
-    sections = [{
-        "title": "Itens concluídos",
-        "rows": [
-            {
-                "id": f"AM:UNDO:{it.id}",
-                "title": _wa_row_title(it.idx, it.text),
-                "description": _wa_row_desc(it.text),
-            }
-            for it in items
-        ],
-    }]
+    matches = _find_agenda_matches_by_number_or_text(checkin, raw)
 
-    body = "Selecione o item para reabrir:"
-    resp = send_list(
-        manager.phone_e164,
-        body=body,
-        button_text="Selecionar",
-        sections=sections,
-    )
+    if action == "done":
+        matches = [it for it in matches if it and it.status != "done"]
+        if matches and len(matches) == 1 and matches[0].status == "skip":
+            # concluir um item pulado deve reabrir como done normalmente
+            pass
+    elif action == "undo":
+        matches = [it for it in matches if it and it.status != "open"]
+    elif action == "remove":
+        matches = [it for it in matches if it]
+    else:
+        return False
 
-    _log_outbound_interactive(
-        manager=manager,
-        checkin=checkin,
-        body=body,
-        resp=resp,
-        kind="agenda_undo_picker",
-    )
-
-    return True
-
-
-def _send_agenda_remove_picker(manager, checkin):
-    from .models import AgendaItem
-
-    items = list(
-        AgendaItem.objects.filter(checkin=checkin)
-        .order_by("idx")[:10]
-    )
-
-    if not items:
-        send_text(manager.phone_e164, "Agenda vazia.")
+    if not matches:
+        if action == "done":
+            send_text(
+                manager.phone_e164,
+                "Não achei item pendente com esse número ou texto. Responda com o número da agenda ou parte do nome."
+            )
+        elif action == "undo":
+            send_text(
+                manager.phone_e164,
+                "Não achei item concluído/pulado com esse número ou texto. Responda com o número da agenda ou parte do nome."
+            )
+        else:
+            send_text(
+                manager.phone_e164,
+                "Não achei esse item. Responda com o número da agenda ou parte do nome."
+            )
         return True
 
-    sections = [{
-        "title": "Remover item",
-        "rows": [
-            {
-                "id": f"AM:REMOVE:{it.id}",
-                "title": _wa_row_title(it.idx, it.text),
-                "description": _wa_row_desc(it.text),
-            }
-            for it in items
-        ],
-    }]
+    if len(matches) > 1:
+        preview = "\n".join([f"{it.idx}) {it.text}" for it in matches[:8]])
+        if len(matches) > 8:
+            preview += "\n..."
+        send_text(
+            manager.phone_e164,
+            "Encontrei mais de um item com esse texto:\n"
+            f"{preview}\n\n"
+            "Responda com o número correto."
+        )
+        return True
 
-    body = "Selecione o item para remover:"
-    resp = send_list(
-        manager.phone_e164,
-        body=body,
-        button_text="Selecionar",
-        sections=sections,
-    )
+    it = matches[0]
 
-    _log_outbound_interactive(
-        manager=manager,
-        checkin=checkin,
-        body=body,
-        resp=resp,
-        kind="agenda_remove_picker",
-    )
+    if action == "done":
+        if it.status == "done":
+            logger.warning(
+                "AGENDA_PENDING_DUPLICATE_DONE_IGNORED manager=%s checkin_id=%s idx=%s",
+                getattr(manager, "name", ""),
+                getattr(checkin, "id", None),
+                it.idx,
+            )
+            send_text(manager.phone_e164, "Esse item já está concluído. Me diga outro item.")
+            return True
 
+        it.status = "done"
+        it.done_at = now
+        it.save(update_fields=["status", "done_at"])
+        header = f"✅ Item concluído: {it.idx}) {it.text}"
+
+    elif action == "undo":
+        if it.status == "open":
+            logger.warning(
+                "AGENDA_PENDING_DUPLICATE_UNDO_IGNORED manager=%s checkin_id=%s idx=%s",
+                getattr(manager, "name", ""),
+                getattr(checkin, "id", None),
+                it.idx,
+            )
+            send_text(manager.phone_e164, "Esse item já está em aberto. Me diga outro item.")
+            return True
+
+        it.status = "open"
+        it.done_at = None
+        it.save(update_fields=["status", "done_at"])
+        header = f"↩️ Item reaberto: {it.idx}) {it.text}"
+
+    elif action == "remove":
+        idx = it.idx
+        txt = it.text
+        it.delete()
+        header = f"🗑️ Item removido: {idx}) {txt}"
+
+    else:
+        return False
+
+    _clear_agenda_pending_action(checkin, now)
+    _send_agenda_snapshot(manager, checkin, header=header)
+    _send_agenda_action_menu(manager, checkin)
     return True
 
 
@@ -341,93 +428,14 @@ def _agenda_next_idx(checkin):
 
 
 def _handle_agenda_menu_action(*, manager, checkin, reply_id: str, now):
-    from .models import AgendaItem
-
     if reply_id == "AM:MENU:DONE":
-        return _send_agenda_done_picker(manager, checkin)
+        return _send_agenda_pending_action_prompt(manager, checkin, "done", now)
 
     if reply_id == "AM:MENU:UNDO":
-        return _send_agenda_undo_picker(manager, checkin)
+        return _send_agenda_pending_action_prompt(manager, checkin, "undo", now)
 
     if reply_id == "AM:MENU:REMOVE":
-        return _send_agenda_remove_picker(manager, checkin)
-
-    if reply_id.startswith("AM:DONE:"):
-        try:
-            item_id = int(reply_id.split(":")[2])
-        except Exception:
-            return False
-
-        it = AgendaItem.objects.filter(id=item_id, checkin=checkin).first()
-        if not it:
-            send_text(manager.phone_e164, "Não achei esse item.")
-            return True
-
-        if it.status == "done":
-            logger.warning(
-                "AGENDA_MENU_DUPLICATE_DONE_IGNORED manager=%s checkin_id=%s item_id=%s idx=%s",
-                getattr(manager, "name", ""),
-                getattr(checkin, "id", None),
-                it.id,
-                it.idx,
-            )
-            return True
-
-        it.status = "done"
-        it.done_at = now
-        it.save(update_fields=["status", "done_at"])
-
-        _send_agenda_snapshot(manager, checkin, header=f"✅ Item concluído: {it.idx}) {it.text}")
-        _send_agenda_action_menu(manager, checkin)
-        return True
-
-    if reply_id.startswith("AM:UNDO:"):
-        try:
-            item_id = int(reply_id.split(":")[2])
-        except Exception:
-            return False
-
-        it = AgendaItem.objects.filter(id=item_id, checkin=checkin).first()
-        if not it:
-            send_text(manager.phone_e164, "Não achei esse item.")
-            return True
-
-        if it.status == "open":
-            logger.warning(
-                "AGENDA_MENU_DUPLICATE_UNDO_IGNORED manager=%s checkin_id=%s item_id=%s idx=%s",
-                getattr(manager, "name", ""),
-                getattr(checkin, "id", None),
-                it.id,
-                it.idx,
-            )
-            return True
-
-        it.status = "open"
-        it.done_at = None
-        it.save(update_fields=["status", "done_at"])
-
-        _send_agenda_snapshot(manager, checkin, header=f"↩️ Item reaberto: {it.idx}) {it.text}")
-        _send_agenda_action_menu(manager, checkin)
-        return True
-
-    if reply_id.startswith("AM:REMOVE:"):
-        try:
-            item_id = int(reply_id.split(":")[2])
-        except Exception:
-            return False
-
-        it = AgendaItem.objects.filter(id=item_id, checkin=checkin).first()
-        if not it:
-            send_text(manager.phone_e164, "Não achei esse item.")
-            return True
-
-        txt = it.text
-        idx = it.idx
-        it.delete()
-
-        _send_agenda_snapshot(manager, checkin, header=f"🗑️ Item removido: {idx}) {txt}")
-        _send_agenda_action_menu(manager, checkin)
-        return True
+        return _send_agenda_pending_action_prompt(manager, checkin, "remove", now)
 
     return False
 
@@ -446,6 +454,9 @@ def _handle_agenda_text_command(manager, checkin, text, now):
     from .models import AgendaItem
 
     t = (text or "").strip()
+
+    if _handle_agenda_pending_action_text(manager, checkin, t, now):
+        return True
 
     if CMD_LIST.match(t):
         send_text(manager.phone_e164, _agenda_reply_text(checkin))
