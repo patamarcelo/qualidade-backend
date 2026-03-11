@@ -236,6 +236,146 @@ from io import BytesIO
 from openpyxl.styles import numbers
 
 
+import json
+import logging
+import re
+
+logger = logging.getLogger(__name__)
+
+
+def _try_json_loads(raw_body):
+    if not raw_body:
+        return None
+    try:
+        return json.loads(raw_body)
+    except Exception as e:
+        logger.warning("JSON normal falhou: %s", e)
+        return None
+
+
+def _extract_balanced_json_object(text, start_idx):
+    """
+    Recebe uma string e o índice de um '{'.
+    Retorna (obj_str, end_idx) do objeto JSON balanceado.
+    """
+    if start_idx < 0 or start_idx >= len(text) or text[start_idx] != "{":
+        return None, start_idx
+
+    depth = 0
+    in_string = False
+    escape = False
+
+    for i in range(start_idx, len(text)):
+        ch = text[i]
+
+        if escape:
+            escape = False
+            continue
+
+        if ch == "\\":
+            escape = True
+            continue
+
+        if ch == '"':
+            in_string = not in_string
+            continue
+
+        if not in_string:
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    return text[start_idx:i + 1], i + 1
+
+    return None, start_idx
+
+
+def _repair_protheus_payload(raw_body):
+    """
+    Corrige payloads onde `retorno` vem assim:
+    "retorno":"{...objeto json sem escape...}"
+    e transforma em:
+    "retorno": {...}
+    """
+    if not raw_body or '"retorno":"{' not in raw_body:
+        return raw_body
+
+    s = raw_body
+    result = []
+    i = 0
+
+    while i < len(s):
+        marker = '"retorno":"{'
+        pos = s.find(marker, i)
+
+        if pos == -1:
+            result.append(s[i:])
+            break
+
+        # copia tudo antes do marker
+        result.append(s[i:pos])
+
+        # escreve início corrigido
+        result.append('"retorno":')
+
+        # posição do primeiro { do objeto interno
+        obj_start = pos + len('"retorno":"')
+        obj_str, obj_end = _extract_balanced_json_object(s, obj_start)
+
+        if not obj_str:
+            # falhou, mantém resto original
+            result.append(s[pos:])
+            break
+
+        result.append(obj_str)
+
+        # depois do objeto, normalmente ainda existe a aspa de fechamento da string original
+        # padrão esperado: ...}}"
+        next_i = obj_end
+        if next_i < len(s) and s[next_i] == '"':
+            next_i += 1
+
+        i = next_i
+
+    repaired = "".join(result)
+    return repaired
+
+
+def _parse_protheus_payload(raw_body):
+    """
+    Estratégia:
+    1) tenta parse normal
+    2) tenta corrigir retorno quebrado e parsear novamente
+    3) retorna dict ou {}
+    """
+    data = _try_json_loads(raw_body)
+    if isinstance(data, dict):
+        return data
+
+    repaired = _repair_protheus_payload(raw_body)
+    if repaired != raw_body:
+        logger.warning("Payload Protheus reparado via fallback.")
+        data = _try_json_loads(repaired)
+        if isinstance(data, dict):
+            return data
+
+    return {}
+
+
+def _safe_json_loads(value):
+    """
+    Tenta fazer json.loads sem quebrar.
+    Se falhar, retorna o valor original.
+    """
+    if not isinstance(value, str):
+        return value
+
+    try:
+        return json.loads(value)
+    except Exception:
+        return value
+
 class CachedTokenAuthentication(TokenAuthentication):
     def authenticate(self, request):
         # Ensure that the Authorization header exists
@@ -5638,44 +5778,11 @@ class DefensivoViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["POST"])
     def payload_from_protheus_to_farmbox(self, request):
-        def _safe_json_loads(value):
-            if isinstance(value, (dict, list)):
-                return value
-            if not value or not isinstance(value, str):
-                return value
-            try:
-                return json.loads(value)
-            except Exception:
-                return value
-
-        def _normalize_payload(data):
-            if isinstance(data, QueryDict):
-                return data.dict()
-            return data
-
-        def _to_pretty_json(value):
-            try:
-                return json.dumps(value, ensure_ascii=False, indent=2)
-            except Exception:
-                return str(value)
-
-        def _extract_nested(obj, *keys, default=None):
-            current = obj
-            for key in keys:
-                if not isinstance(current, dict):
-                    return default
-                current = current.get(key)
-                if current is None:
-                    return default
-            return current
-
-        # 1) body bruto
         try:
             raw_body = request.body.decode("utf-8") if request.body else ""
         except Exception as e:
             raw_body = f"Erro ao tentar ler o body: {e}"
 
-        # 2) request.data
         try:
             payload_data = request.data
         except Exception:
@@ -5683,19 +5790,28 @@ class DefensivoViewSet(viewsets.ModelViewSet):
 
         query_params = request.query_params
 
-        # 3) fallback manual
-        if (payload_data is None or payload_data == "" or payload_data == {} or payload_data == []) and raw_body:
-            try:
-                payload_data = json.loads(raw_body)
-            except json.JSONDecodeError:
-                payload_data = None
+        parsed_data = None
 
-        payload = _normalize_payload(payload_data) or {}
+        # 1) usa request.data se vier certo
+        if isinstance(payload_data, dict) and payload_data:
+            parsed_data = payload_data
+            logger.warning("Protheus: usando request.data parseado pelo DRF.")
 
-        if not isinstance(payload, dict):
-            payload = {"payload": payload}
+        # 2) fallback robusto via raw_body
+        if not parsed_data:
+            parsed_data = _parse_protheus_payload(raw_body)
+            logger.warning("Protheus: usando parse robusto do raw_body.")
 
-        itens = payload.get("itens", [])
+        # 3) garantia
+        if not isinstance(parsed_data, dict):
+            parsed_data = {}
+
+        logger.warning("PAYLOAD FINAL PROTHEUS: %s", parsed_data)
+
+        doc = parsed_data.get("doc") or "-"
+        filial_origem = parsed_data.get("filial_origem") or "-"
+        itens = parsed_data.get("itens") or []
+
         if not isinstance(itens, list):
             itens = []
 
@@ -5719,21 +5835,30 @@ class DefensivoViewSet(viewsets.ModelViewSet):
             except Exception:
                 pass
 
-            sucesso = bool(item_enriched.get("sucesso"))
+            sucesso_raw = item_enriched.get("sucesso")
+            sucesso = bool(sucesso_raw)
+
             if sucesso:
                 sucesso_count += 1
             else:
                 erro_count += 1
 
             retorno_raw = item_enriched.get("retorno")
-            retorno_parsed = _safe_json_loads(retorno_raw)
+            retorno_parsed = retorno_raw
 
-            # se vier string quase-json, tenta uma limpeza leve
-            if isinstance(retorno_parsed, str):
-                try:
-                    retorno_parsed = json.loads(retorno_parsed.replace('\\"', '"'))
-                except Exception:
-                    pass
+            # tenta interpretar retorno
+            if isinstance(retorno_raw, dict):
+                retorno_parsed = retorno_raw
+            elif isinstance(retorno_raw, str):
+                retorno_parsed = _safe_json_loads(retorno_raw)
+
+                # se _safe_json_loads devolver a própria string ou não resolver,
+                # tenta uma segunda abordagem leve
+                if isinstance(retorno_parsed, str):
+                    try:
+                        retorno_parsed = json.loads(retorno_raw.replace('\\"', '"'))
+                    except Exception:
+                        retorno_parsed = retorno_raw
 
             input_id = None
             storage_id = None
@@ -5768,7 +5893,7 @@ class DefensivoViewSet(viewsets.ModelViewSet):
 
             itens_enriched.append(item_enriched)
 
-        payload_enriched = dict(payload)
+        payload_enriched = dict(parsed_data)
         payload_enriched["itens"] = itens_enriched
 
         received_at = timezone.now()
@@ -5785,6 +5910,7 @@ class DefensivoViewSet(viewsets.ModelViewSet):
         print(f"1. request.body (Texto BRUTO lido primeiro): {raw_body}")
         print(f"2. request.data (Parseado pelo DRF): {payload_data}")
         print(f"3. request.query_params (URL): {query_params}")
+        print(f"4. parsed_data final: {parsed_data}")
         print("=======================================================\n")
 
         email_sent = False
@@ -5804,8 +5930,8 @@ class DefensivoViewSet(viewsets.ModelViewSet):
                     if isinstance(payload_enriched, (dict, list))
                     else [("payload", payload_enriched)],
                     "payload": payload_enriched,
-                    "doc": payload_enriched.get("doc"),
-                    "filial_origem": payload_enriched.get("filial_origem"),
+                    "doc": payload_enriched.get("doc") or "-",
+                    "filial_origem": payload_enriched.get("filial_origem") or "-",
                     "itens": itens_enriched,
                     "itens_count": len(itens_enriched),
                     "sucesso_count": sucesso_count,
@@ -5835,6 +5961,7 @@ class DefensivoViewSet(viewsets.ModelViewSet):
         except Exception as e:
             email_sent = False
             email_error = str(e)
+            logger.exception("Erro ao enviar e-mail do payload do Protheus")
 
         return Response(
             {
@@ -5845,8 +5972,8 @@ class DefensivoViewSet(viewsets.ModelViewSet):
                 "email_sent": email_sent,
                 "email_error": email_error,
                 "gmail_result": gmail_result,
-                "doc": payload_enriched.get("doc"),
-                "filial_origem": payload_enriched.get("filial_origem"),
+                "doc": payload_enriched.get("doc") or "-",
+                "filial_origem": payload_enriched.get("filial_origem") or "-",
                 "itens_count": len(itens_enriched),
                 "sucesso_count": sucesso_count,
                 "erro_count": erro_count,
@@ -5855,6 +5982,7 @@ class DefensivoViewSet(viewsets.ModelViewSet):
             },
             status=status.HTTP_200_OK,
         )
+        
         
     def processar_em_background(self, task_id):
         # ✅ threads precisam disso (evita usar conexão herdada do request)
