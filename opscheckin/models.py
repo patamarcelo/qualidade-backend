@@ -55,14 +55,24 @@ class ManagerNotificationSubscription(models.Model):
 class Manager(models.Model):
     name = models.CharField(max_length=80)
     phone_e164 = models.CharField(max_length=20, unique=True)  # ex: 5551999999999
-    is_active = models.BooleanField(default=True)
     
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Participa do fluxo de agenda diária"
+    )
+    
+    is_active_resume_agenda = models.BooleanField(
+        default=False,
+        help_text="Recebe o resumo consolidado da agenda (diretoria)"
+    )
     notification_types = models.ManyToManyField(
         "NotificationType",
         through="ManagerNotificationSubscription",
         blank=True,
         related_name="managers",
     )
+    
+    
     
     def clean(self):
         super().clean()

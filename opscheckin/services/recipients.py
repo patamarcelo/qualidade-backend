@@ -13,6 +13,17 @@ def managers_subscribed(code: str, *, include_inactive: bool = False):
     )
 
     if not include_inactive:
-        qs = qs.filter(is_active=True)
+
+        # fluxo normal da agenda
+        if code == "agenda_prompt":
+            qs = qs.filter(is_active=True)
+
+        # resumo para diretores
+        elif code == "agenda_summary_director":
+            qs = qs.filter(is_active_resume_agenda=True)
+
+        # fallback
+        else:
+            qs = qs.filter(is_active=True)
 
     return qs

@@ -55,7 +55,7 @@ class ManagerAdminForm(forms.ModelForm):
 
     class Meta:
         model = Manager
-        fields = ("name", "country", "ddd", "number", "is_active")
+        fields = ("name", "country", "ddd", "number", "is_active", 'is_active_resume_agenda')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -100,6 +100,7 @@ class ManagerAdmin(admin.ModelAdmin):
         "name",
         "phone_e164",
         "is_active",
+        "is_active_resume_agenda",
         "notification_codes",
         "notifications_count",
         "last_checkin_link",
