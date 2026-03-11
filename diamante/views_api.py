@@ -101,6 +101,7 @@ import json
 import csv
 
 
+
 from colorama import init as colorama_init
 from colorama import Fore
 from colorama import Style
@@ -5633,16 +5634,48 @@ class DefensivoViewSet(viewsets.ModelViewSet):
             },
             status=status.HTTP_200_OK,
         )
-    
+
+
     @action(detail=False, methods=["POST"])
     def payload_from_protheus_to_farmbox(self, request):
-        # 1) Lê o body bruto primeiro
+        def _safe_json_loads(value):
+            if isinstance(value, (dict, list)):
+                return value
+            if not value or not isinstance(value, str):
+                return value
+            try:
+                return json.loads(value)
+            except Exception:
+                return value
+
+        def _normalize_payload(data):
+            if isinstance(data, QueryDict):
+                return data.dict()
+            return data
+
+        def _to_pretty_json(value):
+            try:
+                return json.dumps(value, ensure_ascii=False, indent=2)
+            except Exception:
+                return str(value)
+
+        def _extract_nested(obj, *keys, default=None):
+            current = obj
+            for key in keys:
+                if not isinstance(current, dict):
+                    return default
+                current = current.get(key)
+                if current is None:
+                    return default
+            return current
+
+        # 1) body bruto
         try:
             raw_body = request.body.decode("utf-8") if request.body else ""
         except Exception as e:
             raw_body = f"Erro ao tentar ler o body: {e}"
 
-        # 2) Depois request.data (DRF)
+        # 2) request.data
         try:
             payload_data = request.data
         except Exception:
@@ -5650,41 +5683,101 @@ class DefensivoViewSet(viewsets.ModelViewSet):
 
         query_params = request.query_params
 
-        # 3) Fallback: parse manual se request.data vier vazio/None mas raw_body tiver conteúdo
-        if (payload_data is None or payload_data == "" or payload_data == {} or payload_data == [] ) and raw_body:
+        # 3) fallback manual
+        if (payload_data is None or payload_data == "" or payload_data == {} or payload_data == []) and raw_body:
             try:
                 payload_data = json.loads(raw_body)
             except json.JSONDecodeError:
                 payload_data = None
 
-        payload = payload_data or {}
+        payload = _normalize_payload(payload_data) or {}
 
-        # ✅ multipart/form-data vem QueryDict → normaliza pra dict simples
-        if isinstance(payload, QueryDict):
-            payload = payload.dict()
-        # ✅ Enriquecimento: storage_id -> storage_name (via JSON local)
-        storage_id = payload.get("storage_id") if isinstance(payload, dict) else None
-        storage_name = resolve_storage_name(storage_id) if storage_id is not None else None
+        if not isinstance(payload, dict):
+            payload = {"payload": payload}
 
-        payload_enriched = dict(payload) if isinstance(payload, dict) else payload
-        if isinstance(payload_enriched, dict):
-            payload_enriched["storage_name"] = storage_name
-        
-        # buscar nome do defensivo pelo input_id
-        input_id = payload.get("input_id") if isinstance(payload, dict) else None
-        defensivo_nome = resolve_defensivo_nome(input_id) if input_id is not None else None
+        itens = payload.get("itens", [])
+        if not isinstance(itens, list):
+            itens = []
 
-        if isinstance(payload_enriched, dict):
-            payload_enriched["defensivo_nome"] = defensivo_nome
-        
+        itens_enriched = []
+        total_quantidade = 0
+        sucesso_count = 0
+        erro_count = 0
+
+        for idx, item in enumerate(itens, start=1):
+            if isinstance(item, QueryDict):
+                item = item.dict()
+
+            if not isinstance(item, dict):
+                item = {"raw_item": item}
+
+            item_enriched = dict(item)
+
+            quantidade = item_enriched.get("quantidade")
+            try:
+                total_quantidade += float(quantidade or 0)
+            except Exception:
+                pass
+
+            sucesso = bool(item_enriched.get("sucesso"))
+            if sucesso:
+                sucesso_count += 1
+            else:
+                erro_count += 1
+
+            retorno_raw = item_enriched.get("retorno")
+            retorno_parsed = _safe_json_loads(retorno_raw)
+
+            # se vier string quase-json, tenta uma limpeza leve
+            if isinstance(retorno_parsed, str):
+                try:
+                    retorno_parsed = json.loads(retorno_parsed.replace('\\"', '"'))
+                except Exception:
+                    pass
+
+            input_id = None
+            storage_id = None
+            storage_name = None
+            defensivo_nome = None
+
+            if isinstance(retorno_parsed, dict):
+                input_id = retorno_parsed.get("input_id")
+                storage_id = retorno_parsed.get("storage_id")
+            else:
+                input_id = item_enriched.get("input_id")
+                storage_id = item_enriched.get("storage_id")
+
+            if storage_id is not None:
+                try:
+                    storage_name = resolve_storage_name(storage_id)
+                except Exception:
+                    storage_name = None
+
+            if input_id is not None:
+                try:
+                    defensivo_nome = resolve_defensivo_nome(input_id)
+                except Exception:
+                    defensivo_nome = None
+
+            item_enriched["retorno_parsed"] = retorno_parsed
+            item_enriched["input_id"] = input_id
+            item_enriched["storage_id"] = storage_id
+            item_enriched["storage_name"] = storage_name
+            item_enriched["defensivo_nome"] = defensivo_nome
+            item_enriched["item_index"] = idx
+
+            itens_enriched.append(item_enriched)
+
+        payload_enriched = dict(payload)
+        payload_enriched["itens"] = itens_enriched
 
         received_at = timezone.now()
 
-        # ⚠️ headers podem ter token; mascarar SEMPRE (inclusive no print)
+        # headers mascarados
         headers_dict = dict(request.headers) if hasattr(request, "headers") else {}
         safe_headers = self._mask_sensitive_headers(headers_dict)
 
-        # DEBUG opcional
+        # debug
         print("\n================ INVESTIGAÇÃO PROTHEUS ================")
         print(f"Content-Type recebido: {request.content_type}")
         print(f"Headers (masked): {safe_headers}")
@@ -5710,15 +5803,23 @@ class DefensivoViewSet(viewsets.ModelViewSet):
                     "payload_rows": self._dict_to_rows(payload_enriched)
                     if isinstance(payload_enriched, (dict, list))
                     else [("payload", payload_enriched)],
-                    "defensivo_nome": defensivo_nome,
-                    "storage_name": storage_name,  # opcional pro resumo
+                    "payload": payload_enriched,
+                    "doc": payload_enriched.get("doc"),
+                    "filial_origem": payload_enriched.get("filial_origem"),
+                    "itens": itens_enriched,
+                    "itens_count": len(itens_enriched),
+                    "sucesso_count": sucesso_count,
+                    "erro_count": erro_count,
+                    "total_quantidade": total_quantidade,
                 },
             )
 
-            subject = f"[Protheus] Payload recebido ({received_at.strftime('%Y-%m-%d %H:%M:%S')})"
+            subject = (
+                f"[Protheus] Payload recebido - doc {payload_enriched.get('doc', '-')}"
+                f" ({received_at.strftime('%Y-%m-%d %H:%M:%S')})"
+            )
             to_emails = ["marcelo@gdourado.com.br"]
 
-            # ✅ usa sua Gmail API
             gmail_result = send_mail_gmail_api(
                 subject=subject,
                 body_html=html,
@@ -5744,12 +5845,17 @@ class DefensivoViewSet(viewsets.ModelViewSet):
                 "email_sent": email_sent,
                 "email_error": email_error,
                 "gmail_result": gmail_result,
-                "storage_name": storage_name,
+                "doc": payload_enriched.get("doc"),
+                "filial_origem": payload_enriched.get("filial_origem"),
+                "itens_count": len(itens_enriched),
+                "sucesso_count": sucesso_count,
+                "erro_count": erro_count,
+                "total_quantidade": total_quantidade,
                 "payload": payload_enriched,
             },
             status=status.HTTP_200_OK,
         )
-    
+        
     def processar_em_background(self, task_id):
         # ✅ threads precisam disso (evita usar conexão herdada do request)
         close_old_connections()

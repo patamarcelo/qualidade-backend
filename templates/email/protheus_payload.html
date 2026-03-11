@@ -9,9 +9,8 @@
 <body style="margin:0;padding:0;background-color:#f4f6f9;font-family:Arial,Helvetica,sans-serif;">
 
   <div
-    style="max-width:1000px;margin:30px auto;background:#ffffff;border-radius:10px;padding:28px;box-shadow:0 4px 12px rgba(0,0,0,0.08);">
+    style="max-width:1100px;margin:30px auto;background:#ffffff;border-radius:10px;padding:28px;box-shadow:0 4px 12px rgba(0,0,0,0.08);">
 
-    <!-- HEADER -->
     <h2 style="margin:0 0 8px 0;color:#111827;">
       📦 Payload recebido do Protheus
     </h2>
@@ -22,104 +21,163 @@
       <strong>Query Params:</strong> {{ query_params }}
     </p>
 
-    <!-- RESUMO EXECUTIVO -->
+    <!-- RESUMO GERAL -->
     <div style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;margin:0 0 22px 0;">
       <div style="background:#f9fafb;padding:12px 14px;border-bottom:1px solid #e5e7eb;">
-        <h3 style="margin:0;color:#111827;font-size:15px;">✅ Resumo</h3>
+        <h3 style="margin:0;color:#111827;font-size:15px;">✅ Resumo geral</h3>
         <p style="margin:6px 0 0 0;color:#6b7280;font-size:12px;">
-          Campos principais (se existirem no payload).
+          Informações principais do lote recebido.
         </p>
       </div>
 
       <table style="border-collapse:collapse;width:100%;font-size:14px;">
         <tbody>
           <tr>
-            <td style="width:200px;padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;background:#ffffff;">
-              <strong>input_id</strong>
+            <td style="width:220px;padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;">
+              <strong>doc</strong>
             </td>
             <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;font-family:monospace;color:#111827;">
-              {% if payload_rows %}
-              {% for k,v in payload_rows %}{% if k == "input_id" %}{{ v }}{% endif %}{% endfor %}
-              {% else %}-{% endif %}
+              {{ doc|default:"-" }}
             </td>
           </tr>
           <tr>
-            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;background:#ffffff;">
-              <strong>produto</strong>
+            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;">
+              <strong>filial_origem</strong>
             </td>
             <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;font-family:monospace;color:#111827;">
-              {% if defensivo_nome %}
-              {{ defensivo_nome }}
-              {% else %}
-              -
-              {% endif %}
+              {{ filial_origem|default:"-" }}
             </td>
           </tr>
-
           <tr>
-            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;background:#ffffff;">
-              <strong>storage_id</strong>
+            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;">
+              <strong>quantidade de itens</strong>
             </td>
             <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;font-family:monospace;color:#111827;">
-              {% if payload_rows %}
-              {% for k,v in payload_rows %}{% if k == "storage_id" %}{{ v }}{% endif %}{% endfor %}
-              {% else %}-{% endif %}
+              {{ itens_count }}
             </td>
           </tr>
-
           <tr>
-            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;background:#ffffff;">
-              <strong>storage_name</strong>
+            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;">
+              <strong>itens com sucesso</strong>
             </td>
             <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;font-family:monospace;color:#111827;">
-              {% if storage_name %}
-              {{ storage_name }}
-              {% else %}
-              {% if payload_rows %}
-              {% for k,v in payload_rows %}{% if k == "storage_name" %}{{ v }}{% endif %}{% endfor %}
-              {% else %}-{% endif %}
-              {% endif %}
+              {{ sucesso_count }}
             </td>
           </tr>
-
-
           <tr>
-            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;background:#ffffff;">
-              <strong>movimentation_type</strong>
+            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;">
+              <strong>itens com erro</strong>
             </td>
             <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;font-family:monospace;color:#111827;">
-              {% if payload_rows %}
-              {% for k,v in payload_rows %}{% if k == "movimentation_type" %}{{ v }}{% endif %}{% endfor %}
-              {% else %}-{% endif %}
+              {{ erro_count }}
             </td>
           </tr>
-
           <tr>
-            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;background:#ffffff;">
-              <strong>quantity</strong>
-            </td>
-            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;font-family:monospace;color:#111827;">
-              {% if payload_rows %}
-              {% for k,v in payload_rows %}{% if k == "quantity" %}{{ v }}{% endif %}{% endfor %}
-              {% else %}-{% endif %}
-            </td>
-          </tr>
-
-          <tr>
-            <td style="padding:10px 12px;color:#374151;background:#ffffff;">
-              <strong>date</strong>
+            <td style="padding:10px 12px;color:#374151;">
+              <strong>quantidade total</strong>
             </td>
             <td style="padding:10px 12px;font-family:monospace;color:#111827;">
-              {% if payload_rows %}
-              {% for k,v in payload_rows %}{% if k == "date" %}{{ v }}{% endif %}{% endfor %}
-              {% else %}-{% endif %}
+              {{ total_quantidade }}
             </td>
           </tr>
         </tbody>
       </table>
     </div>
 
-    <!-- TABELA COMPLETA DO PAYLOAD -->
+    <!-- ITENS -->
+    <h3 style="margin:0 0 10px 0;color:#111827;">📋 Itens recebidos</h3>
+
+    <table style="border-collapse:collapse;width:100%;font-size:13px;margin-bottom:22px;">
+      <thead>
+        <tr style="background:#f3f4f6;">
+          <th style="text-align:left;padding:10px;border:1px solid #e5e7eb;">#</th>
+          <th style="text-align:left;padding:10px;border:1px solid #e5e7eb;">Produto</th>
+          <th style="text-align:left;padding:10px;border:1px solid #e5e7eb;">Defensivo</th>
+          <th style="text-align:left;padding:10px;border:1px solid #e5e7eb;">Quantidade</th>
+          <th style="text-align:left;padding:10px;border:1px solid #e5e7eb;">Filial destino</th>
+          <th style="text-align:left;padding:10px;border:1px solid #e5e7eb;">Armazém destino</th>
+          <th style="text-align:left;padding:10px;border:1px solid #e5e7eb;">Input ID</th>
+          <th style="text-align:left;padding:10px;border:1px solid #e5e7eb;">Storage ID</th>
+          <th style="text-align:left;padding:10px;border:1px solid #e5e7eb;">Storage Name</th>
+          <th style="text-align:left;padding:10px;border:1px solid #e5e7eb;">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if itens %}
+        {% for item in itens %}
+        <tr>
+          <td style="padding:8px;border:1px solid #e5e7eb;font-family:monospace;">
+            {{ forloop.counter }}
+          </td>
+          <td style="padding:8px;border:1px solid #e5e7eb;font-family:monospace;">
+            {{ item.produto|default:"-" }}
+          </td>
+          <td style="padding:8px;border:1px solid #e5e7eb;">
+            {{ item.defensivo_nome|default:"-" }}
+          </td>
+          <td style="padding:8px;border:1px solid #e5e7eb;font-family:monospace;">
+            {{ item.quantidade|default:"-" }}
+          </td>
+          <td style="padding:8px;border:1px solid #e5e7eb;font-family:monospace;">
+            {{ item.filial_destino|default:"-" }}
+          </td>
+          <td style="padding:8px;border:1px solid #e5e7eb;font-family:monospace;">
+            {{ item.armazem_destino|default:"-" }}
+          </td>
+          <td style="padding:8px;border:1px solid #e5e7eb;font-family:monospace;">
+            {{ item.input_id|default:"-" }}
+          </td>
+          <td style="padding:8px;border:1px solid #e5e7eb;font-family:monospace;">
+            {{ item.storage_id|default:"-" }}
+          </td>
+          <td style="padding:8px;border:1px solid #e5e7eb;">
+            {{ item.storage_name|default:"-" }}
+          </td>
+          <td style="padding:8px;border:1px solid #e5e7eb;">
+            {% if item.sucesso %}
+            <span style="color:#065f46;font-weight:bold;">✅ Sucesso</span>
+            {% else %}
+            <span style="color:#991b1b;font-weight:bold;">❌ Erro</span>
+            {% endif %}
+          </td>
+        </tr>
+
+        <!-- LINHA EXTRA COM RETORNO -->
+        <tr style="background:#fafafa;">
+          <td colspan="10" style="padding:10px;border:1px solid #e5e7eb;">
+            <div style="font-size:12px;color:#374151;margin-bottom:6px;">
+              <strong>Retorno Farmbox:</strong>
+            </div>
+            <div style="
+                background:#111827;
+                color:#f9fafb;
+                padding:12px;
+                border-radius:8px;
+                font-family:monospace;
+                font-size:12px;
+                white-space:pre-wrap;
+                word-break:break-word;
+              ">
+              {% if item.retorno_parsed %}
+              {{ item.retorno_parsed }}
+              {% else %}
+              {{ item.retorno|default:"-" }}
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+        {% else %}
+        <tr>
+          <td colspan="10" style="padding:10px;border:1px solid #e5e7eb;text-align:center;">
+            Nenhum item recebido
+          </td>
+        </tr>
+        {% endif %}
+      </tbody>
+    </table>
+
+    <!-- PAYLOAD COMPLETO -->
     <h3 style="margin:0 0 10px 0;color:#111827;">🔎 Payload completo</h3>
 
     <table style="border-collapse:collapse;width:100%;font-size:14px;margin-bottom:22px;">
