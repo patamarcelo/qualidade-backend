@@ -1,6 +1,5 @@
 <!doctype html>
 <html lang="pt-br">
-
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -11,6 +10,7 @@
       --bg: #f6f7fb;
       --surface: #ffffff;
       --surface2: #f2f4f8;
+      --surface3: #edf2f7;
       --border: rgba(15, 23, 42, .12);
       --border2: rgba(15, 23, 42, .08);
       --text: #0f172a;
@@ -25,28 +25,24 @@
       --warn: #f59e0b;
       --danger: #ef4444;
 
-      --colW: 440px;
+      --sideW: 320px;
+      --colW: 420px;
       --colGap: 12px;
-      --colHeaderH: 76px;
+      --pad: 10px;
 
-      --pad5: 5px;
-
-      /* WhatsApp-ish ticks */
       --tickGrey: rgba(15, 23, 42, .45);
       --tickBlue: #3b82f6;
     }
 
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
-    html,
-    body {
+    html, body {
       height: 100%;
+      margin: 0;
+      overflow: hidden;
     }
 
     body {
-      margin: 0;
       font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
       color: var(--text);
       background:
@@ -58,8 +54,8 @@
     .top {
       position: sticky;
       top: 0;
-      z-index: 50;
-      background: rgba(246, 247, 251, .90);
+      z-index: 60;
+      background: rgba(246, 247, 251, .92);
       backdrop-filter: blur(10px);
       border-bottom: 1px solid var(--border);
       padding: 8px 10px;
@@ -108,9 +104,7 @@
       margin: 0 0 4px 0;
     }
 
-    input[type="date"],
-    textarea,
-    select {
+    input[type="date"], textarea, select, input[type="text"] {
       background: var(--surface);
       border: 1px solid var(--border);
       color: var(--text);
@@ -129,10 +123,6 @@
       cursor: pointer;
       white-space: nowrap;
       box-shadow: 0 10px 18px rgba(22, 163, 74, .15);
-    }
-
-    .btn:hover {
-      filter: brightness(1.03);
     }
 
     .pillBtn {
@@ -165,7 +155,7 @@
       box-shadow: 0 8px 16px rgba(15, 23, 42, .06);
     }
 
-    details.sender>summary {
+    details.sender > summary {
       cursor: pointer;
       list-style: none;
       display: flex;
@@ -176,9 +166,7 @@
       white-space: nowrap;
     }
 
-    details.sender>summary::-webkit-details-marker {
-      display: none;
-    }
+    details.sender > summary::-webkit-details-marker { display: none; }
 
     .chev {
       width: 26px;
@@ -190,11 +178,10 @@
       border: 1px solid var(--border);
       font-weight: 900;
       color: rgba(15, 23, 42, .70);
+      transition: transform .15s ease;
     }
 
-    details.sender[open] .chev {
-      transform: rotate(180deg);
-    }
+    details.sender[open] .chev { transform: rotate(180deg); }
 
     .senderBody {
       margin-top: 8px;
@@ -204,21 +191,151 @@
       flex-wrap: wrap;
     }
 
-    textarea {
+    .senderBody textarea {
       width: 420px;
       max-width: 520px;
       height: 78px;
       resize: vertical;
     }
 
-    select {
+    .senderBody select {
       width: 320px;
       height: 112px;
     }
 
-    .wrap {
-      height: calc(100vh - 74px);
-      padding: var(--pad5);
+    .app {
+      height: calc(100vh - 60px);
+      display: grid;
+      grid-template-columns: var(--sideW) 1fr;
+      gap: 0;
+      overflow: hidden;
+    }
+
+    .sidebar {
+      border-right: 1px solid var(--border);
+      background: rgba(255, 255, 255, .88);
+      backdrop-filter: blur(10px);
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .sidebarTop {
+      padding: 10px;
+      border-bottom: 1px solid var(--border2);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      background: rgba(255, 255, 255, .92);
+    }
+
+    .sidebarTitle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .searchInput {
+      width: 100%;
+      border-radius: 10px;
+      padding: 9px 10px;
+      font-size: 12px;
+    }
+
+    .conversationList {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 6px;
+    }
+
+    .conversationItem {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 6px 10px;
+      padding: 10px;
+      border-radius: 12px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: .15s ease;
+      margin-bottom: 4px;
+      background: transparent;
+    }
+
+    .conversationItem:hover {
+      background: rgba(15, 23, 42, .035);
+      border-color: rgba(15, 23, 42, .05);
+    }
+
+    .conversationItem.active {
+      background: rgba(22, 163, 74, .10);
+      border-color: rgba(22, 163, 74, .18);
+    }
+
+    .conversationMain {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .conversationHead {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .managerDot {
+      font-size: 11px;
+      line-height: 1;
+    }
+
+    .dotOn { color: #16a34a; }
+    .dotOff { color: #ef4444; }
+
+    .conversationName {
+      font-size: 12.5px;
+      font-weight: 900;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .conversationPreview {
+      font-size: 11px;
+      color: var(--muted);
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .conversationTime {
+      font-size: 11px;
+      color: var(--muted);
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+      align-self: start;
+    }
+
+    .main {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .boardWrap {
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+      padding: var(--pad);
     }
 
     .board {
@@ -231,46 +348,31 @@
       align-items: stretch;
       overflow-x: auto;
       overflow-y: hidden;
-      padding: 0;
       scroll-snap-type: x proximity;
+      padding-bottom: 4px;
     }
 
     .col {
       scroll-snap-align: start;
       width: var(--colW);
       max-width: var(--colW);
-      height: 95%;
-      background: rgba(255, 255, 255, .78);
+      height: 100%;
+      background: rgba(255, 255, 255, .82);
       border: 1px solid var(--border);
-      border-radius: 14px;
+      border-radius: 16px;
       overflow: hidden;
       box-shadow: 0 10px 22px rgba(15, 23, 42, .06);
       display: flex;
       flex-direction: column;
       position: relative;
-      margin-top: 10px;
-    }
-
-    .board .col:not(:last-child)::after {
-      content: "";
-      position: absolute;
-      top: 8px;
-      right: calc(var(--colGap) * -0.5);
-      width: 1px;
-      height: calc(100% - 16px);
-      background: rgba(15, 23, 42, .10);
-      opacity: .55;
-      pointer-events: none;
     }
 
     .colHeader {
-      position: sticky;
-      top: 54px;
-      z-index: 20;
-      background: rgba(255, 255, 255, .92);
+      flex: 0 0 auto;
+      background: rgba(255, 255, 255, .94);
       backdrop-filter: blur(8px);
       border-bottom: 1px solid var(--border2);
-      padding: 8px 9px;
+      padding: 10px;
     }
 
     .colHeaderTop {
@@ -283,13 +385,13 @@
     .mgr {
       display: flex;
       flex-direction: column;
-      gap: 2px;
+      gap: 3px;
       min-width: 0;
     }
 
     .mgrName {
       font-size: 13px;
-      font-weight: 850;
+      font-weight: 900;
       line-height: 1.1;
       white-space: nowrap;
       overflow: hidden;
@@ -297,19 +399,6 @@
       display: flex;
       align-items: center;
       gap: 6px;
-    }
-
-    .dot {
-      font-size: 12px;
-      line-height: 1;
-    }
-
-    .dotOn {
-      color: #16a34a;
-    }
-
-    .dotOff {
-      color: #ef4444;
     }
 
     .state {
@@ -373,7 +462,7 @@
     }
 
     .colMeta {
-      margin-top: 6px;
+      margin-top: 8px;
       display: flex;
       gap: 6px;
       flex-wrap: wrap;
@@ -383,19 +472,23 @@
 
     .pill {
       padding: 3px 8px;
-      border-radius: 4px;
+      border-radius: 999px;
       border: 1px solid var(--border2);
       background: rgba(15, 23, 42, .03);
     }
 
-    /* thread scroll, leaving space for composer at bottom */
     .thread {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 10px;
       display: flex;
       flex-direction: column;
       gap: 8px;
-      overflow-y: auto;
-      flex: 1;
-      min-height: 0;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.35), rgba(255,255,255,.10)),
+        linear-gradient(0deg, rgba(15,23,42,.02), rgba(15,23,42,.02));
     }
 
     .msgRow {
@@ -405,24 +498,20 @@
       width: 100%;
     }
 
-    .msgRow.left {
-      align-items: flex-start;
-    }
-
-    .msgRow.right {
-      align-items: flex-end;
-    }
+    .msgRow.left { align-items: flex-start; }
+    .msgRow.right { align-items: flex-end; }
 
     .bubble {
       display: inline-block;
-      max-width: 85%;
-      padding: 6px 8px;
-      border-radius: 10px;
+      max-width: 86%;
+      padding: 7px 9px;
+      border-radius: 12px;
       font-size: 12.5px;
-      line-height: 1.25;
+      line-height: 1.28;
       border: 1px solid var(--border2);
       white-space: pre-wrap;
       word-break: break-word;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, .04);
     }
 
     .bubble.inb {
@@ -446,9 +535,7 @@
       justify-content: flex-end;
     }
 
-    .msgRow.left .metaLine {
-      justify-content: flex-start;
-    }
+    .msgRow.left .metaLine { justify-content: flex-start; }
 
     .time {
       font-variant-numeric: tabular-nums;
@@ -462,27 +549,15 @@
       background: rgba(15, 23, 42, .03);
     }
 
-    /* ticks */
     .ticks {
       font-weight: 900;
       letter-spacing: -1px;
     }
 
-    .ticksSent {
-      color: var(--tickGrey);
-    }
-
-    .ticksDel {
-      color: var(--tickGrey);
-    }
-
-    .ticksRead {
-      color: var(--tickBlue);
-    }
-
-    .ticksFail {
-      color: #ef4444;
-    }
+    .ticksSent { color: var(--tickGrey); }
+    .ticksDel { color: var(--tickGrey); }
+    .ticksRead { color: var(--tickBlue); }
+    .ticksFail { color: #ef4444; }
 
     .empty {
       padding: 10px;
@@ -493,141 +568,15 @@
       background: rgba(255, 255, 255, .75);
     }
 
-    /* Composer per-column (sticky bottom) */
-    .composer {
-      position: sticky;
-      bottom: 0;
-      z-index: 25;
-      padding: 8px;
-      border-top: 1px solid var(--border2);
-      background: rgba(255, 255, 255, .92);
-      backdrop-filter: blur(8px);
-    }
-
-    .composerRow {
-      display: flex;
-      gap: 8px;
-      align-items: flex-end;
-    }
-
-    .composerText {
-      flex: 1;
-      width: 100%;
-      min-height: 38px;
-      max-height: 140px;
-      resize: none;
-      /* auto-grow via JS */
-      border-radius: 999px;
-      /* cara WhatsApp */
-      padding: 10px 12px;
-      line-height: 1.2;
-      overflow: hidden;
-    }
-
-    .sendBtn {
-      width: 40px;
-      height: 40px;
-      border-radius: 999px;
-      border: 1px solid rgba(22, 163, 74, .25);
-      background: rgba(22, 163, 74, .14);
-      color: #166534;
-      font-weight: 900;
-      cursor: pointer;
-      display: grid;
-      place-items: center;
-      flex: 0 0 auto;
-    }
-
-    .sendBtn:hover {
-      filter: brightness(1.03);
-    }
-
-    @media (max-width: 900px) {
-      textarea {
-        width: 320px;
-      }
-
-      select {
-        width: 280px;
-      }
-
-      .wrap {
-        height: calc(100vh - 92px);
-      }
-
-      .colHeader {
-        top: 92px;
-      }
-    }
-
-    @media (max-width: 420px) {
-      :root {
-        --colW: 300px;
-      }
-    }
-
-    @media (min-width: 1600px) {
-      :root {
-        --colW: 360px;
-      }
-    }
-
-    html,
-    body {
-      height: 100%;
-      overflow: hidden;
-      /* ✅ trava scroll global */
-    }
-
-    .wrap {
-      height: calc(100vh - 54px);
-      padding: var(--pad5);
-      overflow: hidden;
-      /* ✅ nada de scroll aqui */
-    }
-
-    .board {
-      height: 100%;
-      overflow-x: auto;
-      overflow-y: hidden;
-      margin-left: 30px;
-      /* ✅ só horizontal */
-    }
-
-    .col {
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      /* ✅ nada de scroll na coluna */
-    }
-
-    .colHeader {
-      position: sticky;
-      top: 44px;
-      z-index: 20;
-    }
-
-    /* ✅ thread vira a única área rolável */
-    .thread {
-      flex: 1;
-      min-height: 0;
-      /* ✅ essencial no flex */
-      overflow-y: auto;
-      /* ✅ só aqui rola */
-      overflow-x: hidden;
-      padding: calc(var(--pad5) + var(--colHeaderH)) var(--pad5) var(--pad5);
-    }
-
-    /* ✅ composer NÃO precisa ser sticky se a coluna é flex;
-   mas pode manter sticky também. Eu prefiro "flex" fixo. */
     .composer {
       flex: 0 0 auto;
       border-top: 1px solid var(--border2);
-      background: rgba(255, 255, 255, .92);
+      background: rgba(255, 255, 255, .94);
       backdrop-filter: blur(8px);
       padding: 10px;
-      /* ✅ padding “da caixa de texto de baixo” */
     }
+
+    .composer form { margin: 0; }
 
     .composerRow {
       display: flex;
@@ -638,29 +587,22 @@
     .composerText {
       flex: 1;
       width: 100%;
-      min-height: 32px;
+      min-height: 36px;
       max-height: 140px;
-
       resize: none;
       overflow: hidden;
-
-      border-radius: 0;
-      /* ✅ sem border radius */
+      border-radius: 18px;
       border: 1px solid var(--border);
-
-      padding: 6px 8px;
-      /* ✅ pequeno */
+      padding: 8px 10px;
       line-height: 1.2;
       font-size: 12.5px;
-
       background: #fff;
     }
 
     .sendBtn {
-      width: 34px;
-      height: 34px;
-      border-radius: 0;
-      /* ✅ sem radius */
+      width: 38px;
+      height: 38px;
+      border-radius: 999px;
       border: 1px solid rgba(22, 163, 74, .25);
       background: rgba(22, 163, 74, .14);
       color: #166534;
@@ -671,17 +613,48 @@
       flex: 0 0 auto;
     }
 
-    .thread::-webkit-scrollbar {
+    .thread::-webkit-scrollbar,
+    .conversationList::-webkit-scrollbar,
+    .board::-webkit-scrollbar {
       width: 10px;
+      height: 10px;
     }
 
-    .thread::-webkit-scrollbar-thumb {
+    .thread::-webkit-scrollbar-thumb,
+    .conversationList::-webkit-scrollbar-thumb,
+    .board::-webkit-scrollbar-thumb {
       background: rgba(15, 23, 42, .18);
       border-radius: 8px;
     }
 
-    .thread::-webkit-scrollbar-track {
+    .thread::-webkit-scrollbar-track,
+    .conversationList::-webkit-scrollbar-track,
+    .board::-webkit-scrollbar-track {
       background: rgba(15, 23, 42, .06);
+    }
+
+    @media (max-width: 1250px) {
+      :root {
+        --sideW: 280px;
+        --colW: 380px;
+      }
+    }
+
+    @media (max-width: 900px) {
+      .app {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        display: none;
+      }
+
+      :root {
+        --colW: 330px;
+      }
+
+      .senderBody textarea { width: 320px; }
+      .senderBody select { width: 280px; }
     }
   </style>
 </head>
@@ -695,11 +668,10 @@
       </div>
 
       <div class="controls">
-        <!-- Date filter -->
         <form method="get" action="" class="rowInline" style="margin:0;">
           <div style="display:flex; flex-direction:column; gap:4px;">
             <label style="margin:0;">Data</label>
-            <div class="rowInline" style="gap:8px;">
+            <div class="rowInline" style="display:flex; gap:8px;">
               <input type="date" name="date" value="{{ day|date:'Y-m-d' }}" />
               <button class="btn" type="submit">Filtrar</button>
             </div>
@@ -707,17 +679,15 @@
           {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
         </form>
 
-        <!-- Client-side filter -->
         <div style="display:flex; flex-direction:column; gap:4px;">
           <label style="margin:0;">Managers</label>
-          <div class="rowInline" style="gap:8px;">
+          <div class="rowInline" style="display:flex; gap:8px;">
             <div class="pillBtn active" id="fActive" data-filter="active">Ativos</div>
             <div class="pillBtn" id="fInactive" data-filter="inactive">Inativos</div>
             <div class="pillBtn" id="fAll" data-filter="all">Todos</div>
           </div>
         </div>
 
-        <!-- Collapsible manual sender (bulk) -->
         <details class="sender">
           <summary>
             <span style="font-size:12px;font-weight:900;">Envio manual</span>
@@ -738,17 +708,17 @@
               <select name="manager_ids" multiple>
                 <optgroup label="🟢 Ativos">
                   {% for m in managers %}
-                  {% if m.is_active %}
-                  <option value="{{ m.id }}">● {{ m.name }} ({{ m.phone_e164 }})</option>
-                  {% endif %}
+                    {% if m.is_active %}
+                      <option value="{{ m.id }}">● {{ m.name }} ({{ m.phone_e164 }})</option>
+                    {% endif %}
                   {% endfor %}
                 </optgroup>
 
                 <optgroup label="🔴 Inativos">
                   {% for m in managers %}
-                  {% if not m.is_active %}
-                  <option value="{{ m.id }}">● {{ m.name }} ({{ m.phone_e164 }})</option>
-                  {% endif %}
+                    {% if not m.is_active %}
+                      <option value="{{ m.id }}">● {{ m.name }} ({{ m.phone_e164 }})</option>
+                    {% endif %}
                   {% endfor %}
                 </optgroup>
               </select>
@@ -761,105 +731,158 @@
     </div>
   </div>
 
-  <div class="wrap">
-    <div class="board" id="board">
-      {% for col in cols %}
-      <div class="col" data-active="{% if col.manager.is_active %}1{% else %}0{% endif %}">
-        <div class="colHeader">
-          <div class="colHeaderTop">
-            <div class="mgr">
-              <div class="mgrName">
-                <span class="dot {% if col.manager.is_active %}dotOn{% else %}dotOff{% endif %}">●</span>
-                {{ col.manager.name }}
-                <span class="state {% if col.manager.is_active %}stateOn{% else %}stateOff{% endif %}">
-                  {% if col.manager.is_active %}ativo{% else %}inativo{% endif %}
-                </span>
-              </div>
-              <div class="mgrPhone">{{ col.manager.phone_e164 }}</div>
-            </div>
-
-            <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;">
-              <div class="{{ col.agenda_badge.1 }}">AGENDA: {{ col.agenda_badge.0 }}</div>
-              <div class="{{ col.confirm_badge.1 }}">CONF: {{ col.confirm_badge.0 }}</div>
-
-              {% if col.items.total > 0 %}
-              {% if col.items.open == 0 and col.items.done > 0 %}
-              <div class="badge b-ok">ITENS: ok</div>
-              {% elif col.items.open > 0 %}
-              <div class="badge b-warn">ITENS: {{ col.items.open }} abertos</div>
-              {% else %}
-              <div class="badge">ITENS: {{ col.items.total }}</div>
-              {% endif %}
-              {% else %}
-              <div class="badge">ITENS: —</div>
-              {% endif %}
-            </div>
-
-          </div>
-
-          <div class="colMeta">
-            <div class="pill">{{ day|date:"d/m" }}</div>
-
-            {% if col.agenda_q %}
-            <div class="pill">AgendaRem: {{ col.agenda_q.reminder_count }}</div>
-            <div class="pill">AgendaChars: {{ col.agenda_q.answer_text|length }}</div>
-            {% endif %}
-
-            {% if col.confirm_q %}
-            <div class="pill">ConfAt:
-              {% if col.confirm_q.sent_at %}{{ col.confirm_q.sent_at|date:"H:i" }}{% else %}—{% endif %}</div>
-            {% endif %}
-
-            {% if col.items.total > 0 %}
-            <div class="pill">Open: {{ col.items.open }}</div>
-            <div class="pill">Done: {{ col.items.done }}</div>
-            <div class="pill">Skip: {{ col.items.skip }}</div>
-            {% endif %}
-          </div>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="sidebarTop">
+        <div class="sidebarTitle">
+          <span>Conversas</span>
+          <span>{{ cols|length }} managers</span>
         </div>
-
-        <div class="thread">
-          {% if col.timeline|length == 0 %}
-          <div class="empty">Sem conversa ainda.</div>
-          {% else %}
-          {% for it in col.timeline %}
-          <div class="msgRow {{ it.side }}">
-            <div class="bubble {% if it.side == 'right' %}outb{% else %}inb{% endif %}">
-              {{ it.text }}
-            </div>
-            <div class="metaLine">
-              <span class="time">{{ it.label }}</span>
-
-              {% if it.is_outbound and it.ticks %}
-              <span class="ticks {{ it.ticks_class }}">{{ it.ticks }}</span>
-              {% endif %}
-
-              {% if it.meta %}
-              <span class="tag">{{ it.meta }}</span>
-              {% endif %}
-            </div>
-          </div>
-          {% endfor %}
-          {% endif %}
-        </div>
-
-        <!-- ✅ Composer por coluna (conversa direta) -->
-        <div class="composer">
-          <form method="post" action="">
-            {% csrf_token %}
-            <input type="hidden" name="mode" value="single" />
-            <input type="hidden" name="manager_id" value="{{ col.manager.id }}" />
-            <div class="composerRow">
-              <textarea class="composerText" name="message_single" rows="1"
-                placeholder="Mensagem para {{ col.manager.name }}…" data-autogrow="1"></textarea>
-              <button class="sendBtn" type="submit" title="Enviar">➤</button>
-            </div>
-          </form>
-        </div>
-
+        <input
+          type="text"
+          id="managerSearch"
+          class="searchInput"
+          placeholder="Buscar manager..."
+        />
       </div>
-      {% endfor %}
-    </div>
+
+      <div class="conversationList" id="conversationList">
+        {% for col in cols %}
+          <div
+            class="conversationItem"
+            data-manager-name="{{ col.manager.name|lower }}"
+            data-active="{% if col.manager.is_active %}1{% else %}0{% endif %}"
+            data-target="{{ col.column_id }}"
+          >
+            <div class="conversationMain">
+              <div class="conversationHead">
+                <span class="managerDot {% if col.manager.is_active %}dotOn{% else %}dotOff{% endif %}">●</span>
+                <div class="conversationName">{{ col.manager.name }}</div>
+              </div>
+              <div class="conversationPreview">
+                {{ col.last_side }}{{ col.last_preview }}
+              </div>
+            </div>
+            <div class="conversationTime">{{ col.last_label }}</div>
+          </div>
+        {% endfor %}
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="boardWrap">
+        <div class="board" id="board">
+          {% for col in cols %}
+            <div
+              class="col"
+              id="{{ col.column_id }}"
+              data-active="{% if col.manager.is_active %}1{% else %}0{% endif %}"
+              data-manager-name="{{ col.manager.name|lower }}"
+            >
+              <div class="colHeader">
+                <div class="colHeaderTop">
+                  <div class="mgr">
+                    <div class="mgrName">
+                      <span class="managerDot {% if col.manager.is_active %}dotOn{% else %}dotOff{% endif %}">●</span>
+                      {{ col.manager.name }}
+                      <span class="state {% if col.manager.is_active %}stateOn{% else %}stateOff{% endif %}">
+                        {% if col.manager.is_active %}ativo{% else %}inativo{% endif %}
+                      </span>
+                    </div>
+                    <div class="mgrPhone">{{ col.manager_phone_display }}</div>
+                  </div>
+
+                  <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;">
+                    <div class="{{ col.agenda_badge.1 }}">AGENDA: {{ col.agenda_badge.0 }}</div>
+                    <div class="{{ col.confirm_badge.1 }}">CONF: {{ col.confirm_badge.0 }}</div>
+
+                    {% if col.items.total > 0 %}
+                      {% if col.items.open == 0 and col.items.done > 0 %}
+                        <div class="badge b-ok">ITENS: ok</div>
+                      {% elif col.items.open > 0 %}
+                        <div class="badge b-warn">ITENS: {{ col.items.open }} abertos</div>
+                      {% else %}
+                        <div class="badge">ITENS: {{ col.items.total }}</div>
+                      {% endif %}
+                    {% else %}
+                      <div class="badge">ITENS: —</div>
+                    {% endif %}
+                  </div>
+                </div>
+
+                <div class="colMeta">
+                  <div class="pill">{{ day|date:"d/m" }}</div>
+
+                  {% if col.agenda_q %}
+                    <div class="pill">AgendaRem: {{ col.agenda_q.reminder_count }}</div>
+                    <div class="pill">AgendaChars: {{ col.agenda_q.answer_text|length }}</div>
+                  {% endif %}
+
+                  {% if col.confirm_q %}
+                    <div class="pill">
+                      ConfAt: {% if col.confirm_q.sent_at %}{{ col.confirm_q.sent_at|date:"H:i" }}{% else %}—{% endif %}
+                    </div>
+                  {% endif %}
+
+                  {% if col.last_ts %}
+                    <div class="pill">Última: {{ col.last_label }}</div>
+                  {% endif %}
+
+                  {% if col.items.total > 0 %}
+                    <div class="pill">Open: {{ col.items.open }}</div>
+                    <div class="pill">Done: {{ col.items.done }}</div>
+                    <div class="pill">Skip: {{ col.items.skip }}</div>
+                  {% endif %}
+                </div>
+              </div>
+
+              <div class="thread" data-thread="1">
+                {% if col.timeline|length == 0 %}
+                  <div class="empty">Sem conversa ainda.</div>
+                {% else %}
+                  {% for it in col.timeline %}
+                    <div class="msgRow {{ it.side }}">
+                      <div class="bubble {% if it.side == 'right' %}outb{% else %}inb{% endif %}">
+                        {{ it.text }}
+                      </div>
+                      <div class="metaLine">
+                        <span class="time">{{ it.label }}</span>
+
+                        {% if it.is_outbound and it.ticks %}
+                          <span class="ticks {{ it.ticks_class }}">{{ it.ticks }}</span>
+                        {% endif %}
+
+                        {% if it.meta %}
+                          <span class="tag">{{ it.meta }}</span>
+                        {% endif %}
+                      </div>
+                    </div>
+                  {% endfor %}
+                {% endif %}
+              </div>
+
+              <div class="composer">
+                <form method="post" action="">
+                  {% csrf_token %}
+                  <input type="hidden" name="mode" value="single" />
+                  <input type="hidden" name="manager_id" value="{{ col.manager.id }}" />
+                  <div class="composerRow">
+                    <textarea
+                      class="composerText"
+                      name="message_single"
+                      rows="1"
+                      placeholder="Mensagem para {{ col.manager.name }}…"
+                      data-autogrow="1"
+                    ></textarea>
+                    <button class="sendBtn" type="submit" title="Enviar">➤</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </main>
   </div>
 
   <script>
@@ -868,6 +891,9 @@
       const btnInactive = document.getElementById("fInactive");
       const btnAll = document.getElementById("fAll");
       const cols = Array.from(document.querySelectorAll(".col"));
+      const items = Array.from(document.querySelectorAll(".conversationItem"));
+      const searchInput = document.getElementById("managerSearch");
+      const board = document.getElementById("board");
 
       function setActiveBtn(which) {
         [btnActive, btnInactive, btnAll].forEach(b => b.classList.remove("active"));
@@ -876,14 +902,29 @@
         if (which === "all") btnAll.classList.add("active");
       }
 
+      function matchFilters(el, which, term) {
+        const isActive = el.getAttribute("data-active") === "1";
+        const name = (el.getAttribute("data-manager-name") || "").toLowerCase();
+
+        let okStatus = true;
+        if (which === "active") okStatus = isActive;
+        if (which === "inactive") okStatus = !isActive;
+
+        let okSearch = true;
+        if (term) okSearch = name.includes(term);
+
+        return okStatus && okSearch;
+      }
+
       function applyFilter(which) {
+        const term = (searchInput?.value || "").trim().toLowerCase();
+
         cols.forEach(c => {
-          const isActive = c.getAttribute("data-active") === "1";
-          let show = true;
-          if (which === "active") show = isActive;
-          if (which === "inactive") show = !isActive;
-          if (which === "all") show = true;
-          c.style.display = show ? "" : "none";
+          c.style.display = matchFilters(c, which, term) ? "" : "none";
+        });
+
+        items.forEach(i => {
+          i.style.display = matchFilters(i, which, term) ? "" : "none";
         });
       }
 
@@ -891,20 +932,81 @@
         setActiveBtn("active");
         applyFilter("active");
       });
+
       btnInactive.addEventListener("click", () => {
         setActiveBtn("inactive");
         applyFilter("inactive");
       });
+
       btnAll.addEventListener("click", () => {
         setActiveBtn("all");
         applyFilter("all");
       });
 
+      if (searchInput) {
+        searchInput.addEventListener("input", () => {
+          const active = document.querySelector(".pillBtn.active")?.dataset?.filter || "active";
+          applyFilter(active);
+        });
+      }
+
+      items.forEach(item => {
+        item.addEventListener("click", () => {
+          const targetId = item.getAttribute("data-target");
+          const target = document.getElementById(targetId);
+          if (!target) return;
+
+          items.forEach(x => x.classList.remove("active"));
+          item.classList.add("active");
+
+          target.scrollIntoView({
+            behavior: "smooth",
+            inline: "start",
+            block: "nearest"
+          });
+        });
+      });
+
+      function syncActiveConversation() {
+        const visibleCols = cols.filter(c => c.style.display !== "none");
+        if (!visibleCols.length) return;
+
+        const boardRect = board.getBoundingClientRect();
+        let best = null;
+        let bestDist = Infinity;
+
+        visibleCols.forEach(col => {
+          const rect = col.getBoundingClientRect();
+          const dist = Math.abs(rect.left - boardRect.left - 8);
+          if (dist < bestDist) {
+            bestDist = dist;
+            best = col;
+          }
+        });
+
+        if (!best) return;
+
+        const id = best.id;
+        items.forEach(i => {
+          i.classList.toggle("active", i.getAttribute("data-target") === id);
+        });
+      }
+
+      board.addEventListener("scroll", () => {
+        window.requestAnimationFrame(syncActiveConversation);
+      });
+
       setActiveBtn("active");
       applyFilter("active");
+      syncActiveConversation();
     })();
 
-    // ✅ Textarea auto-grow + Enter para enviar (Shift+Enter quebra linha)
+    (function () {
+      document.querySelectorAll("[data-thread='1']").forEach((thread) => {
+        thread.scrollTop = thread.scrollHeight;
+      });
+    })();
+
     (function () {
       function autoGrow(el) {
         el.style.height = "auto";
@@ -914,6 +1016,7 @@
 
       document.querySelectorAll("textarea[data-autogrow='1']").forEach((ta) => {
         autoGrow(ta);
+
         ta.addEventListener("input", () => autoGrow(ta));
 
         ta.addEventListener("keydown", (e) => {
@@ -921,7 +1024,6 @@
             e.preventDefault();
             const form = ta.closest("form");
             if (!form) return;
-            // evita enviar vazio
             if (!String(ta.value || "").trim()) return;
             form.submit();
           }
@@ -930,5 +1032,4 @@
     })();
   </script>
 </body>
-
 </html>

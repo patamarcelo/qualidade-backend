@@ -95,24 +95,22 @@ def _status_and_items_for_manager(manager, day):
     }
 
 
-def build_director_agenda_summary(*, day, managers):
+def _truncate_block(text, max_len=4000):
+    text = (text or "").strip()
+    if len(text) <= max_len:
+        return text
+    return text[: max_len - 2].rstrip() + "…"
+
+
+def build_director_agenda_summary_blocks(*, day, managers):
     entries = [_status_and_items_for_manager(m, day) for m in managers]
 
-    total = len(entries)
-    answered = sum(1 for e in entries if e["status"] == "answered")
-    pending = sum(1 for e in entries if e["status"] in {"no_checkin", "no_answer"})
-    invalid = sum(1 for e in entries if e["status"] == "answered_no_items")
-
-    total_items = sum(e["total_count"] for e in entries)
-    total_done = sum(e["done_count"] for e in entries)
-    total_open = sum(e["open_count"] for e in entries)
-    total_skip = sum(e["skip_count"] for e in entries)
-
     day_br = day.strftime("%d/%m/%Y")
-    lines = [f"📋 Resumo das agendas — {day_br}", ""]
+    blocks = []
 
     for idx, entry in enumerate(entries, start=1):
-        lines.append(f"{idx}) 👤 *{entry['manager'].name}")
+        lines = [f"📋 Agenda {idx}/{len(entries)} — {day_br}", ""]
+        lines.append(f"👤 *{entry['manager'].name}*")
         lines.append(f"Status: {entry['status_label']}")
 
         if entry["total_count"] > 0:
@@ -132,17 +130,52 @@ def build_director_agenda_summary(*, day, managers):
         else:
             lines.append("• Sem agenda enviada")
 
-        lines.append("")
+        block = "\n".join(lines).strip()
+        blocks.append(_truncate_block(block))
 
-    lines.append("Resumo geral:")
+    return blocks
+
+
+def build_director_agenda_summary_overview(*, day, managers):
+    entries = [_status_and_items_for_manager(m, day) for m in managers]
+
+    total = len(entries)
+    answered = sum(1 for e in entries if e["status"] == "answered")
+    pending = sum(1 for e in entries if e["status"] in {"no_checkin", "no_answer"})
+    invalid = sum(1 for e in entries if e["status"] == "answered_no_items")
+
+    total_items = sum(e["total_count"] for e in entries)
+    total_done = sum(e["done_count"] for e in entries)
+    total_open = sum(e["open_count"] for e in entries)
+    total_skip = sum(e["skip_count"] for e in entries)
+
+    day_br = day.strftime("%d/%m/%Y")
+    lines = [f"📊 Resumo geral das agendas — {day_br}", ""]
+
     lines.append(f"• Managers com agenda válida: {answered}/{total}")
     lines.append(f"• Managers sem resposta: {pending}/{total}")
     if invalid:
         lines.append(f"• Respostas sem itens válidos: {invalid}/{total}")
-    lines.append(f"• Itens concluídos: {total_done}/{total_items}" if total_items else "• Itens concluídos: 0/0")
+
+    lines.append(
+        f"• Itens concluídos: {total_done}/{total_items}" if total_items else "• Itens concluídos: 0/0"
+    )
+
     if total_open:
         lines.append(f"• Itens pendentes: {total_open}")
     if total_skip:
         lines.append(f"• Itens pulados: {total_skip}")
 
-    return "\n".join(lines).strip()
+    return _truncate_block("\n".join(lines).strip())
+
+
+def build_director_agenda_summary(*, day, managers):
+    """
+    Mantido por compatibilidade.
+    Continua retornando um texto único, caso algum outro ponto do sistema ainda use.
+    """
+    blocks = build_director_agenda_summary_blocks(day=day, managers=managers)
+    overview = build_director_agenda_summary_overview(day=day, managers=managers)
+
+    parts = blocks + ["", overview]
+    return "\n\n".join(p for p in parts if p).strip()

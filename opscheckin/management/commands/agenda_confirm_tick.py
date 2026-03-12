@@ -14,7 +14,7 @@ from opscheckin.services.whatsapp import send_list
 logger = logging.getLogger("opscheckin.agenda_confirm_tick")
 
 # fluxo
-SEND_CONFIRM_AFTER_MINUTES = 10
+SEND_CONFIRM_AFTER_MINUTES = 0
 AUTO_OK_MINUTES = 15
 
 SLOT_GRACE_SECONDS = 120
