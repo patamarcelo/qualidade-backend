@@ -76,6 +76,78 @@ def _mark_inbound_processed(inbound, now, *, linked_question=None):
     inbound.save(update_fields=fields)
 
 
+def _build_agenda_bulk_header(action: str, changed: list[str], already: list[int], not_found: list[int]) -> str:
+    lines = []
+
+    if changed:
+        if action == "done":
+            lines.append(f"✅ {len(changed)} item(ns) concluído(s):")
+        elif action == "undo":
+            lines.append(f"↩️ {len(changed)} item(ns) reaberto(s):")
+        elif action == "remove":
+            lines.append(f"🗑️ {len(changed)} item(ns) removido(s):")
+
+        lines.extend(changed[:12])
+        if len(changed) > 12:
+            lines.append("...")
+
+    if already:
+        lines.append("")
+        if action == "done":
+            lines.append("Já estavam concluídos: " + ", ".join(str(x) for x in already))
+        elif action == "undo":
+            lines.append("Já estavam em aberto: " + ", ".join(str(x) for x in already))
+        elif action == "remove":
+            lines.append("Já não exigiam ação: " + ", ".join(str(x) for x in already))
+
+    if not_found:
+        lines.append("")
+        lines.append("Não encontrados: " + ", ".join(str(x) for x in not_found))
+
+    return "\n".join(x for x in lines if x is not None).strip()
+
+
+def _parse_agenda_selection_input(raw_value: str):
+    """
+    Interpreta a resposta do usuário no modo de ação pendente da agenda.
+
+    Retornos:
+      {"mode": "empty"}
+      {"mode": "single_number", "numbers": [3]}
+      {"mode": "multi_number", "numbers": [3, 4, 5]}
+      {"mode": "text", "text": "irrigação"}
+      {"mode": "invalid_mixed", "raw": "..."}
+    """
+    raw = (raw_value or "").strip()
+    if not raw:
+        return {"mode": "empty"}
+
+    normalized = raw.replace("\r", "\n")
+    normalized = normalized.replace(",", " ")
+    normalized = normalized.replace(";", " ")
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+
+    if re.fullmatch(r"\d{1,3}(?:\s+\d{1,3})*", normalized):
+        nums = [int(x) for x in normalized.split() if x.isdigit()]
+
+        seen = set()
+        ordered = []
+        for n in nums:
+            if n in seen:
+                continue
+            seen.add(n)
+            ordered.append(n)
+
+        if len(ordered) == 1:
+            return {"mode": "single_number", "numbers": ordered}
+
+        return {"mode": "multi_number", "numbers": ordered}
+
+    if re.search(r"\d", raw) and not re.fullmatch(r"\d{1,3}", raw):
+        return {"mode": "invalid_mixed", "raw": raw}
+
+    return {"mode": "text", "text": raw}
+
 def _wa_row_title(idx: int, text: str, prefix: str = "") -> str:
     raw = f"{prefix}{idx}) {(text or '').strip()}".strip()
     return raw[:24].rstrip()
@@ -243,6 +315,53 @@ def _clear_agenda_pending_action(checkin, now):
         status="pending",
         answered_at__isnull=True,
     ).update(status="answered", answered_at=now, answer_text="resolved")
+    
+
+def _parse_agenda_selection_input(raw_value: str):
+    """
+    Interpreta a resposta do usuário no modo de ação pendente da agenda.
+
+    Retornos possíveis:
+      {"mode": "empty"}
+      {"mode": "single_number", "numbers": [3]}
+      {"mode": "multi_number", "numbers": [3, 4, 5]}
+      {"mode": "text", "text": "irrigação"}
+      {"mode": "invalid_mixed", "raw": "..."}
+    """
+    raw = (raw_value or "").strip()
+    if not raw:
+        return {"mode": "empty"}
+
+    # normaliza separadores comuns de lista numérica
+    normalized = raw
+    normalized = normalized.replace("\r", "\n")
+    normalized = normalized.replace(";", " ")
+    normalized = normalized.replace(",", " ")
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+
+    # somente números e separadores => tratar como lote
+    if re.fullmatch(r"\d{1,3}(?:\s+\d{1,3})*", normalized):
+        nums = [int(x) for x in normalized.split() if x.isdigit()]
+
+        # remove duplicados preservando ordem
+        seen = set()
+        ordered = []
+        for n in nums:
+            if n in seen:
+                continue
+            seen.add(n)
+            ordered.append(n)
+
+        if len(ordered) == 1:
+            return {"mode": "single_number", "numbers": ordered}
+
+        return {"mode": "multi_number", "numbers": ordered}
+
+    # se misturou texto + vários números, não tenta adivinhar
+    if re.search(r"\d", raw) and not re.fullmatch(r"\d{1,3}", raw):
+        return {"mode": "invalid_mixed", "raw": raw}
+
+    return {"mode": "text", "text": raw}
 
 
 def _normalize_agenda_search_text(s: str) -> str:
@@ -288,17 +407,29 @@ def _send_agenda_pending_action_prompt(manager, checkin, action: str, now):
     if action == "done":
         body = (
             "Me diga o número ou parte do nome do item que foi concluído.\n"
-            "Ex.: 3 ou irrigação"
+            "Você pode enviar um ou vários números.\n\n"
+            "Ex.:\n"
+            "3\n"
+            "ou\n"
+            "3 4 5"
         )
     elif action == "undo":
         body = (
             "Me diga o número ou parte do nome do item para desmarcar.\n"
-            "Ex.: 2 ou biguá"
+            "Você pode enviar um ou vários números.\n\n"
+            "Ex.:\n"
+            "2\n"
+            "ou\n"
+            "2 4 6"
         )
     elif action == "remove":
         body = (
             "Me diga o número ou parte do nome do item para remover.\n"
-            "Ex.: 5 ou plantadeiras"
+            "Você pode enviar um ou vários números.\n\n"
+            "Ex.:\n"
+            "5\n"
+            "ou\n"
+            "5 7"
         )
     else:
         return False
@@ -315,20 +446,125 @@ def _handle_agenda_pending_action_text(manager, checkin, text, now):
     from .models import AgendaItem
 
     raw = (text or "").strip()
-    if not raw:
+    parsed = _parse_agenda_selection_input(raw)
+
+    logger.warning(
+        "AGENDA_PENDING_ACTION_INPUT manager=%s checkin_id=%s action=%s raw=%r parsed=%s",
+        getattr(manager, "name", ""),
+        getattr(checkin, "id", None),
+        action,
+        raw,
+        parsed,
+    )
+
+    if parsed["mode"] == "empty":
         send_text(
             manager.phone_e164,
-            "Responda com o número da agenda ou parte do nome do item."
+            "Responda com o número da agenda, vários números, ou parte do nome do item."
         )
         return True
 
-    matches = _find_agenda_matches_by_number_or_text(checkin, raw)
+    if parsed["mode"] == "invalid_mixed":
+        send_text(
+            manager.phone_e164,
+            "Não consegui interpretar essa resposta.\n"
+            "Envie apenas números (ex.: 3 ou 3 4 5) ou apenas parte do nome do item."
+        )
+        return True
+
+    if parsed["mode"] in ("single_number", "multi_number"):
+        numbers = parsed["numbers"] or []
+        if not numbers:
+            send_text(
+                manager.phone_e164,
+                "Não consegui identificar os números. Tente novamente."
+            )
+            return True
+
+        items = list(
+            AgendaItem.objects
+            .filter(checkin=checkin, idx__in=numbers)
+            .order_by("idx")
+        )
+        by_idx = {it.idx: it for it in items}
+
+        not_found = []
+        changed = []
+        already = []
+
+        for idx in numbers:
+            it = by_idx.get(idx)
+            if not it:
+                not_found.append(idx)
+                continue
+
+            if action == "done":
+                if it.status == "done":
+                    already.append(idx)
+                    continue
+                it.status = "done"
+                it.done_at = now
+                it.save(update_fields=["status", "done_at"])
+                changed.append(f"{it.idx}) {it.text}")
+
+            elif action == "undo":
+                if it.status == "open":
+                    already.append(idx)
+                    continue
+                it.status = "open"
+                it.done_at = None
+                it.save(update_fields=["status", "done_at"])
+                changed.append(f"{it.idx}) {it.text}")
+
+            elif action == "remove":
+                label = f"{it.idx}) {it.text}"
+                it.delete()
+                changed.append(label)
+
+            else:
+                return False
+
+        if not changed and not not_found and already:
+            if action == "done":
+                send_text(
+                    manager.phone_e164,
+                    "Todos esses itens já estavam concluídos. Me envie outros números."
+                )
+            elif action == "undo":
+                send_text(
+                    manager.phone_e164,
+                    "Todos esses itens já estavam em aberto. Me envie outros números."
+                )
+            else:
+                send_text(
+                    manager.phone_e164,
+                    "Não consegui remover os itens informados."
+                )
+            return True
+
+        if not changed and not_found:
+            send_text(
+                manager.phone_e164,
+                "Não achei estes itens na agenda: " + ", ".join(str(x) for x in not_found)
+            )
+            return True
+
+        header = _build_agenda_bulk_header(
+            action=action,
+            changed=changed,
+            already=already,
+            not_found=not_found,
+        )
+
+        _clear_agenda_pending_action(checkin, now)
+        _send_agenda_snapshot(manager, checkin, header=header)
+        _send_agenda_action_menu(manager, checkin)
+        return True
+
+    matches = _find_agenda_matches_by_number_or_text(checkin, parsed["text"])
 
     if action == "done":
         matches = [it for it in matches if it and it.status != "done"]
-        if matches and len(matches) == 1 and matches[0].status == "skip":
-            # concluir um item pulado deve reabrir como done normalmente
-            pass
     elif action == "undo":
         matches = [it for it in matches if it and it.status != "open"]
     elif action == "remove":
@@ -340,17 +576,19 @@ def _handle_agenda_pending_action_text(manager, checkin, text, now):
         if action == "done":
             send_text(
                 manager.phone_e164,
-                "Não achei item pendente com esse número ou texto. Responda com o número da agenda ou parte do nome."
+                "Não achei item pendente com esse número ou texto. "
+                "Responda com o número, vários números, ou parte do nome."
             )
         elif action == "undo":
             send_text(
                 manager.phone_e164,
-                "Não achei item concluído/pulado com esse número ou texto. Responda com o número da agenda ou parte do nome."
+                "Não achei item concluído/pulado com esse número ou texto. "
+                "Responda com o número, vários números, ou parte do nome."
             )
         else:
             send_text(
                 manager.phone_e164,
-                "Não achei esse item. Responda com o número da agenda ou parte do nome."
+                "Não achei esse item. Responda com o número, vários números, ou parte do nome."
             )
         return True
 
@@ -413,6 +651,7 @@ def _handle_agenda_pending_action_text(manager, checkin, text, now):
     _send_agenda_snapshot(manager, checkin, header=header)
     _send_agenda_action_menu(manager, checkin)
     return True
+
 
 
 def _agenda_next_idx(checkin):
