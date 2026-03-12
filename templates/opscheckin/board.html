@@ -33,6 +33,12 @@
 
       --tickGrey: rgba(15, 23, 42, .45);
       --tickBlue: #3b82f6;
+
+      --selectedBlue: #2563eb;
+      --selectedBlueSoft: rgba(37, 99, 235, .12);
+      --selectedBlueSoft2: rgba(37, 99, 235, .18);
+      --selectedBlueBorder: rgba(37, 99, 235, .45);
+      --selectedBlueGlow: rgba(37, 99, 235, .18);
     }
 
     * {
@@ -118,6 +124,15 @@
       border-radius: 10px;
       padding: 8px 10px;
       outline: none;
+      transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+    }
+
+    input[type="date"]:focus,
+    textarea:focus,
+    select:focus,
+    input[type="text"]:focus {
+      border-color: rgba(37, 99, 235, .45);
+      box-shadow: 0 0 0 4px rgba(37, 99, 235, .10);
     }
 
     .btn {
@@ -293,7 +308,7 @@
     }
 
     .conversationItem.active::after {
-      background: rgba(22, 163, 74, .35);
+      background: var(--selectedBlueBorder);
     }
 
     .conversationItem:hover {
@@ -302,8 +317,26 @@
     }
 
     .conversationItem.active {
-      background: rgba(22, 163, 74, .10);
-      border-color: rgba(22, 163, 74, .18);
+      background: linear-gradient(180deg, rgba(37, 99, 235, .18), rgba(37, 99, 235, .12));
+      border: 2px solid #2563eb;
+      box-shadow:
+        inset 0 0 0 1px rgba(37, 99, 235, .25),
+        0 0 0 4px rgba(37, 99, 235, .18);
+    }
+
+    .conversationItem.active::before {
+      content: "";
+      position: absolute;
+      left: -2px;
+      top: 6px;
+      bottom: 6px;
+      width: 4px;
+      border-radius: 4px;
+      background: #2563eb;
+    }
+
+    .conversationItem.active .conversationName {
+      color: var(--selectedBlue);
     }
 
     .conversationMain {
@@ -400,6 +433,18 @@
       display: flex;
       flex-direction: column;
       position: relative;
+      transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+    }
+
+    .col.active {
+      border-color: var(--selectedBlueBorder);
+      box-shadow:
+        0 0 0 3px rgba(37, 99, 235, .10),
+        0 14px 28px rgba(37, 99, 235, .08);
+    }
+
+    .col.active .colHeader {
+      box-shadow: inset 0 3px 0 rgba(37, 99, 235, .55);
     }
 
     .colHeader {
@@ -408,6 +453,7 @@
       backdrop-filter: blur(8px);
       border-bottom: 1px solid var(--border2);
       padding: 10px;
+      transition: box-shadow .15s ease;
     }
 
     .colHeaderTop {
@@ -660,12 +706,17 @@
       max-height: 140px;
       resize: none;
       overflow: hidden;
-      border-radius: 18px;
+      border-radius: 10px;
       border: 1px solid var(--border);
       padding: 8px 10px;
       line-height: 1.2;
       font-size: 12.5px;
       background: #fff;
+    }
+
+    .col.active .composerText {
+      border-color: rgba(37, 99, 235, .30);
+      background: rgba(255, 255, 255, .98);
     }
 
     .sendBtn {
@@ -680,6 +731,36 @@
       display: grid;
       place-items: center;
       flex: 0 0 auto;
+      position: relative;
+    }
+
+    .sendBtnText {
+      line-height: 1;
+      font-size: 15px;
+    }
+
+    .sendBtnSpinner {
+      width: 16px;
+      height: 16px;
+      border-radius: 999px;
+      border: 2px solid rgba(22, 163, 74, .25);
+      border-top-color: #166534;
+      animation: spin .8s linear infinite;
+      display: none;
+    }
+
+    .sendBtn.loading .sendBtnText {
+      display: none;
+    }
+
+    .sendBtn.loading .sendBtnSpinner {
+      display: inline-block;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
     }
 
     .thread::-webkit-scrollbar,
@@ -746,6 +827,21 @@
     .col.hasNew .colHeader {
       box-shadow: inset 0 2px 0 rgba(59, 130, 246, .45);
     }
+
+    .sendBtn:disabled {
+      opacity: .7;
+      cursor: wait;
+    }
+
+    html {
+  scroll-behavior: smooth;
+}
+
+.thread,
+.conversationList,
+.board {
+  scroll-behavior: smooth;
+}
   </style>
 </head>
 
@@ -833,10 +929,10 @@
 
       <div class="conversationList" id="conversationList">
         {% for col in cols %}
-        <div class="conversationItem"  data-manager-id="{{ col.manager.id }}"
-        data-manager-name="{{ col.manager.name|lower }}"
-        data-active="{% if col.manager.is_active %}1{% else %}0{% endif %}"
-        data-target="{{ col.column_id }}">
+        <div class="conversationItem" data-manager-id="{{ col.manager.id }}"
+          data-manager-name="{{ col.manager.name|lower }}"
+          data-active="{% if col.manager.is_active %}1{% else %}0{% endif %}"
+          data-target="{{ col.column_id }}">
           <div class="conversationMain">
             <div class="conversationHead">
               <span class="managerDot {% if col.manager.is_active %}dotOn{% else %}dotOff{% endif %}">●</span>
@@ -857,7 +953,7 @@
         <div class="board" id="board">
           {% for col in cols %}
           <div class="col" id="{{ col.column_id }}" data-active="{% if col.manager.is_active %}1{% else %}0{% endif %}"
-            data-manager-name="{{ col.manager.name|lower }}"   data-manager-id="{{ col.manager.id }}">
+            data-manager-name="{{ col.manager.name|lower }}" data-manager-id="{{ col.manager.id }}">
             <div class="colHeader">
               <div class="colHeaderTop">
                 <div class="mgr">
@@ -948,7 +1044,10 @@
                 <div class="composerRow">
                   <textarea class="composerText" name="message_single" rows="1"
                     placeholder="Mensagem para {{ col.manager.name }}…" data-autogrow="1"></textarea>
-                  <button class="sendBtn" type="submit" title="Enviar">➤</button>
+                  <button class="sendBtn" type="submit" title="Enviar">
+                    <span class="sendBtnText">➤</span>
+                    <span class="sendBtnSpinner"></span>
+                  </button>
                 </div>
               </form>
             </div>
@@ -959,153 +1058,363 @@
     </main>
   </div>
 
-<script>
-  (function () {
-    const btnActive = document.getElementById("fActive");
-    const btnInactive = document.getElementById("fInactive");
-    const btnAll = document.getElementById("fAll");
-    const cols = Array.from(document.querySelectorAll(".col"));
-    const items = Array.from(document.querySelectorAll(".conversationItem"));
-    const searchInput = document.getElementById("managerSearch");
-    const board = document.getElementById("board");
+  <script>
+    (function () {
+      const btnActive = document.getElementById("fActive");
+      const btnInactive = document.getElementById("fInactive");
+      const btnAll = document.getElementById("fAll");
+      const cols = Array.from(document.querySelectorAll(".col"));
+      const items = Array.from(document.querySelectorAll(".conversationItem"));
+      const searchInput = document.getElementById("managerSearch");
+      const board = document.getElementById("board");
 
-    function setActiveBtn(which) {
-      [btnActive, btnInactive, btnAll].forEach(b => b.classList.remove("active"));
-      if (which === "active") btnActive.classList.add("active");
-      if (which === "inactive") btnInactive.classList.add("active");
-      if (which === "all") btnAll.classList.add("active");
-    }
+      let lockedTargetId = null;
+      let lockTimer = null;
 
-    function matchFilters(el, which, term) {
-      const isActive = el.getAttribute("data-active") === "1";
-      const name = (el.getAttribute("data-manager-name") || "").toLowerCase();
+      function setActiveBtn(which) {
+        [btnActive, btnInactive, btnAll].forEach(b => b.classList.remove("active"));
+        if (which === "active") btnActive.classList.add("active");
+        if (which === "inactive") btnInactive.classList.add("active");
+        if (which === "all") btnAll.classList.add("active");
+      }
 
-      let okStatus = true;
-      if (which === "active") okStatus = isActive;
-      if (which === "inactive") okStatus = !isActive;
+      function matchFilters(el, which, term) {
+        const isActive = el.getAttribute("data-active") === "1";
+        const name = (el.getAttribute("data-manager-name") || "").toLowerCase();
 
-      let okSearch = true;
-      if (term) okSearch = name.includes(term);
+        let okStatus = true;
+        if (which === "active") okStatus = isActive;
+        if (which === "inactive") okStatus = !isActive;
 
-      return okStatus && okSearch;
-    }
+        let okSearch = true;
+        if (term) okSearch = name.includes(term);
 
-    function applyFilter(which) {
-      const term = (searchInput?.value || "").trim().toLowerCase();
+        return okStatus && okSearch;
+      }
 
-      cols.forEach(c => {
-        c.style.display = matchFilters(c, which, term) ? "" : "none";
-      });
+      function applyFilter(which) {
+        const term = (searchInput?.value || "").trim().toLowerCase();
 
-      items.forEach(i => {
-        i.style.display = matchFilters(i, which, term) ? "" : "none";
-      });
-    }
+        cols.forEach(c => {
+          c.style.display = matchFilters(c, which, term) ? "" : "none";
+        });
 
-    btnActive.addEventListener("click", () => {
-      setActiveBtn("active");
-      applyFilter("active");
-    });
+        items.forEach(i => {
+          i.style.display = matchFilters(i, which, term) ? "" : "none";
+        });
+      }
 
-    btnInactive.addEventListener("click", () => {
-      setActiveBtn("inactive");
-      applyFilter("inactive");
-    });
-
-    btnAll.addEventListener("click", () => {
-      setActiveBtn("all");
-      applyFilter("all");
-    });
-
-    if (searchInput) {
-      searchInput.addEventListener("input", () => {
-        const active = document.querySelector(".pillBtn.active")?.dataset?.filter || "active";
-        applyFilter(active);
-      });
-    }
-
-    items.forEach(item => {
-      item.addEventListener("click", () => {
-        const targetId = item.getAttribute("data-target");
-        const target = document.getElementById(targetId);
+      function focusComposer(target) {
         if (!target) return;
+        const textarea = target.querySelector(".composerText");
+        if (!textarea) return;
 
-        items.forEach(x => x.classList.remove("active"));
-        item.classList.add("active");
+        textarea.focus({ preventScroll: true });
 
-        target.scrollIntoView({
-          behavior: "smooth",
-          inline: "start",
-          block: "nearest"
+        const val = textarea.value || "";
+        textarea.setSelectionRange(val.length, val.length);
+      }
+
+      function setSelectedConversation(targetId, options = {}) {
+        const { focus = false, lock = false } = options;
+
+        items.forEach(i => {
+          i.classList.toggle("active", i.getAttribute("data-target") === targetId);
+        });
+
+        cols.forEach(c => {
+          c.classList.toggle("active", c.id === targetId);
+        });
+
+        if (lock) {
+          lockedTargetId = targetId;
+          if (lockTimer) clearTimeout(lockTimer);
+          lockTimer = setTimeout(() => {
+            lockedTargetId = null;
+          }, 900);
+        }
+
+        if (focus) {
+          const target = document.getElementById(targetId);
+          focusComposer(target);
+        }
+      }
+
+      btnActive.addEventListener("click", () => {
+        setActiveBtn("active");
+        applyFilter("active");
+        syncActiveConversation();
+      });
+
+      btnInactive.addEventListener("click", () => {
+        setActiveBtn("inactive");
+        applyFilter("inactive");
+        syncActiveConversation();
+      });
+
+      btnAll.addEventListener("click", () => {
+        setActiveBtn("all");
+        applyFilter("all");
+        syncActiveConversation();
+      });
+
+      if (searchInput) {
+        searchInput.addEventListener("input", () => {
+          const active = document.querySelector(".pillBtn.active")?.dataset?.filter || "active";
+          applyFilter(active);
+          syncActiveConversation();
+        });
+      }
+
+      items.forEach(item => {
+        item.addEventListener("click", () => {
+          const targetId = item.getAttribute("data-target");
+          const target = document.getElementById(targetId);
+          if (!target) return;
+
+          setSelectedConversation(targetId, { focus: true, lock: true });
+
+          target.scrollIntoView({
+            behavior: "smooth",
+            inline: "start",
+            block: "nearest"
+          });
         });
       });
-    });
 
-    function syncActiveConversation() {
-      const visibleCols = cols.filter(c => c.style.display !== "none");
-      if (!visibleCols.length) return;
-
-      const boardRect = board.getBoundingClientRect();
-      let best = null;
-      let bestDist = Infinity;
-
-      visibleCols.forEach(col => {
-        const rect = col.getBoundingClientRect();
-        const dist = Math.abs(rect.left - boardRect.left - 8);
-        if (dist < bestDist) {
-          bestDist = dist;
-          best = col;
+      function syncActiveConversation() {
+        if (lockedTargetId) {
+          setSelectedConversation(lockedTargetId, { focus: false, lock: false });
+          return;
         }
+
+        const visibleCols = cols.filter(c => c.style.display !== "none");
+        if (!visibleCols.length) return;
+
+        const boardRect = board.getBoundingClientRect();
+        let best = null;
+        let bestDist = Infinity;
+
+        visibleCols.forEach(col => {
+          const rect = col.getBoundingClientRect();
+          const dist = Math.abs(rect.left - boardRect.left - 8);
+          if (dist < bestDist) {
+            bestDist = dist;
+            best = col;
+          }
+        });
+
+        if (!best) return;
+        setSelectedConversation(best.id, { focus: false, lock: false });
+      }
+
+      let syncRaf = null;
+      board.addEventListener("scroll", () => {
+        if (syncRaf) cancelAnimationFrame(syncRaf);
+        syncRaf = window.requestAnimationFrame(syncActiveConversation);
       });
 
-      if (!best) return;
+      setActiveBtn("active");
+      applyFilter("active");
+      syncActiveConversation();
 
-      const id = best.id;
-      items.forEach(i => {
-        i.classList.toggle("active", i.getAttribute("data-target") === id);
-      });
+      window.__opsBoard = window.__opsBoard || {};
+      window.__opsBoard.setSelectedConversation = setSelectedConversation;
+      window.__opsBoard.focusComposer = focusComposer;
+    })();
+  </script>
+
+  <script>
+  (function () {
+    function escapeHtml(str) {
+      return String(str || "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
     }
 
-    board.addEventListener("scroll", () => {
-      window.requestAnimationFrame(syncActiveConversation);
-    });
+    function normalizeText(str) {
+      return String(str || "")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
 
-    setActiveBtn("active");
-    applyFilter("active");
-    syncActiveConversation();
-  })();
+    function nowLabel() {
+      const d = new Date();
+      const hh = String(d.getHours()).padStart(2, "0");
+      const mm = String(d.getMinutes()).padStart(2, "0");
+      return `${hh}:${mm}`;
+    }
 
-  (function () {
-    document.querySelectorAll("[data-thread='1']").forEach((thread) => {
-      thread.scrollTop = thread.scrollHeight;
-    });
-  })();
-
-  (function () {
     function autoGrow(el) {
+      if (!el) return;
       el.style.height = "auto";
       const h = Math.min(el.scrollHeight, 140);
       el.style.height = h + "px";
     }
 
-    document.querySelectorAll("textarea[data-autogrow='1']").forEach((ta) => {
-      autoGrow(ta);
+    function scrollThreadToBottom(thread, smooth = true) {
+      if (!thread) return;
+      requestAnimationFrame(() => {
+        thread.scrollTo({
+          top: thread.scrollHeight,
+          behavior: smooth ? "smooth" : "auto"
+        });
+      });
+    }
 
-      ta.addEventListener("input", () => autoGrow(ta));
+    function scrollAllThreadsToBottom(smooth = true) {
+      document.querySelectorAll(".thread[data-thread='1']").forEach((thread) => {
+        scrollThreadToBottom(thread, smooth);
+      });
+    }
 
-      ta.addEventListener("keydown", (e) => {
-        if (e.key === "Enter" && !e.shiftKey) {
-          e.preventDefault();
-          const form = ta.closest("form");
-          if (!form) return;
-          if (!String(ta.value || "").trim()) return;
-          form.submit();
+    function appendOptimisticMessage(managerId, text) {
+      const thread = document.querySelector(`.thread[data-manager-id="${managerId}"]`);
+      if (!thread) return;
+
+      const normalized = normalizeText(text);
+
+      const alreadyExists = Array.from(thread.querySelectorAll('.msgRow[data-optimistic="1"]'))
+        .some(row => normalizeText(row.dataset.messageText || "") === normalized);
+
+      if (alreadyExists) return;
+
+      const empty = thread.querySelector(".empty");
+      if (empty) empty.remove();
+
+      const html = `
+        <div class="msgRow right"
+             data-optimistic="1"
+             data-message-text="${escapeHtml(normalized)}">
+          <div class="bubble outb">${escapeHtml(text)}</div>
+          <div class="metaLine">
+            <span class="time">${nowLabel()}</span>
+            <span class="ticks ticksSent">✓</span>
+            <span class="tag">manual</span>
+          </div>
+        </div>
+      `;
+
+      thread.insertAdjacentHTML("beforeend", html);
+      scrollThreadToBottom(thread, true);
+    }
+
+    function updateSidebarPreview(managerId, text) {
+      const item = document.querySelector(`.conversationItem[data-manager-id="${managerId}"]`);
+      const col = document.querySelector(`.col[data-manager-id="${managerId}"]`);
+      if (!item || !col) return;
+
+      const previewEl = item.querySelector(".conversationPreview");
+      const timeEl = item.querySelector(".conversationTime");
+
+      if (previewEl) previewEl.textContent = `→ ${text}`;
+      if (timeEl) timeEl.textContent = nowLabel();
+
+      item.classList.remove("hasNew");
+      col.classList.remove("hasNew");
+    }
+
+    async function sendSingleMessage(form) {
+      if (!form || form.dataset.sending === "1") return;
+
+      const textarea = form.querySelector('textarea[name="message_single"]');
+      const managerIdInput = form.querySelector('input[name="manager_id"]');
+      const sendBtn = form.querySelector(".sendBtn");
+
+      if (!textarea || !managerIdInput) return;
+
+      const text = String(textarea.value || "").trim();
+      const managerId = managerIdInput.value;
+
+      if (!text) return;
+
+      form.dataset.sending = "1";
+
+      if (sendBtn) {
+        sendBtn.disabled = true;
+        sendBtn.classList.add("loading");
+      }
+
+      try {
+        const formData = new FormData(form);
+
+        const resp = await fetch(form.action || window.location.href, {
+          method: "POST",
+          body: formData,
+          credentials: "same-origin",
+          headers: {
+            "X-Requested-With": "XMLHttpRequest"
+          }
+        });
+
+        if (!resp.ok) {
+          throw new Error(`HTTP ${resp.status}`);
         }
+
+        appendOptimisticMessage(managerId, text);
+        updateSidebarPreview(managerId, text);
+
+        textarea.value = "";
+        autoGrow(textarea);
+
+        const col = document.querySelector(`.col[data-manager-id="${managerId}"]`);
+        if (col) {
+          window.__opsBoard?.setSelectedConversation?.(col.id, { focus: true, lock: true });
+        }
+      } catch (err) {
+        console.error("sendSingleMessage error", err);
+        alert("Não foi possível enviar a mensagem.");
+      } finally {
+        form.dataset.sending = "0";
+        if (sendBtn) {
+          sendBtn.disabled = false;
+          sendBtn.classList.remove("loading");
+        }
+      }
+    }
+
+    document.querySelectorAll(".composer form").forEach((form) => {
+      const textarea = form.querySelector('textarea[name="message_single"]');
+
+      if (textarea) {
+        autoGrow(textarea);
+
+        textarea.addEventListener("input", () => {
+          autoGrow(textarea);
+        });
+
+        textarea.addEventListener("keydown", async (e) => {
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (form.dataset.sending === "1") return;
+            if (!String(textarea.value || "").trim()) return;
+            await sendSingleMessage(form);
+          }
+        });
+      }
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (form.dataset.sending === "1") return;
+        await sendSingleMessage(form);
       });
     });
+
+    scrollAllThreadsToBottom(false);
+
+    window.__opsBoardMessaging = window.__opsBoardMessaging || {};
+    window.__opsBoardMessaging.scrollAllThreadsToBottom = scrollAllThreadsToBottom;
+    window.__opsBoardMessaging.scrollThreadToBottom = scrollThreadToBottom;
+    window.__opsBoardMessaging.normalizeText = normalizeText;
   })();
 </script>
-<script>
+
+  <script>
   (function () {
     const bodyEl = document.body;
     const day = bodyEl.dataset.day;
@@ -1121,9 +1430,17 @@
         .replaceAll("'", "&#039;");
     }
 
+    function normalizeText(str) {
+      return window.__opsBoardMessaging?.normalizeText
+        ? window.__opsBoardMessaging.normalizeText(str)
+        : String(str || "").replace(/\s+/g, " ").trim();
+    }
+
     function messageHtml(msg) {
       return `
-        <div class="msgRow ${msg.side}" data-message-id="${escapeHtml(msg.message_id || "")}" data-provider-message-id="${escapeHtml(msg.provider_message_id || "")}">
+        <div class="msgRow ${msg.side}"
+             data-message-id="${escapeHtml(msg.message_id || "")}"
+             data-provider-message-id="${escapeHtml(msg.provider_message_id || "")}">
           <div class="bubble ${msg.side === "right" ? "outb" : "inb"}">
             ${escapeHtml(msg.text)}
           </div>
@@ -1136,25 +1453,58 @@
       `;
     }
 
-    function isNearBottom(el, threshold = 80) {
+    function isNearBottom(el, threshold = 100) {
       return (el.scrollHeight - el.scrollTop - el.clientHeight) < threshold;
+    }
+
+    function removeMatchingOptimistic(thread, msg) {
+      if (!thread || msg.side !== "right") return false;
+
+      const normalizedIncoming = normalizeText(msg.text);
+      const optimisticRows = Array.from(thread.querySelectorAll('.msgRow[data-optimistic="1"]'));
+
+      const match = optimisticRows.find(row => {
+        const optimisticText = normalizeText(row.dataset.messageText || row.querySelector(".bubble")?.textContent || "");
+        return optimisticText === normalizedIncoming;
+      });
+
+      if (match) {
+        match.remove();
+        return true;
+      }
+
+      return false;
     }
 
     function appendMessage(msg) {
       const thread = document.querySelector(`.thread[data-manager-id="${msg.manager_id}"]`);
       if (!thread) return;
 
-      const exists = msg.message_id && thread.querySelector(`[data-message-id="${msg.message_id}"]`);
-      if (exists) return;
+      const existsById = msg.message_id && thread.querySelector(`[data-message-id="${msg.message_id}"]`);
+      if (existsById) return;
+
+      const shouldStick = isNearBottom(thread);
 
       const empty = thread.querySelector(".empty");
       if (empty) empty.remove();
 
-      const shouldStick = isNearBottom(thread);
+      removeMatchingOptimistic(thread, msg);
+
+      const existsByContent = Array.from(thread.querySelectorAll(".msgRow")).some(row => {
+        const bubble = row.querySelector(".bubble");
+        const rowText = normalizeText(bubble?.textContent || "");
+        const incomingText = normalizeText(msg.text || "");
+        const sameSide =
+          row.classList.contains(msg.side);
+        return sameSide && rowText === incomingText && !row.dataset.optimistic;
+      });
+
+      if (existsByContent) return;
+
       thread.insertAdjacentHTML("beforeend", messageHtml(msg));
 
       if (shouldStick) {
-        thread.scrollTop = thread.scrollHeight;
+        window.__opsBoardMessaging?.scrollThreadToBottom?.(thread, true);
       }
 
       const col = document.querySelector(`.col[data-manager-id="${msg.manager_id}"]`);
@@ -1199,7 +1549,7 @@
       if (meta) {
         const items = update.items || {};
         meta.innerHTML = `
-          <div class="pill">${bodyEl.dataset.day.split("-").reverse().slice(0,2).join("/")}</div>
+          <div class="pill">${bodyEl.dataset.day.split("-").reverse().slice(0, 2).join("/")}</div>
           ${update.last_label ? `<div class="pill">Última: ${escapeHtml(update.last_label)}</div>` : ""}
           ${(items.total || 0) > 0 ? `<div class="pill">Open: ${items.open || 0}</div>` : ""}
           ${(items.total || 0) > 0 ? `<div class="pill">Done: ${items.done || 0}</div>` : ""}
@@ -1257,6 +1607,8 @@
         if (col) col.classList.remove("hasNew");
       });
     });
+
+    window.__opsBoardMessaging?.scrollAllThreadsToBottom?.(false);
 
     pollTimer = window.setInterval(fetchBoardUpdates, 5000);
   })();
