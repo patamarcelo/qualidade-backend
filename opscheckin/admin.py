@@ -15,6 +15,33 @@ from .models import (
 )
 
 
+def format_phone_br(phone: str) -> str:
+    s = only_digits(phone)
+
+    if not s:
+        return "-"
+
+    # se vier com 55 salvo por algum motivo, remove só para exibição
+    if s.startswith("55") and len(s) > 10:
+        s = s[2:]
+
+    if len(s) < 10:
+        return phone or "-"
+
+    ddd = s[:2]
+    number = s[2:]
+
+    # formato esperado do projeto: 8 dígitos
+    if len(number) == 8:
+        return f"({ddd}) {number[:4]}-{number[4:]}"
+
+    # fallback caso exista algum legado com 9 dígitos
+    if len(number) == 9:
+        return f"({ddd}) {number[:5]}-{number[5:]}"
+
+    return f"({ddd}) {number}"
+
+
 # opscheckin/admin.py
 BR_DDDS = [
     "11", "12", "13", "14", "15", "16", "17", "18", "19",
@@ -50,12 +77,19 @@ class ManagerAdminForm(forms.ModelForm):
     number = forms.CharField(
         label="Número",
         required=True,
-        widget=forms.TextInput(attrs={"placeholder": "91234-5678"}),
+        help_text="Informe no máximo 8 dígitos neste campo. Não incluir o 9º Dígito",
+        widget=forms.TextInput(
+            attrs={
+                "placeholder": "91234-5678",
+                "maxlength": "9",
+                "inputmode": "numeric",
+            }
+        ),
     )
 
     class Meta:
         model = Manager
-        fields = ("name", "country", "ddd", "number", "is_active", 'is_active_resume_agenda')
+        fields = ("name", "country", "ddd", "number", "is_active", "is_active_resume_agenda")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -82,7 +116,8 @@ class ManagerAdminForm(forms.ModelForm):
         phone_e164 = f"55{ddd}{number}"
         self.instance.phone_e164 = phone_e164
         return cleaned
-
+    
+    
 
 class ManagerNotificationSubscriptionInline(admin.StackedInline):
     model = ManagerNotificationSubscription
@@ -98,7 +133,7 @@ class ManagerAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "name",
-        "phone_e164",
+        "phone_display",
         "is_active",
         "is_active_resume_agenda",
         "notification_codes",
@@ -135,6 +170,12 @@ class ManagerAdmin(admin.ModelAdmin):
             )
         )
         return qs
+    
+    def phone_display(self, obj):
+        return format_phone_br(obj.phone_e164)
+
+    phone_display.short_description = "Telefone"
+    phone_display.admin_order_field = "phone_e164"
 
     def notification_codes(self, obj):
         subs = obj.notification_subscriptions.select_related("notification_type").order_by(
@@ -225,7 +266,9 @@ class ManagerNotificationSubscriptionAdmin(admin.ModelAdmin):
         return super().get_queryset(request).select_related("manager", "notification_type")
 
     def manager_phone(self, obj):
-        return obj.manager.phone_e164
+        return format_phone_br(obj.manager.phone_e164)
+
+
 
     manager_phone.short_description = "Telefone"
 

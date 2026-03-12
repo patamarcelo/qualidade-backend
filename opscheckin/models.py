@@ -54,7 +54,7 @@ class ManagerNotificationSubscription(models.Model):
 
 class Manager(models.Model):
     name = models.CharField(max_length=80)
-    phone_e164 = models.CharField(max_length=20, unique=True)  # ex: 5551999999999
+    phone_e164 = models.CharField(max_length=12, unique=True)  # ex: 5551999999999
     
     is_active = models.BooleanField(
         default=True,
