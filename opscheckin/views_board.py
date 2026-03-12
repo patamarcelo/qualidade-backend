@@ -16,11 +16,182 @@ from .models import (
 from .services.templates import render_message
 from .services.whatsapp import send_text
 
+from django.http import JsonResponse
+from django.utils.dateparse import parse_datetime
+
 
 DEFAULT_MSG = (
     "Bom dia {name},\n\n"
     "Por favor poderia me mandar a sua agenda do dia?"
 )
+
+def _iso(dt):
+    if not dt:
+        return ""
+    return timezone.localtime(dt).isoformat()
+
+
+def _parse_since(value):
+    if not value:
+        return None
+    dt = parse_datetime(value)
+    if not dt:
+        return None
+    if timezone.is_naive(dt):
+        dt = timezone.make_aware(dt, timezone.get_current_timezone())
+    return dt
+
+
+def _build_message_payload(it):
+    return {
+        "message_id": it.get("message_id", ""),
+        "provider_message_id": it.get("provider_message_id", ""),
+        "manager_id": it["manager_id"],
+        "column_id": f"manager-{it['manager_id']}",
+        "kind": it["kind"],
+        "ts": _iso(it["ts"]),
+        "label": timezone.localtime(it["ts"]).strftime("%H:%M") if it.get("ts") else "",
+        "side": it["side"],
+        "text": it["text"] or "",
+        "meta": it.get("meta", "") or "",
+        "ticks": it.get("ticks", "") or "",
+        "ticks_class": it.get("ticks_class", "") or "",
+    }
+
+
+@staff_member_required
+@require_http_methods(["GET"])
+def board_updates(request):
+    day_str = request.GET.get("day") or ""
+    since_str = request.GET.get("since") or ""
+
+    day = _parse_date(day_str) or timezone.localdate()
+    start_dt, end_dt = _day_bounds_local(day)
+    since = _parse_since(since_str) or start_dt
+
+    managers = list(Manager.objects.all().order_by("name"))
+    manager_ids = [m.id for m in managers]
+
+    outbound_qs = (
+        OutboundMessage.objects
+        .filter(
+            manager_id__in=manager_ids,
+            sent_at__gte=start_dt,
+            sent_at__lte=end_dt,
+            sent_at__gt=since,
+        )
+        .select_related("manager")
+        .order_by("sent_at", "id")
+    )
+
+    inbound_qs = (
+        InboundMessage.objects
+        .filter(
+            manager_id__in=manager_ids,
+            received_at__gte=start_dt,
+            received_at__lte=end_dt,
+            received_at__gt=since,
+        )
+        .select_related("manager")
+        .order_by("received_at", "id")
+    )
+
+    messages = []
+
+    for om in outbound_qs:
+        glyph, cls = _ticks_from_wa_status(getattr(om, "wa_status", ""))
+        messages.append(_build_message_payload({
+            "message_id": f"out-{om.id}",
+            "provider_message_id": om.provider_message_id or "",
+            "manager_id": om.manager_id,
+            "kind": "outbound",
+            "ts": om.sent_at,
+            "side": "right",
+            "text": om.text,
+            "meta": om.kind or "",
+            "ticks": glyph,
+            "ticks_class": cls,
+        }))
+
+    for im in inbound_qs:
+        messages.append(_build_message_payload({
+            "message_id": f"in-{im.id}",
+            "provider_message_id": "",
+            "manager_id": im.manager_id,
+            "kind": "inbound",
+            "ts": im.received_at,
+            "side": "left",
+            "text": im.text,
+            "meta": im.msg_type or "",
+        }))
+
+    messages.sort(key=lambda x: x["ts"] or "")
+
+    checkins = (
+        DailyCheckin.objects
+        .filter(date=day, manager_id__in=manager_ids)
+        .prefetch_related("questions")
+    )
+    by_manager = {c.manager_id: c for c in checkins}
+
+    try:
+        from .models import AgendaItem
+
+        item_stats = (
+            AgendaItem.objects.filter(checkin__date=day, checkin__manager_id__in=manager_ids)
+            .values("checkin__manager_id")
+            .annotate(
+                total=Count("id"),
+                open=Count("id", filter=Q(status="open")),
+                done=Count("id", filter=Q(status="done")),
+                skip=Count("id", filter=Q(status="skip")),
+            )
+        )
+        stats_by_manager = {x["checkin__manager_id"]: x for x in item_stats}
+    except Exception:
+        stats_by_manager = {}
+
+    manager_updates = []
+    for m in managers:
+        c = by_manager.get(m.id)
+        agenda_q = c.questions.filter(step="AGENDA").order_by("-id").first() if c else None
+        confirm_q = c.questions.filter(step="AGENDA_CONFIRM").order_by("-id").first() if c else None
+        st = stats_by_manager.get(m.id) or {}
+
+        timeline = _build_manager_timeline(m, start_dt, end_dt)
+        preview = _build_sidebar_preview(timeline)
+
+        manager_updates.append({
+            "manager_id": m.id,
+            "column_id": f"manager-{m.id}",
+            "last_ts": _iso(preview["last_ts"]) if preview["last_ts"] else "",
+            "last_label": preview["last_label"],
+            "last_preview": preview["last_preview"],
+            "last_side": preview["last_side"],
+            "agenda_badge": list(_badge_for_q(agenda_q)),
+            "confirm_badge": list(_badge_for_q(confirm_q)),
+            "items": {
+                "total": int(st.get("total") or 0),
+                "open": int(st.get("open") or 0),
+                "done": int(st.get("done") or 0),
+                "skip": int(st.get("skip") or 0),
+            },
+        })
+
+    latest_ts = []
+    if messages:
+        latest_ts.extend([parse_datetime(m["ts"]) for m in messages if m.get("ts")])
+
+    server_now = timezone.now()
+    max_ts = max(latest_ts) if latest_ts else server_now
+
+    return JsonResponse({
+        "ok": True,
+        "day": day.isoformat(),
+        "server_now": _iso(max_ts),
+        "messages": messages,
+        "manager_updates": manager_updates,
+    })
 
 
 def _parse_date(s: str):
@@ -353,5 +524,6 @@ def board_view(request):
             "managers": list(managers),
             "default_msg": DEFAULT_MSG,
             "status_filter": request.GET.get("status") or "",
+            "initial_sync": timezone.now().isoformat(),
         },
     )

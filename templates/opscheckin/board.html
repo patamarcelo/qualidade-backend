@@ -730,10 +730,26 @@
         width: 280px;
       }
     }
+
+    .conversationItem.hasNew {
+      background: rgba(59, 130, 246, .08);
+    }
+
+    .conversationItem.hasNew .conversationName::after {
+      content: " • nova";
+      font-size: 10px;
+      color: #2563eb;
+      font-weight: 800;
+      margin-left: 4px;
+    }
+
+    .col.hasNew .colHeader {
+      box-shadow: inset 0 2px 0 rgba(59, 130, 246, .45);
+    }
   </style>
 </head>
 
-<body>
+<body data-day="{{ day|date:'Y-m-d' }}" data-initial-sync="{{ initial_sync }}">
   <div class="top">
     <div class="topRow">
       <div class="title">
@@ -817,8 +833,10 @@
 
       <div class="conversationList" id="conversationList">
         {% for col in cols %}
-        <div class="conversationItem" data-manager-name="{{ col.manager.name|lower }}"
-          data-active="{% if col.manager.is_active %}1{% else %}0{% endif %}" data-target="{{ col.column_id }}">
+        <div class="conversationItem"  data-manager-id="{{ col.manager.id }}"
+        data-manager-name="{{ col.manager.name|lower }}"
+        data-active="{% if col.manager.is_active %}1{% else %}0{% endif %}"
+        data-target="{{ col.column_id }}">
           <div class="conversationMain">
             <div class="conversationHead">
               <span class="managerDot {% if col.manager.is_active %}dotOn{% else %}dotOff{% endif %}">●</span>
@@ -839,7 +857,7 @@
         <div class="board" id="board">
           {% for col in cols %}
           <div class="col" id="{{ col.column_id }}" data-active="{% if col.manager.is_active %}1{% else %}0{% endif %}"
-            data-manager-name="{{ col.manager.name|lower }}">
+            data-manager-name="{{ col.manager.name|lower }}"   data-manager-id="{{ col.manager.id }}">
             <div class="colHeader">
               <div class="colHeaderTop">
                 <div class="mgr">
@@ -897,7 +915,7 @@
               </div>
             </div>
 
-            <div class="thread" data-thread="1">
+            <div class="thread" data-thread="1" data-manager-id="{{ col.manager.id }}">
               {% if col.timeline|length == 0 %}
               <div class="empty">Sem conversa ainda.</div>
               {% else %}
@@ -1085,6 +1103,162 @@
         }
       });
     });
+  })();
+</script>
+<script>
+  (function () {
+    const bodyEl = document.body;
+    const day = bodyEl.dataset.day;
+    let lastSync = bodyEl.dataset.initialSync;
+    let pollTimer = null;
+
+    function escapeHtml(str) {
+      return String(str || "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function messageHtml(msg) {
+      return `
+        <div class="msgRow ${msg.side}" data-message-id="${escapeHtml(msg.message_id || "")}" data-provider-message-id="${escapeHtml(msg.provider_message_id || "")}">
+          <div class="bubble ${msg.side === "right" ? "outb" : "inb"}">
+            ${escapeHtml(msg.text)}
+          </div>
+          <div class="metaLine">
+            <span class="time">${escapeHtml(msg.label || "")}</span>
+            ${msg.side === "right" && msg.ticks ? `<span class="ticks ${escapeHtml(msg.ticks_class || "")}">${escapeHtml(msg.ticks)}</span>` : ""}
+            ${msg.meta ? `<span class="tag">${escapeHtml(msg.meta)}</span>` : ""}
+          </div>
+        </div>
+      `;
+    }
+
+    function isNearBottom(el, threshold = 80) {
+      return (el.scrollHeight - el.scrollTop - el.clientHeight) < threshold;
+    }
+
+    function appendMessage(msg) {
+      const thread = document.querySelector(`.thread[data-manager-id="${msg.manager_id}"]`);
+      if (!thread) return;
+
+      const exists = msg.message_id && thread.querySelector(`[data-message-id="${msg.message_id}"]`);
+      if (exists) return;
+
+      const empty = thread.querySelector(".empty");
+      if (empty) empty.remove();
+
+      const shouldStick = isNearBottom(thread);
+      thread.insertAdjacentHTML("beforeend", messageHtml(msg));
+
+      if (shouldStick) {
+        thread.scrollTop = thread.scrollHeight;
+      }
+
+      const col = document.querySelector(`.col[data-manager-id="${msg.manager_id}"]`);
+      const item = document.querySelector(`.conversationItem[data-manager-id="${msg.manager_id}"]`);
+
+      if (col) col.classList.add("hasNew");
+      if (item) item.classList.add("hasNew");
+    }
+
+    function updateSidebarAndHeader(update) {
+      const item = document.querySelector(`.conversationItem[data-manager-id="${update.manager_id}"]`);
+      const col = document.querySelector(`.col[data-manager-id="${update.manager_id}"]`);
+      if (!item || !col) return;
+
+      const previewEl = item.querySelector(".conversationPreview");
+      const timeEl = item.querySelector(".conversationTime");
+      if (previewEl) previewEl.textContent = `${update.last_side || ""}${update.last_preview || ""}`;
+      if (timeEl) timeEl.textContent = update.last_label || "—";
+
+      const badges = col.querySelector(".headerBadges");
+      if (badges) {
+        const items = update.items || {};
+        let itemsHtml = `<div class="badge">ITENS: —</div>`;
+        if ((items.total || 0) > 0) {
+          if ((items.open || 0) === 0 && (items.done || 0) > 0) {
+            itemsHtml = `<div class="badge b-ok">ITENS: ok</div>`;
+          } else if ((items.open || 0) > 0) {
+            itemsHtml = `<div class="badge b-warn">ITENS: ${items.open} abertos</div>`;
+          } else {
+            itemsHtml = `<div class="badge">ITENS: ${items.total}</div>`;
+          }
+        }
+
+        badges.innerHTML = `
+          <div class="${update.agenda_badge?.[1] || 'badge'}">AGENDA: ${update.agenda_badge?.[0] || '—'}</div>
+          <div class="${update.confirm_badge?.[1] || 'badge'}">CONF: ${update.confirm_badge?.[0] || '—'}</div>
+          ${itemsHtml}
+        `;
+      }
+
+      const meta = col.querySelector(".colMeta");
+      if (meta) {
+        const items = update.items || {};
+        meta.innerHTML = `
+          <div class="pill">${bodyEl.dataset.day.split("-").reverse().slice(0,2).join("/")}</div>
+          ${update.last_label ? `<div class="pill">Última: ${escapeHtml(update.last_label)}</div>` : ""}
+          ${(items.total || 0) > 0 ? `<div class="pill">Open: ${items.open || 0}</div>` : ""}
+          ${(items.total || 0) > 0 ? `<div class="pill">Done: ${items.done || 0}</div>` : ""}
+          ${(items.total || 0) > 0 ? `<div class="pill">Skip: ${items.skip || 0}</div>` : ""}
+        `;
+      }
+    }
+
+    function reorderSidebar() {
+      const list = document.getElementById("conversationList");
+      if (!list) return;
+
+      const items = Array.from(list.querySelectorAll(".conversationItem"));
+      items.sort((a, b) => {
+        const ta = (a.querySelector(".conversationTime")?.textContent || "").trim();
+        const tb = (b.querySelector(".conversationTime")?.textContent || "").trim();
+        return tb.localeCompare(ta);
+      });
+
+      items.forEach(i => list.appendChild(i));
+    }
+
+    async function fetchBoardUpdates() {
+      try {
+        const url = `/opscheckin/board/updates/?day=${encodeURIComponent(day)}&since=${encodeURIComponent(lastSync)}`;
+        const resp = await fetch(url, {
+          headers: { "X-Requested-With": "XMLHttpRequest" },
+          credentials: "same-origin",
+        });
+
+        if (!resp.ok) return;
+        const data = await resp.json();
+        if (!data.ok) return;
+
+        (data.messages || []).forEach(appendMessage);
+        (data.manager_updates || []).forEach(updateSidebarAndHeader);
+
+        if ((data.messages || []).length > 0) {
+          reorderSidebar();
+        }
+
+        if (data.server_now) {
+          lastSync = data.server_now;
+        }
+      } catch (err) {
+        console.error("board-updates error", err);
+      }
+    }
+
+    document.querySelectorAll(".conversationItem").forEach(item => {
+      item.addEventListener("click", () => {
+        item.classList.remove("hasNew");
+        const managerId = item.dataset.managerId;
+        const col = document.querySelector(`.col[data-manager-id="${managerId}"]`);
+        if (col) col.classList.remove("hasNew");
+      });
+    });
+
+    pollTimer = window.setInterval(fetchBoardUpdates, 5000);
   })();
 </script>
 </body>

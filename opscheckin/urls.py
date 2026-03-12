@@ -1,9 +1,10 @@
 # opscheckin/urls.py
 from django.urls import path
 from .views import whatsapp_webhook
-from .views_board import board_view
+from .views_board import board_view, board_updates
 
 urlpatterns = [
     path("whatsapp/webhook/", whatsapp_webhook, name="whatsapp_webhook"),
     path("board/", board_view, name="opscheckin_board"),
+    path("board/updates/", board_updates, name="opscheckin_board_updates"),
 ]
