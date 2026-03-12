@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, time
 
 from django.contrib.admin.views.decorators import staff_member_required
 from django.db.models import Count, Q
@@ -78,10 +78,37 @@ def _truncate(text: str, limit: int = 72) -> str:
     return text[: limit - 1].rstrip() + "…"
 
 
-def _build_full_timeline(checkin):
+def _day_bounds_local(day):
+    tz = timezone.get_current_timezone()
+    start_local = timezone.make_aware(datetime.combine(day, time.min), tz)
+    end_local = timezone.make_aware(datetime.combine(day, time.max), tz)
+    return start_local, end_local
+
+
+def _build_manager_timeline(manager, start_dt, end_dt):
     items = []
 
-    for om in checkin.outbound_messages.all().order_by("sent_at", "id"):
+    outbound_qs = (
+        OutboundMessage.objects
+        .filter(
+            manager=manager,
+            sent_at__gte=start_dt,
+            sent_at__lte=end_dt,
+        )
+        .order_by("sent_at", "id")
+    )
+
+    inbound_qs = (
+        InboundMessage.objects
+        .filter(
+            manager=manager,
+            received_at__gte=start_dt,
+            received_at__lte=end_dt,
+        )
+        .order_by("received_at", "id")
+    )
+
+    for om in outbound_qs:
         glyph, cls = _ticks_from_wa_status(getattr(om, "wa_status", ""))
 
         items.append(
@@ -96,7 +123,7 @@ def _build_full_timeline(checkin):
             }
         )
 
-    for im in checkin.inbound_messages.all().order_by("received_at", "id"):
+    for im in inbound_qs:
         items.append(
             {
                 "ts": im.received_at,
@@ -157,6 +184,7 @@ def _build_sidebar_preview(timeline):
 def board_view(request):
     date_str = request.GET.get("date") or ""
     day = _parse_date(date_str) or timezone.localdate()
+    start_dt, end_dt = _day_bounds_local(day)
 
     managers = Manager.objects.all().order_by("name")
 
@@ -235,7 +263,7 @@ def board_view(request):
     checkins = (
         DailyCheckin.objects.filter(date=day)
         .select_related("manager")
-        .prefetch_related("questions", "inbound_messages", "outbound_messages")
+        .prefetch_related("questions")
     )
     by_manager = {c.manager_id: c for c in checkins}
 
@@ -260,24 +288,24 @@ def board_view(request):
     for m in managers:
         c = by_manager.get(m.id)
 
+        timeline = _build_manager_timeline(m, start_dt, end_dt)
+
         if not c:
             cols.append(
                 {
                     "manager": m,
                     "manager_phone_display": format_phone_br(m.phone_e164),
-                    "timeline": [],
+                    "timeline": timeline,
                     "agenda_q": None,
                     "confirm_q": None,
                     "agenda_badge": ("—", "badge"),
                     "confirm_badge": ("—", "badge"),
                     "items": {"total": 0, "open": 0, "done": 0, "skip": 0},
                     "column_id": f"manager-{m.id}",
-                    **_build_sidebar_preview([]),
+                    **_build_sidebar_preview(timeline),
                 }
             )
             continue
-
-        timeline = _build_full_timeline(c)
 
         agenda_q = c.questions.filter(step="AGENDA").order_by("-id").first()
         confirm_q = c.questions.filter(step="AGENDA_CONFIRM").order_by("-id").first()
