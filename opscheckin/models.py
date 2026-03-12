@@ -176,13 +176,16 @@ class OutboundMessage(models.Model):
     provider_message_id = models.CharField(max_length=128, blank=True, default="", db_index=True)
 
     kind = models.CharField(
-        max_length=24,
+        max_length=150,
         default="text",
         choices=[
             ("agenda", "Agenda"),
             ("reminder", "Reminder"),
             ("manual", "Manual"),
             ("other", "Other"),
+            ("agenda_summary_director", "Resumo diretoria"),
+            ("agenda_summary_director_overview", "Resumo diretoria geral"),
+            ("agenda_summary_director_actions", "Ações resumo diretoria"),
         ],
         db_index=True,
     )
