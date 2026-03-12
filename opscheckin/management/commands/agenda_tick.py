@@ -8,9 +8,9 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 from django.db.models import Q
 
-from opscheckin.models import  DailyCheckin, InboundMessage, OutboundMessage
+from opscheckin.models import DailyCheckin, InboundMessage, OutboundMessage
 from opscheckin.services.recipients import managers_subscribed
-from opscheckin.services.whatsapp import send_list, send_buttons
+from opscheckin.services.whatsapp import send_text, send_buttons
 
 logger = logging.getLogger("opscheckin.agenda_tick")
 
@@ -24,10 +24,6 @@ END_HOUR = 17  # inclusive (vamos permitir até 17:59)
 # anti-spam
 COOLDOWN_MINUTES = 35  # não manda se houve atividade recente
 
-# limite do WhatsApp na list (rows) — costuma ser 10 por seção; dependendo conta pode aceitar mais,
-# mas vamos ser conservadores:
-MAX_ROWS = 10
-
 
 def _local_today():
     return timezone.localdate()
@@ -36,6 +32,13 @@ def _local_today():
 def _in_operational_window(local_now):
     # permite de START_HOUR:00 até END_HOUR:59
     return START_HOUR <= local_now.hour <= END_HOUR
+
+
+def _extract_provider_id(resp):
+    try:
+        return ((resp or {}).get("messages") or [{}])[0].get("id") or ""
+    except Exception:
+        return ""
 
 
 def _recent_activity_at(manager, checkin):
@@ -62,11 +65,11 @@ def _recent_activity_at(manager, checkin):
 
 def _last_followup_sent_at(checkin):
     """
-    Âncora do 90/90: último outbound do tipo agenda_followup.
+    Âncora do 90/90: último outbound do tipo agenda_followup_actions.
     """
     return (
         OutboundMessage.objects
-        .filter(checkin=checkin, kind="agenda_followup")
+        .filter(checkin=checkin, kind="agenda_followup_actions")
         .order_by("-sent_at", "-id")
         .values_list("sent_at", flat=True)
         .first()
@@ -88,16 +91,12 @@ def _agenda_confirm_anchor_at(checkin):
         return None
     if q.status != "answered":
         return None
-    return q.answered_at or q.sent_at  # fallback
+    return q.answered_at or q.sent_at
 
 
-def _log_outbound_interactive(*, manager, checkin, body, resp, kind="agenda_followup"):
+def _log_outbound_message(*, manager, checkin, body, resp, kind):
     now = timezone.now()
-    provider_id = ""
-    try:
-        provider_id = ((resp or {}).get("messages") or [{}])[0].get("id") or ""
-    except Exception:
-        pass
+    provider_id = _extract_provider_id(resp)
 
     data = dict(
         manager=manager,
@@ -110,29 +109,12 @@ def _log_outbound_interactive(*, manager, checkin, body, resp, kind="agenda_foll
         sent_at=now,
         raw_response=resp,
     )
+
     if provider_id:
         data["wa_status"] = "sent"
         data["wa_sent_at"] = now
 
     OutboundMessage.objects.create(**data)
-    
-
-
-def _wa_list_row_title(idx: int, text: str) -> str:
-    """
-    WhatsApp list row title: máximo 24 chars.
-    Ex.: '✅ 3) Ajuste cronogr'
-    """
-    raw = f"✅ {idx}) {(text or '').strip()}"
-    return raw[:24].rstrip()
-
-
-def _wa_list_row_description(text: str) -> str:
-    """
-    Description pode ser maior; mantemos curta para leitura.
-    """
-    s = (text or "").strip()
-    return (s[:72] + "…") if len(s) > 72 else s
 
 
 def _agenda_reply_text(checkin):
@@ -150,20 +132,67 @@ def _agenda_reply_text(checkin):
     return "Agenda de hoje:\n" + "\n".join(lines)
 
 
-
 def _send_followup_buttons(manager, checkin):
-    body = (
+    """
+    Novo formato:
+    1) envia a agenda consolidada em texto separado
+    2) envia a ação curta com botões
+    """
+    agenda_body = _agenda_reply_text(checkin)
+
+    logger.warning(
+        "AGENDA_FOLLOWUP_TEXT_LEN manager=%s checkin_id=%s len=%s",
+        getattr(manager, "name", ""),
+        getattr(checkin, "id", None),
+        len(agenda_body or ""),
+    )
+
+    resp_text = send_text(manager.phone_e164, agenda_body)
+
+    _log_outbound_message(
+        manager=manager,
+        checkin=checkin,
+        body=agenda_body,
+        resp=resp_text,
+        kind="agenda_followup_snapshot",
+    )
+
+    provider_id_text = _extract_provider_id(resp_text)
+    if not provider_id_text:
+        logger.warning(
+            "AGENDA_FOLLOWUP_SNAPSHOT_FAILED manager=%s checkin_id=%s resp=%s",
+            getattr(manager, "name", ""),
+            getattr(checkin, "id", None),
+            resp_text,
+        )
+        return False
+
+    action_body = (
         "Atualização da agenda 🕘\n\n"
-        f"{_agenda_reply_text(checkin)}\n\n"
         "Se quiser incluir um item, escreva:\n"
         "+ exemplo de item\n\n"
         "Ou, se deseja alterar alguma coisa na agenda,\n"
         "basta selecionar uma das opções abaixo:"
+    ).strip()
+
+    logger.warning(
+        "AGENDA_FOLLOWUP_ACTIONS_LEN manager=%s checkin_id=%s len=%s",
+        getattr(manager, "name", ""),
+        getattr(checkin, "id", None),
+        len(action_body or ""),
     )
 
-    resp = send_buttons(
+    if not action_body:
+        logger.warning(
+            "AGENDA_FOLLOWUP_EMPTY_ACTION_BODY manager=%s checkin_id=%s",
+            getattr(manager, "name", ""),
+            getattr(checkin, "id", None),
+        )
+        return False
+
+    resp_buttons = send_buttons(
         manager.phone_e164,
-        body=body,
+        body=action_body,
         buttons=[
             {"id": "AM:MENU:DONE", "title": "✅ Concluir"},
             {"id": "AM:MENU:UNDO", "title": "↩️ Desmarcar"},
@@ -171,16 +200,34 @@ def _send_followup_buttons(manager, checkin):
         ],
     )
 
-    _log_outbound_interactive(
+    _log_outbound_message(
         manager=manager,
         checkin=checkin,
-        body=body,
-        resp=resp,
-        kind="agenda_followup",
+        body=action_body,
+        resp=resp_buttons,
+        kind="agenda_followup_actions",
+    )
+
+    provider_id_buttons = _extract_provider_id(resp_buttons)
+    if not provider_id_buttons:
+        logger.warning(
+            "AGENDA_FOLLOWUP_BUTTONS_FAILED manager=%s checkin_id=%s resp=%s",
+            getattr(manager, "name", ""),
+            getattr(checkin, "id", None),
+            resp_buttons,
+        )
+        return False
+
+    logger.warning(
+        "AGENDA_FOLLOWUP_SENT manager=%s checkin_id=%s",
+        getattr(manager, "name", ""),
+        getattr(checkin, "id", None),
     )
     return True
+
+
 class Command(BaseCommand):
-    help = "Follow-up real 90/90 (relativo) após confirmação da agenda, com Interactive List."
+    help = "Follow-up real 90/90 (relativo) após confirmação da agenda."
 
     def add_arguments(self, parser):
         parser.add_argument("--date", type=str, default="", help="YYYY-MM-DD (padrão: hoje local)")
@@ -202,7 +249,6 @@ class Command(BaseCommand):
         every_min = int(opts["every_min"] or FOLLOWUP_EVERY_MINUTES)
         cooldown_min = int(opts["cooldown_min"] or COOLDOWN_MINUTES)
 
-        # só roda no horário operacional (evita followup às 3 da manhã caso scheduler rode)
         if not _in_operational_window(local_now):
             self.stdout.write("[agenda_tick] out of operational window")
             return
@@ -211,7 +257,6 @@ class Command(BaseCommand):
             "agenda_followup",
             include_inactive=opts.get("include_inactive", False),
         )
-        
 
         from opscheckin.models import AgendaItem
 
@@ -219,66 +264,73 @@ class Command(BaseCommand):
         skipped = 0
 
         for m in qs:
-            checkin = DailyCheckin.objects.filter(manager=m, date=day).first()
-            if not checkin:
-                logger.warning("AGENDA_FOLLOWUP_SKIP_NO_CHECKIN manager=%s day=%s", m.name, day)
-                skipped += 1
-                continue
+            try:
+                checkin = DailyCheckin.objects.filter(manager=m, date=day).first()
+                if not checkin:
+                    logger.warning("AGENDA_FOLLOWUP_SKIP_NO_CHECKIN manager=%s day=%s", m.name, day)
+                    skipped += 1
+                    continue
 
-            # precisa ter pelo menos 1 item de agenda no dia
-            if not AgendaItem.objects.filter(checkin=checkin).exists():
-                logger.warning(
-                    "AGENDA_FOLLOWUP_SKIP_NO_ITEMS manager=%s checkin_id=%s",
-                    m.name,
-                    checkin.id,
-                )
-                skipped += 1
-                continue
-
-            # precisa ter agenda confirmada (manual ou auto)
-            anchor = _agenda_confirm_anchor_at(checkin)
-            if not anchor:
-                logger.warning(
-                    "AGENDA_FOLLOWUP_SKIP_NO_CONFIRM manager=%s checkin_id=%s",
-                    m.name,
-                    checkin.id,
-                )
-                skipped += 1
-                continue
-
-            # precisa ter itens abertos
-            if not AgendaItem.objects.filter(checkin=checkin, status="open").exists():
-                logger.warning(
-                    "AGENDA_FOLLOWUP_SKIP_NO_OPEN_ITEMS manager=%s checkin_id=%s",
-                    m.name,
-                    checkin.id,
-                )
-                skipped += 1
-                continue
-
-            # cooldown por atividade recente
-            last_activity = _recent_activity_at(m, checkin)
-            if last_activity:
-                age_min = (now - last_activity).total_seconds() / 60.0
-                if age_min < cooldown_min:
+                if not AgendaItem.objects.filter(checkin=checkin).exists():
                     logger.warning(
-                        "AGENDA_FOLLOWUP_SKIP_COOLDOWN manager=%s age_min=%.1f",
-                        m.name, age_min
+                        "AGENDA_FOLLOWUP_SKIP_NO_ITEMS manager=%s checkin_id=%s",
+                        m.name,
+                        checkin.id,
                     )
                     skipped += 1
                     continue
 
-            # âncora 90/90: último followup, senão a confirmação
-            last_fu = _last_followup_sent_at(checkin)
-            base = last_fu or anchor
+                anchor = _agenda_confirm_anchor_at(checkin)
+                if not anchor:
+                    logger.warning(
+                        "AGENDA_FOLLOWUP_SKIP_NO_CONFIRM manager=%s checkin_id=%s",
+                        m.name,
+                        checkin.id,
+                    )
+                    skipped += 1
+                    continue
 
-            due_at = base + timedelta(minutes=every_min)
-            if now < due_at:
+                if not AgendaItem.objects.filter(checkin=checkin, status="open").exists():
+                    logger.warning(
+                        "AGENDA_FOLLOWUP_SKIP_NO_OPEN_ITEMS manager=%s checkin_id=%s",
+                        m.name,
+                        checkin.id,
+                    )
+                    skipped += 1
+                    continue
+
+                last_activity = _recent_activity_at(m, checkin)
+                if last_activity:
+                    age_min = (now - last_activity).total_seconds() / 60.0
+                    if age_min < cooldown_min:
+                        logger.warning(
+                            "AGENDA_FOLLOWUP_SKIP_COOLDOWN manager=%s age_min=%.1f",
+                            m.name,
+                            age_min,
+                        )
+                        skipped += 1
+                        continue
+
+                last_fu = _last_followup_sent_at(checkin)
+                base = last_fu or anchor
+
+                due_at = base + timedelta(minutes=every_min)
+                if now < due_at:
+                    continue
+
+                ok = _send_followup_buttons(m, checkin)
+                if ok:
+                    sent += 1
+
+            except Exception as e:
+                logger.exception(
+                    "AGENDA_FOLLOWUP_EXCEPTION manager=%s day=%s err=%s",
+                    getattr(m, "name", ""),
+                    day,
+                    str(e),
+                )
+                skipped += 1
                 continue
-
-            ok = _send_followup_buttons(m, checkin)
-            if ok:
-                sent += 1
 
         self.stdout.write(
             self.style.SUCCESS(
