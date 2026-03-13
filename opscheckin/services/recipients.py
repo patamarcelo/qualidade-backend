@@ -22,6 +22,10 @@ def managers_subscribed(code: str, *, include_inactive: bool = False):
         elif code == "agenda_summary_director":
             qs = qs.filter(is_active_resume_agenda=True)
 
+        # reuniões diárias
+        elif code == "daily_meeting_reminder":
+            qs = qs.filter(is_active_for_meetings=True)
+
         # fallback
         else:
             qs = qs.filter(is_active=True)

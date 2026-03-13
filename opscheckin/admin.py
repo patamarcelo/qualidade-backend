@@ -12,6 +12,8 @@ from .models import (
     InboundMessage,
     NotificationType,
     ManagerNotificationSubscription,
+    DailyManagerEvent,
+    DailyManagerEventDispatch,
 )
 
 
@@ -89,7 +91,7 @@ class ManagerAdminForm(forms.ModelForm):
 
     class Meta:
         model = Manager
-        fields = ("name", "country", "ddd", "number", "is_active", "is_active_resume_agenda")
+        fields = ("name", "country", "ddd", "number", "is_active", "is_active_resume_agenda", 'is_active_for_meetings')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -136,6 +138,7 @@ class ManagerAdmin(admin.ModelAdmin):
         "phone_display",
         "is_active",
         "is_active_resume_agenda",
+        "is_active_for_meetings",
         "notification_codes",
         "notifications_count",
         "last_checkin_link",
@@ -501,3 +504,108 @@ class InboundMessageAdmin(admin.ModelAdmin):
         return (t[:120] + "…") if len(t) > 120 else t
 
     short_text.short_description = "Texto"
+
+@admin.register(DailyManagerEvent)
+class DailyManagerEventAdmin(admin.ModelAdmin):
+    list_display = (
+        "name",
+        "code",
+        "is_active",
+        "default_time",
+        "override_date",
+        "override_time",
+        "reminder_offset_minutes",
+        "allowed_window_minutes",
+        "template_enabled",
+        "template_name",
+        "updated_at",
+    )
+    list_filter = (
+        "is_active",
+        "template_enabled",
+    )
+    search_fields = (
+        "name",
+        "code",
+        "template_name",
+        "meet_link",
+    )
+    readonly_fields = (
+        "updated_at",
+        "last_reset_at",
+    )
+
+    fieldsets = (
+        ("Identificação", {
+            "fields": (
+                "code",
+                "name",
+                "is_active",
+            )
+        }),
+        ("Horários", {
+            "fields": (
+                "default_time",
+                "override_date",
+                "override_time",
+                "reminder_offset_minutes",
+                "allowed_window_minutes",
+            )
+        }),
+        ("Mensagem / template", {
+            "fields": (
+                "template_enabled",
+                "template_name",
+                "template_language",
+                "meet_link",
+            )
+        }),
+        ("Controle interno", {
+            "fields": (
+                "last_reset_at",
+                "updated_at",
+            )
+        }),
+    )
+
+
+@admin.register(DailyManagerEventDispatch)
+class DailyManagerEventDispatchAdmin(admin.ModelAdmin):
+    list_display = (
+        "event",
+        "manager",
+        "event_date",
+        "scheduled_event_time",
+        "target_send_time",
+        "sent_at",
+        "status",
+        "provider_message_id",
+    )
+    list_filter = (
+        "event",
+        "status",
+        "event_date",
+        "scheduled_event_time",
+    )
+    search_fields = (
+        "manager__name",
+        "manager__phone_e164",
+        "event__name",
+        "event__code",
+        "provider_message_id",
+    )
+    readonly_fields = (
+        "event",
+        "manager",
+        "event_date",
+        "scheduled_event_time",
+        "target_send_time",
+        "sent_at",
+        "provider_message_id",
+        "status",
+    )
+
+    def has_add_permission(self, request):
+        return False
+    
+    

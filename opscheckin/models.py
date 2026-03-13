@@ -65,6 +65,12 @@ class Manager(models.Model):
         default=False,
         help_text="Recebe o resumo consolidado da agenda (diretoria)"
     )
+    
+    is_active_for_meetings = models.BooleanField(
+        default=False,
+        help_text="Recebe lembretes de reuniões diárias"
+    )
+    
     notification_types = models.ManyToManyField(
         "NotificationType",
         through="ManagerNotificationSubscription",
@@ -186,6 +192,7 @@ class OutboundMessage(models.Model):
             ("agenda_summary_director", "Resumo diretoria"),
             ("agenda_summary_director_overview", "Resumo diretoria geral"),
             ("agenda_summary_director_actions", "Ações resumo diretoria"),
+            ("daily_meeting_reminder", "Lembrete reunião diária"),
         ],
         db_index=True,
     )
@@ -284,3 +291,58 @@ class AgendaItem(models.Model):
     done_at = models.DateTimeField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
+    
+
+class DailyManagerEvent(models.Model):
+    EVENT_CHOICES = [
+        ("farm_daily_agenda", "Agenda diária da fazenda"),
+    ]
+
+    code = models.CharField(max_length=60, choices=EVENT_CHOICES, unique=True)
+    name = models.CharField(max_length=120, default="Agenda diária da fazenda")
+
+    is_active = models.BooleanField(default=True)
+
+    default_time = models.TimeField()  # ex: 11:00
+    override_date = models.DateField(null=True, blank=True)
+    override_time = models.TimeField(null=True, blank=True)  # ex: 17:00 só hoje
+
+    meet_link = models.URLField(blank=True, default="")
+
+    template_name = models.CharField(max_length=120, blank=True, default="daily_meeting_reminder")
+    template_language = models.CharField(max_length=20, default="pt_BR")
+    template_enabled = models.BooleanField(default=False)
+
+    reminder_offset_minutes = models.PositiveSmallIntegerField(default=60)  # 1 hora antes
+    allowed_window_minutes = models.PositiveSmallIntegerField(default=90)   # dispara se faltar <= 90 min
+
+    last_reset_at = models.DateTimeField(null=True, blank=True)
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def get_effective_time(self, day):
+        if self.override_date == day and self.override_time:
+            return self.override_time
+        return self.default_time
+
+    def reset_override_if_past(self, day):
+        if self.override_date and self.override_date < day:
+            self.override_date = None
+            self.override_time = None
+            self.save(update_fields=["override_date", "override_time"])
+            
+            
+class DailyManagerEventDispatch(models.Model):
+    event = models.ForeignKey(DailyManagerEvent, on_delete=models.CASCADE, related_name="dispatches")
+    manager = models.ForeignKey(Manager, on_delete=models.CASCADE, related_name="event_dispatches")
+
+    event_date = models.DateField(db_index=True)
+    scheduled_event_time = models.TimeField()
+    target_send_time = models.TimeField()
+
+    sent_at = models.DateTimeField(default=timezone.now)
+    provider_message_id = models.CharField(max_length=128, blank=True, default="")
+    status = models.CharField(max_length=20, default="sent")
+
+    class Meta:
+        unique_together = [("event", "manager", "event_date", "target_send_time")]

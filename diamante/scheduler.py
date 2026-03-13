@@ -20,7 +20,8 @@ from opscheckin.cron import (
     run_opscheckin_reminders,         # ✅ reminders cravados 06:15/06:30/06:45/07:00
     run_opscheckin_agenda_followups,  # ✅ follow-up (tick) itens/agenda durante o dia
     run_opscheckin_agenda_confirm,   # ✅ ADD
-    run_opscheckin_director_agenda_summary
+    run_opscheckin_director_agenda_summary,
+    run_opscheckin_daily_manager_event_tick
 
 )
 
@@ -213,9 +214,32 @@ def start():
                 coalesce=True,
                 max_instances=1,
             )
+            
+            # =====================================================================
+            # GRUPO E — OPSCHECKIN (WhatsApp) — LEMBRETE REUNIÃO DIÁRIA
+            # =====================================================================
+            # Roda de hora em hora, de segunda a sábado, das 9h às 16h.
+            # A lógica interna decide:
+            #  - horário efetivo do evento (default ou override do dia)
+            #  - se falta <= 90 min para a reunião
+            #  - se já entrou na janela de disparo (ex.: 60 min antes)
+            #  - se já enviou hoje para cada manager
+            scheduler.add_job(
+                run_opscheckin_daily_manager_event_tick,
+                "cron",
+                day_of_week="mon-sat",
+                hour="9-16",
+                minute="0",
+                id="opscheckin_daily_manager_event_tick_hourly_0916",
+                replace_existing=True,
+                misfire_grace_time=600,
+                coalesce=True,
+                max_instances=1,
+            )
             # =====================================================================
             # GRUPO E — MANUTENÇÃO APSCHEDULER
             # =====================================================================
+            
             scheduler.add_job(
                 delete_old_job_executions,
                 "cron",
