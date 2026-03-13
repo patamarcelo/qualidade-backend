@@ -95,11 +95,13 @@ def _status_and_items_for_manager(manager, day):
     }
 
 
-def _truncate_block(text, max_len=4000):
+TEMPLATE_BODY_SAFE_LEN = 850
+
+def _truncate_block(text, max_len=TEMPLATE_BODY_SAFE_LEN):
     text = (text or "").strip()
     if len(text) <= max_len:
         return text
-    return text[: max_len - 2].rstrip() + "…"
+    return text[: max_len - 1].rstrip() + "…"
 
 
 def build_director_agenda_summary_blocks(*, day, managers):

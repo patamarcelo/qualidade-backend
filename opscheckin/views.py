@@ -1,4 +1,3 @@
-# opscheckin/views.py
 import re
 import json
 import hmac
@@ -19,12 +18,232 @@ from .models import (
     OutboundMessage,
 )
 
-from opscheckin.services.whatsapp import send_buttons, send_text, send_list
+from opscheckin.services.whatsapp import send_buttons, send_text, send_list, send_template
 
 logger = logging.getLogger("opscheckin.whatsapp")
 
 # mínimo “anti-vazio” p/ considerar que veio algo (a validação real é pelo parse)
 MIN_AGENDA_CHARS = 10
+
+DIRECTOR_MANAGER_SUMMARY_TEMPLATE_NAME = getattr(
+    settings,
+    "WHATSAPP_TEMPLATE_AGENDA_SUMMARY_NAME",
+    "agenda_summary",
+)
+DIRECTOR_GLOBAL_SUMMARY_TEMPLATE_NAME = getattr(
+    settings,
+    "WHATSAPP_TEMPLATE_DIRECTOR_AGENDA_GLOBAL_SUMMARY_ACTION_NAME",
+    "director_agenda_global_summary_action",
+)
+DIRECTOR_TEMPLATE_LANGUAGE = getattr(settings, "WHATSAPP_TEMPLATE_LANGUAGE", "pt_BR")
+
+
+# =========================
+# TEMPLATE FLAGS / HELPERS
+# =========================
+
+def _setting_bool(name: str, default: bool = False) -> bool:
+    return bool(getattr(settings, name, default))
+
+
+def _director_manager_summary_template_enabled() -> bool:
+    return _setting_bool("WHATSAPP_TEMPLATE_AGENDA_SUMMARY_ENABLED", False)
+
+
+def _director_global_summary_template_enabled() -> bool:
+    return _setting_bool("WHATSAPP_TEMPLATE_DIRECTOR_AGENDA_GLOBAL_SUMMARY_ACTION_ENABLED", False)
+
+
+def _director_templates_enabled() -> bool:
+    return (
+        _director_manager_summary_template_enabled()
+        and _director_global_summary_template_enabled()
+    )
+
+
+def _extract_provider_id(resp):
+    try:
+        return ((resp or {}).get("messages") or [{}])[0].get("id") or ""
+    except Exception:
+        return ""
+
+
+def _strip_manager_title_from_summary(manager_name: str, summary: str) -> str:
+    text = (summary or "").strip()
+    if not text:
+        return ""
+
+    lines = text.splitlines()
+
+    # remove linha tipo: "📋 Agenda 1/6 — 13/03/2026"
+    if lines and re.match(r"^📋\s+Agenda\s+\d+/\d+\s+—\s+\d{2}/\d{2}/\d{4}$", lines[0].strip()):
+        lines = lines[1:]
+        while lines and not lines[0].strip():
+            lines.pop(0)
+
+    # remove linha do nome
+    if lines:
+        first = lines[0].strip()
+        name = (manager_name or "").strip()
+        patterns = [
+            rf"^\*?{re.escape(name)}\*?$",
+            rf"^👤\s*\*?{re.escape(name)}\*?$",
+            rf"^📋\s*\*?{re.escape(name)}\*?$",
+        ]
+        if any(re.match(p, first, re.I) for p in patterns):
+            lines = lines[1:]
+            while lines and not lines[0].strip():
+                lines.pop(0)
+
+    return "\n".join(lines).strip()
+
+
+
+def _build_director_template_entries(managers, blocks):
+    entries = []
+    block_list = list(blocks or [])
+
+    for idx, manager in enumerate(list(managers or [])):
+        raw_block = block_list[idx] if idx < len(block_list) else ""
+        raw_block = (raw_block or "").strip()
+        if not raw_block:
+            continue
+
+        clean_summary = _strip_manager_title_from_summary(
+            getattr(manager, "name", "") or f"Manager {idx + 1}",
+            raw_block,
+        )
+
+        entries.append({
+            "manager": manager,
+            "name": getattr(manager, "name", "") or f"Manager {idx + 1}",
+            "summary": clean_summary or raw_block,
+        })
+
+    return entries
+
+
+def _send_director_summary_templates(*, director, managers, day):
+    from opscheckin.services.director_agenda_summary import (
+        build_director_agenda_summary_blocks,
+        build_director_agenda_summary_overview,
+    )
+
+    if not _director_templates_enabled():
+        logger.warning(
+            "DIRECTOR_TEMPLATE_SEND_SKIPPED director=%s phone=%s day=%s "
+            "agenda_summary_enabled=%s global_summary_enabled=%s",
+            getattr(director, "name", ""),
+            getattr(director, "phone_e164", ""),
+            day.isoformat(),
+            _director_manager_summary_template_enabled(),
+            _director_global_summary_template_enabled(),
+        )
+        return False
+
+    blocks = build_director_agenda_summary_blocks(day=day, managers=managers)
+    overview = build_director_agenda_summary_overview(day=day, managers=managers)
+    entries = _build_director_template_entries(managers, blocks)
+
+    logger.warning(
+        "DIRECTOR_TEMPLATE_BUILD director=%s phone=%s day=%s managers=%s entries=%s overview_len=%s",
+        getattr(director, "name", ""),
+        getattr(director, "phone_e164", ""),
+        day.isoformat(),
+        len(managers or []),
+        len(entries),
+        len(overview or ""),
+    )
+
+    if not entries:
+        logger.warning(
+            "DIRECTOR_TEMPLATE_NO_ENTRIES director=%s phone=%s day=%s",
+            getattr(director, "name", ""),
+            getattr(director, "phone_e164", ""),
+            day.isoformat(),
+        )
+        return False
+
+    # 1) 1 template por manager
+    for idx, entry in enumerate(entries, start=1):
+        resp_template = send_template(
+            director.phone_e164,
+            template_name=DIRECTOR_MANAGER_SUMMARY_TEMPLATE_NAME,
+            language_code=DIRECTOR_TEMPLATE_LANGUAGE,
+            body_params=[
+                entry["name"],
+                entry["summary"],
+            ],
+        )
+
+        _log_outbound_interactive(
+            manager=director,
+            checkin=None,
+            body=f"[TEMPLATE:{DIRECTOR_MANAGER_SUMMARY_TEMPLATE_NAME}] {entry['name']}\n\n{entry['summary']}",
+            resp=resp_template,
+            kind="agenda_summary_director_template",
+        )
+
+        provider_id = _extract_provider_id(resp_template)
+        if not provider_id:
+            logger.warning(
+                "DIRECTOR_TEMPLATE_MANAGER_FAILED director=%s phone=%s day=%s idx=%s template=%s resp=%s",
+                getattr(director, "name", ""),
+                getattr(director, "phone_e164", ""),
+                day.isoformat(),
+                idx,
+                DIRECTOR_MANAGER_SUMMARY_TEMPLATE_NAME,
+                resp_template,
+            )
+            return False
+
+        logger.warning(
+            "DIRECTOR_TEMPLATE_MANAGER_SENT director=%s phone=%s day=%s idx=%s manager_name=%s template=%s",
+            getattr(director, "name", ""),
+            getattr(director, "phone_e164", ""),
+            day.isoformat(),
+            idx,
+            entry["name"],
+            DIRECTOR_MANAGER_SUMMARY_TEMPLATE_NAME,
+        )
+
+    # 2) template final com resumo geral + botão
+    resp_global = send_template(
+        director.phone_e164,
+        template_name=DIRECTOR_GLOBAL_SUMMARY_TEMPLATE_NAME,
+        language_code=DIRECTOR_TEMPLATE_LANGUAGE,
+        body_params=[overview],
+        quick_reply_payloads=["DIR:REFRESH"],
+    )
+
+    _log_outbound_interactive(
+        manager=director,
+        checkin=None,
+        body=f"[TEMPLATE:{DIRECTOR_GLOBAL_SUMMARY_TEMPLATE_NAME}] {overview}",
+        resp=resp_global,
+        kind="agenda_summary_director_global_template",
+    )
+
+    provider_id_global = _extract_provider_id(resp_global)
+    if not provider_id_global:
+        logger.warning(
+            "DIRECTOR_TEMPLATE_GLOBAL_FAILED director=%s phone=%s day=%s template=%s resp=%s",
+            getattr(director, "name", ""),
+            getattr(director, "phone_e164", ""),
+            day.isoformat(),
+            DIRECTOR_GLOBAL_SUMMARY_TEMPLATE_NAME,
+            resp_global,
+        )
+        return False
+
+    logger.warning(
+        "DIRECTOR_TEMPLATE_GLOBAL_SENT director=%s phone=%s day=%s template=%s",
+        getattr(director, "name", ""),
+        getattr(director, "phone_e164", ""),
+        day.isoformat(),
+        DIRECTOR_GLOBAL_SUMMARY_TEMPLATE_NAME,
+    )
+    return True
 
 
 # =========================
@@ -164,10 +383,6 @@ def _wa_row_desc(text: str) -> str:
 def _handle_director_action(*, manager, reply_id: str, now) -> bool:
     from django.utils import timezone
     from opscheckin.services.recipients import managers_subscribed
-    from opscheckin.services.director_agenda_summary import (
-        build_director_agenda_summary_blocks,
-        build_director_agenda_summary_overview,
-    )
 
     rid = (reply_id or "").strip().upper()
     if rid != "DIR:REFRESH":
@@ -202,6 +417,21 @@ def _handle_director_action(*, manager, reply_id: str, now) -> bool:
             )
             return True
 
+        if not _director_templates_enabled():
+            send_text(
+                manager.phone_e164,
+                "Os templates de resumo dos diretores ainda não estão habilitados."
+            )
+            logger.warning(
+                "DIRECTOR_REFRESH_TEMPLATES_DISABLED manager=%s phone=%s "
+                "agenda_summary_enabled=%s global_summary_enabled=%s",
+                getattr(manager, "name", ""),
+                getattr(manager, "phone_e164", ""),
+                _director_manager_summary_template_enabled(),
+                _director_global_summary_template_enabled(),
+            )
+            return True
+
         day = timezone.localdate()
         managers = list(
             managers_subscribed("agenda_prompt")
@@ -228,79 +458,28 @@ def _handle_director_action(*, manager, reply_id: str, now) -> bool:
             )
             return True
 
-        blocks = build_director_agenda_summary_blocks(day=day, managers=managers)
-        overview = build_director_agenda_summary_overview(day=day, managers=managers)
-
-        logger.warning(
-            "DIRECTOR_REFRESH_BUILT director=%s blocks=%s overview_len=%s",
-            getattr(manager, "name", ""),
-            len(blocks or []),
-            len(overview or ""),
+        sent_ok = _send_director_summary_templates(
+            director=manager,
+            managers=managers,
+            day=day,
         )
 
-        action_body = "Deseja receber as agendas atualizadas?"
-
-        for idx, block in enumerate(blocks or [], start=1):
-            resp_text = send_text(manager.phone_e164, block)
-
-            _log_outbound_interactive(
-                manager=manager,
-                checkin=None,
-                body=block,
-                resp=resp_text,
-                kind="agenda_summary_director",
-            )
-
+        if not sent_ok:
+            send_text(manager.phone_e164, "Não consegui atualizar o resumo agora.")
             logger.warning(
-                "DIRECTOR_REFRESH_BLOCK_SENT to=%s manager=%s day=%s block=%s len=%s",
-                manager.phone_e164,
-                manager.name,
+                "DIRECTOR_REFRESH_SEND_FAILED director=%s phone=%s day=%s",
+                getattr(manager, "name", ""),
+                getattr(manager, "phone_e164", ""),
                 day.isoformat(),
-                idx,
-                len(block or ""),
             )
-
-        resp_overview = send_text(manager.phone_e164, overview)
-
-        _log_outbound_interactive(
-            manager=manager,
-            checkin=None,
-            body=overview,
-            resp=resp_overview,
-            kind="agenda_summary_director_overview",
-        )
+            return True
 
         logger.warning(
-            "DIRECTOR_REFRESH_OVERVIEW_SENT to=%s manager=%s day=%s len=%s",
-            manager.phone_e164,
-            manager.name,
-            day.isoformat(),
-            len(overview or ""),
-        )
-
-        resp_buttons = send_buttons(
-            manager.phone_e164,
-            body=action_body,
-            buttons=[
-                {"id": "DIR:REFRESH", "title": "Atualizar agora"},
-            ],
-        )
-
-        _log_outbound_interactive(
-            manager=manager,
-            checkin=None,
-            body=action_body,
-            resp=resp_buttons,
-            kind="agenda_summary_director_actions",
-        )
-
-        logger.warning(
-            "DIRECTOR_REFRESH_BUTTON_SENT to=%s manager=%s day=%s",
-            manager.phone_e164,
-            manager.name,
+            "DIRECTOR_REFRESH_COMPLETED director=%s phone=%s day=%s",
+            getattr(manager, "name", ""),
+            getattr(manager, "phone_e164", ""),
             day.isoformat(),
         )
-
         return True
 
     except Exception as e:

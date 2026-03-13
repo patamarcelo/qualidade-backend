@@ -64,27 +64,64 @@ def send_template(
     *,
     template_name: str,
     language_code: str = "pt_BR",
-    body_params=None,  # list[str] posicional OU dict[str,str] nomeado (parameter_name)
+    body_params=None,          # list[str] posicional OU dict[str,str] nomeado
+    header_params=None,        # list[str] ou dict[str,str]
+    quick_reply_payloads=None, # list[str] na ordem dos botões
 ) -> dict:
     components = []
 
-    if body_params:
-        if isinstance(body_params, dict):
-            params = []
-            for k, v in body_params.items():
-                params.append(
+    def _build_text_parameters(params):
+        if not params:
+            return []
+
+        if isinstance(params, dict):
+            out = []
+            for k, v in params.items():
+                out.append(
                     {
                         "type": "text",
                         "parameter_name": str(k),
                         "text": str(v),
                     }
                 )
-            components.append({"type": "body", "parameters": params})
-        else:
+            return out
+
+        return [{"type": "text", "text": str(x)} for x in params]
+
+    # HEADER
+    header_parameters = _build_text_parameters(header_params)
+    if header_parameters:
+        components.append(
+            {
+                "type": "header",
+                "parameters": header_parameters,
+            }
+        )
+
+    # BODY
+    body_parameters = _build_text_parameters(body_params)
+    if body_parameters:
+        components.append(
+            {
+                "type": "body",
+                "parameters": body_parameters,
+            }
+        )
+
+    # QUICK REPLY BUTTONS
+    if quick_reply_payloads:
+        for idx, payload in enumerate(quick_reply_payloads):
             components.append(
                 {
-                    "type": "body",
-                    "parameters": [{"type": "text", "text": str(x)} for x in body_params],
+                    "type": "button",
+                    "sub_type": "quick_reply",
+                    "index": str(idx),
+                    "parameters": [
+                        {
+                            "type": "payload",
+                            "payload": str(payload),
+                        }
+                    ],
                 }
             )
 
@@ -98,7 +135,9 @@ def send_template(
             **({"components": components} if components else {}),
         },
     }
+
     return _post(payload, to_phone_e164=to_phone_e164)
+
 
 
 def send_buttons(
