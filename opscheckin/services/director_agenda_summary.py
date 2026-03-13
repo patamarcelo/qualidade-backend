@@ -152,8 +152,8 @@ def build_director_agenda_summary_overview(*, day, managers):
     day_br = day.strftime("%d/%m/%Y")
     lines = [f"📊 Resumo geral das agendas — {day_br}", ""]
 
-    lines.append(f"• Managers com agenda válida: {answered}/{total}")
-    lines.append(f"• Managers sem resposta: {pending}/{total}")
+    lines.append(f"• Gerentes com agenda válida: {answered}/{total}")
+    lines.append(f"• Gerentes sem resposta: {pending}/{total}")
     if invalid:
         lines.append(f"• Respostas sem itens válidos: {invalid}/{total}")
 

@@ -42,6 +42,7 @@ CMD_LIST = re.compile(r"^(listar|status|lista)\s*$", re.I)
 WA_LIST_MAX_ROWS = 10
 WA_CONFIRM_FIXED_ROWS = 1  # AC:OK
 
+
 def _trim_list_sections(sections, max_rows=WA_LIST_MAX_ROWS):
     total = 0
     out = []
@@ -63,6 +64,7 @@ def _trim_list_sections(sections, max_rows=WA_LIST_MAX_ROWS):
         total += len(clipped)
 
     return out
+
 
 def _mark_inbound_processed(inbound, now, *, linked_question=None):
     fields = ["processed", "processed_at"]
@@ -111,7 +113,7 @@ def _parse_agenda_selection_input(raw_value: str):
     """
     Interpreta a resposta do usuário no modo de ação pendente da agenda.
 
-    Retornos:
+    Retornos possíveis:
       {"mode": "empty"}
       {"mode": "single_number", "numbers": [3]}
       {"mode": "multi_number", "numbers": [3, 4, 5]}
@@ -148,6 +150,7 @@ def _parse_agenda_selection_input(raw_value: str):
 
     return {"mode": "text", "text": raw}
 
+
 def _wa_row_title(idx: int, text: str, prefix: str = "") -> str:
     raw = f"{prefix}{idx}) {(text or '').strip()}".strip()
     return raw[:24].rstrip()
@@ -160,35 +163,26 @@ def _wa_row_desc(text: str) -> str:
 
 def _handle_director_action(*, manager, reply_id: str, now) -> bool:
     from django.utils import timezone
-    logger.warning(
-        "DIRECTOR_REFRESH_START manager=%s phone=%s reply_id=%s",
-        getattr(manager, "name", ""),
-        getattr(manager, "phone_e164", ""),
-        reply_id,
+    from opscheckin.services.recipients import managers_subscribed
+    from opscheckin.services.director_agenda_summary import (
+        build_director_agenda_summary_blocks,
+        build_director_agenda_summary_overview,
     )
+
     rid = (reply_id or "").strip().upper()
     if rid != "DIR:REFRESH":
         return False
 
     logger.warning(
-        "DIRECTOR_REFRESH_START manager=%s phone=%s reply_id=%s",
+        "DIRECTOR_REFRESH_START manager=%s phone=%s reply_id=%s resume_enabled=%s",
         getattr(manager, "name", ""),
         getattr(manager, "phone_e164", ""),
         rid,
+        getattr(manager, "is_active_resume_agenda", None),
     )
 
     try:
-        from opscheckin.services.recipients import managers_subscribed
-        from opscheckin.services.director_agenda_summary import (
-            build_director_agenda_summary_blocks,
-            build_director_agenda_summary_overview,
-        )
-
-        is_director = manager.notification_subscriptions.filter(
-            notification_type__code="agenda_summary_director",
-            notification_type__is_active=True,
-            is_active=True,
-        ).exists()
+        is_director = bool(getattr(manager, "is_active_resume_agenda", False))
 
         logger.warning(
             "DIRECTOR_REFRESH_ROLE_CHECK manager=%s is_director=%s",
@@ -209,7 +203,11 @@ def _handle_director_action(*, manager, reply_id: str, now) -> bool:
             return True
 
         day = timezone.localdate()
-        managers = list(managers_subscribed("agenda_prompt").order_by("name"))
+        managers = list(
+            managers_subscribed("agenda_prompt")
+            .filter(is_active=True)
+            .order_by("name")
+        )
 
         logger.warning(
             "DIRECTOR_REFRESH_MANAGERS_FOUND director=%s total=%s day=%s",
@@ -323,6 +321,7 @@ def _handle_director_action(*, manager, reply_id: str, now) -> bool:
             )
         return True
 
+
 def _agenda_reply_text(checkin):
     from .models import AgendaItem
 
@@ -433,53 +432,6 @@ def _clear_agenda_pending_action(checkin, now):
         status="pending",
         answered_at__isnull=True,
     ).update(status="answered", answered_at=now, answer_text="resolved")
-    
-
-def _parse_agenda_selection_input(raw_value: str):
-    """
-    Interpreta a resposta do usuário no modo de ação pendente da agenda.
-
-    Retornos possíveis:
-      {"mode": "empty"}
-      {"mode": "single_number", "numbers": [3]}
-      {"mode": "multi_number", "numbers": [3, 4, 5]}
-      {"mode": "text", "text": "irrigação"}
-      {"mode": "invalid_mixed", "raw": "..."}
-    """
-    raw = (raw_value or "").strip()
-    if not raw:
-        return {"mode": "empty"}
-
-    # normaliza separadores comuns de lista numérica
-    normalized = raw
-    normalized = normalized.replace("\r", "\n")
-    normalized = normalized.replace(";", " ")
-    normalized = normalized.replace(",", " ")
-    normalized = re.sub(r"\s+", " ", normalized).strip()
-
-    # somente números e separadores => tratar como lote
-    if re.fullmatch(r"\d{1,3}(?:\s+\d{1,3})*", normalized):
-        nums = [int(x) for x in normalized.split() if x.isdigit()]
-
-        # remove duplicados preservando ordem
-        seen = set()
-        ordered = []
-        for n in nums:
-            if n in seen:
-                continue
-            seen.add(n)
-            ordered.append(n)
-
-        if len(ordered) == 1:
-            return {"mode": "single_number", "numbers": ordered}
-
-        return {"mode": "multi_number", "numbers": ordered}
-
-    # se misturou texto + vários números, não tenta adivinhar
-    if re.search(r"\d", raw) and not re.fullmatch(r"\d{1,3}", raw):
-        return {"mode": "invalid_mixed", "raw": raw}
-
-    return {"mode": "text", "text": raw}
 
 
 def _normalize_agenda_search_text(s: str) -> str:
@@ -769,7 +721,6 @@ def _handle_agenda_pending_action_text(manager, checkin, text, now):
     _send_agenda_snapshot(manager, checkin, header=header)
     _send_agenda_action_menu(manager, checkin)
     return True
-
 
 
 def _agenda_next_idx(checkin):
@@ -1075,7 +1026,6 @@ def _handle_confirm_action(*, manager, checkin, reply_id: str, now) -> bool:
             send_text(manager.phone_e164, "Não achei esse item (talvez já removido).")
             return True
 
-        removed_label = f"{it.idx}) {it.text[:80]}"
         it.delete()
 
         items = list(AgendaItem.objects.filter(checkin=checkin).order_by("idx")[:20])
@@ -1114,7 +1064,7 @@ def _handle_confirm_action(*, manager, checkin, reply_id: str, now) -> bool:
                 ],
             },
         ]
-        
+
         sections = _trim_list_sections(sections, max_rows=10)
 
         resp = send_list(
@@ -1482,9 +1432,13 @@ def whatsapp_webhook(request):
                 msg_type = (msg.get("msg_type") or "text").strip() or "text"
                 reply_id = (msg.get("reply_id") or "").strip()
 
-                manager = Manager.objects.filter(phone_e164=from_phone, is_active=True).first()
+                manager = Manager.objects.filter(phone_e164=from_phone).first()
+
+                is_checkin_user = bool(manager and manager.is_active)
+                is_resume_director = bool(manager and manager.is_active_resume_agenda)
+
                 checkin = None
-                if manager:
+                if is_checkin_user:
                     checkin, _ = DailyCheckin.objects.get_or_create(manager=manager, date=today)
 
                 inbound_defaults = dict(
@@ -1516,7 +1470,12 @@ def whatsapp_webhook(request):
                         **inbound_defaults,
                     )
 
-                if not manager or not checkin:
+                if not manager:
+                    logger.warning(
+                        "WHATSAPP_WEBHOOK_MANAGER_NOT_FOUND from_phone=%s reply_id=%s",
+                        from_phone,
+                        reply_id,
+                    )
                     _mark_inbound_processed(inbound, now)
                     continue
 
@@ -1526,14 +1485,28 @@ def whatsapp_webhook(request):
 
                 if reply_id.startswith("DIR:"):
                     logger.warning(
-                        "WEBHOOK_DIR_ACTION manager=%s phone=%s reply_id=%s",
+                        "WEBHOOK_DIR_ACTION manager=%s phone=%s reply_id=%s resume_enabled=%s",
                         getattr(manager, "name", ""),
                         getattr(manager, "phone_e164", ""),
                         reply_id,
+                        is_resume_director,
                     )
                     if _handle_director_action(manager=manager, reply_id=reply_id, now=now):
                         _mark_inbound_processed(inbound, now)
                         continue
+
+                # Daqui em diante exige participação no check-in diário
+                if not is_checkin_user or not checkin:
+                    logger.warning(
+                        "WHATSAPP_WEBHOOK_MANAGER_NOT_ELIGIBLE_FOR_CHECKIN manager=%s phone=%s is_active=%s has_checkin=%s reply_id=%s",
+                        getattr(manager, "name", ""),
+                        from_phone,
+                        getattr(manager, "is_active", None),
+                        bool(checkin),
+                        reply_id,
+                    )
+                    _mark_inbound_processed(inbound, now)
+                    continue
 
                 if reply_id.startswith("AM:"):
                     if _handle_agenda_menu_action(
