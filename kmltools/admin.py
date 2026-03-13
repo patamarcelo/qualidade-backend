@@ -264,6 +264,7 @@ class KMLMergeJobAdmin(admin.ModelAdmin):
         "plan",
         "status",
         "visitor_country_name",
+        "visitor_ip",
         "tol_m",
         "corridor_width_m",
         "total_files",

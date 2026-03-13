@@ -2358,14 +2358,25 @@ class UnlockFreeCreditView(APIView):
     def post(self, request):
         bp = ensure_billing_profile(request.user)
         if not bp:
-            return Response({"detail": "BillingProfile ausente."}, status=status.HTTP_401_UNAUTHORIZED)
+            return Response(
+                {"detail": "BillingProfile ausente."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
 
         anon_id = (request.headers.get("X-ANON-ID") or "").strip() or None
+        ip_address = get_client_ip(request)
+
+        # opcional: ignora IPs privados / inválidos
+        if ip_address and not is_public_ip(ip_address):
+            ip_address = None
 
         # anti-abuso por conta
         if bool(getattr(bp, "free_unlock_used", False)):
             return Response(
-                {"detail": "Free unlock already used.", "code": "FREE_UNLOCK_ALREADY_USED"},
+                {
+                    "detail": "Free unlock already used.",
+                    "code": "FREE_UNLOCK_ALREADY_USED",
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -2375,6 +2386,16 @@ class UnlockFreeCreditView(APIView):
                 {
                     "detail": "Free unlock already used on this device.",
                     "code": "FREE_UNLOCK_ALREADY_USED_FOR_DEVICE",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # anti-abuso por IP/rede
+        if ip_address and UnlockFeedback.objects.filter(ip_address=ip_address).exists():
+            return Response(
+                {
+                    "detail": "Free unlock already used from this network.",
+                    "code": "FREE_UNLOCK_ALREADY_USED_FOR_IP",
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -2414,21 +2435,28 @@ class UnlockFreeCreditView(APIView):
 
         if missing:
             return Response(
-                {"detail": "Missing fields.", "missing": missing, "code": "MISSING_FIELDS"},
+                {
+                    "detail": "Missing fields.",
+                    "missing": missing,
+                    "code": "MISSING_FIELDS",
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         with transaction.atomic():
             bp = BillingProfile.objects.select_for_update().get(pk=bp.pk)
 
-            # recheck por conta dentro da transação
+            # recheck por conta
             if bool(getattr(bp, "free_unlock_used", False)):
                 return Response(
-                    {"detail": "Free unlock already used.", "code": "FREE_UNLOCK_ALREADY_USED"},
+                    {
+                        "detail": "Free unlock already used.",
+                        "code": "FREE_UNLOCK_ALREADY_USED",
+                    },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            # recheck por dispositivo dentro da transação
+            # recheck por dispositivo
             if anon_id and UnlockFeedback.objects.select_for_update().filter(anon_id=anon_id).exists():
                 return Response(
                     {
@@ -2438,14 +2466,25 @@ class UnlockFreeCreditView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
+            # recheck por IP
+            if ip_address and UnlockFeedback.objects.select_for_update().filter(ip_address=ip_address).exists():
+                return Response(
+                    {
+                        "detail": "Free unlock already used from this network.",
+                        "code": "FREE_UNLOCK_ALREADY_USED_FOR_IP",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
             UnlockFeedback.objects.create(
                 user=request.user,
                 anon_id=anon_id,
+                ip_address=ip_address,
                 use_case=use_case,
-                other_use_case_text=other_use_case_text,
                 frequency=frequency,
                 willingness=willingness,
                 price_expectation=price_expectation,
+                other_use_case_text=other_use_case_text,
             )
 
             bp.prepaid_credits = int(getattr(bp, "prepaid_credits", 0) or 0) + 1
