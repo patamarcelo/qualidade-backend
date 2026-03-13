@@ -10,7 +10,7 @@ from datetime import date
 
 class UnlockFeedback(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL)
-    anon_id = models.CharField(max_length=120, null=True, blank=True)
+    anon_id = models.CharField(max_length=120, null=True, blank=True, db_index=True)
 
     use_case = models.CharField(max_length=100)
     frequency = models.CharField(max_length=50)
