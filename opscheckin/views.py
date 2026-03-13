@@ -160,40 +160,84 @@ def _wa_row_desc(text: str) -> str:
 
 def _handle_director_action(*, manager, reply_id: str, now) -> bool:
     from django.utils import timezone
-    from opscheckin.services.recipients import managers_subscribed
-    from opscheckin.services.director_agenda_summary import (
-        build_director_agenda_summary_blocks,
-        build_director_agenda_summary_overview,
-    )
 
     rid = (reply_id or "").strip().upper()
     if rid != "DIR:REFRESH":
         return False
 
-    is_director = manager.notification_subscriptions.filter(
-        notification_type__code="agenda_summary_director",
-        notification_type__is_active=True,
-        is_active=True,
-    ).exists()
-
-    if not is_director:
-        send_text(manager.phone_e164, "Você não está habilitado para receber o resumo das agendas.")
-        return True
-
-    day = timezone.localdate()
-    managers = list(managers_subscribed("agenda_prompt").order_by("name"))
-
-    if not managers:
-        send_text(manager.phone_e164, "Não encontrei managers inscritos para montar o resumo.")
-        return True
-
-    blocks = build_director_agenda_summary_blocks(day=day, managers=managers)
-    overview = build_director_agenda_summary_overview(day=day, managers=managers)
-    action_body = "Deseja receber as agendas atualizadas?"
+    logger.warning(
+        "DIRECTOR_REFRESH_START manager=%s phone=%s reply_id=%s",
+        getattr(manager, "name", ""),
+        getattr(manager, "phone_e164", ""),
+        rid,
+    )
 
     try:
-        # 1) blocos por manager
-        for idx, block in enumerate(blocks, start=1):
+        from opscheckin.services.recipients import managers_subscribed
+        from opscheckin.services.director_agenda_summary import (
+            build_director_agenda_summary_blocks,
+            build_director_agenda_summary_overview,
+        )
+
+        is_director = manager.notification_subscriptions.filter(
+            notification_type__code="agenda_summary_director",
+            notification_type__is_active=True,
+            is_active=True,
+        ).exists()
+
+        logger.warning(
+            "DIRECTOR_REFRESH_ROLE_CHECK manager=%s is_director=%s",
+            getattr(manager, "name", ""),
+            is_director,
+        )
+
+        if not is_director:
+            send_text(
+                manager.phone_e164,
+                "Você não está habilitado para receber o resumo das agendas."
+            )
+            logger.warning(
+                "DIRECTOR_REFRESH_NOT_ALLOWED manager=%s phone=%s",
+                getattr(manager, "name", ""),
+                getattr(manager, "phone_e164", ""),
+            )
+            return True
+
+        day = timezone.localdate()
+        managers = list(managers_subscribed("agenda_prompt").order_by("name"))
+
+        logger.warning(
+            "DIRECTOR_REFRESH_MANAGERS_FOUND director=%s total=%s day=%s",
+            getattr(manager, "name", ""),
+            len(managers),
+            day.isoformat(),
+        )
+
+        if not managers:
+            send_text(
+                manager.phone_e164,
+                "Não encontrei managers inscritos para montar o resumo."
+            )
+            logger.warning(
+                "DIRECTOR_REFRESH_NO_MANAGERS director=%s day=%s",
+                getattr(manager, "name", ""),
+                day.isoformat(),
+            )
+            return True
+
+        blocks = build_director_agenda_summary_blocks(day=day, managers=managers)
+        overview = build_director_agenda_summary_overview(day=day, managers=managers)
+
+        logger.warning(
+            "DIRECTOR_REFRESH_BUILT director=%s blocks=%s overview_len=%s",
+            getattr(manager, "name", ""),
+            len(blocks or []),
+            len(overview or ""),
+        )
+
+        action_body = "Deseja receber as agendas atualizadas?"
+
+        for idx, block in enumerate(blocks or [], start=1):
             resp_text = send_text(manager.phone_e164, block)
 
             _log_outbound_interactive(
@@ -213,7 +257,6 @@ def _handle_director_action(*, manager, reply_id: str, now) -> bool:
                 len(block or ""),
             )
 
-        # 2) overview
         resp_overview = send_text(manager.phone_e164, overview)
 
         _log_outbound_interactive(
@@ -232,12 +275,11 @@ def _handle_director_action(*, manager, reply_id: str, now) -> bool:
             len(overview or ""),
         )
 
-        # 3) botão curto
         resp_buttons = send_buttons(
             manager.phone_e164,
             body=action_body,
-                    buttons=[
-                {"id": "DIR:REFRESH", "title": "🔄 Atualizar agora"},
+            buttons=[
+                {"id": "DIR:REFRESH", "title": "Atualizar agora"},
             ],
         )
 
@@ -256,26 +298,25 @@ def _handle_director_action(*, manager, reply_id: str, now) -> bool:
             day.isoformat(),
         )
 
+        return True
+
     except Exception as e:
         logger.exception(
-            "DIRECTOR_REFRESH_EXCEPTION to=%s manager=%s day=%s err=%s",
-            manager.phone_e164,
-            manager.name,
-            day.isoformat(),
+            "DIRECTOR_REFRESH_EXCEPTION manager=%s phone=%s reply_id=%s err=%s",
+            getattr(manager, "name", ""),
+            getattr(manager, "phone_e164", ""),
+            rid,
             str(e),
         )
         try:
             send_text(manager.phone_e164, "Não consegui atualizar o resumo agora.")
         except Exception:
             logger.exception(
-                "DIRECTOR_REFRESH_FALLBACK_SEND_FAILED to=%s manager=%s",
-                manager.phone_e164,
-                manager.name,
+                "DIRECTOR_REFRESH_FALLBACK_SEND_FAILED manager=%s phone=%s",
+                getattr(manager, "name", ""),
+                getattr(manager, "phone_e164", ""),
             )
         return True
-
-    return True
-
 
 def _agenda_reply_text(checkin):
     from .models import AgendaItem
