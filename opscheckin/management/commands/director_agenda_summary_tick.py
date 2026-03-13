@@ -90,7 +90,7 @@ class Command(BaseCommand):
 
         blocks = build_director_agenda_summary_blocks(day=day, managers=managers)
         overview = build_director_agenda_summary_overview(day=day, managers=managers)
-        action_body = "O que deseja fazer agora?"
+        action_body = "Deseja receber as agendas atualizadas?"
 
         if dry_run:
             for i, block in enumerate(blocks, start=1):
@@ -163,7 +163,7 @@ class Command(BaseCommand):
                     director.phone_e164,
                     body=action_body,
                     buttons=[
-                        {"id": "DIR:REFRESH", "title": "Atualizar agendas"},
+                        {"id": "DIR:REFRESH", "title": "🔄 Atualizar agora"},
                     ],
                 )
 
