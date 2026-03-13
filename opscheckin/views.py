@@ -160,7 +160,12 @@ def _wa_row_desc(text: str) -> str:
 
 def _handle_director_action(*, manager, reply_id: str, now) -> bool:
     from django.utils import timezone
-
+    logger.warning(
+        "DIRECTOR_REFRESH_START manager=%s phone=%s reply_id=%s",
+        getattr(manager, "name", ""),
+        getattr(manager, "phone_e164", ""),
+        reply_id,
+    )
     rid = (reply_id or "").strip().upper()
     if rid != "DIR:REFRESH":
         return False
@@ -1520,6 +1525,12 @@ def whatsapp_webhook(request):
                 # ==========
 
                 if reply_id.startswith("DIR:"):
+                    logger.warning(
+                        "WEBHOOK_DIR_ACTION manager=%s phone=%s reply_id=%s",
+                        getattr(manager, "name", ""),
+                        getattr(manager, "phone_e164", ""),
+                        reply_id,
+                    )
                     if _handle_director_action(manager=manager, reply_id=reply_id, now=now):
                         _mark_inbound_processed(inbound, now)
                         continue
