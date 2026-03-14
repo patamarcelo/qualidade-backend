@@ -1412,15 +1412,21 @@ def _extract_messages_from_meta(payload: dict):
 
                     if msg_type == "text":
                         text = ((msg.get("text") or {}).get("body") or "").strip()
+
                     elif msg_type == "button":
-                        text = (msg.get("button", {}).get("text") or "").strip()
+                        btn = msg.get("button") or {}
+                        text = (btn.get("text") or "").strip()
+                        reply_id = (btn.get("payload") or "").strip()
+
                     elif msg_type == "interactive":
                         inter = msg.get("interactive") or {}
-                        itype = inter.get("type")
+                        itype = (inter.get("type") or "").strip()
+
                         if itype == "button_reply":
                             br = inter.get("button_reply") or {}
                             text = (br.get("title") or "").strip()
                             reply_id = (br.get("id") or "").strip()
+
                         elif itype == "list_reply":
                             lr = inter.get("list_reply") or {}
                             text = (lr.get("title") or "").strip()
@@ -1456,9 +1462,10 @@ def _extract_messages_from_meta(payload: dict):
                             }
                         )
     except Exception:
-        pass
+        logger.exception("WHATSAPP_EXTRACT_MESSAGES_FAILED")
 
     return out
+
 
 
 # =========================
