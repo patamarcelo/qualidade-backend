@@ -26,4 +26,4 @@ def run_opscheckin_director_agenda_summary():
     call_command("director_agenda_summary_tick")
 
 def run_opscheckin_daily_manager_event_tick():
-    call_command("run_daily_manager_event_tick")
+    call_command("daily_manager_event_tick")
