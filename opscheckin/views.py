@@ -160,211 +160,8 @@ def _wa_row_desc(text: str) -> str:
     return (s[:72] + "…") if len(s) > 72 else s
 
 
-def _send_director_summary_text_flow(*, director, managers, day):
-    from opscheckin.services.director_agenda_summary import (
-        build_director_agenda_summary_blocks,
-        build_director_agenda_summary_overview,
-    )
-
-    blocks = build_director_agenda_summary_blocks(day=day, managers=managers)
-    overview = build_director_agenda_summary_overview(day=day, managers=managers)
-    action_body = "Deseja receber as agendas atualizadas?"
-
-    logger.warning(
-        "DIRECTOR_TEXT_FLOW_BUILD director=%s phone=%s day=%s managers=%s blocks=%s overview_len=%s",
-        getattr(director, "name", ""),
-        getattr(director, "phone_e164", ""),
-        day.isoformat(),
-        len(managers or []),
-        len(blocks or []),
-        len(overview or ""),
-    )
-
-    for idx, block in enumerate(blocks or [], start=1):
-        resp_text = send_text(director.phone_e164, block)
-
-        _log_outbound_interactive(
-            manager=director,
-            checkin=None,
-            body=block,
-            resp=resp_text,
-            kind="agenda_summary_director",
-        )
-
-        provider_id = _extract_provider_id(resp_text)
-        if not provider_id:
-            logger.warning(
-                "DIRECTOR_TEXT_FLOW_BLOCK_FAILED director=%s phone=%s day=%s idx=%s resp=%s",
-                getattr(director, "name", ""),
-                getattr(director, "phone_e164", ""),
-                day.isoformat(),
-                idx,
-                resp_text,
-            )
-            return False
-
-    resp_overview = send_text(director.phone_e164, overview)
-
-    _log_outbound_interactive(
-        manager=director,
-        checkin=None,
-        body=overview,
-        resp=resp_overview,
-        kind="agenda_summary_director_overview",
-    )
-
-    provider_id_overview = _extract_provider_id(resp_overview)
-    if not provider_id_overview:
-        logger.warning(
-            "DIRECTOR_TEXT_FLOW_OVERVIEW_FAILED director=%s phone=%s day=%s resp=%s",
-            getattr(director, "name", ""),
-            getattr(director, "phone_e164", ""),
-            day.isoformat(),
-            resp_overview,
-        )
-        return False
-
-    resp_buttons = send_buttons(
-        director.phone_e164,
-        body=action_body,
-        buttons=[
-            {"id": "DIR:REFRESH", "title": "Atualizar agora"},
-        ],
-    )
-
-    _log_outbound_interactive(
-        manager=director,
-        checkin=None,
-        body=action_body,
-        resp=resp_buttons,
-        kind="agenda_summary_director_actions",
-    )
-
-    provider_id_buttons = _extract_provider_id(resp_buttons)
-    if not provider_id_buttons:
-        logger.warning(
-            "DIRECTOR_TEXT_FLOW_BUTTON_FAILED director=%s phone=%s day=%s resp=%s",
-            getattr(director, "name", ""),
-            getattr(director, "phone_e164", ""),
-            day.isoformat(),
-            resp_buttons,
-        )
-        return False
-
-    logger.warning(
-        "DIRECTOR_TEXT_FLOW_SENT director=%s phone=%s day=%s blocks=%s",
-        getattr(director, "name", ""),
-        getattr(director, "phone_e164", ""),
-        day.isoformat(),
-        len(blocks or []),
-    )
-    return True
 
 
-def _handle_director_action(*, manager, reply_id: str, now) -> bool:
-    from django.utils import timezone
-    from opscheckin.services.recipients import managers_subscribed
-
-    rid = (reply_id or "").strip().upper()
-    if rid != "DIR:REFRESH":
-        return False
-
-    logger.warning(
-        "DIRECTOR_REFRESH_START manager=%s phone=%s reply_id=%s resume_enabled=%s",
-        getattr(manager, "name", ""),
-        getattr(manager, "phone_e164", ""),
-        rid,
-        getattr(manager, "is_active_resume_agenda", None),
-    )
-
-    try:
-        is_director = bool(getattr(manager, "is_active_resume_agenda", False))
-
-        logger.warning(
-            "DIRECTOR_REFRESH_ROLE_CHECK manager=%s is_director=%s",
-            getattr(manager, "name", ""),
-            is_director,
-        )
-
-        if not is_director:
-            send_text(
-                manager.phone_e164,
-                "Você não está habilitado para receber o resumo das agendas."
-            )
-            logger.warning(
-                "DIRECTOR_REFRESH_NOT_ALLOWED manager=%s phone=%s",
-                getattr(manager, "name", ""),
-                getattr(manager, "phone_e164", ""),
-            )
-            return True
-
-        day = timezone.localdate()
-        managers = list(
-            managers_subscribed("agenda_prompt")
-            .filter(is_active=True)
-            .order_by("name")
-        )
-
-        logger.warning(
-            "DIRECTOR_REFRESH_MANAGERS_FOUND director=%s total=%s day=%s",
-            getattr(manager, "name", ""),
-            len(managers),
-            day.isoformat(),
-        )
-
-        if not managers:
-            send_text(
-                manager.phone_e164,
-                "Não encontrei managers inscritos para montar o resumo."
-            )
-            logger.warning(
-                "DIRECTOR_REFRESH_NO_MANAGERS director=%s day=%s",
-                getattr(manager, "name", ""),
-                day.isoformat(),
-            )
-            return True
-
-        sent_ok = _send_director_summary_text_flow(
-            director=manager,
-            managers=managers,
-            day=day,
-        )
-
-        if not sent_ok:
-            send_text(manager.phone_e164, "Não consegui atualizar o resumo agora.")
-            logger.warning(
-                "DIRECTOR_REFRESH_SEND_FAILED director=%s phone=%s day=%s",
-                getattr(manager, "name", ""),
-                getattr(manager, "phone_e164", ""),
-                day.isoformat(),
-            )
-            return True
-
-        logger.warning(
-            "DIRECTOR_REFRESH_COMPLETED director=%s phone=%s day=%s",
-            getattr(manager, "name", ""),
-            getattr(manager, "phone_e164", ""),
-            day.isoformat(),
-        )
-        return True
-
-    except Exception as e:
-        logger.exception(
-            "DIRECTOR_REFRESH_EXCEPTION manager=%s phone=%s reply_id=%s err=%s",
-            getattr(manager, "name", ""),
-            getattr(manager, "phone_e164", ""),
-            rid,
-            str(e),
-        )
-        try:
-            send_text(manager.phone_e164, "Não consegui atualizar o resumo agora.")
-        except Exception:
-            logger.exception(
-                "DIRECTOR_REFRESH_FALLBACK_SEND_FAILED manager=%s phone=%s",
-                getattr(manager, "name", ""),
-                getattr(manager, "phone_e164", ""),
-            )
-        return True
 
 
 def _agenda_reply_text(checkin):
@@ -781,9 +578,312 @@ def _agenda_next_idx(checkin):
 
 def _extract_provider_id(resp):
     try:
-        return ((resp or {}).get("messages") or [{}])[0].get("id") or ""
+        if isinstance(resp, dict):
+            return ((resp.get("messages") or [{}])[0].get("id") or "").strip()
+        return ""
     except Exception:
         return ""
+
+
+def _response_has_explicit_error(resp):
+    """
+    Considera erro apenas quando o provider devolve erro explícito.
+    Ausência de provider_id não deve abortar o fluxo.
+    """
+    try:
+        if resp is None:
+            return False
+
+        if isinstance(resp, dict):
+            if resp.get("error"):
+                return True
+
+            # alguns providers podem devolver sucesso fora de "messages"
+            if resp.get("messages") is not None:
+                return False
+
+            return False
+
+        return False
+    except Exception:
+        return False
+
+
+def _send_director_summary_text_flow(*, director, managers, day):
+    from opscheckin.services.director_agenda_summary import (
+        build_director_agenda_summary_blocks,
+        build_director_agenda_summary_overview,
+    )
+
+    blocks = build_director_agenda_summary_blocks(day=day, managers=managers)
+    overview = build_director_agenda_summary_overview(day=day, managers=managers)
+    action_body = "Deseja receber as agendas atualizadas?"
+
+    logger.warning(
+        "DIRECTOR_TEXT_FLOW_BUILD director=%s phone=%s day=%s managers=%s blocks=%s overview_len=%s director_is_active=%s director_resume_enabled=%s",
+        getattr(director, "name", ""),
+        getattr(director, "phone_e164", ""),
+        day.isoformat(),
+        len(managers or []),
+        len(blocks or []),
+        len(overview or ""),
+        getattr(director, "is_active", None),
+        getattr(director, "is_active_resume_agenda", None),
+    )
+
+    for idx, block in enumerate(blocks or [], start=1):
+        try:
+            resp_text = send_text(director.phone_e164, block)
+        except Exception:
+            logger.exception(
+                "DIRECTOR_TEXT_FLOW_BLOCK_EXCEPTION director=%s phone=%s day=%s idx=%s",
+                getattr(director, "name", ""),
+                getattr(director, "phone_e164", ""),
+                day.isoformat(),
+                idx,
+            )
+            return False
+
+        _log_outbound_interactive(
+            manager=director,
+            checkin=None,
+            body=block,
+            resp=resp_text,
+            kind="agenda_summary_director",
+        )
+
+        provider_id = _extract_provider_id(resp_text)
+        if not provider_id:
+            logger.warning(
+                "DIRECTOR_TEXT_FLOW_BLOCK_NO_PROVIDER_ID director=%s phone=%s day=%s idx=%s resp=%s",
+                getattr(director, "name", ""),
+                getattr(director, "phone_e164", ""),
+                day.isoformat(),
+                idx,
+                resp_text,
+            )
+
+        if _response_has_explicit_error(resp_text):
+            logger.warning(
+                "DIRECTOR_TEXT_FLOW_BLOCK_EXPLICIT_ERROR director=%s phone=%s day=%s idx=%s resp=%s",
+                getattr(director, "name", ""),
+                getattr(director, "phone_e164", ""),
+                day.isoformat(),
+                idx,
+                resp_text,
+            )
+            return False
+
+    try:
+        resp_overview = send_text(director.phone_e164, overview)
+    except Exception:
+        logger.exception(
+            "DIRECTOR_TEXT_FLOW_OVERVIEW_EXCEPTION director=%s phone=%s day=%s",
+            getattr(director, "name", ""),
+            getattr(director, "phone_e164", ""),
+            day.isoformat(),
+        )
+        return False
+
+    _log_outbound_interactive(
+        manager=director,
+        checkin=None,
+        body=overview,
+        resp=resp_overview,
+        kind="agenda_summary_director_overview",
+    )
+
+    provider_id_overview = _extract_provider_id(resp_overview)
+    if not provider_id_overview:
+        logger.warning(
+            "DIRECTOR_TEXT_FLOW_OVERVIEW_NO_PROVIDER_ID director=%s phone=%s day=%s resp=%s",
+            getattr(director, "name", ""),
+            getattr(director, "phone_e164", ""),
+            day.isoformat(),
+            resp_overview,
+        )
+
+    if _response_has_explicit_error(resp_overview):
+        logger.warning(
+            "DIRECTOR_TEXT_FLOW_OVERVIEW_EXPLICIT_ERROR director=%s phone=%s day=%s resp=%s",
+            getattr(director, "name", ""),
+            getattr(director, "phone_e164", ""),
+            day.isoformat(),
+            resp_overview,
+        )
+        return False
+
+    try:
+        resp_buttons = send_buttons(
+            director.phone_e164,
+            body=action_body,
+            buttons=[
+                {"id": "DIR:REFRESH", "title": "Atualizar agora"},
+            ],
+        )
+    except Exception:
+        logger.exception(
+            "DIRECTOR_TEXT_FLOW_BUTTON_EXCEPTION director=%s phone=%s day=%s",
+            getattr(director, "name", ""),
+            getattr(director, "phone_e164", ""),
+            day.isoformat(),
+        )
+        return False
+
+    _log_outbound_interactive(
+        manager=director,
+        checkin=None,
+        body=action_body,
+        resp=resp_buttons,
+        kind="agenda_summary_director_actions",
+    )
+
+    provider_id_buttons = _extract_provider_id(resp_buttons)
+    if not provider_id_buttons:
+        logger.warning(
+            "DIRECTOR_TEXT_FLOW_BUTTON_NO_PROVIDER_ID director=%s phone=%s day=%s resp=%s",
+            getattr(director, "name", ""),
+            getattr(director, "phone_e164", ""),
+            day.isoformat(),
+            resp_buttons,
+        )
+
+    if _response_has_explicit_error(resp_buttons):
+        logger.warning(
+            "DIRECTOR_TEXT_FLOW_BUTTON_EXPLICIT_ERROR director=%s phone=%s day=%s resp=%s",
+            getattr(director, "name", ""),
+            getattr(director, "phone_e164", ""),
+            day.isoformat(),
+            resp_buttons,
+        )
+        return False
+
+    logger.warning(
+        "DIRECTOR_TEXT_FLOW_SENT director=%s phone=%s day=%s blocks=%s director_is_active=%s director_resume_enabled=%s",
+        getattr(director, "name", ""),
+        getattr(director, "phone_e164", ""),
+        day.isoformat(),
+        len(blocks or []),
+        getattr(director, "is_active", None),
+        getattr(director, "is_active_resume_agenda", None),
+    )
+    return True
+
+
+def _handle_director_action(*, manager, reply_id: str, now) -> bool:
+    from django.utils import timezone
+    from opscheckin.services.recipients import managers_subscribed
+
+    rid = (reply_id or "").strip().upper()
+    if rid != "DIR:REFRESH":
+        return False
+
+    logger.warning(
+        "DIRECTOR_REFRESH_START manager=%s phone=%s reply_id=%s manager_is_active=%s resume_enabled=%s",
+        getattr(manager, "name", ""),
+        getattr(manager, "phone_e164", ""),
+        rid,
+        getattr(manager, "is_active", None),
+        getattr(manager, "is_active_resume_agenda", None),
+    )
+
+    try:
+        is_director = bool(getattr(manager, "is_active_resume_agenda", False))
+
+        logger.warning(
+            "DIRECTOR_REFRESH_ROLE_CHECK manager=%s is_director=%s manager_is_active=%s resume_enabled=%s",
+            getattr(manager, "name", ""),
+            is_director,
+            getattr(manager, "is_active", None),
+            getattr(manager, "is_active_resume_agenda", None),
+        )
+
+        if not is_director:
+            send_text(
+                manager.phone_e164,
+                "Você não está habilitado para receber o resumo das agendas."
+            )
+            logger.warning(
+                "DIRECTOR_REFRESH_NOT_ALLOWED manager=%s phone=%s",
+                getattr(manager, "name", ""),
+                getattr(manager, "phone_e164", ""),
+            )
+            return True
+
+        day = timezone.localdate()
+
+        # Aqui buscamos os managers que participam da agenda diária.
+        # O diretor que recebe o resumo NÃO precisa ser is_active=True;
+        # ele só precisa estar habilitado em is_active_resume_agenda.
+        managers = list(
+            managers_subscribed("agenda_prompt")
+            .filter(is_active=True)
+            .order_by("name")
+        )
+
+        logger.warning(
+            "DIRECTOR_REFRESH_MANAGERS_FOUND director=%s total=%s day=%s director_is_active=%s director_resume_enabled=%s",
+            getattr(manager, "name", ""),
+            len(managers),
+            day.isoformat(),
+            getattr(manager, "is_active", None),
+            getattr(manager, "is_active_resume_agenda", None),
+        )
+
+        if not managers:
+            send_text(
+                manager.phone_e164,
+                "Não encontrei managers inscritos para montar o resumo."
+            )
+            logger.warning(
+                "DIRECTOR_REFRESH_NO_MANAGERS director=%s day=%s",
+                getattr(manager, "name", ""),
+                day.isoformat(),
+            )
+            return True
+
+        sent_ok = _send_director_summary_text_flow(
+            director=manager,
+            managers=managers,
+            day=day,
+        )
+
+        if not sent_ok:
+            send_text(manager.phone_e164, "Não consegui atualizar o resumo agora.")
+            logger.warning(
+                "DIRECTOR_REFRESH_SEND_FAILED director=%s phone=%s day=%s",
+                getattr(manager, "name", ""),
+                getattr(manager, "phone_e164", ""),
+                day.isoformat(),
+            )
+            return True
+
+        logger.warning(
+            "DIRECTOR_REFRESH_COMPLETED director=%s phone=%s day=%s",
+            getattr(manager, "name", ""),
+            getattr(manager, "phone_e164", ""),
+            day.isoformat(),
+        )
+        return True
+
+    except Exception as e:
+        logger.exception(
+            "DIRECTOR_REFRESH_EXCEPTION manager=%s phone=%s reply_id=%s err=%s",
+            getattr(manager, "name", ""),
+            getattr(manager, "phone_e164", ""),
+            rid,
+            str(e),
+        )
+        try:
+            send_text(manager.phone_e164, "Não consegui atualizar o resumo agora.")
+        except Exception:
+            logger.exception(
+                "DIRECTOR_REFRESH_FALLBACK_SEND_FAILED manager=%s phone=%s",
+                getattr(manager, "name", ""),
+                getattr(manager, "phone_e164", ""),
+            )
+        return True
+    
     
     
 def _handle_agenda_menu_action(*, manager, checkin, reply_id: str, now):
@@ -1491,6 +1591,16 @@ def whatsapp_webhook(request):
                 checkin = None
                 if is_checkin_user:
                     checkin, _ = DailyCheckin.objects.get_or_create(manager=manager, date=today)
+                    
+                logger.warning(
+                    "WHATSAPP_WEBHOOK_MANAGER_RESOLUTION manager=%s phone=%s is_active=%s is_resume_director=%s has_checkin=%s reply_id=%s",
+                    getattr(manager, "name", "") if manager else "",
+                    from_phone,
+                    getattr(manager, "is_active", None) if manager else None,
+                    getattr(manager, "is_active_resume_agenda", None) if manager else None,
+                    bool(checkin),
+                    reply_id,
+                )
 
                 inbound_defaults = dict(
                     manager=manager,
