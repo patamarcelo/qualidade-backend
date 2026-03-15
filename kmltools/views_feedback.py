@@ -16,7 +16,7 @@ from diamante.gmail.gmail_api import send_mail_gmail_api
 
 
 def _notify_feedback_email(user_email: str, job: KMLMergeJob, message: str):
-    notify_to = getattr(settings, "KML_FEEDBACK_NOTIFY_TO", None) or "patamarcelo@gmail.com"
+    notify_to = "contact@kmlunifier.com"
 
     subject = f"[KMLUnifier] New feedback - job {job.id} - {user_email or 'unknown'}"
 
