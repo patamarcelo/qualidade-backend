@@ -22,13 +22,11 @@ logger = logging.getLogger("opscheckin.daily_manager_event_tick")
 EVENT_CODE = "farm_daily_agenda"
 NOTIFICATION_CODE = "daily_meeting_reminder"
 
+REMINDER_OFFSETS_MINUTES = [60, 10]
+
 
 def _local_now():
     return timezone.localtime(timezone.now())
-
-
-def _local_today():
-    return _local_now().date()
 
 
 def _extract_provider_id(resp):
@@ -47,8 +45,15 @@ def _fmt_hhmm(t):
     return t.strftime("%H:%M")
 
 
-def _get_greeting(event_dt):
+def _get_base_greeting(event_dt):
     return "Bom dia," if event_dt.hour < 12 else "Boa tarde,"
+
+
+def _build_greeting(event_dt, *, is_reschedule=False):
+    base = _get_base_greeting(event_dt)
+    if is_reschedule:
+        return f"*Atenção: o horário da reunião foi alterado.*\n\n{base}"
+    return base
 
 
 def _get_effective_event_time(event, day):
@@ -86,16 +91,32 @@ def _reset_past_override_if_needed(event, day):
             )
 
 
-def _should_send_now(*, now_local, event_dt):
-    remaining_minutes = (event_dt - now_local).total_seconds() / 60.0
+def _is_due_target(*, now_local, target_dt, allowed_window_minutes):
+    """
+    Considera vencido se o horário alvo já chegou e ainda está dentro da janela tolerada.
+    """
+    diff_minutes = (now_local - target_dt).total_seconds() / 60.0
+    return 0 <= diff_minutes <= allowed_window_minutes, diff_minutes
 
-    if remaining_minutes < 0:
-        return False, remaining_minutes
 
-    if 50 <= remaining_minutes <= 90:
-        return True, remaining_minutes
+def _build_due_targets(*, now_local, event_dt, allowed_window_minutes):
+    due = []
 
-    return False, remaining_minutes
+    for offset in REMINDER_OFFSETS_MINUTES:
+        target_dt = event_dt - timedelta(minutes=offset)
+        is_due, diff_minutes = _is_due_target(
+            now_local=now_local,
+            target_dt=target_dt,
+            allowed_window_minutes=allowed_window_minutes,
+        )
+        due.append({
+            "offset": offset,
+            "target_dt": target_dt,
+            "is_due": is_due,
+            "delay_minutes": diff_minutes,
+        })
+
+    return due
 
 
 def _already_sent(event, manager, day, scheduled_event_time, target_send_time):
@@ -105,6 +126,40 @@ def _already_sent(event, manager, day, scheduled_event_time, target_send_time):
         event_date=day,
         scheduled_event_time=scheduled_event_time,
         target_send_time=target_send_time,
+    ).exists()
+
+
+def _manager_has_any_dispatch_today(event, manager, day):
+    return DailyManagerEventDispatch.objects.filter(
+        event=event,
+        manager=manager,
+        event_date=day,
+    ).exists()
+
+
+def _manager_has_dispatch_for_other_schedule_today(event, manager, day, scheduled_event_time):
+    return DailyManagerEventDispatch.objects.filter(
+        event=event,
+        manager=manager,
+        event_date=day,
+    ).exclude(
+        scheduled_event_time=scheduled_event_time,
+    ).exists()
+
+
+def _reschedule_notice_already_sent(event, manager, day, scheduled_event_time):
+    """
+    Sem alterar model:
+    usamos um target_send_time sintético igual ao próprio scheduled_event_time
+    para registrar o 'aviso imediato de alteração'.
+    """
+    return DailyManagerEventDispatch.objects.filter(
+        event=event,
+        manager=manager,
+        event_date=day,
+        scheduled_event_time=scheduled_event_time,
+        target_send_time=scheduled_event_time,
+        status="schedule_changed",
     ).exists()
 
 
@@ -139,6 +194,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **opts):
         now_local = _local_now()
+
         if opts.get("date"):
             try:
                 fake_day = datetime.strptime(opts["date"], "%Y-%m-%d").date()
@@ -205,28 +261,19 @@ class Command(BaseCommand):
             timezone.get_current_timezone(),
         )
 
-        offset_minutes = int(getattr(event, "reminder_offset_minutes", 60) or 60)
-        allowed_window_minutes = int(getattr(event, "allowed_window_minutes", 90) or 90)
-        
-        
-        send_target_dt = event_dt - timedelta(minutes=60)
+        allowed_window_minutes = int(getattr(event, "allowed_window_minutes", 15) or 15)
 
-        should_send, remaining_minutes = _should_send_now(
+        due_targets = _build_due_targets(
             now_local=now_local,
             event_dt=event_dt,
+            allowed_window_minutes=allowed_window_minutes,
         )
-        
 
         self.stdout.write(
             "[daily_manager_event_tick] "
             f"event_time={event_dt:%H:%M} "
-            f"send_target={send_target_dt:%H:%M} "
-            f"remaining_minutes={remaining_minutes:.1f} "
-            f"should_send={should_send}"
+            f"due_targets={[(x['offset'], x['target_dt'].strftime('%H:%M'), x['is_due']) for x in due_targets]}"
         )
-
-        if not should_send:
-            return
 
         managers = list(
             managers_subscribed(
@@ -234,21 +281,29 @@ class Command(BaseCommand):
                 include_inactive=include_inactive,
             ).order_by("name")
         )
-        
-    
 
         if not managers:
             self.stdout.write("[daily_manager_event_tick] nenhum manager assinado/ativo")
             return
 
-        greeting = _get_greeting(event_dt)
         meeting_time_str = _fmt_hhmm(scheduled_event_time)
         meeting_name = (getattr(event, "name", "") or "AGENDA DIÁRIA DA FAZENDA").strip()
         meet_link = (getattr(event, "meet_link", "") or "").strip()
 
-        preview = (
+        normal_greeting = _build_greeting(event_dt, is_reschedule=False)
+        changed_greeting = _build_greeting(event_dt, is_reschedule=True)
+
+        normal_preview = (
             f"Lembrete de reunião diária da fazenda.\n\n"
-            f"{greeting}\n\n"
+            f"{normal_greeting}\n\n"
+            f"Segue o link para a reunião das {meeting_time_str} horas - {meeting_name}.\n\n"
+            f"Link da reunião:\n{meet_link}\n\n"
+            f"Mensagem automática do sistema OpsCheckin."
+        )
+
+        changed_preview = (
+            f"Lembrete de reunião diária da fazenda.\n\n"
+            f"{changed_greeting}\n\n"
             f"Segue o link para a reunião das {meeting_time_str} horas - {meeting_name}.\n\n"
             f"Link da reunião:\n{meet_link}\n\n"
             f"Mensagem automática do sistema OpsCheckin."
@@ -258,91 +313,200 @@ class Command(BaseCommand):
             self.stdout.write("===== DRY RUN =====")
             self.stdout.write(f"template_name={template_name}")
             self.stdout.write(f"template_language={template_language}")
-            self.stdout.write(f"greeting={greeting}")
             self.stdout.write(f"meeting_time={meeting_time_str}")
             self.stdout.write(f"meeting_name={meeting_name}")
             self.stdout.write(f"meet_link={meet_link}")
+            self.stdout.write(f"allowed_window_minutes={allowed_window_minutes}")
             self.stdout.write(f"managers={len(managers)}")
             self.stdout.write("")
+
             for m in managers:
-                already = _already_sent(
+                has_changed_schedule = _manager_has_dispatch_for_other_schedule_today(
                     event=event,
                     manager=m,
                     day=day,
                     scheduled_event_time=scheduled_event_time,
-                    target_send_time=send_target_dt.time(),
                 )
+                changed_notice_sent = _reschedule_notice_already_sent(
+                    event=event,
+                    manager=m,
+                    day=day,
+                    scheduled_event_time=scheduled_event_time,
+                )
+
                 self.stdout.write(
-                    f"- {m.name} ({m.phone_e164}) | already_sent={already}"
+                    f"- {m.name} ({m.phone_e164}) | "
+                    f"has_changed_schedule={has_changed_schedule} | "
+                    f"changed_notice_sent={changed_notice_sent}"
                 )
+
+                for item in due_targets:
+                    already = _already_sent(
+                        event=event,
+                        manager=m,
+                        day=day,
+                        scheduled_event_time=scheduled_event_time,
+                        target_send_time=item["target_dt"].time(),
+                    )
+                    self.stdout.write(
+                        f"    offset={item['offset']} "
+                        f"target={item['target_dt']:%H:%M} "
+                        f"is_due={item['is_due']} "
+                        f"already_sent={already}"
+                    )
             return
 
         sent = 0
         skipped_already = 0
         failed = 0
+        changed_sent = 0
 
         for manager in managers:
             try:
-                if _already_sent(
+                # -------------------------------------------------
+                # 1) Aviso imediato de alteração de horário
+                # -------------------------------------------------
+                has_dispatch_today = _manager_has_any_dispatch_today(
+                    event=event,
+                    manager=manager,
+                    day=day,
+                )
+
+                has_dispatch_for_other_schedule = _manager_has_dispatch_for_other_schedule_today(
                     event=event,
                     manager=manager,
                     day=day,
                     scheduled_event_time=scheduled_event_time,
-                    target_send_time=send_target_dt.time(),
-                ):
-                    skipped_already += 1
+                )
+
+                should_send_schedule_changed_notice = (
+                    has_dispatch_today
+                    and has_dispatch_for_other_schedule
+                    and not _reschedule_notice_already_sent(
+                        event=event,
+                        manager=manager,
+                        day=day,
+                        scheduled_event_time=scheduled_event_time,
+                    )
+                )
+
+                if should_send_schedule_changed_notice:
+                    resp = send_template(
+                        manager.phone_e164,
+                        template_name=template_name,
+                        language_code=template_language,
+                        body_params=[
+                            changed_greeting,
+                            meeting_time_str,
+                            meeting_name,
+                            meet_link,
+                        ],
+                    )
+
+                    provider_id = _extract_provider_id(resp)
+
+                    DailyManagerEventDispatch.objects.create(
+                        event=event,
+                        manager=manager,
+                        event_date=day,
+                        scheduled_event_time=scheduled_event_time,
+                        target_send_time=scheduled_event_time,  # marcador sintético
+                        sent_at=timezone.now(),
+                        provider_message_id=provider_id,
+                        status="schedule_changed",
+                    )
+
+                    _log_outbound_template(
+                        manager=manager,
+                        body_preview=changed_preview,
+                        resp=resp,
+                        kind="daily_meeting_reminder_changed",
+                    )
+
+                    changed_sent += 1
                     logger.warning(
-                        "DAILY_EVENT_ALREADY_SENT manager=%s phone=%s event=%s day=%s time=%s",
+                        "DAILY_EVENT_SCHEDULE_CHANGED_SENT manager=%s phone=%s event=%s day=%s new_meeting_time=%s provider_id=%s",
                         manager.name,
                         manager.phone_e164,
                         event.code,
                         day.isoformat(),
                         meeting_time_str,
+                        provider_id,
                     )
-                    continue
 
-                resp = send_template(
-                    manager.phone_e164,
-                    template_name=template_name,
-                    language_code=template_language,
-                    body_params=[
-                        greeting,
+                # -------------------------------------------------
+                # 2) Lembretes normais de 60 e 10 minutos
+                # -------------------------------------------------
+                for item in due_targets:
+                    if not item["is_due"]:
+                        continue
+
+                    target_send_time = item["target_dt"].time()
+
+                    if _already_sent(
+                        event=event,
+                        manager=manager,
+                        day=day,
+                        scheduled_event_time=scheduled_event_time,
+                        target_send_time=target_send_time,
+                    ):
+                        skipped_already += 1
+                        logger.warning(
+                            "DAILY_EVENT_ALREADY_SENT manager=%s phone=%s event=%s day=%s meeting_time=%s offset=%s target=%s",
+                            manager.name,
+                            manager.phone_e164,
+                            event.code,
+                            day.isoformat(),
+                            meeting_time_str,
+                            item["offset"],
+                            item["target_dt"].strftime("%H:%M"),
+                        )
+                        continue
+
+                    resp = send_template(
+                        manager.phone_e164,
+                        template_name=template_name,
+                        language_code=template_language,
+                        body_params=[
+                            normal_greeting,
+                            meeting_time_str,
+                            meeting_name,
+                            meet_link,
+                        ],
+                    )
+
+                    provider_id = _extract_provider_id(resp)
+
+                    DailyManagerEventDispatch.objects.create(
+                        event=event,
+                        manager=manager,
+                        event_date=day,
+                        scheduled_event_time=scheduled_event_time,
+                        target_send_time=target_send_time,
+                        sent_at=timezone.now(),
+                        provider_message_id=provider_id,
+                        status=("sent" if provider_id else "unknown"),
+                    )
+
+                    _log_outbound_template(
+                        manager=manager,
+                        body_preview=normal_preview,
+                        resp=resp,
+                        kind="daily_meeting_reminder",
+                    )
+
+                    sent += 1
+                    logger.warning(
+                        "DAILY_EVENT_SENT manager=%s phone=%s event=%s day=%s meeting_time=%s offset=%s target=%s provider_id=%s",
+                        manager.name,
+                        manager.phone_e164,
+                        event.code,
+                        day.isoformat(),
                         meeting_time_str,
-                        meeting_name,
-                        meet_link,
-                    ],
-                )
-
-                provider_id = _extract_provider_id(resp)
-
-                DailyManagerEventDispatch.objects.create(
-                    event=event,
-                    manager=manager,
-                    event_date=day,
-                    scheduled_event_time=scheduled_event_time,
-                    target_send_time=send_target_dt.time(),
-                    sent_at=timezone.now(),
-                    provider_message_id=provider_id,
-                    status=("sent" if provider_id else "unknown"),
-                )
-
-                _log_outbound_template(
-                    manager=manager,
-                    body_preview=preview,
-                    resp=resp,
-                    kind="daily_meeting_reminder",
-                )
-
-                sent += 1
-                logger.warning(
-                    "DAILY_EVENT_SENT manager=%s phone=%s event=%s day=%s meeting_time=%s provider_id=%s",
-                    manager.name,
-                    manager.phone_e164,
-                    event.code,
-                    day.isoformat(),
-                    meeting_time_str,
-                    provider_id,
-                )
+                        item["offset"],
+                        item["target_dt"].strftime("%H:%M"),
+                        provider_id,
+                    )
 
             except Exception as e:
                 failed += 1
@@ -356,5 +520,5 @@ class Command(BaseCommand):
                 )
 
         self.stdout.write(self.style.SUCCESS(
-            f"[daily_manager_event_tick] sent={sent} skipped_already={skipped_already} failed={failed} managers={len(managers)}"
+            f"[daily_manager_event_tick] sent={sent} changed_sent={changed_sent} skipped_already={skipped_already} failed={failed} managers={len(managers)}"
         ))
