@@ -345,4 +345,15 @@ class DailyManagerEventDispatch(models.Model):
     status = models.CharField(max_length=20, default="sent")
 
     class Meta:
-        unique_together = [("event", "manager", "event_date", "target_send_time")]
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    "event",
+                    "manager",
+                    "event_date",
+                    "scheduled_event_time",
+                    "target_send_time",
+                ],
+                name="uniq_daily_manager_event_dispatch_slot",
+            )
+        ]

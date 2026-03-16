@@ -4,6 +4,7 @@ import logging
 from datetime import datetime, timedelta
 
 from django.core.management.base import BaseCommand
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from opscheckin.models import (
@@ -149,9 +150,8 @@ def _manager_has_dispatch_for_other_schedule_today(event, manager, day, schedule
 
 def _reschedule_notice_already_sent(event, manager, day, scheduled_event_time):
     """
-    Sem alterar model:
-    usamos um target_send_time sintético igual ao próprio scheduled_event_time
-    para registrar o 'aviso imediato de alteração'.
+    Para o aviso de alteração, usamos target_send_time sintético igual ao próprio
+    scheduled_event_time e status='schedule_changed'.
     """
     return DailyManagerEventDispatch.objects.filter(
         event=event,
@@ -161,6 +161,36 @@ def _reschedule_notice_already_sent(event, manager, day, scheduled_event_time):
         target_send_time=scheduled_event_time,
         status="schedule_changed",
     ).exists()
+
+
+def _reserve_dispatch_slot(
+    *,
+    event,
+    manager,
+    day,
+    scheduled_event_time,
+    target_send_time,
+    status="pending",
+):
+    """
+    Reserva atômica do slot de envio ANTES de mandar o template.
+    Isso evita duplicidade quando duas execuções entram ao mesmo tempo.
+    Exige unique constraint no banco.
+    """
+    try:
+        with transaction.atomic():
+            dispatch = DailyManagerEventDispatch.objects.create(
+                event=event,
+                manager=manager,
+                event_date=day,
+                scheduled_event_time=scheduled_event_time,
+                target_send_time=target_send_time,
+                sent_at=timezone.now(),
+                status=status,
+            )
+            return dispatch, True
+    except IntegrityError:
+        return None, False
 
 
 def _log_outbound_template(*, manager, body_preview, resp, kind="daily_meeting_reminder"):
@@ -391,48 +421,62 @@ class Command(BaseCommand):
                 )
 
                 if should_send_schedule_changed_notice:
-                    resp = send_template(
-                        manager.phone_e164,
-                        template_name=template_name,
-                        language_code=template_language,
-                        body_params=[
-                            changed_greeting,
-                            meeting_time_str,
-                            meeting_name,
-                            meet_link,
-                        ],
-                    )
-
-                    provider_id = _extract_provider_id(resp)
-
-                    DailyManagerEventDispatch.objects.create(
+                    dispatch, reserved = _reserve_dispatch_slot(
                         event=event,
                         manager=manager,
-                        event_date=day,
+                        day=day,
                         scheduled_event_time=scheduled_event_time,
                         target_send_time=scheduled_event_time,  # marcador sintético
-                        sent_at=timezone.now(),
-                        provider_message_id=provider_id,
                         status="schedule_changed",
                     )
 
-                    _log_outbound_template(
-                        manager=manager,
-                        body_preview=changed_preview,
-                        resp=resp,
-                        kind="daily_meeting_reminder_changed",
-                    )
+                    if reserved:
+                        resp = send_template(
+                            manager.phone_e164,
+                            template_name=template_name,
+                            language_code=template_language,
+                            body_params=[
+                                changed_greeting,
+                                meeting_time_str,
+                                meeting_name,
+                                meet_link,
+                            ],
+                        )
 
-                    changed_sent += 1
-                    logger.warning(
-                        "DAILY_EVENT_SCHEDULE_CHANGED_SENT manager=%s phone=%s event=%s day=%s new_meeting_time=%s provider_id=%s",
-                        manager.name,
-                        manager.phone_e164,
-                        event.code,
-                        day.isoformat(),
-                        meeting_time_str,
-                        provider_id,
-                    )
+                        provider_id = _extract_provider_id(resp)
+
+                        dispatch.provider_message_id = provider_id
+                        dispatch.status = "schedule_changed"
+                        dispatch.sent_at = timezone.now()
+                        dispatch.save(update_fields=["provider_message_id", "status", "sent_at"])
+
+                        _log_outbound_template(
+                            manager=manager,
+                            body_preview=changed_preview,
+                            resp=resp,
+                            kind="daily_meeting_reminder_changed",
+                        )
+
+                        changed_sent += 1
+                        logger.warning(
+                            "DAILY_EVENT_SCHEDULE_CHANGED_SENT manager=%s phone=%s event=%s day=%s new_meeting_time=%s provider_id=%s",
+                            manager.name,
+                            manager.phone_e164,
+                            event.code,
+                            day.isoformat(),
+                            meeting_time_str,
+                            provider_id,
+                        )
+                    else:
+                        skipped_already += 1
+                        logger.warning(
+                            "DAILY_EVENT_SCHEDULE_CHANGED_ALREADY_RESERVED manager=%s phone=%s event=%s day=%s new_meeting_time=%s",
+                            manager.name,
+                            manager.phone_e164,
+                            event.code,
+                            day.isoformat(),
+                            meeting_time_str,
+                        )
 
                 # -------------------------------------------------
                 # 2) Lembretes normais de 60 e 10 minutos
@@ -443,16 +487,19 @@ class Command(BaseCommand):
 
                     target_send_time = item["target_dt"].time()
 
-                    if _already_sent(
+                    dispatch, reserved = _reserve_dispatch_slot(
                         event=event,
                         manager=manager,
                         day=day,
                         scheduled_event_time=scheduled_event_time,
                         target_send_time=target_send_time,
-                    ):
+                        status="pending",
+                    )
+
+                    if not reserved:
                         skipped_already += 1
                         logger.warning(
-                            "DAILY_EVENT_ALREADY_SENT manager=%s phone=%s event=%s day=%s meeting_time=%s offset=%s target=%s",
+                            "DAILY_EVENT_ALREADY_RESERVED manager=%s phone=%s event=%s day=%s meeting_time=%s offset=%s target=%s",
                             manager.name,
                             manager.phone_e164,
                             event.code,
@@ -477,16 +524,10 @@ class Command(BaseCommand):
 
                     provider_id = _extract_provider_id(resp)
 
-                    DailyManagerEventDispatch.objects.create(
-                        event=event,
-                        manager=manager,
-                        event_date=day,
-                        scheduled_event_time=scheduled_event_time,
-                        target_send_time=target_send_time,
-                        sent_at=timezone.now(),
-                        provider_message_id=provider_id,
-                        status=("sent" if provider_id else "unknown"),
-                    )
+                    dispatch.provider_message_id = provider_id
+                    dispatch.status = "sent" if provider_id else "unknown"
+                    dispatch.sent_at = timezone.now()
+                    dispatch.save(update_fields=["provider_message_id", "status", "sent_at"])
 
                     _log_outbound_template(
                         manager=manager,
