@@ -177,68 +177,7 @@
       </tbody>
     </table>
 
-    <!-- PAYLOAD COMPLETO -->
-    <h3 style="margin:0 0 10px 0;color:#111827;">🔎 Payload completo</h3>
-
-    <table style="border-collapse:collapse;width:100%;font-size:14px;margin-bottom:22px;">
-      <thead>
-        <tr style="background:#f3f4f6;">
-          <th style="text-align:left;padding:10px;border:1px solid #e5e7eb;">Campo</th>
-          <th style="text-align:left;padding:10px;border:1px solid #e5e7eb;">Valor</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% if payload_rows %}
-        {% for key, value in payload_rows %}
-        <tr>
-          <td style="padding:8px;border:1px solid #e5e7eb;font-family:monospace;">
-            {{ key }}
-          </td>
-          <td
-            style="padding:8px;border:1px solid #e5e7eb;font-family:monospace;white-space:pre-wrap;word-break:break-word;">
-            {{ value }}
-          </td>
-        </tr>
-        {% endfor %}
-        {% else %}
-        <tr>
-          <td colspan="2" style="padding:10px;border:1px solid #e5e7eb;text-align:center;">
-            Nenhum dado recebido
-          </td>
-        </tr>
-        {% endif %}
-      </tbody>
-    </table>
-
-    <!-- HEADERS -->
-    <h3 style="margin:0 0 10px 0;color:#111827;">🧾 Headers (sensíveis mascarados)</h3>
-
-    <table style="border-collapse:collapse;width:100%;font-size:13px;margin-bottom:22px;">
-      <thead>
-        <tr style="background:#f3f4f6;">
-          <th style="text-align:left;padding:8px;border:1px solid #e5e7eb;">Header</th>
-          <th style="text-align:left;padding:8px;border:1px solid #e5e7eb;">Valor</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for key, value in headers.items %}
-        <tr>
-          <td style="padding:6px;border:1px solid #e5e7eb;font-family:monospace;">
-            {{ key }}
-          </td>
-          <td style="padding:6px;border:1px solid #e5e7eb;font-family:monospace;word-break:break-all;">
-            {{ value }}
-          </td>
-        </tr>
-        {% empty %}
-        <tr>
-          <td colspan="2" style="padding:8px;border:1px solid #e5e7eb;text-align:center;">
-            Nenhum header disponível
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  
 
     <!-- RAW BODY -->
     <h3 style="margin:0 0 10px 0;color:#111827;">📄 Raw Body</h3>
