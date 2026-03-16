@@ -1,13 +1,17 @@
 # kmltools/admin.py
 from django.contrib import admin
 from django.utils import timezone
-from django.db.models import Sum
 from django.contrib.auth import get_user_model
+from django.utils.html import format_html
 
 from .models import BillingProfile, WeeklyUsage, KMLMergeJob, MergeFeedback, UnlockFeedback
 
-from django.db.models import Count
-from django.utils.html import format_html
+from django.db.models import OuterRef, Subquery, IntegerField, Value, Case, When, F,  CharField, Count, Sum, TextField
+from django.db.models.functions import Coalesce, Trim, Cast
+from django.db.models.expressions import Func
+
+
+
 
 
 
@@ -18,6 +22,9 @@ from django.utils.html import format_html
 def _email(obj):
     return getattr(getattr(obj, "user", None), "email", "") or ""
 
+class SplitPart(Func):
+    function = "SPLIT_PART"
+    output_field = CharField()
 
 # =========================
 # BillingProfile
@@ -261,10 +268,12 @@ class KMLMergeJobAdmin(admin.ModelAdmin):
         "created_at",
         "user_email",
         "anon_id",
+        "anon_id_total_jobs",
         "plan",
         "status",
         "visitor_country_name",
         "visitor_ip",
+        "visitor_ip_total_jobs",
         "tol_m",
         "corridor_width_m",
         "total_files",
@@ -382,12 +391,83 @@ class KMLMergeJobAdmin(admin.ModelAdmin):
         ),
     )
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request).select_related("user")
+
+        qs = qs.annotate(
+            visitor_ip_normalized_annotated=Trim(
+                SplitPart(
+                    Cast(F("visitor_ip"), TextField()),
+                    Value(","),
+                    Value(1),
+                )
+            )
+        )
+
+        anon_count_subquery = (
+            KMLMergeJob.objects
+            .filter(anon_id=OuterRef("anon_id"))
+            .exclude(anon_id__isnull=True)
+            .exclude(anon_id="")
+            .values("anon_id")
+            .annotate(total=Count("id"))
+            .values("total")[:1]
+        )
+
+        ip_count_subquery = (
+            KMLMergeJob.objects
+            .annotate(
+                visitor_ip_normalized_inner=Trim(
+                    SplitPart(
+                        Cast(F("visitor_ip"), TextField()),
+                        Value(","),
+                        Value(1),
+                    )
+                )
+            )
+            .filter(visitor_ip_normalized_inner=OuterRef("visitor_ip_normalized_annotated"))
+            .exclude(visitor_ip__isnull=True)
+            .values("visitor_ip_normalized_inner")
+            .annotate(total=Count("id"))
+            .values("total")[:1]
+        )
+
+        return qs.annotate(
+            anon_id_total_jobs_annotated=Coalesce(
+                Subquery(anon_count_subquery, output_field=IntegerField()),
+                Value(0),
+            ),
+            visitor_ip_total_jobs_annotated=Coalesce(
+                Subquery(ip_count_subquery, output_field=IntegerField()),
+                Value(0),
+            ),
+        )
+
     def user_email(self, obj):
         return obj.user.email if obj.user else "—"
 
     user_email.short_description = "Email"
     user_email.admin_order_field = "user__email"
 
+    def anon_id_total_jobs(self, obj):
+        return obj.anon_id_total_jobs_annotated
+
+    anon_id_total_jobs.short_description = "Merges / anon_id"
+    anon_id_total_jobs.admin_order_field = "anon_id_total_jobs_annotated"
+
+    def visitor_ip_normalized(self, obj):
+        return obj.visitor_ip_normalized_annotated or "—"
+
+    visitor_ip_normalized.short_description = "IP normalizado"
+    visitor_ip_normalized.admin_order_field = "visitor_ip_normalized_annotated"
+
+    def visitor_ip_total_jobs(self, obj):
+        return obj.visitor_ip_total_jobs_annotated
+
+    visitor_ip_total_jobs.short_description = "Merges / IP"
+    visitor_ip_total_jobs.admin_order_field = "visitor_ip_total_jobs_annotated"
+    
+    
 @admin.register(MergeFeedback)
 class MergeFeedbackAdmin(admin.ModelAdmin):
     list_display = ("id", "user", "merge_job", "source", "created_at")

@@ -82,7 +82,7 @@ def geo_country_from_ip(ip: str):
     ipapi.co é simples e bom o bastante p/ isso.
     """
     try:
-        r = requests.get(f"https://ipapi.co/{ip}/json/", timeout=2.0)
+        r = requests.get(f"https://ipapi.co/{ip}/json/", timeout=5.0)
         if r.status_code != 200:
             return None, None
         data = r.json() or {}
