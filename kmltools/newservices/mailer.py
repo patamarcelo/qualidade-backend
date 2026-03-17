@@ -18,7 +18,7 @@ def send_job_zip_email(to_email: str, *, context: dict, zip_bytes: bytes, zip_fi
     _ = render_to_string("email/kml_bundle.txt", context)  # opcional: manter para debug/consistência
     html_body = render_to_string("email/kml_bundle.html", context)
 
-    from_email = getattr(settings, "DEFAULT_FROM_EMAIL", "") or "patamarcelo@gmail.com"
+    from_email =  "contact@kmlunifier.com"
 
     # Anexo ZIP
     attachments = [

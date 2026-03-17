@@ -15,7 +15,7 @@ from kmltools.models import KMLMergeJob  # ajuste se o import estiver em outro a
 resend.api_key = os.getenv("RESEND_EMAIL_API_KEY_KMLUNIFIER")
 
 FROM_EMAIL = os.getenv("KML_DEFAULT_FROM", "KML Unifier <team@kmlunifier.com>")
-REPLY_EMAIL = os.getenv("REPLY_EMAIL", "patamarcelo@gmail.com")
+REPLY_EMAIL = "contact@kmlunifier.com"
 
 
 def _fmt(n, digits=0):
@@ -32,7 +32,7 @@ def _fmt(n, digits=0):
 
 def _build_email_html(job, plan: str, download_url: str | None):
     site_url = os.getenv("KML_SITE_URL", "https://kmlunifier.com").rstrip("/")
-    support_email = os.getenv("REPLY_EMAIL", REPLY_EMAIL)
+    support_email = "contact@kmlunifier.com"
 
     # métricas (podem ser None)
     tol_m = getattr(job, "tol_m", None)
