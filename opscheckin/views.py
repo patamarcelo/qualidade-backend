@@ -1,8 +1,13 @@
+import os
 import re
 import json
 import hmac
 import hashlib
 import logging
+import tempfile
+
+import requests
+from openai import OpenAI
 
 from django.conf import settings
 from django.http import JsonResponse, HttpResponse
@@ -24,6 +29,7 @@ logger = logging.getLogger("opscheckin.whatsapp")
 
 # mínimo “anti-vazio” p/ considerar que veio algo (a validação real é pelo parse)
 MIN_AGENDA_CHARS = 10
+MAX_AUDIO_SECONDS = 300  # 5 minutos
 
 
 # =========================
@@ -158,10 +164,6 @@ def _wa_row_title(idx: int, text: str, prefix: str = "") -> str:
 def _wa_row_desc(text: str) -> str:
     s = (text or "").strip()
     return (s[:72] + "…") if len(s) > 72 else s
-
-
-
-
 
 
 def _agenda_reply_text(checkin):
@@ -576,6 +578,7 @@ def _agenda_next_idx(checkin):
     )
     return int(last or 0) + 1
 
+
 def _extract_provider_id(resp):
     try:
         if isinstance(resp, dict):
@@ -598,7 +601,6 @@ def _response_has_explicit_error(resp):
             if resp.get("error"):
                 return True
 
-            # alguns providers podem devolver sucesso fora de "messages"
             if resp.get("messages") is not None:
                 return False
 
@@ -812,9 +814,6 @@ def _handle_director_action(*, manager, reply_id: str, now) -> bool:
 
         day = timezone.localdate()
 
-        # Aqui buscamos os managers que participam da agenda diária.
-        # O diretor que recebe o resumo NÃO precisa ser is_active=True;
-        # ele só precisa estar habilitado em is_active_resume_agenda.
         managers = list(
             managers_subscribed("agenda_prompt")
             .filter(is_active=True)
@@ -883,9 +882,8 @@ def _handle_director_action(*, manager, reply_id: str, now) -> bool:
                 getattr(manager, "phone_e164", ""),
             )
         return True
-    
-    
-    
+
+
 def _handle_agenda_menu_action(*, manager, checkin, reply_id: str, now):
     if reply_id == "AM:MENU:DONE":
         return _send_agenda_pending_action_prompt(manager, checkin, "done", now)
@@ -1467,7 +1465,6 @@ def _extract_messages_from_meta(payload: dict):
     return out
 
 
-
 # =========================
 # Agenda parsing (ignora "Bom dia", trim, etc.)
 # =========================
@@ -1510,6 +1507,139 @@ def _parse_agenda_lines(text: str) -> list[str]:
 
 def _local_today():
     return timezone.localdate()
+
+
+# =========================
+# Áudio / Transcrição
+# =========================
+
+def _get_openai_client():
+    api_key = getattr(settings, "OPENAI_API_KEY", "") or os.getenv("OPENAI_API_KEY", "")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY não configurada")
+    return OpenAI(api_key=api_key)
+
+
+def _get_meta_media_info(media_id: str):
+    token = getattr(settings, "WHATSAPP_TOKEN", "") or ""
+    version = getattr(settings, "WHATSAPP_GRAPH_VERSION", "v23.0")
+
+    if not token:
+        raise RuntimeError("WHATSAPP_TOKEN não configurado")
+    if not media_id:
+        raise ValueError("media_id vazio")
+
+    url = f"https://graph.facebook.com/{version}/{media_id}"
+    resp = requests.get(
+        url,
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=30,
+    )
+    resp.raise_for_status()
+
+    data = resp.json() or {}
+    return data
+
+
+def _download_meta_media_to_tempfile(media_url: str, suffix: str = ".ogg"):
+    token = getattr(settings, "WHATSAPP_TOKEN", "") or ""
+    if not token:
+        raise RuntimeError("WHATSAPP_TOKEN não configurado")
+    if not media_url:
+        raise ValueError("media_url vazia")
+
+    resp = requests.get(
+        media_url,
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=60,
+        stream=True,
+    )
+    resp.raise_for_status()
+
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+    try:
+        for chunk in resp.iter_content(chunk_size=8192):
+            if chunk:
+                tmp.write(chunk)
+        tmp.flush()
+        return tmp.name
+    finally:
+        tmp.close()
+
+
+def _guess_audio_suffix(mime_type: str) -> str:
+    mt = (mime_type or "").lower()
+    if "ogg" in mt or "opus" in mt:
+        return ".ogg"
+    if "mpeg" in mt or "mp3" in mt:
+        return ".mp3"
+    if "mp4" in mt:
+        return ".mp4"
+    if "wav" in mt:
+        return ".wav"
+    if "webm" in mt:
+        return ".webm"
+    return ".audio"
+
+
+def _extract_audio_duration_seconds(raw_msg: dict):
+    audio = (raw_msg or {}).get("audio") or {}
+    media_id = (audio.get("id") or "").strip()
+    if not media_id:
+        return None
+
+    info = _get_meta_media_info(media_id)
+    duration = info.get("file_length") or info.get("duration") or info.get("voice_duration")
+
+    try:
+        return int(duration) if duration is not None else None
+    except Exception:
+        return None
+
+
+def _transcribe_audio_file(file_path: str) -> str:
+    client = _get_openai_client()
+
+    with open(file_path, "rb") as audio_file:
+        resp = client.audio.transcriptions.create(
+            model="gpt-4o-mini-transcribe",
+            file=audio_file,
+        )
+
+    text = getattr(resp, "text", "") or ""
+    return text.strip()
+
+
+def _transcribe_whatsapp_audio_from_message(raw_msg: dict) -> str:
+    audio = (raw_msg or {}).get("audio") or {}
+    media_id = (audio.get("id") or "").strip()
+    mime_type = (audio.get("mime_type") or "").strip()
+
+    if not media_id:
+        return ""
+
+    media_info = _get_meta_media_info(media_id)
+    media_url = (media_info.get("url") or "").strip()
+    if not media_url:
+        return ""
+
+    suffix = _guess_audio_suffix(mime_type)
+
+    temp_path = None
+    try:
+        temp_path = _download_meta_media_to_tempfile(media_url, suffix=suffix)
+        if not temp_path:
+            return ""
+
+        text = _transcribe_audio_file(temp_path)
+        return (text or "").strip()
+
+    finally:
+        if temp_path:
+            try:
+                os.remove(temp_path)
+            except Exception:
+                logger.exception("WHATSAPP_AUDIO_TEMPFILE_DELETE_FAILED path=%s", temp_path)
 
 
 # =========================
@@ -1598,7 +1728,7 @@ def whatsapp_webhook(request):
                 checkin = None
                 if is_checkin_user:
                     checkin, _ = DailyCheckin.objects.get_or_create(manager=manager, date=today)
-                    
+
                 logger.warning(
                     "WHATSAPP_WEBHOOK_MANAGER_RESOLUTION manager=%s phone=%s is_active=%s is_resume_director=%s has_checkin=%s reply_id=%s",
                     getattr(manager, "name", "") if manager else "",
@@ -1647,6 +1777,127 @@ def whatsapp_webhook(request):
                     _mark_inbound_processed(inbound, now)
                     continue
 
+                if msg_type == "audio":
+                    logger.warning(
+                        "WHATSAPP_AUDIO_RECEIVED manager=%s phone=%s msg_id=%s",
+                        getattr(manager, "name", ""),
+                        from_phone,
+                        msg_id,
+                    )
+
+                    try:
+                        duration_seconds = _extract_audio_duration_seconds(
+                            msg.get("raw_msg") or {}
+                        )
+                    except Exception:
+                        logger.exception(
+                            "WHATSAPP_AUDIO_DURATION_CHECK_FAILED manager=%s phone=%s msg_id=%s",
+                            getattr(manager, "name", ""),
+                            from_phone,
+                            msg_id,
+                        )
+                        duration_seconds = None
+
+                    if duration_seconds is not None and duration_seconds > MAX_AUDIO_SECONDS:
+                        logger.warning(
+                            "WHATSAPP_AUDIO_TOO_LONG manager=%s phone=%s msg_id=%s duration_seconds=%s",
+                            getattr(manager, "name", ""),
+                            from_phone,
+                            msg_id,
+                            duration_seconds,
+                        )
+                        try:
+                            send_text(
+                                manager.phone_e164,
+                                "Recebi seu áudio, mas no momento só consigo processar áudios de até 5 minutos. Pode me enviar um áudio menor ou por escrito?"
+                            )
+                        except Exception:
+                            logger.exception(
+                                "WHATSAPP_AUDIO_TOO_LONG_REPLY_FAILED manager=%s phone=%s msg_id=%s",
+                                getattr(manager, "name", ""),
+                                from_phone,
+                                msg_id,
+                            )
+
+                        _mark_inbound_processed(inbound, now)
+                        continue
+
+                    try:
+                        transcribed_text = _transcribe_whatsapp_audio_from_message(
+                            msg.get("raw_msg") or {}
+                        )
+                    except Exception:
+                        logger.exception(
+                            "WHATSAPP_AUDIO_TRANSCRIPTION_FAILED manager=%s phone=%s msg_id=%s",
+                            getattr(manager, "name", ""),
+                            from_phone,
+                            msg_id,
+                        )
+                        try:
+                            send_text(
+                                manager.phone_e164,
+                                "Recebi seu áudio, mas não consegui processá-lo agora. Pode me enviar por escrito?"
+                            )
+                        except Exception:
+                            logger.exception(
+                                "WHATSAPP_AUDIO_TRANSCRIPTION_FAILED_REPLY_FAILED manager=%s phone=%s msg_id=%s",
+                                getattr(manager, "name", ""),
+                                from_phone,
+                                msg_id,
+                            )
+
+                        _mark_inbound_processed(inbound, now)
+                        continue
+
+                    if not transcribed_text:
+                        logger.warning(
+                            "WHATSAPP_AUDIO_TRANSCRIPTION_EMPTY manager=%s phone=%s msg_id=%s",
+                            getattr(manager, "name", ""),
+                            from_phone,
+                            msg_id,
+                        )
+                        try:
+                            send_text(
+                                manager.phone_e164,
+                                "Recebi seu áudio, mas não consegui entender o conteúdo. Pode me enviar por escrito?"
+                            )
+                        except Exception:
+                            logger.exception(
+                                "WHATSAPP_AUDIO_TRANSCRIPTION_EMPTY_REPLY_FAILED manager=%s phone=%s msg_id=%s",
+                                getattr(manager, "name", ""),
+                                from_phone,
+                                msg_id,
+                            )
+
+                        _mark_inbound_processed(inbound, now)
+                        continue
+
+                    logger.warning(
+                        "WHATSAPP_AUDIO_TRANSCRIBED manager=%s phone=%s msg_id=%s text=%r",
+                        getattr(manager, "name", ""),
+                        from_phone,
+                        msg_id,
+                        transcribed_text[:500],
+                    )
+
+                    text = transcribed_text
+                    msg_type = "text"
+
+                    try:
+                        inbound.text = transcribed_text
+                        inbound.raw_payload = {
+                            **(inbound.raw_payload or {}),
+                            "_audio_transcription": transcribed_text,
+                        }
+                        inbound.save(update_fields=["text", "raw_payload"])
+                    except Exception:
+                        logger.exception(
+                            "WHATSAPP_AUDIO_TRANSCRIPTION_SAVE_FAILED manager=%s phone=%s msg_id=%s",
+                            getattr(manager, "name", ""),
+                            from_phone,
+                            msg_id,
+                        )
+
                 # ==========
                 # 1) actions via reply_id (ordem importa)
                 # ==========
@@ -1673,29 +1924,6 @@ def whatsapp_webhook(request):
                         bool(checkin),
                         reply_id,
                     )
-                    _mark_inbound_processed(inbound, now)
-                    continue
-                
-                if msg_type == "audio":
-                    logger.warning(
-                        "WHATSAPP_AUDIO_NOT_SUPPORTED manager=%s phone=%s msg_id=%s",
-                        getattr(manager, "name", ""),
-                        from_phone,
-                        msg_id,
-                    )
-                    try:
-                        send_text(
-                            manager.phone_e164,
-                            "Recebi seu áudio 👍 No momento o OpsCheckin só processa mensagens em texto. Pode me enviar por escrito?"
-                        )
-                    except Exception:
-                        logger.exception(
-                            "WHATSAPP_AUDIO_NOT_SUPPORTED_REPLY_FAILED manager=%s phone=%s msg_id=%s",
-                            getattr(manager, "name", ""),
-                            from_phone,
-                            msg_id,
-                        )
-
                     _mark_inbound_processed(inbound, now)
                     continue
 
