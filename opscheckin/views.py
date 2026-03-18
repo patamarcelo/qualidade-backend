@@ -1675,6 +1675,29 @@ def whatsapp_webhook(request):
                     )
                     _mark_inbound_processed(inbound, now)
                     continue
+                
+                if msg_type == "audio":
+                    logger.warning(
+                        "WHATSAPP_AUDIO_NOT_SUPPORTED manager=%s phone=%s msg_id=%s",
+                        getattr(manager, "name", ""),
+                        from_phone,
+                        msg_id,
+                    )
+                    try:
+                        send_text(
+                            manager.phone_e164,
+                            "Recebi seu áudio 👍 No momento o OpsCheckin só processa mensagens em texto. Pode me enviar por escrito?"
+                        )
+                    except Exception:
+                        logger.exception(
+                            "WHATSAPP_AUDIO_NOT_SUPPORTED_REPLY_FAILED manager=%s phone=%s msg_id=%s",
+                            getattr(manager, "name", ""),
+                            from_phone,
+                            msg_id,
+                        )
+
+                    _mark_inbound_processed(inbound, now)
+                    continue
 
                 if reply_id.startswith("AM:"):
                     if _handle_agenda_menu_action(
