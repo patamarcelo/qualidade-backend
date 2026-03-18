@@ -1018,7 +1018,7 @@
               {% for it in col.timeline %}
               <div class="msgRow {{ it.side }}">
                 <div class="bubble {% if it.side == 'right' %}outb{% else %}inb{% endif %}">
-                  {{ it.text }}
+                  {% if it.side == 'left' and it.meta == 'audio' %}🎤 {% endif %}{{ it.text }}
                 </div>
                 <div class="metaLine">
                   <span class="time">{{ it.label }}</span>
@@ -1028,7 +1028,9 @@
                   {% endif %}
 
                   {% if it.meta %}
-                  <span class="tag">{{ it.meta }}</span>
+                    <span class="tag">
+                      {% if it.meta == 'audio' %}🎤 áudio{% else %}{{ it.meta }}{% endif %}
+                    </span>
                   {% endif %}
                 </div>
               </div>
@@ -1442,12 +1444,12 @@
              data-message-id="${escapeHtml(msg.message_id || "")}"
              data-provider-message-id="${escapeHtml(msg.provider_message_id || "")}">
           <div class="bubble ${msg.side === "right" ? "outb" : "inb"}">
-            ${escapeHtml(msg.text)}
+            ${msg.side === "left" && msg.meta === "audio" ? "🎤 " : ""}${escapeHtml(msg.text)}
           </div>
           <div class="metaLine">
             <span class="time">${escapeHtml(msg.label || "")}</span>
             ${msg.side === "right" && msg.ticks ? `<span class="ticks ${escapeHtml(msg.ticks_class || "")}">${escapeHtml(msg.ticks)}</span>` : ""}
-            ${msg.meta ? `<span class="tag">${escapeHtml(msg.meta)}</span>` : ""}
+            ${msg.meta ? `<span class="tag">${msg.meta === "audio" ? "🎤 áudio" : escapeHtml(msg.meta)}</span>` : ""}
           </div>
         </div>
       `;
