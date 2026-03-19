@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta
+import re
 
 from django.core.management.base import BaseCommand
 from django.db import IntegrityError, transaction
@@ -53,7 +54,7 @@ def _get_base_greeting(event_dt):
 def _build_greeting(event_dt, *, is_reschedule=False):
     base = _get_base_greeting(event_dt)
     if is_reschedule:
-        return f"*Atenção: o horário da reunião foi alterado.*\n\n{base}"
+        return f"Atenção: o horário da reunião foi alterado. {base}"
     return base
 
 
@@ -210,6 +211,13 @@ def _log_outbound_template(*, manager, body_preview, resp, kind="daily_meeting_r
         wa_status=("sent" if provider_id else ""),
         wa_sent_at=(now if provider_id else None),
     )
+
+
+def _sanitize_template_param(text):
+    text = str(text or "")
+    text = text.replace("\n", " ").replace("\r", " ").replace("\t", " ")
+    text = re.sub(r" {2,}", " ", text)
+    return text.strip()
 
 
 class Command(BaseCommand):
@@ -436,13 +444,12 @@ class Command(BaseCommand):
                             template_name=template_name,
                             language_code=template_language,
                             body_params=[
-                                changed_greeting,
-                                meeting_time_str,
-                                meeting_name,
-                                meet_link,
-                            ],
+                                _sanitize_template_param(changed_greeting),
+                                _sanitize_template_param(meeting_time_str),
+                                _sanitize_template_param(meeting_name),
+                                _sanitize_template_param(meet_link),
+                            ]
                         )
-
                         provider_id = _extract_provider_id(resp)
 
                         dispatch.provider_message_id = provider_id
