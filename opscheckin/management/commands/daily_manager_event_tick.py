@@ -54,7 +54,7 @@ def _get_base_greeting(event_dt):
 def _build_greeting(event_dt, *, is_reschedule=False):
     base = _get_base_greeting(event_dt)
     if is_reschedule:
-        return f"Atenção: o horário da reunião foi alterado. {base}"
+        return f"*Atenção: o horário da reunião foi alterado*"
     return base
 
 
@@ -334,7 +334,7 @@ class Command(BaseCommand):
         normal_preview = (
             f"Lembrete de reunião diária da fazenda.\n\n"
             f"{normal_greeting}\n\n"
-            f"Segue o link para a reunião das {meeting_time_str} horas - {meeting_name}.\n\n"
+            f"Segue o link para a reunião das {meeting_time_str} horas.\n\n"
             f"Link da reunião:\n{meet_link}\n\n"
             f"Mensagem automática do sistema OpsCheckin."
         )
@@ -342,7 +342,7 @@ class Command(BaseCommand):
         changed_preview = (
             f"Lembrete de reunião diária da fazenda.\n\n"
             f"{changed_greeting}\n\n"
-            f"Segue o link para a reunião das {meeting_time_str} horas - {meeting_name}.\n\n"
+            f"Segue o link para a reunião das {meeting_time_str} horas.\n\n"
             f"Link da reunião:\n{meet_link}\n\n"
             f"Mensagem automática do sistema OpsCheckin."
         )
