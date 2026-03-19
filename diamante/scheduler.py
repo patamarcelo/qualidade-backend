@@ -157,7 +157,7 @@ def start():
                 "cron",
                 day_of_week="*",
                 hour="5-19",
-                minute="0",
+                minute="58",
                 id="update_farmbox_apps_hourly",
                 replace_existing=True,
                 misfire_grace_time=1800,
