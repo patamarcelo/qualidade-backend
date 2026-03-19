@@ -5,9 +5,10 @@ import logging
 from datetime import datetime
 
 from django.core.management.base import BaseCommand
+from django.db import connection
 from django.utils import timezone
 
-from opscheckin.models import  DailyCheckin, OutboundQuestion, OutboundMessage
+from opscheckin.models import DailyCheckin, OutboundQuestion, OutboundMessage
 from opscheckin.services.recipients import managers_subscribed
 from opscheckin.services.whatsapp import send_list
 
@@ -53,14 +54,20 @@ def _log_outbound_interactive(*, manager, checkin, body, resp, kind="agenda_conf
 
 def _agenda_preview(checkin, *, max_lines=12) -> str:
     from opscheckin.models import AgendaItem
-    items = list(AgendaItem.objects.filter(checkin=checkin).order_by("idx")[:max_lines])
+
+    items = list(
+        AgendaItem.objects.filter(checkin=checkin).order_by("idx")[:max_lines]
+    )
     if not items:
         return "(sem itens)"
+
     lines = []
     for it in items:
         lines.append(f"{it.idx}) {it.text}")
+
     if len(items) >= max_lines:
         lines.append("…")
+
     return "\n".join(lines)
 
 
@@ -159,6 +166,7 @@ def _send_confirm(manager, checkin):
         button_text="Abrir opções",
         sections=sections,
     )
+
     _log_outbound_interactive(
         manager=manager,
         checkin=checkin,
@@ -167,8 +175,10 @@ def _send_confirm(manager, checkin):
         kind="agenda_confirm",
     )
     return True
+
+
 class Command(BaseCommand):
-    help = "Envia confirmação da agenda (10 min após resposta) e aplica OK automático por silêncio."
+    help = "Envia confirmação da agenda após resposta e aplica OK automático por silêncio."
 
     def add_arguments(self, parser):
         parser.add_argument("--date", type=str, default="", help="YYYY-MM-DD (padrão: hoje local)")
@@ -177,8 +187,11 @@ class Command(BaseCommand):
         parser.add_argument("--auto-ok-min", type=int, default=AUTO_OK_MINUTES)
 
     def handle(self, *args, **opts):
+        connection.close_if_unusable_or_obsolete()
+
         now = timezone.now()
         day = _local_today()
+
         if opts["date"]:
             try:
                 day = datetime.strptime(opts["date"], "%Y-%m-%d").date()
@@ -192,12 +205,15 @@ class Command(BaseCommand):
             "agenda_confirm",
             include_inactive=opts.get("include_inactive", False),
         )
-        
+
+        # materializa o queryset uma vez só para evitar query lazy
+        # no meio do loop em conexão eventualmente instável
+        managers = list(qs)
 
         sent = 0
         auto_ok = 0
 
-        for m in qs:
+        for m in managers:
             checkin = DailyCheckin.objects.filter(manager=m, date=day).first()
             if not checkin:
                 continue
@@ -210,12 +226,10 @@ class Command(BaseCommand):
             if not agenda_q or agenda_q.status != "answered" or not agenda_q.answered_at:
                 continue
 
-            # se ainda não passou 10 min desde resposta da agenda, não manda confirmação
             age_min = (now - agenda_q.answered_at).total_seconds() / 60.0
             if age_min < send_after:
                 continue
 
-            # 1) cria/manda confirmação se ainda não foi enviada
             conf_q = (
                 checkin.questions.filter(step="AGENDA_CONFIRM")
                 .order_by("-id")
@@ -231,7 +245,6 @@ class Command(BaseCommand):
                     sent += 1
                 continue
 
-            # 2) auto-ok: se confirmação está pending e já passou auto_ok_min desde envio
             if conf_q.status == "pending" and conf_q.sent_at and not conf_q.answered_at:
                 conf_age = (now - conf_q.sent_at).total_seconds() / 60.0
                 if conf_age >= auto_ok_min:
@@ -243,6 +256,6 @@ class Command(BaseCommand):
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"[agenda_confirm_tick] managers={qs.count()} sent={sent} auto_ok={auto_ok}"
+                f"[agenda_confirm_tick] managers={len(managers)} sent={sent} auto_ok={auto_ok}"
             )
         )
