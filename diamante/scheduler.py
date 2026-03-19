@@ -46,12 +46,73 @@ def delete_old_job_executions(max_age=604_800):
     DjangoJobExecution.objects.delete_old_job_executions(max_age)
 
 
-def _wrap_job(fn):
-    def wrapped(*args, **kwargs):
-        close_old_connections()
-        connection.close_if_unusable_or_obsolete()
-        return fn(*args, **kwargs)
-    return wrapped
+def _prepare_db_for_job():
+    close_old_connections()
+    connection.close_if_unusable_or_obsolete()
+
+
+# =====================================================================
+# JOB WRAPPERS SERIALIZÁVEIS
+# =====================================================================
+
+def job_finalizar_parcelas_encerradas():
+    _prepare_db_for_job()
+    return finalizar_parcelas_encerradas()
+
+
+def job_update_farmbox_mongodb_app():
+    _prepare_db_for_job()
+    return update_farmbox_mongodb_app()
+
+
+def job_enviar_email_diario():
+    _prepare_db_for_job()
+    return enviar_email_diario()
+
+
+def job_enviar_email_alerta_mungo_verde_por_regra():
+    _prepare_db_for_job()
+    return enviar_email_alerta_mungo_verde_por_regra()
+
+
+def job_enviar_email_estoque_farmbox_diario():
+    _prepare_db_for_job()
+    return enviar_email_estoque_farmbox_diario()
+
+
+def job_run_opscheckin_agenda_0600():
+    _prepare_db_for_job()
+    return run_opscheckin_agenda_0600()
+
+
+def job_run_opscheckin_reminders():
+    _prepare_db_for_job()
+    return run_opscheckin_reminders()
+
+
+def job_run_opscheckin_agenda_followups():
+    _prepare_db_for_job()
+    return run_opscheckin_agenda_followups()
+
+
+def job_run_opscheckin_agenda_confirm():
+    _prepare_db_for_job()
+    return run_opscheckin_agenda_confirm()
+
+
+def job_run_opscheckin_director_agenda_summary():
+    _prepare_db_for_job()
+    return run_opscheckin_director_agenda_summary()
+
+
+def job_run_opscheckin_daily_manager_event_tick():
+    _prepare_db_for_job()
+    return run_opscheckin_daily_manager_event_tick()
+
+
+def job_delete_old_job_executions():
+    _prepare_db_for_job()
+    return delete_old_job_executions()
 
 
 def start():
@@ -75,7 +136,7 @@ def start():
             # GRUPO A — ROTINAS FINANCEIRAS / PARCELAS (Diamante)
             # =====================================================================
             scheduler.add_job(
-                _wrap_job(finalizar_parcelas_encerradas),
+                job_finalizar_parcelas_encerradas,
                 "cron",
                 day_of_week="*",
                 hour="5",
@@ -92,7 +153,7 @@ def start():
             # Regra: rodar todos os dias, de hora em hora, das 05:00 às 19:00
             # =====================================================================
             scheduler.add_job(
-                _wrap_job(update_farmbox_mongodb_app),
+                job_update_farmbox_mongodb_app,
                 "cron",
                 day_of_week="*",
                 hour="5-19",
@@ -108,7 +169,7 @@ def start():
             # GRUPO C — E-MAILS / ALERTAS (Diamante)
             # =====================================================================
             scheduler.add_job(
-                _wrap_job(enviar_email_diario),
+                job_enviar_email_diario,
                 "cron",
                 day_of_week="mon-fri",
                 hour="6",
@@ -121,7 +182,7 @@ def start():
             )
 
             scheduler.add_job(
-                _wrap_job(enviar_email_alerta_mungo_verde_por_regra),
+                job_enviar_email_alerta_mungo_verde_por_regra,
                 "cron",
                 day_of_week="sun",
                 hour="12",
@@ -134,7 +195,7 @@ def start():
             )
 
             scheduler.add_job(
-                _wrap_job(enviar_email_estoque_farmbox_diario),
+                job_enviar_email_estoque_farmbox_diario,
                 "cron",
                 day_of_week="*",
                 hour="6",
@@ -150,7 +211,7 @@ def start():
             # GRUPO D — OPSCHECKIN (WhatsApp) — AGENDA + REMINDERS
             # =====================================================================
             scheduler.add_job(
-                _wrap_job(run_opscheckin_agenda_0600),
+                job_run_opscheckin_agenda_0600,
                 "cron",
                 day_of_week="*",
                 hour="6",
@@ -163,7 +224,7 @@ def start():
             )
 
             scheduler.add_job(
-                _wrap_job(run_opscheckin_reminders),
+                job_run_opscheckin_reminders,
                 "cron",
                 day_of_week="*",
                 hour="6",
@@ -176,7 +237,7 @@ def start():
             )
 
             scheduler.add_job(
-                _wrap_job(run_opscheckin_reminders),
+                job_run_opscheckin_reminders,
                 "cron",
                 day_of_week="*",
                 hour="7",
@@ -192,7 +253,7 @@ def start():
             # GRUPO E — OPSCHECKIN (WhatsApp) — FOLLOW-UP DO DIA
             # =====================================================================
             scheduler.add_job(
-                _wrap_job(run_opscheckin_agenda_followups),
+                job_run_opscheckin_agenda_followups,
                 "cron",
                 day_of_week="*",
                 hour="9-18",
@@ -205,7 +266,7 @@ def start():
             )
 
             scheduler.add_job(
-                _wrap_job(run_opscheckin_agenda_confirm),
+                job_run_opscheckin_agenda_confirm,
                 "cron",
                 day_of_week="*",
                 hour="6-18",
@@ -218,7 +279,7 @@ def start():
             )
 
             scheduler.add_job(
-                _wrap_job(run_opscheckin_director_agenda_summary),
+                job_run_opscheckin_director_agenda_summary,
                 "cron",
                 day_of_week="*",
                 hour="7",
@@ -234,7 +295,7 @@ def start():
             # GRUPO F — OPSCHECKIN (WhatsApp) — LEMBRETE REUNIÃO DIÁRIA
             # =====================================================================
             scheduler.add_job(
-                _wrap_job(run_opscheckin_daily_manager_event_tick),
+                job_run_opscheckin_daily_manager_event_tick,
                 "cron",
                 day_of_week="mon-sat",
                 hour="9-17",
@@ -250,7 +311,7 @@ def start():
             # GRUPO G — MANUTENÇÃO APSCHEDULER
             # =====================================================================
             scheduler.add_job(
-                _wrap_job(delete_old_job_executions),
+                job_delete_old_job_executions,
                 "cron",
                 day_of_week="*",
                 hour="4",
