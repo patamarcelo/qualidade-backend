@@ -55,6 +55,7 @@ def _prepare_db_for_job():
 # JOB WRAPPERS SERIALIZÁVEIS
 # =====================================================================
 
+
 def job_finalizar_parcelas_encerradas():
     _prepare_db_for_job()
     return finalizar_parcelas_encerradas()
@@ -119,9 +120,26 @@ def start():
     close_old_connections()
     connection.close_if_unusable_or_obsolete()
 
-    if not acquire_scheduler_lock():
-        logger.info("Scheduler não iniciado (lock já está com outro processo).")
-        return None
+    try:
+        has_lock = acquire_scheduler_lock()
+    except Exception as e:
+        logger.error(
+            "Erro ao adquirir advisory lock do scheduler: %s", e, exc_info=True
+        )
+        return {
+            "ok": False,
+            "reason": "lock_error",
+            "error": str(e),
+        }
+
+    if not has_lock:
+        logger.warning(
+            "Scheduler não iniciado: advisory lock já está ativo em outro processo."
+        )
+        return {
+            "ok": False,
+            "reason": "lock_active",
+        }
 
     try:
         fuso_horario = pytz.timezone(settings.TIME_ZONE)
@@ -157,7 +175,7 @@ def start():
                 "cron",
                 day_of_week="*",
                 hour="5-19",
-                minute="58",
+                minute="0",
                 id="update_farmbox_apps_hourly",
                 replace_existing=True,
                 misfire_grace_time=1800,
@@ -327,12 +345,24 @@ def start():
 
             scheduler.start()
             logger.info("Scheduler started successfully with DjangoJobStore.")
-            return scheduler
+            return {
+                "ok": True,
+                "scheduler": scheduler,
+            }
 
-        logger.info("DEBUG=True: scheduler não será iniciado localmente (rodará apenas no servidor).")
-        return None
+        logger.info(
+            "DEBUG=True: scheduler não será iniciado localmente (rodará apenas no servidor)."
+        )
+        return {
+            "ok": False,
+            "reason": "debug_mode",
+        }
 
     except Exception as e:
         logger.error("Erro fatal ao iniciar o scheduler: %s", e, exc_info=True)
         print(f"Erro ao resolver/iniciar as funções do scheduler: {e}")
-        return None
+        return {
+            "ok": False,
+            "reason": "startup_error",
+            "error": str(e),
+        }
