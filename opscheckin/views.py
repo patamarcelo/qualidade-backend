@@ -1510,7 +1510,7 @@ def _local_today():
 
 
 # =========================
-# Áudio / Transcrição
+# Áudio / Transcrição / Normalização
 # =========================
 
 def _get_openai_client():
@@ -1604,10 +1604,54 @@ def _transcribe_audio_file(file_path: str) -> str:
         resp = client.audio.transcriptions.create(
             model="gpt-4o-mini-transcribe",
             file=audio_file,
+            prompt=(
+                "O áudio está em português do Brasil. "
+                "Transcreva com boa pontuação e clareza, preservando o conteúdo falado."
+            ),
         )
 
     text = getattr(resp, "text", "") or ""
     return text.strip()
+
+
+def _normalize_transcribed_agenda_text(text: str) -> str:
+    """
+    Recebe uma transcrição de áudio referente à agenda
+    e devolve uma tarefa por linha, sem inventar conteúdo.
+    """
+    raw = (text or "").strip()
+    if not raw:
+        return ""
+
+    client = _get_openai_client()
+
+    prompt = (
+        "Você vai receber a transcrição de um áudio com a agenda de trabalho de um gerente rural.\n\n"
+        "Sua tarefa é reformatar o conteúdo como uma lista de tarefas, com exatamente uma tarefa por linha.\n\n"
+        "Regras:\n"
+        "- Não invente nenhuma tarefa.\n"
+        "- Não adicione contexto que não exista no texto.\n"
+        "- Não resuma demais.\n"
+        "- Se houver várias tarefas em uma frase, separe em linhas.\n"
+        "- Se o texto já estiver em formato de lista, apenas normalize.\n"
+        "- Remova saudações iniciais como 'bom dia' se existirem.\n"
+        "- Não use numeração.\n"
+        "- Não use marcadores.\n"
+        "- Devolva somente as tarefas, uma por linha.\n"
+        "- Se não houver múltiplas tarefas claras, devolva o texto em uma única linha.\n\n"
+        f"Texto:\n{raw}"
+    )
+
+    try:
+        resp = client.responses.create(
+            model="gpt-5.4-mini",
+            input=prompt,
+        )
+        normalized = (getattr(resp, "output_text", "") or "").strip()
+        return normalized or raw
+    except Exception:
+        logger.exception("AGENDA_AUDIO_NORMALIZATION_FAILED")
+        return raw
 
 
 def _transcribe_whatsapp_audio_from_message(raw_msg: dict) -> str:
@@ -1718,6 +1762,7 @@ def whatsapp_webhook(request):
                 text = msg["text"]
                 msg_id = (msg.get("msg_id") or "").strip()
                 msg_type = (msg.get("msg_type") or "text").strip() or "text"
+                original_msg_type = msg_type
                 reply_id = (msg.get("reply_id") or "").strip()
 
                 manager = Manager.objects.filter(phone_e164=from_phone).first()
@@ -1982,6 +2027,44 @@ def whatsapp_webhook(request):
                 if not pending:
                     _mark_inbound_processed(inbound, now)
                     continue
+
+                # normalização extra somente para:
+                # - origem original = áudio
+                # - pergunta pendente = AGENDA
+                if original_msg_type == "audio" and pending.step == "AGENDA":
+                    try:
+                        normalized_agenda_text = _normalize_transcribed_agenda_text(text)
+                        if normalized_agenda_text:
+                            logger.warning(
+                                "AGENDA_AUDIO_NORMALIZED manager=%s checkin_id=%s msg_id=%s normalized=%r",
+                                getattr(manager, "name", ""),
+                                getattr(checkin, "id", None),
+                                msg_id,
+                                normalized_agenda_text[:500],
+                            )
+                            text = normalized_agenda_text
+
+                            try:
+                                inbound.text = normalized_agenda_text
+                                inbound.raw_payload = {
+                                    **(inbound.raw_payload or {}),
+                                    "_audio_agenda_normalized": normalized_agenda_text,
+                                }
+                                inbound.save(update_fields=["text", "raw_payload"])
+                            except Exception:
+                                logger.exception(
+                                    "AGENDA_AUDIO_NORMALIZED_SAVE_FAILED manager=%s checkin_id=%s msg_id=%s",
+                                    getattr(manager, "name", ""),
+                                    getattr(checkin, "id", None),
+                                    msg_id,
+                                )
+                    except Exception:
+                        logger.exception(
+                            "AGENDA_AUDIO_NORMALIZATION_STEP_FAILED manager=%s checkin_id=%s msg_id=%s",
+                            getattr(manager, "name", ""),
+                            getattr(checkin, "id", None),
+                            msg_id,
+                        )
 
                 prev = (pending.answer_text or "").strip()
                 cur = (text or "").strip()
