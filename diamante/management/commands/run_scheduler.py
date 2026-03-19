@@ -17,6 +17,14 @@ class Command(BaseCommand):
 
         scheduler = start()
 
+        if not scheduler:
+            self.stdout.write(
+                self.style.WARNING("Scheduler não iniciado (lock ativo ou erro na inicialização).")
+            )
+            return
+
+        self.stdout.write(self.style.SUCCESS("Scheduler iniciado com sucesso."))
+
         try:
             while True:
                 connection.close_if_unusable_or_obsolete()

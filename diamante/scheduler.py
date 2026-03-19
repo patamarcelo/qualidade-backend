@@ -8,8 +8,15 @@ from django.db import close_old_connections, connection
 
 import pytz
 
-from diamante.utils import finalizar_parcelas_encerradas, enviar_email_alerta_mungo_verde_por_regra
-from diamante.cron import enviar_email_estoque_farmbox_diario, enviar_email_diario
+from diamante.utils import (
+    finalizar_parcelas_encerradas,
+    enviar_email_alerta_mungo_verde_por_regra,
+)
+from diamante.cron import (
+    enviar_email_estoque_farmbox_diario,
+    enviar_email_diario,
+    update_farmbox_mongodb_app,
+)
 
 from opscheckin.cron import (
     run_opscheckin_agenda_0600,
@@ -70,7 +77,24 @@ def start():
             )
 
             # =====================================================================
-            # GRUPO B — E-MAILS / ALERTAS (Diamante)
+            # GRUPO B — FARMBOX / MONGODB
+            # Regra: rodar todos os dias, de hora em hora, das 05:00 às 19:00
+            # =====================================================================
+            scheduler.add_job(
+                _wrap_job(update_farmbox_mongodb_app),
+                "cron",
+                day_of_week="*",
+                hour="5-19",
+                minute="0",
+                id="update_farmbox_apps_hourly",
+                replace_existing=True,
+                misfire_grace_time=1800,
+                coalesce=True,
+                max_instances=1,
+            )
+
+            # =====================================================================
+            # GRUPO C — E-MAILS / ALERTAS (Diamante)
             # =====================================================================
             scheduler.add_job(
                 _wrap_job(enviar_email_diario),
@@ -112,7 +136,7 @@ def start():
             )
 
             # =====================================================================
-            # GRUPO C — OPSCHECKIN (WhatsApp) — AGENDA + REMINDERS (Templates)
+            # GRUPO D — OPSCHECKIN (WhatsApp) — AGENDA + REMINDERS
             # =====================================================================
             scheduler.add_job(
                 _wrap_job(run_opscheckin_agenda_0600),
@@ -154,7 +178,7 @@ def start():
             )
 
             # =====================================================================
-            # GRUPO D — OPSCHECKIN (WhatsApp) — FOLLOW-UP DO DIA
+            # GRUPO E — OPSCHECKIN (WhatsApp) — FOLLOW-UP DO DIA
             # =====================================================================
             scheduler.add_job(
                 _wrap_job(run_opscheckin_agenda_followups),
@@ -196,7 +220,7 @@ def start():
             )
 
             # =====================================================================
-            # GRUPO E — OPSCHECKIN (WhatsApp) — LEMBRETE REUNIÃO DIÁRIA
+            # GRUPO F — OPSCHECKIN (WhatsApp) — LEMBRETE REUNIÃO DIÁRIA
             # =====================================================================
             scheduler.add_job(
                 _wrap_job(run_opscheckin_daily_manager_event_tick),
@@ -215,9 +239,8 @@ def start():
             logger.info("Scheduler started successfully without DjangoJobStore.")
             return scheduler
 
-        else:
-            logger.info("DEBUG=True: scheduler não será iniciado localmente (rodará apenas no servidor).")
-            return None
+        logger.info("DEBUG=True: scheduler não será iniciado localmente (rodará apenas no servidor).")
+        return None
 
     except Exception as e:
         logger.error("Erro fatal ao iniciar o scheduler: %s", e, exc_info=True)
