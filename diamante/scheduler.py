@@ -257,7 +257,8 @@ def start():
             register_events(scheduler)
 
             scheduler.start()
-            logger.info("Scheduler started successfully with timezone=%s", settings.TIME_ZONE)
+            logger.info("Scheduler started successfully...")
+            return scheduler
 
         else:
             logger.info("DEBUG=True: scheduler não será iniciado localmente (rodará apenas no servidor).")
