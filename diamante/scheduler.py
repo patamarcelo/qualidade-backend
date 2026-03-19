@@ -1,4 +1,6 @@
 from apscheduler.schedulers.background import BackgroundScheduler
+from django_apscheduler.jobstores import DjangoJobStore, register_events
+from django_apscheduler.models import DjangoJobExecution
 
 import logging
 from datetime import datetime
@@ -37,6 +39,13 @@ def get_formatted_datetime():
     return now.strftime("%Y_%m_%d_%H_%M_%S")
 
 
+def delete_old_job_executions(max_age=604_800):
+    """
+    Apaga logs antigos de execuções do APScheduler (default: 7 dias).
+    """
+    DjangoJobExecution.objects.delete_old_job_executions(max_age)
+
+
 def _wrap_job(fn):
     def wrapped(*args, **kwargs):
         close_old_connections()
@@ -58,6 +67,8 @@ def start():
         scheduler = BackgroundScheduler(timezone=fuso_horario)
 
         if settings.DEBUG is False:
+            scheduler.add_jobstore(DjangoJobStore(), "default")
+
             logger.info("Agendando jobs no servidor… timezone=%s", settings.TIME_ZONE)
 
             # =====================================================================
@@ -235,8 +246,26 @@ def start():
                 max_instances=1,
             )
 
+            # =====================================================================
+            # GRUPO G — MANUTENÇÃO APSCHEDULER
+            # =====================================================================
+            scheduler.add_job(
+                _wrap_job(delete_old_job_executions),
+                "cron",
+                day_of_week="*",
+                hour="4",
+                minute="10",
+                id="apscheduler_cleanup_old_executions",
+                replace_existing=True,
+                misfire_grace_time=3600,
+                coalesce=True,
+                max_instances=1,
+            )
+
+            register_events(scheduler)
+
             scheduler.start()
-            logger.info("Scheduler started successfully without DjangoJobStore.")
+            logger.info("Scheduler started successfully with DjangoJobStore.")
             return scheduler
 
         logger.info("DEBUG=True: scheduler não será iniciado localmente (rodará apenas no servidor).")
