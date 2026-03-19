@@ -101,7 +101,7 @@ def start():
     _prepare_db_for_job()
 
     try:
-        has_lock = acquire_scheduler_lock()
+        has_lock = acquire_scheduler_lock(lock_id=777002)
     except Exception as e:
         logger.error("Erro ao adquirir advisory lock do scheduler: %s", e, exc_info=True)
         return {"ok": False, "reason": "lock_error", "error": str(e)}
