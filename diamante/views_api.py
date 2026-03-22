@@ -181,8 +181,6 @@ from django.db import close_old_connections, connection
 from django.db.utils import OperationalError
 
 
-
-
 # Get a named logger
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -5161,6 +5159,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["GET"])
     def get_map_plot_app_fetch_app(self, request, *args, **kwargs):
+        cond_1 = Q(safra__safra="2025/2026", ciclo__ciclo__in=["2", "3"])
+        cond_2 = Q(safra__safra="2026/2027", ciclo__ciclo="1")
         try:
             print('Start to get Data to plot MAP on APP ')
             query_data = (
@@ -5195,7 +5195,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "finalizado_colheita",
                     "finalizado_plantio"
                 )
-                .filter(safra__safra="2025/2026", ciclo__ciclo__in=["2", "3"])
+                .filter(cond_1 | cond_2)
             )
             response = {
                 "msg": f"Aplicação Aberta com sucesso!!!!",
