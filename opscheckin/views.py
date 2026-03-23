@@ -94,9 +94,8 @@ def _build_agenda_bulk_header(action: str, changed: list[str], already: list[int
         elif action == "remove":
             lines.append(f"🗑️ {len(changed)} item(ns) removido(s):")
 
-        lines.extend(changed[:12])
-        if len(changed) > 12:
-            lines.append("...")
+        # 🔥 REMOVIDO LIMITADOR
+        lines.extend(changed)
 
     if already:
         lines.append("")
@@ -112,7 +111,6 @@ def _build_agenda_bulk_header(action: str, changed: list[str], already: list[int
         lines.append("Não encontrados: " + ", ".join(str(x) for x in not_found))
 
     return "\n".join(x for x in lines if x is not None).strip()
-
 
 def _parse_agenda_selection_input(raw_value: str):
     """
@@ -507,9 +505,7 @@ def _handle_agenda_pending_action_text(manager, checkin, text, now):
         return True
 
     if len(matches) > 1:
-        preview = "\n".join([f"{it.idx}) {it.text}" for it in matches[:8]])
-        if len(matches) > 8:
-            preview += "\n..."
+        preview = "\n".join([f"{it.idx}) {it.text}" for it in matches])
         send_text(
             manager.phone_e164,
             "Encontrei mais de um item com esse texto:\n"
@@ -1177,14 +1173,12 @@ def _handle_confirm_action(*, manager, checkin, reply_id: str, now) -> bool:
 
         it.delete()
 
-        items = list(AgendaItem.objects.filter(checkin=checkin).order_by("idx")[:20])
+        items = list(AgendaItem.objects.filter(checkin=checkin).order_by("idx"))
         if not items:
             send_text(manager.phone_e164, "Agenda ficou vazia. Se quiser, envie + texto para adicionar itens.")
             return True
 
-        preview_lines = [f"{x.idx}) {x.text}" for x in items[:12]]
-        if len(items) > 12:
-            preview_lines.append("…")
+        preview_lines = [f"{x.idx}) {x.text}" for x in items]
         preview = "\n".join(preview_lines)
 
         body = (
