@@ -133,7 +133,7 @@ def build_director_agenda_summary_blocks(*, day, managers):
             lines.append("• Sem agenda enviada")
 
         block = "\n".join(lines).strip()
-        blocks.append(_truncate_block(block))
+        blocks.append(block)
 
     return blocks
 
@@ -168,7 +168,7 @@ def build_director_agenda_summary_overview(*, day, managers):
     if total_skip:
         lines.append(f"• Itens pulados: {total_skip}")
 
-    return _truncate_block("\n".join(lines).strip())
+    return "\n".join(lines).strip()
 
 
 def build_director_agenda_summary(*, day, managers):
