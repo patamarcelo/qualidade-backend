@@ -5913,6 +5913,123 @@ class DefensivoViewSet(viewsets.ModelViewSet):
         print(f"4. parsed_data final: {parsed_data}")
         print("=======================================================\n")
 
+        # =========================================================
+        # NOVO: montagem / print / envio para Farmbox input_values
+        # =========================================================
+        SEND_TO_FARMBOX_INPUT_VALUES = False
+
+        farmbox_input_values_url = "https://farmbox.cc/api/v1/input_values"
+        farmbox_input_values_payloads = []
+        farmbox_input_values_sent = []
+        farmbox_input_values_errors = []
+
+        for item in itens_enriched:
+            try:
+                sucesso_item = bool(item.get("sucesso"))
+                if not sucesso_item:
+                    continue
+
+                input_id = item.get("input_id")
+                storage_id = item.get("storage_id")
+                nf_valor = item.get("nf_valor")
+
+                if input_id in [None, ""] or nf_valor in [None, ""]:
+                    farmbox_input_values_errors.append(
+                        {
+                            "item_index": item.get("item_index"),
+                            "produto": item.get("produto"),
+                            "motivo": "input_id ou nf_valor ausente",
+                            "input_id": input_id,
+                            "storage_id": storage_id,
+                            "nf_valor": nf_valor,
+                        }
+                    )
+                    continue
+
+                # TODO:
+                # Buscar farm_id e harvest_id reais a partir do storage_id
+                # Exemplo:
+                # farm_id, harvest_id = resolve_farm_and_harvest_by_storage(storage_id)
+
+                farm_id = None
+                harvest_id = None
+
+                farmbox_payload = {
+                    "input_id": str(input_id),
+                    "farm_id": str(farm_id) if farm_id is not None else None,
+                    "harvest_id": str(harvest_id) if harvest_id is not None else None,
+                    "value": str(nf_valor),
+                }
+
+                farmbox_input_values_payloads.append(
+                    {
+                        "item_index": item.get("item_index"),
+                        "produto": item.get("produto"),
+                        "produto_desc": item.get("produto_desc"),
+                        "storage_id": storage_id,
+                        "payload": farmbox_payload,
+                    }
+                )
+
+                print("\n================ FARMBOX INPUT_VALUES ================")
+                print(f"ITEM INDEX: {item.get('item_index')}")
+                print(f"PRODUTO: {item.get('produto')} - {item.get('produto_desc')}")
+                print(f"STORAGE ID: {storage_id}")
+                print("PAYLOAD A ENVIAR:")
+                print(json.dumps(farmbox_payload, indent=2, ensure_ascii=False))
+                print("======================================================\n")
+
+                if not farmbox_payload.get("farm_id") or not farmbox_payload.get("harvest_id"):
+                    farmbox_input_values_errors.append(
+                        {
+                            "item_index": item.get("item_index"),
+                            "produto": item.get("produto"),
+                            "motivo": "farm_id/harvest_id ainda não resolvidos",
+                            "storage_id": storage_id,
+                            "payload": farmbox_payload,
+                        }
+                    )
+                    continue
+
+                if SEND_TO_FARMBOX_INPUT_VALUES:
+                    response_farmbox = requests.post(
+                        farmbox_input_values_url,
+                        data=farmbox_payload,
+                        headers={
+                            "Authorization": settings.FARMBOX_ID,
+                        },
+                        timeout=60,
+                    )
+
+                    farmbox_input_values_sent.append(
+                        {
+                            "item_index": item.get("item_index"),
+                            "produto": item.get("produto"),
+                            "status_code": response_farmbox.status_code,
+                            "response_text": response_farmbox.text,
+                            "payload": farmbox_payload,
+                        }
+                    )
+
+                    print("\n================ RESPONSE FARMBOX INPUT_VALUES =======")
+                    print(f"ITEM INDEX: {item.get('item_index')}")
+                    print(f"STATUS: {response_farmbox.status_code}")
+                    print(f"BODY: {response_farmbox.text}")
+                    print("======================================================\n")
+
+            except Exception as e:
+                farmbox_input_values_errors.append(
+                    {
+                        "item_index": item.get("item_index"),
+                        "produto": item.get("produto"),
+                        "motivo": str(e),
+                    }
+                )
+                logger.exception(
+                    "Erro ao montar/enviar input_values para o Farmbox. item_index=%s",
+                    item.get("item_index"),
+                )
+
         email_sent = False
         email_error = ""
         gmail_result = None
@@ -5978,11 +6095,18 @@ class DefensivoViewSet(viewsets.ModelViewSet):
                 "sucesso_count": sucesso_count,
                 "erro_count": erro_count,
                 "total_quantidade": total_quantidade,
+                "farmbox_input_values_send_enabled": SEND_TO_FARMBOX_INPUT_VALUES,
+                "farmbox_input_values_url": farmbox_input_values_url,
+                "farmbox_input_values_payloads_count": len(farmbox_input_values_payloads),
+                "farmbox_input_values_sent_count": len(farmbox_input_values_sent),
+                "farmbox_input_values_errors_count": len(farmbox_input_values_errors),
+                "farmbox_input_values_payloads": farmbox_input_values_payloads,
+                "farmbox_input_values_sent": farmbox_input_values_sent,
+                "farmbox_input_values_errors": farmbox_input_values_errors,
                 "payload": payload_enriched,
             },
             status=status.HTTP_200_OK,
         )
-        
         
     def processar_em_background(self, task_id):
         # ✅ threads precisam disso (evita usar conexão herdada do request)
