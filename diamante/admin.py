@@ -1204,21 +1204,49 @@ class GerarKMLForm(AdminActionForm):
 
 @admin.register(Plantio)
 class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
-    actions = [export_plantio, area_aferida, abrir_aplicacao_farmbox, gerar_formulario_plantio, 'update_data_prevista_plantio', 'gerar_kml_aviacao', 'zerar_plantio_para_replantio']
+    actions = [
+        export_plantio,
+        area_aferida,
+        abrir_aplicacao_farmbox,
+        gerar_formulario_plantio,
+        'update_data_prevista_plantio',
+        'gerar_kml_aviacao',
+        'zerar_plantio_para_replantio'
+    ]
     show_full_result_count = False
     autocomplete_fields = ["talhao", "programa", "variedade"]
     action_form = GerarKMLForm
 
+    TOTAL_C_2_CACHE_KEY = "admin_plantio_total_c_2"
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.total_c_2 = [
-            x
-            for x in Colheita.objects.values_list(
-                "plantio__id", "peso_scs_limpo_e_seco", "data_colheita"
+    def get_total_c_2(self, force_refresh=False):
+        """
+        Carrega as colheitas de forma lazy e com cache.
+        Evita query no startup do Django admin.
+        """
+        if force_refresh:
+            cache.delete(self.TOTAL_C_2_CACHE_KEY)
+
+        data = cache.get(self.TOTAL_C_2_CACHE_KEY)
+        if data is None:
+            data = list(
+                Colheita.objects.values_list(
+                    "plantio__id",
+                    "peso_scs_limpo_e_seco",
+                    "data_colheita"
+                )
             )
-        ]
-    
+            cache.set(self.TOTAL_C_2_CACHE_KEY, data, 60)
+        return data
+
+    @property
+    def total_c_2(self):
+        """
+        Mantém compatibilidade com todo o código legado
+        que usa modeladmin.total_c_2.
+        """
+        return self.get_total_c_2()
+
     class Media:
         css = {
             "all": ("admin/css/plantio_changelist.css",)
@@ -1233,56 +1261,49 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
                 self.admin_site.admin_view(self.view_cronograma_programa),
                 name='view_cronograma_programa',
             ),
-            path('update-data-prevista/', self.admin_site.admin_view(self.update_data_prevista_view), name='update_data_prevista'),
+            path(
+                'update-data-prevista/',
+                self.admin_site.admin_view(self.update_data_prevista_view),
+                name='update_data_prevista'
+            ),
         ]
         return custom_urls + urls
-    
-    
+
     @admin.action(description="Zerar Para Replantio (com confirmação)")
     def zerar_plantio_para_replantio(self, request, queryset):
         """
         Passo 1: Mostrar confirmação
         Passo 2: Se confirmado, aplicar as mudanças e redirecionar de volta
         """
-        # Se o usuário ainda não confirmou, mostra a página de confirmação
         if "confirm" not in request.POST:
-            # IDs selecionados (se não for 'select all across')
             selected = request.POST.getlist(helpers.ACTION_CHECKBOX_NAME)
-            
-            
-            # pega o contexto padrão do Admin (site_title, site_header, user, etc.)
+
             base_ctx = self.admin_site.each_context(request)
-            
-            
-            # alguns temas (ex.: adminlte3) esperam available_apps SEMPRE
             base_ctx["available_apps"] = self.admin_site.get_app_list(request)
-            
+
             context = {
                 **base_ctx,
                 "title": "Confirmar: Zerar para Replantio",
-                "queryset": queryset,  # para listar os itens na página
+                "queryset": queryset,
                 "opts": self.model._meta,
                 "action_checkbox_name": helpers.ACTION_CHECKBOX_NAME,
                 "selected": selected,
                 "select_across": request.POST.get("select_across") == "1",
-                "action": "zerar_plantio_para_replantio",   # nome da action
+                "action": "zerar_plantio_para_replantio",
                 "index": request.POST.get("index", "0"),
             }
             return TemplateResponse(
                 request,
-                "admin/plantio/confirm_zerar_replantio.html",  # veja template abaixo
+                "admin/plantio/confirm_zerar_replantio.html",
                 context,
             )
 
-        # --- A partir daqui é a confirmação (POST com confirm=yes) ---
         try:
             select_across = request.POST.get("select_across") == "1"
             selected_ids = request.POST.getlist(helpers.ACTION_CHECKBOX_NAME)
 
-            # Quando 'select across' (selecionar tudo), usamos o queryset sob os filtros atuais.
-            # Caso contrário, filtramos pelos IDs que vieram do formulário.
             if select_across:
-                qs = queryset  # já vem com os filtros atuais do changelist
+                qs = queryset
             else:
                 qs = self.model.objects.filter(pk__in=selected_ids)
 
@@ -1291,7 +1312,6 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
                 self.message_user(request, "Nada selecionado.", level=messages.WARNING)
                 return HttpResponseRedirect(request.get_full_path())
 
-            # Campos fixos/nulos
             FIELDS_TO_RESET = dict(
                 inicializado_plantio=False,
                 finalizado_plantio=False,
@@ -1309,24 +1329,21 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
             )
 
             with transaction.atomic():
-                # 1) Desativar todos os extratos ligados aos plantios
                 desativados = (
                     PlantioExtratoArea.objects
                     .filter(plantio_id__in=pks, ativo=True)
                     .update(ativo=False)
                 )
 
-                # 2) Zerar/ajustar campos dos plantios
                 atualizados = (
                     Plantio.objects
                     .filter(pk__in=pks)
                     .update(
                         **FIELDS_TO_RESET,
-                        area_colheita=F("area_planejamento_plantio")  # <= igualar
+                        area_colheita=F("area_planejamento_plantio")
                     )
                 )
 
-                # 3) Limpar todo o cache
                 cache.clear()
 
             self.message_user(
@@ -1339,13 +1356,12 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         except Exception as e:
             self.message_user(request, f"Erro ao zerar para replantio: {e}", level=messages.ERROR)
             return HttpResponseRedirect(request.get_full_path())
-        
+
     @admin.action(description="Gerar KML")
     def gerar_kml_aviacao(self, request, queryset):
         try:
             should_use_color = bool(request.POST.get("should_use_color"))
 
-            # Valores mínimos necessários p/ KML (idêntico ao usado na API)
             values_qs = queryset.values(
                 "map_geo_points",
                 "talhao__id_talhao",
@@ -1365,11 +1381,10 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
 
         except Exception as e:
             self.message_user(request, f"Erro ao gerar KML: {e}", level=messages.ERROR)
-    
+
     def update_data_prevista_plantio(self, request, queryset):
         selected = queryset.values_list('pk', flat=True)
         url = reverse('admin:update_data_prevista')
-        # URL atual do changelist (sem path extra)
         current_url = request.get_full_path()
         query = urlencode({
             'ids': ','.join(str(pk) for pk in selected),
@@ -1377,9 +1392,8 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         })
         return redirect(f"{url}?{query}")
     update_data_prevista_plantio.short_description = "Atualizar Dados em Lote"
-    
+
     def _enqueue_farmbox_call(self, id_farmbox, data_str, variedade_id, cultura_id):
-        # dispara em uma thread daemon, sem bloquear a request
         t = Thread(
             target=self._safe_update_farmbox_data,
             args=(id_farmbox, data_str, variedade_id, cultura_id),
@@ -1399,59 +1413,54 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         ids = request.GET.get('ids', '')
         pks = ids.split(',')
         queryset = self.model.objects.filter(pk__in=pks).select_related(
-                'programa',
-                'variedade',
-                'talhao',
-                'talhao__fazenda',
-            ).only(
-                'programa__nome',
-                'variedade__variedade',
-                'talhao__id_talhao',
-                'talhao__fazenda__nome',
-                'safra',
-                'ciclo',
-                'area_colheita',
-                'data_prevista_plantio'
-            )
+            'programa',
+            'variedade',
+            'talhao',
+            'talhao__fazenda',
+        ).only(
+            'programa__nome',
+            'variedade__variedade',
+            'talhao__id_talhao',
+            'talhao__fazenda__nome',
+            'safra',
+            'ciclo',
+            'area_colheita',
+            'data_prevista_plantio'
+        )
         total_area = queryset.aggregate(total_area_colheita=Sum('area_colheita'))['total_area_colheita']
 
         if request.method == 'POST':
             form = UpdateDataPrevistaPlantioForm(request.POST)
             if not form.is_valid():
-                print("FORM ERRORS:", form.errors)  # ← vai aparecer no terminal
+                print("FORM ERRORS:", form.errors)
             if form.is_valid():
                 nova_data = form.cleaned_data.get('data_prevista_plantio')
-                novo_programa = form.cleaned_data.get('programa')     # objeto ou None
-                nova_variedade = form.cleaned_data.get('variedade')   # objeto ou None
+                novo_programa = form.cleaned_data.get('programa')
+                nova_variedade = form.cleaned_data.get('variedade')
 
                 clear_prog = form.cleaned_data.get('_clear_programa')
-                sent_prog  = form.cleaned_data.get('_sent_programa')   # usuário escolheu algo no select?
+                sent_prog = form.cleaned_data.get('_sent_programa')
 
-                clear_var  = form.cleaned_data.get('_clear_variedade')
-                sent_var   = form.cleaned_data.get('_sent_variedade')
-    
+                clear_var = form.cleaned_data.get('_clear_variedade')
+                sent_var = form.cleaned_data.get('_sent_variedade')
+
                 should_update_on_farm = form.cleaned_data.get('should_update_on_farm')
 
-                # print('formCleanedDAta: ', form.cleaned_data)
                 updated_count = 0
 
                 for instance in queryset:
-                    print('id Farm: ', instance.id_farmbox) 
-                    # Atualiza somente se houver valor
-                    
-                    # Guarda o programa original para comparar depois
+                    print('id Farm: ', instance.id_farmbox)
+
                     old_programa = instance.programa
 
-                    
                     if nova_data:
-                        print('nova Data: ', nova_data ) 
+                        print('nova Data: ', nova_data)
                         instance.data_prevista_plantio = nova_data
-                    
-                    # PROGRAMa
-                    if clear_prog:                      # escolheu "⛔ Limpar Programa"
+
+                    if clear_prog:
                         instance.programa = None
                         instance.cronograma_programa = None
-                    elif sent_prog and novo_programa:   # escolheu algum programa válido
+                    elif sent_prog and novo_programa:
                         if old_programa != novo_programa:
                             print(
                                 'Programa alterado: ',
@@ -1459,19 +1468,22 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
                                 'depois =', novo_programa.id
                             )
                             instance.programa = novo_programa
-                            instance.cronograma_programa = None  # força regenerar no save()
-                    
+                            instance.cronograma_programa = None
+
                     if clear_var:
                         instance.variedade = None
                     elif sent_var and nova_variedade:
-                        print('id Farm: ', instance.id_farmbox, 'planned_variety_id', nova_variedade.id_farmbox, 'planned_culture_id', nova_variedade.cultura.id_farmbox ) 
+                        print(
+                            'id Farm: ', instance.id_farmbox,
+                            'planned_variety_id', nova_variedade.id_farmbox,
+                            'planned_culture_id', nova_variedade.cultura.id_farmbox
+                        )
                         instance.variedade = nova_variedade
-                    
+
                     instance.save()
                     updated_count += 1
-                    
+
                     if should_update_on_farm:
-                        # agenda a chamada só após o commit da transação
                         transaction.on_commit(lambda i=instance: self._enqueue_farmbox_call(
                             i.id_farmbox,
                             str(i.data_prevista_plantio) if i.data_prevista_plantio else None,
@@ -1494,50 +1506,6 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         )
         return render(request, 'admin/update_data_prevista.html', context)
 
-    # def view_cronograma_programa(self, request, queryset):
-    #     if queryset.count() != 1:
-    #         self.message_user(request, "Selecione apenas um item.", level='error')
-    #         return
-
-    #     plantio = queryset.first()
-    #     cronograma_raw = plantio.cronograma_programa or []
-    #     cultura_nome = plantio.variedade.cultura.cultura
-    #     variedade_nome = plantio.variedade.variedade
-    #     referer = request.META.get("HTTP_REFERER", "/admin/")  # fallback pro admin
-
-
-    #     # Transformar e ordenar cronograma
-    #     cronograma = []
-
-    #     for etapa in cronograma_raw:
-    #         # Renomear chave
-    #         etapa["data_prevista"] = etapa.pop("data prevista", None)
-
-    #         # Calcular quantidade_aplicar = dose * área_colheita
-    #         for p in etapa.get("produtos", []):
-    #             p["quantidade_aplicar"] = ""
-    #             try:
-    #                 dose = float(p.get("dose", 0))
-    #                 p["quantidade_aplicar"] = round(float(plantio.area_colheita) * dose, 3)
-    #             except Exception:
-    #                 pass  # Se dose ou area forem inválidos
-
-    #         cronograma.append(etapa)
-
-    #     # Ordenar por DAP (colocando -9999 se não tiver dap)
-    #     cronograma.sort(key=lambda x: x.get("dap", -9999))
-
-    #     context = dict(
-    #         **self.admin_site.each_context(request),
-    #         object=plantio,
-    #         cultura_nome=cultura_nome,
-    #         variedade_nome=variedade_nome,
-    #         cronograma=cronograma,
-    #         title=f"{plantio.talhao}",
-    #         voltar_url=referer
-    #     )
-
-    #     return render(request, "admin/view_cronograma.html", context)
     def view_cronograma_programa(self, request, obj_id):
         plantio = get_object_or_404(Plantio, id=obj_id)
         cronograma_raw = plantio.cronograma_programa or []
@@ -1570,14 +1538,15 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         )
         return render(request, "admin/view_cronograma.html", context)
 
-    # @confirm_action
     @admin.action(description="Colher o Plantio")
     def finalize_plantio(self, request, queryset):
         queryset.update(finalizado_colheita=True)
+        cargas = self.total_c_2
+
         for obj in queryset:
             print("colheita finalizada")
-            # GET CLOSED DATE
-            filtered_list = [x[2] for x in self.total_c_2 if obj.id == x[0]]
+
+            filtered_list = [x[2] for x in cargas if obj.id == x[0]]
             sorted_list = sorted(filtered_list)
             closed_date = None
             if len(sorted_list) > 0:
@@ -1586,9 +1555,8 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
                 today = str(datetime.now()).split(" ")[0].strip()
                 closed_date = today
 
-            # GET PROD NUMBER
             total_filt_list = sum(
-                [(x[1] * 60) for x in self.total_c_2 if obj.id == x[0]]
+                [(x[1] * 60) for x in cargas if obj.id == x[0]]
             )
             prod_scs = None
             value = None
@@ -1613,7 +1581,12 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
                 resp_code = response.status_code
                 if int(resp_code) < 300:
                     print('resp obj: , ', resp_obj)
-                    str_resp = f'Alterado no FARMBOX - {resp_obj["farm_name"]} - {resp_obj["name"]} - {resp_obj["harvest_name"]}-{resp_obj["cycle"]} - Produtividade: {resp_obj["productivity"]} - Variedade: {resp_obj["variety_name"]} - Area: {resp_obj["area"]}'
+                    str_resp = (
+                        f'Alterado no FARMBOX - {resp_obj["farm_name"]} - {resp_obj["name"]} - '
+                        f'{resp_obj["harvest_name"]}-{resp_obj["cycle"]} - Produtividade: '
+                        f'{resp_obj["productivity"]} - Variedade: {resp_obj["variety_name"]} - '
+                        f'Area: {resp_obj["area"]}'
+                    )
                     messages.add_message(request, messages.INFO, str_resp)
                 if int(resp_code) > 400 and int(resp_code) < 500:
                     print('resp obj: , ', resp_obj)
@@ -1634,41 +1607,15 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         },
     )
     def atualizar_colheita(self, request):
+        cache.delete(self.TOTAL_C_2_CACHE_KEY)
         self.message_user(request, "Dados da Colheita Atualizado")
-        self.total_c_2 = [
-            x
-            for x in Colheita.objects.values_list(
-                "plantio__id", "peso_scs_limpo_e_seco", "data_colheita"
-            )
-        ]
         print("dados atualizados com sucesso!!")
         return HttpResponseRedirectToReferrer(request)
 
     def get_ordering(self, request):
         return ["data_plantio"]
 
-    # def get_queryset(self, request):
-    #     print(connection.settings_dict)
-    #     return (
-    #         super(PlantioAdmin, self)
-    #         .get_queryset(request)
-    #         .select_related(
-    #             "talhao",
-    #             "safra",
-    #             "ciclo",
-    #             "talhao__fazenda",
-    #             "talhao__fazenda__fazenda",
-    #             "variedade",
-    #             "variedade__cultura",
-    #             "programa"
-    #         )
-    #         .prefetch_related(
-    #             "programa__variedade"
-    #         )
-    #     )
     def get_queryset(self, request):
-        # print(connection.settings_dict)
-
         qs = (
             super(PlantioAdmin, self)
             .get_queryset(request)
@@ -1685,8 +1632,6 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
             .prefetch_related("programa__variedade")
         )
 
-        # Usa a primeira data não nula entre data_plantio e data_prevista_plantio.
-        # Quem não tem nenhuma delas vai pro fim e, nesses casos, ordena por talhao__id_talhao.
         qs = qs.annotate(
             sort_date=Coalesce("data_plantio", "data_prevista_plantio"),
             is_null_both=Case(
@@ -1698,35 +1643,29 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
                 output_field=IntegerField(),
             ),
         ).order_by(
-            "is_null_both",      # Primeiro quem tem alguma data (0), depois quem não tem (1)
-            "sort_date",         # data_plantio; se nula, data_prevista_plantio
-            "talhao__id_talhao", # para os sem data, ordena pelo ID do talhão
+            "is_null_both",
+            "sort_date",
+            "talhao__id_talhao",
         )
 
         return qs
 
     def get_search_results(self, request, queryset, search_term):
-        # tenta pegar ciclo "Colheita", mas não quebra se não existir
         ciclo_filter = CicloAtual.objects.filter(nome="Colheita").first()
 
-        # --- tratamento do operador "!" no search ---
         negate = False
         term = search_term
 
         if search_term and search_term.startswith("!"):
             negate = True
-            term = search_term[1:].strip()  # tira o "!" e espaços
+            term = search_term[1:].strip()
 
-        # se for busca normal, deixa o Django fazer o trabalho
         if not negate:
             queryset, use_distinct = super().get_search_results(
                 request, queryset, term
             )
         else:
-            # se for "!termo", começamos do queryset original (sem filtro por texto)
-            use_distinct = False  # em geral não precisa de distinct aqui
-
-        # --- filtros especiais para autocomplete/model_name ---
+            use_distinct = False
 
         print("resquest_Path", request.path)
         model_request = request.GET.get("model_name")
@@ -1741,7 +1680,6 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
                 programa__isnull=False,
             )
 
-            # aplica a lógica do "!" também aqui, se estiver usando
             if negate and term:
                 q = Q()
                 for field in self.search_fields:
@@ -1761,7 +1699,6 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
                 plantio_descontinuado=False,
             )
 
-            # aplica a lógica do "!" também no autocomplete, se quiser
             if negate and term:
                 q = Q()
                 for field in self.search_fields:
@@ -1773,10 +1710,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
 
             return queryset, use_distinct
 
-        # --- caso padrão: changelist normal do admin ---
-
         if negate and term:
-            # monta um Q com OR em todos os search_fields
             q = Q()
             for field in self.search_fields:
                 q |= Q(**{f"{field}__icontains": term})
@@ -1790,6 +1724,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
             "widget": JSONEditorWidget(width="200%", height="100vh", mode="tree")
         },
     }
+
     search_fields = [
         "safra__safra",
         "talhao__id_unico",
@@ -1805,14 +1740,15 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         "programa__nome",
         "id_farmbox",
     ]
+
     raw_id_fields = ["talhao"]
+
     list_filter = (
         "safra__safra",
         "ciclo__ciclo",
         "variedade__cultura",
         ColheitaFilter,
         ColheitaFilterNoProgram,
-        # VariedadeInProgramaFilter,
         "inicializado_plantio",
         "finalizado_plantio",
         "finalizado_colheita",
@@ -1820,13 +1756,12 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         "talhao__fazenda__fazenda",
         "programa__nome",
         "talhao__modulo",
-        # "talhao__fazenda__nome",
         "variedade",
         "modificado",
         "area_aferida",
         "acompanhamento_medias"
-        # "area_parcial",
     )
+
     list_display = (
         "talhao",
         "cronograma_link",
@@ -1843,9 +1778,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         "get_data_prev_col",
         "get_data_prev_col_real",
         "get_description_finalizado_colheita",
-        # "get_area_parcial",
         "get_total_colheita_cargas_kg",
-        # "talhao",
         "get_total_prod",
         "get_data_primeira_carga",
         "get_data_ultima_carga",
@@ -1856,23 +1789,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         "area_parcial",
         "acompanhamento_medias",
         "id_farmbox",
-        # "check_var_on_programa_list"
-        # "detail",
     )
-
-    # def get_urls(self):
-    #     return [
-    #         path(
-    #             "<pk>/detail",
-    #             self.admin_site.admin_view(PlantioDetailView.as_view()),
-    #             name=f"products_order_detail",
-    #         ),
-    #         *super().get_urls(),
-    #     ]
-
-    # def detail(self, obj: Plantio) -> str:
-    #     url = reverse("admin:products_order_detail", args=[obj.pk])
-    #     return format_html(f'<a href="{url}">📝</a>')
 
     fieldsets = (
         (
@@ -1924,6 +1841,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         ("Display Map", {"fields": ("map_centro_id", "map_geo_points")}),
         ("Cronograma Previsto", {"fields": ("get_cronograma_programa",)}),
     )
+
     readonly_fields = (
         "get_cronograma_programa",
         "criados",
@@ -1939,28 +1857,29 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
     def cronograma_link(self, obj):
         url = reverse('admin:view_cronograma_programa', args=[obj.id])
         return format_html(
-            '<a href="{}" title="Ver Cronograma">'
-            '🗓️'
-            '</a>',
+            '<a href="{}" title="Ver Cronograma">🗓️</a>',
             url
         )
-    
+
     def save_model(self, request, obj, form, change):
         print(obj)
         print(self)
         print("form Plantio")
         print("Valor Atual: ")
+
+        cargas = self.total_c_2
+
         if form.initial:
             if form.initial["data_plantio"] != obj.data_plantio:
                 obj.cronograma_programa = None
+
             if (
                 form.initial["finalizado_colheita"] == False
                 and form.instance.finalizado_colheita == True
             ):
                 print("Colheita Finalizada")
 
-                # GET CLOSED DATE
-                filtered_list = [x[2] for x in self.total_c_2 if obj.id == x[0]]
+                filtered_list = [x[2] for x in cargas if obj.id == x[0]]
                 sorted_list = sorted(filtered_list)
                 closed_date = None
                 if len(sorted_list) > 0:
@@ -1969,9 +1888,8 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
                     today = str(datetime.now()).split(" ")[0].strip()
                     closed_date = today
 
-                # GET PROD NUMBER
                 total_filt_list = sum(
-                    [(x[1] * 60) for x in self.total_c_2 if obj.id == x[0]]
+                    [(x[1] * 60) for x in cargas if obj.id == x[0]]
                 )
                 prod_scs = None
                 value = None
@@ -1996,7 +1914,12 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
                     resp_code = response.status_code
                     if int(resp_code) < 300:
                         print('resp obj: , ', resp_obj)
-                        str_resp = f'Alterado no FARMBOX - {resp_obj["farm_name"]} - {resp_obj["name"]} - {resp_obj["harvest_name"]}-{resp_obj["cycle"]} - Produtividade: {resp_obj["productivity"]} - Variedade: {resp_obj["variety_name"]} - Area: {resp_obj["area"]}'
+                        str_resp = (
+                            f'Alterado no FARMBOX - {resp_obj["farm_name"]} - {resp_obj["name"]} - '
+                            f'{resp_obj["harvest_name"]}-{resp_obj["cycle"]} - Produtividade: '
+                            f'{resp_obj["productivity"]} - Variedade: {resp_obj["variety_name"]} - '
+                            f'Area: {resp_obj["area"]}'
+                        )
                         messages.add_message(request, messages.INFO, str_resp)
                     if int(resp_code) > 400 and int(resp_code) < 500:
                         print('resp obj: , ', resp_obj)
@@ -2009,12 +1932,11 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
                         messages.ERROR,
                         f"Erro ao salvar os dados no Farmbox: {e}",
                     )
+
             if form.initial['plantio_descontinuado'] == False and form.instance.plantio_descontinuado == True:
                 print('valor foi alterado para descontinuado')
                 PlantioExtratoArea.objects.filter(plantio=obj.pk).update(ativo=False)
-                # objs_to_update = PlantioExtratoArea.objects.filter(plantio=obj.pk)
-                # for i in objs_to_update:
-                #     print('objeto a ser atualizado: ', i)
+
         form.save()
 
     def get_readonly_fields(self, request, obj=None):
@@ -2033,12 +1955,11 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
             return " - "
         else:
             return obj.area_parcial
-
     get_area_parcial.short_description = "Area  Parcial"
 
-    # DATA PRIMEIRA CARGA CARREGADA
     def get_data_primeira_carga(self, obj):
-        filtered_list = [x[2] for x in self.total_c_2 if obj.id == x[0]]
+        cargas = self.total_c_2
+        filtered_list = [x[2] for x in cargas if obj.id == x[0]]
         sorted_list = sorted(filtered_list)
         if len(sorted_list) > 0:
             return date_format(
@@ -2046,12 +1967,11 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
             )
         else:
             return "-"
-
     get_data_primeira_carga.short_description = "1ª Carga"
 
-    # DATA ÚLTIMA CARGA CARREGADA
     def get_data_ultima_carga(self, obj):
-        filtered_list = [x[2] for x in self.total_c_2 if obj.id == x[0]]
+        cargas = self.total_c_2
+        filtered_list = [x[2] for x in cargas if obj.id == x[0]]
         sorted_list = sorted(filtered_list)
         if len(sorted_list) > 0:
             return date_format(
@@ -2059,27 +1979,24 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
             )
         else:
             return "-"
-
     get_data_ultima_carga.short_description = "últ. Carga"
 
-    # TOTAL DE CARGAS CARREGADAS PARA O PLANTIO
     def get_total_colheita_cargas(self, obj):
-        filtered_list = [x[1] for x in self.total_c_2 if obj.id == x[0]]
+        cargas = self.total_c_2
+        filtered_list = [x[1] for x in cargas if obj.id == x[0]]
         return len(filtered_list)
-
     get_total_colheita_cargas.short_description = "Cargas"
 
-    # TOTAL DE CARGAS CARREGADAS PARA O PLANTIO E KG
     def get_total_colheita_cargas_kg(self, obj):
-        filtered_list = [(x[1] * 60) for x in self.total_c_2 if obj.id == x[0]]
+        cargas = self.total_c_2
+        filtered_list = [(x[1] * 60) for x in cargas if obj.id == x[0]]
         peso_total = sum(filtered_list) if sum(filtered_list) > 0 else " - "
         return peso_total
-
     get_total_colheita_cargas_kg.short_description = "Peso Carr."
 
-    # PRODUTIVIDADE TOTAL DO PLANTIO
     def get_total_prod(self, obj):
-        total_filt_list = sum([(x[1] * 60) for x in self.total_c_2 if obj.id == x[0]])
+        cargas = self.total_c_2
+        total_filt_list = sum([(x[1] * 60) for x in cargas if obj.id == x[0]])
         prod_scs = None
         if obj.finalizado_colheita:
             try:
@@ -2100,12 +2017,10 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
             return 0
         else:
             return " - "
-
     get_total_prod.short_description = "Produtividade"
 
     def get_talhao__id_unico(self, obj):
         return obj.talhao.id_unico
-
     get_talhao__id_unico.short_description = "ID Talhao"
 
     def get_cronograma_programa(self, obj=None):
@@ -2117,11 +2032,9 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
                 sort_keys=True,
                 cls=DjangoJSONEncoder,
             )
-            # keep spaces
             result_str = f"<pre>{result}</pre>"
             result = mark_safe(result_str)
         return result
-
     get_cronograma_programa.short_description = "Programações"
 
     def get_data_plantio(self, obj):
@@ -2131,7 +2044,6 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
             )
         else:
             return " - "
-
     get_data_plantio.short_description = "Data Plantio "
 
     def get_dias_ciclo(self, obj):
@@ -2139,35 +2051,29 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
             return obj.variedade.dias_ciclo
         else:
             return "Não Planejado"
-
     get_dias_ciclo.short_description = "Ciclo "
 
     def get_dap_description(self, obj):
         return obj.get_dap
-
     get_dap_description.short_description = "DAP "
 
     def get_description_descontinuado_plantio(self, obj):
         return obj.plantio_descontinuado
-
     get_description_descontinuado_plantio.boolean = True
     get_description_descontinuado_plantio.short_description = "Interrom? "
 
     def get_description_inicializado_plantio(self, obj):
         return obj.inicializado_plantio
-
     get_description_inicializado_plantio.boolean = True
     get_description_inicializado_plantio.short_description = "Start Plantio"
-    
+
     def get_description_finalizado_plantio(self, obj):
         return obj.finalizado_plantio
-
     get_description_finalizado_plantio.boolean = True
     get_description_finalizado_plantio.short_description = "End Plantio"
 
     def get_description_finalizado_colheita(self, obj):
         return obj.finalizado_colheita
-
     get_description_finalizado_colheita.boolean = True
     get_description_finalizado_colheita.short_description = "Colheita"
 
@@ -2178,7 +2084,6 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
             )
         else:
             return " - "
-
     get_data.short_description = "Data Plantio"
 
     def get_data_prev_col(self, obj):
@@ -2192,9 +2097,8 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
             )
         else:
             return " - "
-
     get_data_prev_col.short_description = "Data Prev. Col."
-    
+
     def get_data_prev_col_real(self, obj):
         if obj.data_prevista_colheita_real:
             return date_format(
@@ -2202,9 +2106,8 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
             )
         else:
             return " - "
-
     get_data_prev_col_real.short_description = "Data Prev. Col. Real"
-    
+
     def get_data_prev_plantio(self, obj):
         if obj.data_prevista_plantio and obj.variedade:
             return date_format(
@@ -2212,7 +2115,6 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
             )
         else:
             return " - "
-
     get_data_prev_plantio.short_description = "Data Prev. Plantio"
 
     def variedade_description(self, obj):
@@ -2223,7 +2125,6 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         else:
             variedade = "Não Planejado"
         return variedade
-
     variedade_description.short_description = "Variedade"
 
     def cultura_description(self, obj):
@@ -2248,32 +2149,19 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         else:
             cultura = "Não Planejado"
         return cultura
-
     cultura_description.short_description = "Cultura"
 
     def safra_description(self, obj):
         return f"{obj.safra.safra} - {obj.ciclo.ciclo}"
-
     safra_description.short_description = "Safra"
-    
-    def check_var_on_programa_list(self,obj):
+
+    def check_var_on_programa_list(self, obj):
         if obj.programa and obj.variedade:
-                
-            ins_in_programa =  obj.programa.variedade.filter(pk=obj.variedade.pk).exists()
+            ins_in_programa = obj.programa.variedade.filter(pk=obj.variedade.pk).exists()
             return ins_in_programa
-    
-    check_var_on_programa_list.boolean = True  # Display as a boolean field
+    check_var_on_programa_list.boolean = True
     check_var_on_programa_list.short_description = "Variedade / Programa"
-        
-
-    # def talhao_description(self, obj):
-    #     projeto_name = "Projeto"
-    #     if projeto_name in obj.talhao.fazenda.nome:
-    #         return f'{obj.talhao.fazenda.nome.split(projeto_name)[-1]} - {obj.talhao.id_talhao}'
-    #     else:
-    #         return obj.talhao
-    # talhao_description.short_description = "Parcela"
-
+    
 
 def export_cargas(modeladmin, request, queryset):
     response = HttpResponse(content_type="text/csv")
