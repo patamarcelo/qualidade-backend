@@ -2,7 +2,7 @@ from django.shortcuts import render
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 
-
+from django.core.exceptions import ObjectDoesNotExist
 # Create your views here.
 
 from .serializers import (
@@ -240,6 +240,39 @@ import re
 
 logger = logging.getLogger(__name__)
 
+
+
+
+def resolve_farm_and_harvest_by_storage(storage_id):
+    try:
+        projeto = Projeto.objects.select_related("fazenda").get(
+            storage_id_farmbox=storage_id
+        )
+
+        farm_id = projeto.id_farmbox
+
+        # ⚠️ Ajustar aqui conforme sua modelagem real
+        # Exemplo 1: se harvest estiver no projeto
+        harvest_id = getattr(projeto, "harvest_id", None)
+
+        # Exemplo 2 (mais comum): buscar safra ativa da fazenda
+        # harvest = Safra.objects.filter(
+        #     fazenda=projeto.fazenda,
+        #     is_active=True
+        # ).first()
+        # harvest_id = harvest.id_farmbox if harvest else None
+
+        return farm_id, harvest_id
+
+    except ObjectDoesNotExist:
+        print(f"[FARMBOX] Projeto não encontrado para storage_id={storage_id}")
+        return None, None
+
+    except Exception as e:
+        print(f"[FARMBOX][ERROR] resolve_farm_and_harvest_by_storage: {e}")
+        return None, None
+    
+    
 
 def _try_json_loads(raw_body):
     if not raw_body:
@@ -5950,9 +5983,7 @@ class DefensivoViewSet(viewsets.ModelViewSet):
                 # Buscar farm_id e harvest_id reais a partir do storage_id
                 # Exemplo:
                 # farm_id, harvest_id = resolve_farm_and_harvest_by_storage(storage_id)
-
-                farm_id = None
-                harvest_id = None
+                farm_id, harvest_id = resolve_farm_and_harvest_by_storage(storage_id)
 
                 farmbox_payload = {
                     "input_id": str(input_id),

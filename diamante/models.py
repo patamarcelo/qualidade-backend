@@ -96,6 +96,7 @@ class Projeto(Base):
     nome = models.CharField("Nome", max_length=100, help_text="Projeto", unique=True)
     id_d = models.IntegerField("ID_D", unique=True)
     id_farmbox = models.IntegerField("ID FarmBox", unique=True, blank=True, null=True)
+    storage_id_farmbox = models.IntegerField("Storage ID FarmBox", unique=True, blank=True, null=True)
     fazenda = models.ForeignKey(Fazenda, on_delete=models.PROTECT)
     quantidade_area_produtiva = models.DecimalField(
         "Area Produtiva",

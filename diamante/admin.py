@@ -558,6 +558,7 @@ class ProjetoAdmin(admin.ModelAdmin):
         "quantidade_area_produtiva",
         "quantidade_area_total",
         "get_map_centro_id",
+        "storage_id_farmbox"
     )
 
     search_fields = ["fazenda__nome"]
