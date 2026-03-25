@@ -243,35 +243,27 @@ logger = logging.getLogger(__name__)
 
 
 
-def resolve_farm_and_harvest_by_storage(storage_id):
+def resolve_farm_and_harvest_by_storage(storage_id, projetos_by_storage):
+    if storage_id in [None, ""]:
+        return None, None
+
     try:
-        projeto = Projeto.objects.select_related("fazenda").get(
-            storage_id_farmbox=storage_id
-        )
-
-        farm_id = projeto.id_farmbox
-
-        # ⚠️ Ajustar aqui conforme sua modelagem real
-        # Exemplo 1: se harvest estiver no projeto
-        harvest_id = getattr(projeto, "harvest_id", None)
-
-        # Exemplo 2 (mais comum): buscar safra ativa da fazenda
-        # harvest = Safra.objects.filter(
-        #     fazenda=projeto.fazenda,
-        #     is_active=True
-        # ).first()
-        # harvest_id = harvest.id_farmbox if harvest else None
-
-        return farm_id, harvest_id
-
-    except ObjectDoesNotExist:
-        print(f"[FARMBOX] Projeto não encontrado para storage_id={storage_id}")
+        storage_id_int = int(storage_id)
+    except (TypeError, ValueError):
+        print(f"[FARMBOX] storage_id inválido: {storage_id}")
         return None, None
 
-    except Exception as e:
-        print(f"[FARMBOX][ERROR] resolve_farm_and_harvest_by_storage: {e}")
+    projeto = projetos_by_storage.get(storage_id_int)
+    if not projeto:
+        print(f"[FARMBOX] Nenhum Projeto encontrado para storage_id_farmbox={storage_id_int}")
         return None, None
-    
+
+    farm_id = projeto.id_farmbox
+
+    # ajustar depois conforme a regra real da safra
+    harvest_id = None
+
+    return farm_id, harvest_id
     
 
 def _try_json_loads(raw_body):
@@ -5955,6 +5947,22 @@ class DefensivoViewSet(viewsets.ModelViewSet):
         farmbox_input_values_payloads = []
         farmbox_input_values_sent = []
         farmbox_input_values_errors = []
+        
+        storage_ids = list(
+            {
+                int(item.get("storage_id"))
+                for item in itens_enriched
+                if item.get("sucesso") and item.get("storage_id") not in [None, ""]
+            }
+        )
+
+        projetos_by_storage = {
+            projeto.storage_id_farmbox: projeto
+            for projeto in Projeto.objects.select_related("fazenda").filter(
+                storage_id_farmbox__in=storage_ids
+            )
+        }
+        
 
         for item in itens_enriched:
             try:
@@ -5983,7 +5991,7 @@ class DefensivoViewSet(viewsets.ModelViewSet):
                 # Buscar farm_id e harvest_id reais a partir do storage_id
                 # Exemplo:
                 # farm_id, harvest_id = resolve_farm_and_harvest_by_storage(storage_id)
-                farm_id, harvest_id = resolve_farm_and_harvest_by_storage(storage_id)
+                farm_id, harvest_id = resolve_farm_and_harvest_by_storage(storage_id, projetos_by_storage)
 
                 farmbox_payload = {
                     "input_id": str(input_id),
