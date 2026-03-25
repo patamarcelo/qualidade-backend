@@ -73,7 +73,6 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django_crontab",
     "django_apscheduler",
-    "django_dbconn_retry",
     # "diamante.apps.DiamanteConfig",
     "csvexport",
     "debug_toolbar",
@@ -188,7 +187,7 @@ DATABASES = {
     #     'ATOMIC_REQUESTS': True,
     # },
     "default": {
-        "ENGINE": "dj_db_conn_pool.backends.postgresql",
+        "ENGINE": "django.db.backends.postgresql",
         "NAME": env("DB_EL_NAME"),
         "USER": env("DB_EL_USER"),
         "PASSWORD": env("DB_EL_PASSWORD"),
@@ -208,13 +207,6 @@ DATABASES = {
             "keepalives_idle": 30,
             "keepalives_interval": 10,
             "keepalives_count": 5,
-        },
-
-        "POOL_OPTIONS": {
-            "POOL_SIZE": 10,
-            "MAX_OVERFLOW": 20,
-            "RECYCLE": 300,
-            "PRE_PING": True,
         },
     },
     # "dev": {
