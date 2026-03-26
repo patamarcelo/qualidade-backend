@@ -16,6 +16,7 @@ from .views_api import (
     ColheitaPlantioExtratoAreaViewSet,
     BackgroundTaskStatusViewSet,
     task_status_view,
+    FarmPolygonViewSet,
 )
 
 router = routers.DefaultRouter()
@@ -30,6 +31,8 @@ router.register("resumocolheita", PlantioDetailResumoApi)
 router.register("opensts", StViewSet)
 router.register("extratocolheitaarea", ColheitaPlantioExtratoAreaViewSet)
 router.register("backgroundtask", BackgroundTaskStatusViewSet)
+router.register(r"polygons", FarmPolygonViewSet, basename="farm-polygon")
+
 
 
 urlpatterns = [

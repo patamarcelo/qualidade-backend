@@ -1668,3 +1668,44 @@ class AlertRule(Base):
             qs = qs.filter(variedade_id=self.variedade_id)
         return qs
 
+
+
+class FarmPolygon(models.Model):
+    MODE_MANUAL = "manual"
+    MODE_TRACKING = "tracking"
+
+    MODE_CHOICES = [
+        (MODE_MANUAL, "Manual"),
+        (MODE_TRACKING, "Tracking"),
+    ]
+
+    name = models.CharField(max_length=255)
+    farm_name = models.CharField(max_length=255, blank=True, default="")
+    mode = models.CharField(max_length=20, choices=MODE_CHOICES, default=MODE_MANUAL)
+
+    points = models.JSONField(default=list, blank=True)
+    is_closed = models.BooleanField(default=False)
+
+    area_m2 = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True)
+    perimeter_m = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True)
+
+    observation = models.TextField(blank=True, default="")
+
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="farm_polygons",
+        null=True,
+        blank=True,
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Polígono"
+        verbose_name_plural = "Polígonos"
+
+    def __str__(self):
+        return f"{self.name} - {self.farm_name or 'Sem fazenda'}"

@@ -16,8 +16,13 @@ from .serializers import (
     StProtheusIntegrationSerializer,
     ColheitaPlantioExtratoAreaSerializer,
     ColheitaResumoSerializer,
-    BackgroundTaskStatusSerializer
+    BackgroundTaskStatusSerializer,
+    FarmPolygonSerializer
 )
+
+
+
+
 
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -87,7 +92,8 @@ from .models import (
     SentSeeds,
     SeedStock,
     SeedConfig,
-    BackgroundTaskStatus
+    BackgroundTaskStatus,
+    FarmPolygon
 )
 
 from django.db.models import OuterRef, Subquery
@@ -7675,3 +7681,14 @@ def task_status_view(request, task_id):
         })
     except BackgroundTaskStatus.DoesNotExist:
         return Response({"error": "Task não encontrada"}, status=status.HTTP_404_NOT_FOUND)
+
+
+
+class FarmPolygonViewSet(viewsets.ModelViewSet):
+    serializer_class = FarmPolygonSerializer
+    authentication_classes = (CachedTokenAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    def get_queryset(self):
+        user = self.request.user
+        return FarmPolygon.objects.filter(created_by=user).order_by("-created_at")

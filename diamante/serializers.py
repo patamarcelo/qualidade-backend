@@ -11,7 +11,8 @@ from .models import (
     RegistroVisitas,
     StProtheusIntegration,
     ColheitaPlantioExtratoArea,
-    BackgroundTaskStatus
+    BackgroundTaskStatus,
+    FarmPolygon
 )
 from rest_framework.fields import CurrentUserDefault
 
@@ -142,3 +143,88 @@ class BackgroundTaskStatusSerializer(serializers.ModelSerializer):
     class Meta:
         model = BackgroundTaskStatus
         fields = "__all__"
+
+
+
+
+
+class FarmPolygonSerializer(serializers.ModelSerializer):
+    created_by_email = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = FarmPolygon
+        fields = [
+            "id",
+            "name",
+            "farm_name",
+            "mode",
+            "points",
+            "is_closed",
+            "area_m2",
+            "perimeter_m",
+            "observation",
+            "created_by",
+            "created_by_email",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "id",
+            "created_by",
+            "created_by_email",
+            "created_at",
+            "updated_at",
+        ]
+
+    def get_created_by_email(self, obj):
+        if obj.created_by:
+            return getattr(obj.created_by, "email", "")
+        return ""
+
+    def validate_points(self, value):
+        if not isinstance(value, list):
+            raise serializers.ValidationError("points deve ser uma lista.")
+
+        if len(value) < 3:
+            raise serializers.ValidationError("O polígono precisa ter ao menos 3 pontos.")
+
+        for index, point in enumerate(value):
+            if not isinstance(point, dict):
+                raise serializers.ValidationError(
+                    f"O ponto na posição {index} precisa ser um objeto."
+                )
+
+            if "latitude" not in point or "longitude" not in point:
+                raise serializers.ValidationError(
+                    f"O ponto na posição {index} precisa ter latitude e longitude."
+                )
+
+            try:
+                float(point["latitude"])
+                float(point["longitude"])
+            except (TypeError, ValueError):
+                raise serializers.ValidationError(
+                    f"O ponto na posição {index} possui latitude/longitude inválidas."
+                )
+
+        return value
+
+    def validate(self, attrs):
+        is_closed = attrs.get("is_closed", False)
+        points = attrs.get("points", [])
+
+        if is_closed and len(points) < 3:
+            raise serializers.ValidationError(
+                {"points": "Um polígono fechado precisa ter ao menos 3 pontos."}
+            )
+
+        return attrs
+
+    def create(self, validated_data):
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+
+        if user and user.is_authenticated:
+            validated_data["created_by"] = user
+
+        return super().create(validated_data)

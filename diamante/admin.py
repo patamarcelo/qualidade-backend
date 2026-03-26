@@ -14,6 +14,7 @@ from django.contrib import admin
 from .models import *
 from .forms import AplicacoesProgramaInlineFormSet
 
+
 import json
 from django.core.serializers.json import DjangoJSONEncoder
 from django.utils.safestring import mark_safe
@@ -4518,3 +4519,73 @@ class AlertRuleAdmin(admin.ModelAdmin):
     def get_modificado_br(self, obj):
         return date_format(obj.modificado, format="SHORT_DATETIME_FORMAT", use_l10n=True)
     get_modificado_br.short_description = "Atualizado em"
+
+@admin.register(FarmPolygon)
+class FarmPolygonAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "name",
+        "farm_name",
+        "mode",
+        "is_closed",
+        "points_count",
+        "created_by",
+        "created_at",
+        "updated_at",
+    )
+    list_filter = (
+        "mode",
+        "is_closed",
+        "created_at",
+        "updated_at",
+    )
+    search_fields = (
+        "name",
+        "farm_name",
+        "created_by__email",
+    )
+    readonly_fields = (
+        "created_at",
+        "updated_at",
+        "points_pretty",
+    )
+
+    fieldsets = (
+        ("Dados principais", {
+            "fields": (
+                "name",
+                "farm_name",
+                "mode",
+                "is_closed",
+                "created_by",
+            )
+        }),
+        ("Geometria", {
+            "fields": (
+                "points",
+                "points_pretty",
+                "area_m2",
+                "perimeter_m",
+            )
+        }),
+        ("Extras", {
+            "fields": (
+                "observation",
+            )
+        }),
+        ("Datas", {
+            "fields": (
+                "created_at",
+                "updated_at",
+            )
+        }),
+    )
+
+    def points_count(self, obj):
+        return len(obj.points or [])
+    points_count.short_description = "Qtd. pontos"
+
+    def points_pretty(self, obj):
+        import json
+        return json.dumps(obj.points or [], indent=2, ensure_ascii=False)
+    points_pretty.short_description = "Points formatado"
