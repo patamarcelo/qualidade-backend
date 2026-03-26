@@ -34,13 +34,28 @@ router.register("backgroundtask", BackgroundTaskStatusViewSet)
 router.register(r"polygons", FarmPolygonViewSet, basename="farm-polygon")
 
 
+farm_polygon_list = FarmPolygonViewSet.as_view({
+    "get": "list",
+    "post": "create",
+})
+
+farm_polygon_detail = FarmPolygonViewSet.as_view({
+    "get": "retrieve",
+    "put": "update",
+    "patch": "partial_update",
+    "delete": "destroy",
+})
 
 urlpatterns = [
-    path("", include(router.urls)),
-    # 👇 ROTA MANUAL ADICIONADA
+    path("polygons/", farm_polygon_list, name="farm-polygon-list"),
+    path("polygons/<int:pk>/", farm_polygon_detail, name="farm-polygon-detail"),
+
     path(
         "backgroundtask_status/<uuid:task_id>/",
         task_status_view,
         name="backgroundtask-task-status",
-),
+    ),
+
+    path("", include(router.urls)),
 ]
+
