@@ -1679,6 +1679,8 @@ class FarmPolygon(models.Model):
         (MODE_TRACKING, "Tracking"),
     ]
 
+    submitted_email = models.EmailField(blank=True, default="")
+    user_name = models.CharField(max_length=255, default="")
     name = models.CharField(max_length=255)
     farm_name = models.CharField(max_length=255, blank=True, default="")
     mode = models.CharField(max_length=20, choices=MODE_CHOICES, default=MODE_MANUAL)
@@ -1691,13 +1693,7 @@ class FarmPolygon(models.Model):
 
     observation = models.TextField(blank=True, default="")
 
-    created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="farm_polygons",
-        null=True,
-        blank=True,
-    )
+    is_active = models.BooleanField("Ativo", default=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

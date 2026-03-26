@@ -4526,23 +4526,27 @@ class FarmPolygonAdmin(admin.ModelAdmin):
         "id",
         "name",
         "farm_name",
+        "user_name",
+        "submitted_email",
         "mode",
         "is_closed",
+        "is_active",
         "points_count",
-        "created_by",
         "created_at",
         "updated_at",
     )
     list_filter = (
         "mode",
         "is_closed",
+        "is_active",
         "created_at",
         "updated_at",
     )
     search_fields = (
         "name",
         "farm_name",
-        "created_by__email",
+        "user_name",
+        "submitted_email",
     )
     readonly_fields = (
         "created_at",
@@ -4555,9 +4559,11 @@ class FarmPolygonAdmin(admin.ModelAdmin):
             "fields": (
                 "name",
                 "farm_name",
+                "user_name",
+                "submitted_email",
                 "mode",
                 "is_closed",
-                "created_by",
+                "is_active",
             )
         }),
         ("Geometria", {

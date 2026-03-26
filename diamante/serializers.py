@@ -149,12 +149,12 @@ class BackgroundTaskStatusSerializer(serializers.ModelSerializer):
 
 
 class FarmPolygonSerializer(serializers.ModelSerializer):
-    created_by_email = serializers.SerializerMethodField(read_only=True)
-
     class Meta:
         model = FarmPolygon
         fields = [
             "id",
+            "submitted_email",
+            "user_name",
             "name",
             "farm_name",
             "mode",
@@ -163,23 +163,34 @@ class FarmPolygonSerializer(serializers.ModelSerializer):
             "area_m2",
             "perimeter_m",
             "observation",
-            "created_by",
-            "created_by_email",
+            "is_active",
             "created_at",
             "updated_at",
         ]
         read_only_fields = [
             "id",
-            "created_by",
-            "created_by_email",
             "created_at",
             "updated_at",
         ]
 
-    def get_created_by_email(self, obj):
-        if obj.created_by:
-            return getattr(obj.created_by, "email", "")
-        return ""
+    def validate_submitted_email(self, value):
+        value = (value or "").strip().lower()
+        return value
+
+    def validate_user_name(self, value):
+        value = (value or "").strip()
+        if not value:
+            raise serializers.ValidationError("user_name é obrigatório.")
+        return value
+
+    def validate_name(self, value):
+        value = (value or "").strip()
+        if not value:
+            raise serializers.ValidationError("name é obrigatório.")
+        return value
+
+    def validate_farm_name(self, value):
+        return (value or "").strip()
 
     def validate_points(self, value):
         if not isinstance(value, list):
@@ -219,12 +230,3 @@ class FarmPolygonSerializer(serializers.ModelSerializer):
             )
 
         return attrs
-
-    def create(self, validated_data):
-        request = self.context.get("request")
-        user = getattr(request, "user", None)
-
-        if user and user.is_authenticated:
-            validated_data["created_by"] = user
-
-        return super().create(validated_data)
