@@ -1309,6 +1309,13 @@ def _extract_statuses_from_meta(payload: dict):
                 value = ch.get("value") or {}
                 statuses = value.get("statuses") or []
                 for st in statuses:
+                    logger.warning(
+                        "WAPP_STATUS recipient=%s wamid=%s status=%s error=%s",
+                        st.get("recipient_id"),
+                        st.get("id"),
+                        st.get("status"),
+                        st.get("errors"),
+                    )
                     wamid = (st.get("id") or "").strip()
                     status = (st.get("status") or "").strip()
                     ts = (st.get("timestamp") or "").strip()

@@ -31,6 +31,13 @@ def _post(payload: dict, *, to_phone_e164: str, timeout: int = 20) -> dict:
     url = f"https://graph.facebook.com/{api_version}/{phone_id}/messages"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
+    logger.warning(
+        "WAPP_PAYLOAD to=%s type=%s payload=%s",
+        to_phone_e164,
+        payload.get("type"),
+        payload,
+    )
+    
     try:
         r = requests.post(url, json=payload, headers=headers, timeout=timeout)
     except requests.RequestException as e:
@@ -38,6 +45,13 @@ def _post(payload: dict, *, to_phone_e164: str, timeout: int = 20) -> dict:
         raise
 
     logger.warning("WAPP_SEND status=%s to=%s", r.status_code, to_phone_e164)
+ 
+    logger.warning(
+        "WAPP_RESPONSE to=%s status=%s body=%s",
+        to_phone_e164,
+        r.status_code,
+        (r.text or "")[:4000],
+    )
 
     if r.status_code >= 400:
         logger.warning("WAPP_SEND_ERR response=%s", (r.text or "")[:2000])
@@ -135,6 +149,14 @@ def send_template(
             **({"components": components} if components else {}),
         },
     }
+    
+    logger.warning(
+        "WAPP_TEMPLATE_SEND to=%s template=%s body_params=%s quick_reply=%s",
+        to_phone_e164,
+        template_name,
+        body_params,
+        quick_reply_payloads,
+    )
 
     return _post(payload, to_phone_e164=to_phone_e164)
 
