@@ -1,5 +1,5 @@
 from django import forms
-from .models import PlantioExtratoArea, Programa, Variedade, Plantio, BackgroundTaskStatus
+from .models import PlantioExtratoArea, Programa, Variedade, Plantio, BackgroundTaskStatus, Defensivo
 from django.core.exceptions import ValidationError
 from django.db.models import Sum
 from django.utils.safestring import mark_safe
@@ -231,3 +231,84 @@ class AplicacoesProgramaInlineFormSet(BaseInlineFormSet):
                 f"Já existe uma tarefa em andamento para o programa '{programa_nome}'. "
                 "Aguarde finalizar para salvar novamente."
             )
+            
+
+def _normalizar_nome_produto(nome):
+    return " ".join((nome or "").strip().upper().split())
+
+
+class BulkReplaceAplicacaoForm(forms.Form):
+    produto_destino = forms.ModelChoiceField(
+        queryset=Defensivo.objects.filter(ativo=True).order_by("produto"),
+        label="Novo produto",
+        required=True,
+        widget=forms.Select(attrs={
+            "class": "form-select form-select-sm select-busca-avancada",
+            "data-placeholder": "-- Selecione um defensivo --",
+        }),
+    )
+
+    alterar_dose = forms.BooleanField(
+        required=False,
+        initial=False,
+        label="Alterar dose",
+    )
+
+    nova_dose = forms.DecimalField(
+        required=False,
+        max_digits=12,
+        decimal_places=4,
+        label="Nova dose",
+    )
+
+    zerar_custo = forms.BooleanField(
+        required=False,
+        initial=False,
+        label="Zerar custo",
+    )
+
+    def __init__(self, *args, produto_origem=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.produto_origem = produto_origem
+
+        qs = Defensivo.objects.filter(ativo=True).order_by("produto")
+
+        if produto_origem:
+            nome_origem_normalizado = _normalizar_nome_produto(produto_origem.produto)
+
+            ids_mesmo_nome_logico = [
+                d.pk
+                for d in Defensivo.objects.filter(ativo=True).only("id", "produto")
+                if _normalizar_nome_produto(d.produto) == nome_origem_normalizado
+            ]
+
+            if ids_mesmo_nome_logico:
+                qs = qs.exclude(pk__in=ids_mesmo_nome_logico)
+            else:
+                qs = qs.exclude(pk=produto_origem.pk)
+
+        self.fields["produto_destino"].queryset = qs
+
+    def clean(self):
+        cleaned = super().clean()
+
+        produto_destino = cleaned.get("produto_destino")
+        alterar_dose = cleaned.get("alterar_dose")
+        nova_dose = cleaned.get("nova_dose")
+
+        if not produto_destino:
+            raise forms.ValidationError("Selecione o novo produto.")
+
+        if self.produto_origem:
+            origem_nome = _normalizar_nome_produto(self.produto_origem.produto)
+            destino_nome = _normalizar_nome_produto(produto_destino.produto)
+
+            if origem_nome == destino_nome:
+                raise forms.ValidationError(
+                    "O novo produto deve ser diferente do produto origem."
+                )
+
+        if alterar_dose and nova_dose in [None, ""]:
+            self.add_error("nova_dose", "Informe a nova dose para alterar em lote.")
+
+        return cleaned

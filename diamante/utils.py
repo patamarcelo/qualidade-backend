@@ -38,6 +38,9 @@ from datetime import date
 from django.utils.html import strip_tags
 
 
+from collections import OrderedDict
+
+
 # pr_mungo = Programa.objects.all()[2]
 # pr_caupi = Programa.objects.all()[1]
 # pr_rr = Programa.objects.all()[4]
@@ -323,7 +326,7 @@ def admin_form_alter_programa_and_save(
             print("Index: ", index)
             get_index_time = time.time()
             print(f"Time to get index: {get_index_time - loop_start_time} seconds")
-            if index:
+            if index is not None:
                 if nome_estagio_alterado == True:
                     i.cronograma_programa[index]["estagio"] = estagio_alterado
                 if i.cronograma_programa[index]["aplicado"] == False:
@@ -385,7 +388,7 @@ def admin_form_remove_index(query, operation):
     for i in query:
         try:
             index = get_index_dict_estagio(i.cronograma_programa, operation)
-            if index:
+            if index is not None:
                 if i.cronograma_programa[index]["aplicado"] == False:
                     print("removido : ", i.cronograma_programa[index])
                     i.cronograma_programa.pop(index)
@@ -1675,3 +1678,214 @@ def enviar_email_alerta_mungo_verde_por_regra(template_path="email/resumo_alerta
         print("Erro em enviar o email: ", e)
 
     return len(emails_to_send)
+
+
+
+
+
+def _safe_cronograma_list(cronograma):
+    if isinstance(cronograma, list):
+        return cronograma
+    return []
+
+
+def _clone_stage_payload(stage_dict):
+    return {
+        "dap": stage_dict.get("dap", 0),
+        "estagio": stage_dict.get("estagio", ""),
+        "aplicado": bool(stage_dict.get("aplicado", False)),
+        "enviado_farmbox": bool(stage_dict.get("enviado_farmbox", False)),
+        "produtos": list(stage_dict.get("produtos", [])),
+        "data prevista": stage_dict.get("data prevista", ""),
+    }
+
+
+def build_stage_change_payload_from_operacao(operacao):
+    """
+    Monta o payload padrão do estágio a partir da Operacao,
+    usando a mesma lógica que o sistema já usa hoje.
+    """
+    operation_dict = operacao.operation_done_to_add
+
+    return {
+        "lookup_estagio": (operacao.estagio or "").strip(),
+        "target_estagio": (operacao.estagio or "").strip(),
+        "dap": operacao.prazo_dap if operacao.prazo_dap is not None else 0,
+        "produtos": list(operation_dict.get("produtos", [])),
+        "aplicado": False,
+        "enviado_farmbox": False,
+        "rename_stage": False,
+        "old_estagio": (operacao.estagio or "").strip(),
+        "new_estagio": (operacao.estagio or "").strip(),
+    }
+
+
+def build_program_stage_changes_from_operacoes(operacoes):
+    """
+    Recebe queryset/lista de Operacao do MESMO programa.
+    Retorna OrderedDict por estágio para aplicação consolidada.
+    """
+    changes_by_stage = OrderedDict()
+
+    for operacao in operacoes:
+        payload = build_stage_change_payload_from_operacao(operacao)
+        lookup_estagio = payload["lookup_estagio"]
+        changes_by_stage[lookup_estagio] = payload
+
+    return changes_by_stage
+
+
+def admin_form_apply_program_changes_and_save(query, changes_by_stage):
+    """
+    Aplica múltiplas alterações de estágios de um mesmo programa
+    em UMA passada por plantio, preservando itens já aplicados.
+
+    Regras:
+    - se o estágio existir e aplicado == True: não altera
+    - se o estágio existir e aplicado == False: atualiza produtos / dap / data
+    - se o estágio não existir: adiciona ao cronograma
+    """
+    start_time = time.time()
+    print(f"[BULK_PROGRAM] Start time: {start_time}")
+
+    from diamante.models import Plantio
+
+    updated_objects = []
+
+    for plantio in query:
+        try:
+            cronograma = _safe_cronograma_list(plantio.cronograma_programa)
+            changed_anything = False
+
+            for lookup_estagio, payload in changes_by_stage.items():
+                index = get_index_dict_estagio(cronograma, lookup_estagio)
+
+                target_estagio = payload.get("target_estagio") or lookup_estagio
+                dap = payload.get("dap", 0)
+                produtos = list(payload.get("produtos", []))
+                rename_stage = bool(payload.get("rename_stage", False))
+                new_estagio = payload.get("new_estagio") or target_estagio
+
+                data_prevista = format_date_json(
+                    get_prev_app_date(plantio.data_plantio, dap)
+                )
+
+                if index is not None:
+                    item = cronograma[index]
+
+                    # respeita o que já foi aplicado
+                    if item.get("aplicado") is True:
+                        continue
+
+                    if rename_stage and new_estagio:
+                        item["estagio"] = new_estagio
+                    else:
+                        item["estagio"] = target_estagio
+
+                    item["produtos"] = produtos
+                    item["dap"] = dap
+                    item["data prevista"] = data_prevista
+
+                    # mantém/enriquece chaves padrão
+                    if "aplicado" not in item:
+                        item["aplicado"] = False
+                    if "enviado_farmbox" not in item:
+                        item["enviado_farmbox"] = False
+
+                    changed_anything = True
+                else:
+                    operation_to_add = {
+                        "dap": dap,
+                        "estagio": new_estagio if rename_stage and new_estagio else target_estagio,
+                        "aplicado": False,
+                        "enviado_farmbox": False,
+                        "produtos": produtos,
+                        "data prevista": data_prevista,
+                    }
+                    cronograma.append(operation_to_add)
+                    changed_anything = True
+
+            if changed_anything:
+                plantio.cronograma_programa = cronograma
+                updated_objects.append(plantio)
+
+        except Exception as e:
+            print(f"[BULK_PROGRAM] Erro ao atualizar plantio {plantio}: {e}")
+
+    if updated_objects:
+        print(f"[BULK_PROGRAM] Atualizando {len(updated_objects)} plantios")
+        with transaction.atomic():
+            Plantio.objects.bulk_update(updated_objects, ["cronograma_programa"])
+
+        safra = updated_objects[0].safra.safra
+        ciclo = updated_objects[0].ciclo.ciclo
+        invalidate_plantio_cache(safra, ciclo)
+
+    end_time = time.time()
+    print(f"[BULK_PROGRAM] Total time: {end_time - start_time} seconds")
+
+
+def processar_programa_em_background(task_id, programa_id):
+    """
+    Reprocessa TODO o programa de uma vez, consolidando todas as operações ativas.
+    Ideal para lote.
+    """
+    from django.db import close_old_connections
+    from django.utils import timezone
+    from diamante.models import Programa, Plantio, Operacao, BackgroundTaskStatus
+
+    close_old_connections()
+    task = None
+    started_at = timezone.now()
+
+    try:
+        task = BackgroundTaskStatus.objects.get(task_id=task_id)
+        task.status = "running"
+        if hasattr(task, "started_at"):
+            task.started_at = started_at
+        task.save(update_fields=["status"] + (["started_at"] if hasattr(task, "started_at") else []))
+
+        programa = Programa.objects.get(pk=programa_id)
+
+        operacoes = (
+            Operacao.objects
+            .filter(programa=programa, ativo=True)
+            .select_related("programa")
+            .prefetch_related("programa_related_aplicacao__defensivo")
+            .order_by("prazo_dap", "operacao_numero", "id")
+        )
+
+        changes_by_stage = build_program_stage_changes_from_operacoes(operacoes)
+
+        plantios = Plantio.objects.filter(
+            programa=programa,
+            inicializado_plantio=True,
+        )
+
+        admin_form_apply_program_changes_and_save(
+            query=plantios,
+            changes_by_stage=changes_by_stage,
+        )
+
+        task.status = "done"
+        if hasattr(task, "result"):
+            task.result = {"ok": True, "programa_id": programa_id}
+
+    except Exception as e:
+        print(f"[BULK_PROGRAM] Erro ao processar programa {programa_id}: {e}")
+        if task:
+            task.status = "failed"
+            if hasattr(task, "result"):
+                task.result = {"error": str(e)}
+    finally:
+        if task:
+            if hasattr(task, "ended_at"):
+                task.ended_at = timezone.now()
+                task.save(
+                    update_fields=["status"]
+                    + (["result"] if hasattr(task, "result") else [])
+                    + (["ended_at"] if hasattr(task, "ended_at") else [])
+                )
+            else:
+                task.save(update_fields=["status"] + (["result"] if hasattr(task, "result") else []))
+        close_old_connections()

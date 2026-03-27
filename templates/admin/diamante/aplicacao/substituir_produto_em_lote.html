@@ -1,0 +1,856 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static l10n %}
+
+{% block extrahead %}
+  {{ block.super }}
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
+
+  <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
+{% endblock %}
+
+{% block extrastyle %}
+<style>
+  :root {
+    --bulk-bg: #f3f5f9;
+    --bulk-card: #ffffff;
+    --bulk-border: #e4e8f0;
+    --bulk-text: #111827;
+    --bulk-muted: #6b7280;
+    --bulk-primary: #0f172a;
+    --bulk-primary-2: #1e3a5f;
+    --bulk-soft-blue: #eff6ff;
+    --bulk-soft-blue-border: #bfdbfe;
+    --bulk-warning-bg: #fff7e6;
+    --bulk-warning-border: #f5c451;
+    --bulk-warning-text: #92400e;
+    --bulk-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+    --bulk-radius: 20px;
+  }
+
+  body {
+    background: var(--bulk-bg);
+  }
+
+  #content {
+    padding: 24px 28px 36px !important;
+  }
+
+  .bulk-shell {
+    width: 100%;
+    max-width: 1640px;
+    margin: 0 auto;
+  }
+
+  .bulk-topbar {
+    margin-bottom: 18px;
+    color: var(--bulk-muted);
+    font-size: 13px;
+  }
+
+  .bulk-hero {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 28px 32px;
+    border-radius: 24px;
+    color: #fff;
+    background:
+      radial-gradient(circle at top left, rgba(59,130,246,.18), transparent 28%),
+      linear-gradient(135deg, #0b1324 0%, #16243c 45%, #22385d 100%);
+    box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18);
+    margin-bottom: 26px;
+  }
+
+  .bulk-hero-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .bulk-hero h1 {
+    margin: 0 0 8px 0;
+    font-size: 34px;
+    line-height: 1.15;
+    font-weight: 800;
+    color: #fff;
+  }
+
+  .bulk-hero p {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.6;
+    color: rgba(255,255,255,.88);
+    max-width: 760px;
+  }
+
+  .bulk-hero-side {
+    min-width: 250px;
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .bulk-hero-chip {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 220px;
+    padding: 16px 18px;
+    border-radius: 18px;
+    background: rgba(255,255,255,.08);
+    border: 1px solid rgba(255,255,255,.12);
+    backdrop-filter: blur(8px);
+  }
+
+  .bulk-hero-chip-label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: rgba(255,255,255,.72);
+    font-weight: 700;
+  }
+
+  .bulk-hero-chip-value {
+    font-size: 22px;
+    font-weight: 800;
+    color: #fff;
+  }
+
+  .bulk-layout {
+    display: grid;
+    grid-template-columns: minmax(360px, 0.60fr) minmax(420px, .95fr);
+    gap: 24px;
+    align-items: start;
+  }
+
+  .bulk-card {
+    background: var(--bulk-card);
+    border: 1px solid var(--bulk-border);
+    border-radius: var(--bulk-radius);
+    box-shadow: var(--bulk-shadow);
+    overflow: hidden;
+  }
+
+  .bulk-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px;
+    border-bottom: 1px solid #edf1f7;
+    background: linear-gradient(180deg, #fbfcfe 0%, #f6f8fb 100%);
+  }
+
+  .bulk-card-header h2 {
+    margin: 0;
+    font-size: 20px;
+    line-height: 1.2;
+    color: var(--bulk-text);
+    font-weight: 800;
+  }
+
+  .bulk-card-subtitle {
+    color: var(--bulk-muted);
+    font-size: 13px;
+  }
+
+  .bulk-card-body {
+    padding: 24px;
+  }
+
+  .bulk-kpis {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    margin-bottom: 22px;
+  }
+
+  .bulk-kpi {
+    border: 1px solid var(--bulk-border);
+    border-radius: 18px;
+    background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
+    padding: 18px 16px;
+    min-height: 104px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .bulk-kpi-label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--bulk-muted);
+    font-weight: 800;
+  }
+
+  .bulk-kpi-value {
+    font-size: 26px;
+    line-height: 1.2;
+    color: var(--bulk-text);
+    font-weight: 800;
+    word-break: break-word;
+  }
+
+  .bulk-kpi-value.small {
+    font-size: 18px;
+  }
+
+  .origin-box {
+    border: 1px solid var(--bulk-soft-blue-border);
+    background: linear-gradient(180deg, #f3f8ff 0%, #eaf3ff 100%);
+    border-radius: 18px;
+    padding: 18px 18px;
+    margin-bottom: 22px;
+  }
+
+  .origin-box small {
+    display: block;
+    color: #1d4ed8;
+    font-size: 11px;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    font-weight: 800;
+  }
+
+  .origin-box strong {
+    display: block;
+    color: #0f172a;
+    font-size: 24px;
+    line-height: 1.3;
+    margin-bottom: 8px;
+  }
+
+  .muted {
+    color: var(--bulk-muted);
+    font-size: 13px;
+    line-height: 1.55;
+  }
+
+  .bulk-form-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .form-row-modern {
+    margin: 0;
+  }
+
+  .form-row-modern label {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--bulk-text);
+    font-size: 14px;
+    font-weight: 800;
+  }
+
+  .form-row-modern input[type="text"],
+  .form-row-modern input[type="number"],
+  .form-row-modern input[type="email"],
+  .form-row-modern input[type="date"],
+  .form-row-modern select,
+  .form-row-modern textarea {
+    width: 100%;
+    max-width: 100%;
+    min-height: 50px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    border: 1px solid #cfd7e6;
+    background: #fff;
+    box-sizing: border-box;
+    font-size: 14px;
+    color: var(--bulk-text);
+    transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
+  }
+
+  .form-row-modern input:focus,
+  .form-row-modern select:focus,
+  .form-row-modern textarea:focus {
+    outline: none;
+    border-color: #93c5fd;
+    box-shadow: 0 0 0 4px rgba(59,130,246,.12);
+    background: #fff;
+  }
+
+  .checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 24px;
+    padding-top: 2px;
+  }
+
+  .checkbox-row input[type="checkbox"] {
+    transform: scale(1.15);
+    margin: 0;
+  }
+
+  .checkbox-row label {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 700;
+  }
+
+  .hint-text {
+    margin-top: 6px;
+    color: var(--bulk-muted);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .help-box {
+    border: 1px solid var(--bulk-warning-border);
+    background: linear-gradient(180deg, #fffaf0 0%, #fff5df 100%);
+    border-radius: 16px;
+    padding: 16px 16px;
+    color: var(--bulk-warning-text);
+    font-size: 13px;
+    line-height: 1.6;
+    margin-top: 2px;
+  }
+
+  .errors-box {
+    margin-bottom: 4px;
+    padding: 14px 16px;
+    border-radius: 14px;
+    border: 1px solid #fecaca;
+    background: #fef2f2;
+    color: #991b1b;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .submit-row-modern {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 8px;
+    padding-top: 8px;
+  }
+
+  .btn-primary-modern,
+  .btn-secondary-modern {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 48px;
+    padding: 0 20px;
+    border-radius: 14px;
+    font-size: 14px;
+    font-weight: 800;
+    text-decoration: none;
+    cursor: pointer;
+    transition: transform .12s ease, box-shadow .18s ease, opacity .18s ease;
+  }
+
+  .btn-primary-modern {
+    border: 1px solid #0f172a;
+    color: #fff;
+    background: linear-gradient(180deg, #0f172a 0%, #111827 100%);
+    box-shadow: 0 10px 20px rgba(15, 23, 42, 0.16);
+  }
+
+  .btn-primary-modern:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 14px 26px rgba(15, 23, 42, 0.2);
+  }
+
+  .btn-secondary-modern {
+    border: 1px solid #d8deea;
+    color: #111827;
+    background: #fff;
+  }
+
+  .btn-secondary-modern:hover {
+    background: #f8fafc;
+  }
+
+  .preview-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .preview-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 30px;
+    padding: 0 12px;
+    border-radius: 999px;
+    background: #eef2ff;
+    color: #3730a3;
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .preview-table-wrap {
+    border: 1px solid #edf1f7;
+    border-radius: 16px;
+    overflow: hidden;
+    background: #fff;
+  }
+
+  .preview-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  .preview-table thead th {
+    background: #f8fafc;
+    color: #667085;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    font-weight: 800;
+    padding: 14px 14px;
+    text-align: left;
+    border-bottom: 1px solid #edf1f7;
+    white-space: nowrap;
+  }
+
+  .preview-table tbody td {
+    padding: 14px 14px;
+    font-size: 13px;
+    line-height: 1.55;
+    color: #111827;
+    border-bottom: 1px solid #f1f4f8;
+    vertical-align: top;
+  }
+
+  .preview-table tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  .preview-table tbody tr:hover td {
+    background: #fbfdff;
+  }
+
+  .preview-id {
+    font-weight: 800;
+    color: #1d4ed8;
+    white-space: nowrap;
+  }
+
+  .preview-dose {
+    white-space: nowrap;
+    font-weight: 700;
+  }
+
+  .preview-footer-note {
+    margin-top: 12px;
+    color: var(--bulk-muted);
+    font-size: 12px;
+  }
+
+  .bulk-section-spacer {
+    height: 4px;
+  }
+
+  .form-row-modern .ts-wrapper {
+    width: 100%;
+  }
+
+  .form-row-modern .ts-control {
+    min-height: 50px;
+    border-radius: 14px;
+    border: 1px solid #cfd7e6;
+    padding: 10px 12px;
+    box-shadow: none;
+  }
+
+  .form-row-modern .ts-control.focus {
+    border-color: #93c5fd;
+    box-shadow: 0 0 0 4px rgba(59,130,246,.12);
+  }
+
+  .form-row-modern .ts-dropdown {
+    border-radius: 14px;
+    border: 1px solid #dbe3f0;
+    overflow: hidden;
+  }
+
+
+  .bulk-loading-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.38);
+    backdrop-filter: blur(3px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+  }
+
+  .bulk-loading-overlay.is-visible {
+    display: flex;
+  }
+
+  .bulk-loading-box {
+    width: min(92vw, 420px);
+    background: #fff;
+    border-radius: 22px;
+    padding: 28px 24px;
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.24);
+    text-align: center;
+    border: 1px solid #e5e7eb;
+  }
+
+  .bulk-spinner {
+    width: 54px;
+    height: 54px;
+    margin: 0 auto 18px auto;
+    border-radius: 50%;
+    border: 4px solid #dbeafe;
+    border-top-color: #2563eb;
+    animation: bulk-spin 0.8s linear infinite;
+  }
+
+  @keyframes bulk-spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .bulk-loading-title {
+    font-size: 20px;
+    font-weight: 800;
+    color: #111827;
+    margin-bottom: 8px;
+  }
+
+  .bulk-loading-text {
+    font-size: 14px;
+    line-height: 1.6;
+    color: #6b7280;
+  }
+
+  .btn-primary-modern.is-loading {
+    opacity: .88;
+    pointer-events: none;
+  }
+
+  .btn-inline-spinner {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,.35);
+    border-top-color: #fff;
+    animation: bulk-spin 0.8s linear infinite;
+    margin-right: 10px;
+    display: none;
+  }
+
+  .btn-primary-modern.is-loading .btn-inline-spinner {
+    display: inline-block;
+  }
+
+  .btn-primary-modern.is-loading .btn-label-default {
+    display: none;
+  }
+
+  .btn-primary-modern .btn-label-loading {
+    display: none;
+  }
+
+  .btn-primary-modern.is-loading .btn-label-loading {
+    display: inline;
+  }
+
+  @media (max-width: 1180px) {
+    .bulk-layout {
+      grid-template-columns: 1fr;
+    }
+
+    .bulk-hero {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .bulk-hero-side {
+      width: 100%;
+      justify-content: flex-start;
+    }
+  }
+
+  @media (max-width: 780px) {
+    #content {
+      padding: 18px 16px 28px !important;
+    }
+
+    .bulk-kpis {
+      grid-template-columns: 1fr;
+    }
+
+    .bulk-hero {
+      padding: 22px 20px;
+      border-radius: 20px;
+    }
+
+    .bulk-hero h1 {
+      font-size: 28px;
+    }
+
+    .bulk-card-body,
+    .bulk-card-header {
+      padding-left: 18px;
+      padding-right: 18px;
+    }
+
+    .preview-table-wrap {
+      overflow-x: auto;
+    }
+
+    .preview-table {
+      min-width: 720px;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="bulkLoadingOverlay" class="bulk-loading-overlay" aria-hidden="true">
+  <div class="bulk-loading-box">
+    <div class="bulk-spinner"></div>
+    <div class="bulk-loading-title">Processando alterações</div>
+    <div class="bulk-loading-text">
+      Estamos salvando as aplicações e disparando o reprocessamento dos programas afetados.
+      Esta etapa pode levar alguns instantes.
+    </div>
+  </div>
+</div>
+<div class="bulk-shell">
+  <div class="bulk-topbar">
+    Ajuste em lote de aplicações com reprocessamento consolidado por programa
+  </div>
+
+  <div class="bulk-hero">
+    <div class="bulk-hero-content">
+      <h1>Substituição em lote de produto</h1>
+      <p>
+        Altere várias aplicações de uma vez, mantendo a atualização financeira das aplicações
+        e o reprocessamento do <strong>cronograma_programa</strong> dos plantios inicializados
+        de forma consolidada por programa.
+      </p>
+    </div>
+
+    <div class="bulk-hero-side">
+      <div class="bulk-hero-chip">
+        <span class="bulk-hero-chip-label">Registros selecionados</span>
+        <span class="bulk-hero-chip-value">{{ total_registros }}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="bulk-layout">
+    <div class="bulk-card">
+      <div class="bulk-card-header">
+        <div>
+          <h2>Alteração</h2>
+          <div class="bulk-card-subtitle">Defina o novo produto e os ajustes opcionais.</div>
+        </div>
+      </div>
+
+      <div class="bulk-card-body">
+        <div class="bulk-kpis">
+          <div class="bulk-kpi">
+            <span class="bulk-kpi-label">Registros afetados</span>
+            <span class="bulk-kpi-value">{{ total_registros }}</span>
+          </div>
+
+          <div class="bulk-kpi">
+            <span class="bulk-kpi-label">Produto origem</span>
+            <span class="bulk-kpi-value small">{{ produto_origem }}</span>
+          </div>
+
+          <div class="bulk-kpi">
+            <span class="bulk-kpi-label">Escopo</span>
+            <span class="bulk-kpi-value small">
+              {% if select_across %}Todos os filtrados{% else %}Itens selecionados{% endif %}
+            </span>
+          </div>
+        </div>
+
+        <div class="origin-box">
+          <small>Produto origem detectado automaticamente</small>
+          <strong>{{ produto_origem }}</strong>
+          <div class="muted">
+            O produto origem foi identificado pela seleção atual e fica bloqueado para evitar troca indevida.
+          </div>
+        </div>
+
+        <form method="post" novalidate>
+          {% csrf_token %}
+
+          {% localize off %}
+            {% for obj in queryset %}
+              <input type="hidden" name="_selected_action" value="{{ obj.pk }}">
+            {% endfor %}
+          {% endlocalize %}
+
+          <input type="hidden" name="action" value="substituir_produto_em_lote">
+          <input type="hidden" name="apply" value="1">
+          <input type="hidden" name="select_across" value="{% if select_across %}1{% else %}0{% endif %}">
+
+          {% if form.non_field_errors %}
+            <div class="errors-box">{{ form.non_field_errors }}</div>
+          {% endif %}
+
+          <div class="bulk-form-grid">
+            <div class="form-row-modern">
+              <label for="{{ form.produto_destino.id_for_label }}">Novo produto</label>
+              {{ form.produto_destino }}
+              {% if form.produto_destino.errors %}
+                <div class="errors-box" style="margin-top:8px;">{{ form.produto_destino.errors }}</div>
+              {% endif %}
+            </div>
+
+            <div class="form-row-modern">
+              <div class="checkbox-row">
+                {{ form.alterar_dose }}
+                <label for="{{ form.alterar_dose.id_for_label }}">Alterar dose</label>
+              </div>
+            </div>
+
+            <div class="form-row-modern">
+              <label for="{{ form.nova_dose.id_for_label }}">Nova dose</label>
+              {{ form.nova_dose }}
+              <div class="hint-text">
+                Preencha somente quando a dose também precisar ser atualizada em lote.
+              </div>
+              {% if form.nova_dose.errors %}
+                <div class="errors-box" style="margin-top:8px;">{{ form.nova_dose.errors }}</div>
+              {% endif %}
+            </div>
+
+            <div class="form-row-modern">
+              <div class="checkbox-row">
+                {{ form.zerar_custo }}
+                <label for="{{ form.zerar_custo.id_for_label }}">Zerar custo</label>
+              </div>
+            </div>
+
+            <div class="help-box">
+              A rotina salva as <strong>Aplicações</strong> individualmente para preservar os cálculos
+              e depois reprocesa o <strong>cronograma_programa</strong> de forma consolidada por programa,
+              evitando conflito quando mais de um estágio do mesmo plantio foi alterado.
+            </div>
+
+            <div class="submit-row-modern">
+              <button type="submit" class="btn-primary-modern" id="bulkSubmitBtn">
+              <span class="btn-inline-spinner"></span>
+              <span class="btn-label-default">Aplicar substituição</span>
+              <span class="btn-label-loading">Processando...</span>
+            </button>
+              <a href=".." class="btn-secondary-modern">Cancelar</a>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="bulk-card">
+      <div class="bulk-card-header">
+        <div>
+          <h2>Prévia</h2>
+          <div class="bulk-card-subtitle">Amostra dos registros que serão processados.</div>
+        </div>
+      </div>
+
+      <div class="bulk-card-body">
+        <div class="preview-topbar">
+          <div class="muted">Exibindo até 20 registros da seleção atual.</div>
+          <div class="preview-badge">{{ total_registros }} registro{{ total_registros|pluralize:"s" }}</div>
+        </div>
+
+        <div class="preview-table-wrap">
+          <table class="preview-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Operação</th>
+                <th>Programa</th>
+                <th>Estágio</th>
+                <th>Dose</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for obj in queryset %}
+                <tr>
+                  <td class="preview-id">{{ obj.id }}</td>
+                  <td>{{ obj.operacao }}</td>
+                  <td>{{ obj.operacao.programa|default:"-" }}</td>
+                  <td>{{ obj.operacao.estagio|default:"-" }}</td>
+                  <td class="preview-dose">{{ obj.dose }}</td>
+                </tr>
+              {% empty %}
+                <tr>
+                  <td colspan="5">Nenhum registro encontrado.</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        {% if total_registros > 20 %}
+          <div class="preview-footer-note">
+            Há mais registros além desta prévia. O processamento considera toda a seleção atual.
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const select = document.querySelector(".select-busca-avancada");
+
+    if (select && typeof TomSelect !== "undefined") {
+      new TomSelect(select, {
+        create: false,
+        maxOptions: 500,
+        placeholder: select.dataset.placeholder || "-- Selecione um defensivo --",
+        allowEmptyOption: true,
+        sortField: [
+          { field: "text", direction: "asc" }
+        ]
+      });
+    }
+
+    const alterarDose = document.getElementById("{{ form.alterar_dose.id_for_label }}");
+    const novaDose = document.getElementById("{{ form.nova_dose.id_for_label }}");
+
+    function syncDoseState() {
+      if (!novaDose) return;
+      const enabled = !!(alterarDose && alterarDose.checked);
+      novaDose.disabled = !enabled;
+      if (!enabled) {
+        novaDose.value = "";
+      }
+    }
+
+    if (alterarDose) {
+      alterarDose.addEventListener("change", syncDoseState);
+      syncDoseState();
+    }
+    const form = document.querySelector('form[method="post"]');
+    const submitBtn = document.getElementById("bulkSubmitBtn");
+    const overlay = document.getElementById("bulkLoadingOverlay");
+
+    if (form && submitBtn && overlay) {
+      form.addEventListener("submit", function () {
+        submitBtn.classList.add("is-loading");
+        submitBtn.disabled = true;
+        overlay.classList.add("is-visible");
+        overlay.setAttribute("aria-hidden", "false");
+      });
+    }
+  });
+  
+</script>
+{% endblock %}

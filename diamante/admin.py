@@ -128,6 +128,26 @@ from django.template.response import TemplateResponse
 from django.db import close_old_connections
 
 
+from django.contrib import messages
+from django.contrib.admin import helpers
+from django.db import transaction
+from django.http import HttpResponseRedirect
+from django.shortcuts import render
+from .forms import BulkReplaceAplicacaoForm
+
+import uuid
+from threading import Thread
+
+from django.contrib import admin, messages
+from django.contrib.admin import helpers
+from django.core.exceptions import ValidationError
+from django.db import transaction
+from django.http import HttpResponseRedirect
+from django.shortcuts import render
+
+from .forms import BulkReplaceAplicacaoForm
+from .models import Aplicacao, Defensivo, BackgroundTaskStatus, Programa
+from .utils import processar_programa_em_background
 
 main_path = (
     "http://127.0.0.1:8000"
@@ -3244,147 +3264,318 @@ class DefensivoAdmin(admin.ModelAdmin):
     exclude = ('observacao',)  # <-- aqui você informa o campo a excluir
 
 
+
+def _normalizar_nome_produto(nome):
+    return " ".join((nome or "").strip().upper().split())
+
 @admin.register(Aplicacao)
 class AplicacaoAdmin(admin.ModelAdmin):
-    actions = [export_programa]
-
-    def get_queryset(self, request):
-        return (
-            super(AplicacaoAdmin, self)
-            .get_queryset(request)
-            .filter(operacao__programa__ativo=True, operacao__ativo=True)
-            .select_related("operacao", "defensivo", "operacao__programa")
-        )
+    actions = [export_programa, "substituir_produto_em_lote"]
 
     show_full_result_count = False
+    autocomplete_fields = ["defensivo", "operacao"]
 
     list_display = (
         "defensivo",
-        "operacao",
-        "programa",
-        "defensivo__formulacao",
-        "defensivo__unidade_medida",
-        "defensivo__id_farmbox",
+        "operacao_link",
+        "get_programa",
+        "get_safra",
+        "get_ciclo",
+        "get_estagio",
         "dose",
-        "preco_formatado",
+        "preco",
         "moeda",
-        "valor_final_formatado",
-        "valor_aplicacao_formatado",
-        "get_operacao_prazo_dap",
-        "related_link",
+        "valor_final",
+        "valor_aplicacao",
         "ativo",
     )
+
     search_fields = [
-        "operacao__programa__nome",
-        "operacao__estagio",
         "defensivo__produto",
-        "defensivo__tipo",
-        "dose",
+        "operacao__estagio",
+        "operacao__programa__nome",
+        "operacao__programa__nome_fantasia",
     ]
-    raw_id_fields = ["operacao"]
-    list_filter = (
-        PrecoPreenchidoFilter,
-        ProgramaAplicacaoFilter,
-        DefensivoIdFarmboxFilter,
-        ExcludeOperacaoFilter,
-        "operacao__programa__ciclo__ciclo",
-        "operacao__programa__safra__safra",
+
+    list_filter = [
         "ativo",
-        "defensivo",
-        "operacao",
-        "defensivo__tipo",
-    )
+        "operacao__programa__safra",
+        "operacao__programa__ciclo",
+        "operacao__programa__cultura",
+        ProgramaAplicacaoFilter,
+        PrecoPreenchidoFilter,
+        DefensivoIdFarmboxFilter,
+    ]
 
-    readonly_fields = (
-        "criados",
-        "modificado",
-        "valor_final", 
-        "valor_aplicacao"
-    )
-    
-    fieldsets = (
-        (
-            "Dados Gerais",
-            {
-                "fields": (
-                    ("ativo",),
-                    ("criados", "modificado"),
-                )
-            },
-        ),
-        (
-            "Operação e Produto",
-            {
-                "fields": (
-                    ("operacao",),
-                    ("defensivo",),
-                    ("dose",),
-                    ("obs",),
-                )
-            },
-        ),
-        (
-            "Preço e Cálculo",
-            {
-                "fields": (
-                    ("preco", "moeda"),
-                    ("valor_final", "valor_aplicacao"),
-                )
-            },
-        ),
-    )
-    
-    def preco_formatado(self, obj):
-        return format_brl(obj.preco)
-    preco_formatado.short_description = "Preço"
-
-    def valor_final_formatado(self, obj):
-        if not obj.valor_final:
-            return " - "
-        return "R$ " + format_brl(obj.valor_final)
-    valor_final_formatado.short_description = "Valor Final"
-
-    def valor_aplicacao_formatado(self, obj):
-        if not obj.valor_aplicacao:
-            return " - "
-        return format_brl(obj.valor_aplicacao)
-    valor_aplicacao_formatado.short_description = "Valor Aplicação"
-
-    
-    def related_link(self, obj):
-            if obj.operacao:
-                url = reverse('admin:diamante_operacao_change', args=[obj.operacao.id])
-                return format_html('<a href="{}">{}</a>', url, obj.operacao)
+    def get_queryset(self, request):
+        return (
+            super()
+            .get_queryset(request)
+            .select_related(
+                "defensivo",
+                "operacao",
+                "operacao__programa",
+                "operacao__programa__safra",
+                "operacao__programa__ciclo",
+                "operacao__programa__cultura",
+            )
+        )
+    def operacao_link(self, obj):
+        if not obj.operacao_id:
             return "-"
-    related_link.short_description = "Estágio"
 
-    
-    def defensivo__id_farmbox(self, obj):
-        return obj.defensivo.id_farmbox
+        url = reverse(
+            f"admin:{obj.operacao._meta.app_label}_{obj.operacao._meta.model_name}_change",
+            args=[obj.operacao_id],
+        )
+        return format_html('<a href="{}">{}</a>', url, obj.operacao)
 
-    defensivo__id_farmbox.short_description = "id Farm"
-    
-    def defensivo__unidade_medida(self, obj):
-        return obj.defensivo.get_unidade_medida_display()
+    operacao_link.short_description = "Operação"
+    operacao_link.admin_order_field = "operacao"
 
-    defensivo__unidade_medida.short_description = "Unidade"
-    
-    def defensivo__formulacao(self, obj):
-        return obj.defensivo.get_tipo_display()
+    def get_programa(self, obj):
+        return obj.operacao.programa.nome if obj.operacao and obj.operacao.programa else "-"
+    get_programa.short_description = "Programa"
 
-    defensivo__formulacao.short_description = "Tipo"
+    def get_safra(self, obj):
+        prog = getattr(obj.operacao, "programa", None)
+        return prog.safra.safra if prog and prog.safra else "-"
+    get_safra.short_description = "Safra"
 
-    def get_operacao_prazo_dap(self, obj):
-        return obj.operacao.prazo_dap
+    def get_ciclo(self, obj):
+        prog = getattr(obj.operacao, "programa", None)
+        return prog.ciclo.ciclo if prog and prog.ciclo else "-"
+    get_ciclo.short_description = "Ciclo"
 
-    get_operacao_prazo_dap.short_description = "DAP"
+    def get_estagio(self, obj):
+        return obj.operacao.estagio if obj.operacao else "-"
+    get_estagio.short_description = "Estágio"
 
-    def programa(self, obj):
-        return obj.operacao.programa
+    def _get_action_queryset(self, request, queryset):
+        selected_ids = request.POST.getlist(helpers.ACTION_CHECKBOX_NAME)
+        select_across = request.POST.get("select_across") == "1"
 
-    programa.short_description = "Programa"
+        if select_across:
+            return queryset
 
+        return self.model.objects.filter(pk__in=selected_ids)
 
+    def _get_produto_origem_da_selecao(self, qs):
+        itens_origem = list(
+            qs.values("defensivo_id", "defensivo__produto")
+            .order_by("defensivo_id")
+            .distinct()
+        )
+
+        if not itens_origem:
+            return None, [], "empty"
+
+        nomes_normalizados = {
+            _normalizar_nome_produto(item["defensivo__produto"])
+            for item in itens_origem
+            if item.get("defensivo__produto")
+        }
+
+        if len(itens_origem) == 1:
+            produto_origem_id = itens_origem[0]["defensivo_id"]
+            produto_origem = Defensivo.objects.filter(pk=produto_origem_id).first()
+            return produto_origem, itens_origem, None
+
+        if len(nomes_normalizados) == 1:
+            produto_origem_id = itens_origem[0]["defensivo_id"]
+            produto_origem = Defensivo.objects.filter(pk=produto_origem_id).first()
+            return produto_origem, itens_origem, None
+
+        return None, itens_origem, "multiple"
+
+    @admin.action(description="Substituir produto em lote")
+    def substituir_produto_em_lote(self, request, queryset):
+        qs = (
+            self._get_action_queryset(request, queryset)
+            .select_related("defensivo", "operacao", "operacao__programa")
+            .order_by("id")
+        )
+
+        produto_origem, itens_origem, erro_origem = self._get_produto_origem_da_selecao(qs)
+
+        if erro_origem == "empty" or not produto_origem:
+            self.message_user(
+                request,
+                "Nenhuma aplicação válida foi selecionada.",
+                level=messages.WARNING,
+            )
+            return HttpResponseRedirect(request.get_full_path())
+
+        if erro_origem == "multiple":
+            nomes_exibicao = sorted({
+                (item.get("defensivo__produto") or "").strip()
+                for item in itens_origem
+                if item.get("defensivo__produto")
+            })
+
+            self.message_user(
+                request,
+                "Foram encontrados múltiplos produtos diferentes na seleção: "
+                + " | ".join(nomes_exibicao),
+                level=messages.ERROR,
+            )
+            return HttpResponseRedirect(request.get_full_path())
+
+        total_registros = qs.count()
+
+        if "apply" in request.POST:
+            form = BulkReplaceAplicacaoForm(
+                request.POST,
+                produto_origem=produto_origem,
+            )
+
+            if form.is_valid():
+                produto_destino = form.cleaned_data["produto_destino"]
+                alterar_dose = form.cleaned_data["alterar_dose"]
+                nova_dose = form.cleaned_data["nova_dose"]
+                zerar_custo = form.cleaned_data["zerar_custo"]
+
+                atualizados = 0
+                conflitos = 0
+                ignorados = 0
+                programas_afetados = set()
+
+                with transaction.atomic():
+                    for app in qs:
+                        dose_final = nova_dose if alterar_dose else app.dose
+
+                        conflito = Aplicacao.objects.filter(
+                            operacao=app.operacao,
+                            defensivo=produto_destino,
+                            ativo=app.ativo,
+                            dose=dose_final,
+                        ).exclude(pk=app.pk).exists()
+
+                        if conflito:
+                            conflitos += 1
+                            continue
+
+                        mudou_algo = False
+
+                        if app.defensivo_id != produto_destino.id:
+                            app.defensivo = produto_destino
+                            mudou_algo = True
+
+                        if alterar_dose and app.dose != dose_final:
+                            app.dose = dose_final
+                            mudou_algo = True
+
+                        if zerar_custo and (app.preco or 0) != 0:
+                            app.preco = 0
+                            mudou_algo = True
+
+                        if not mudou_algo:
+                            ignorados += 1
+                            continue
+
+                        # importante: mantém a lógica do save() de Aplicacao
+                        app.save()
+                        atualizados += 1
+
+                        if app.operacao and app.operacao.programa_id:
+                            programas_afetados.add(app.operacao.programa_id)
+
+                tasks_disparadas = 0
+                tasks_ignoradas = 0
+
+                for programa_id in programas_afetados:
+                    programa = Programa.objects.filter(pk=programa_id).first()
+                    if not programa:
+                        continue
+
+                    task_name = programa.nome
+
+                    exists_running = BackgroundTaskStatus.objects.filter(
+                        task_name=task_name,
+                        status__in=["pending", "running"],
+                    ).exists()
+
+                    if exists_running:
+                        tasks_ignoradas += 1
+                        continue
+
+                    task_id = str(uuid.uuid4())
+                    BackgroundTaskStatus.objects.create(
+                        task_id=task_id,
+                        task_name=task_name,
+                        status="pending",
+                    )
+
+                    Thread(
+                        target=processar_programa_em_background,
+                        args=(task_id, programa_id),
+                        daemon=True,
+                    ).start()
+
+                    tasks_disparadas += 1
+                    request.session["task_id"] = str(task_id)
+                    request.session["executou_task"] = True
+                    request.session.modified = True
+
+                if atualizados:
+                    self.message_user(
+                        request,
+                        f"{atualizados} aplicação(ões) atualizada(s) com sucesso.",
+                        level=messages.SUCCESS,
+                    )
+
+                if conflitos:
+                    self.message_user(
+                        request,
+                        f"{conflitos} aplicação(ões) não foram alteradas por conflito de unicidade.",
+                        level=messages.WARNING,
+                    )
+
+                if ignorados:
+                    self.message_user(
+                        request,
+                        f"{ignorados} aplicação(ões) já estavam no estado final e foram ignoradas.",
+                        level=messages.INFO,
+                    )
+
+                if tasks_disparadas:
+                    self.message_user(
+                        request,
+                        f"{tasks_disparadas} tarefa(s) de reprocessamento de programa disparada(s).",
+                        level=messages.SUCCESS,
+                    )
+
+                if tasks_ignoradas:
+                    self.message_user(
+                        request,
+                        f"{tasks_ignoradas} programa(s) já tinham tarefa em andamento e foram ignorados.",
+                        level=messages.WARNING,
+                    )
+
+                return HttpResponseRedirect(request.get_full_path())
+
+        else:
+            form = BulkReplaceAplicacaoForm(produto_origem=produto_origem)
+
+        context = {
+            **self.admin_site.each_context(request),
+            "opts": self.model._meta,
+            "title": "Substituir produto em lote",
+            "form": form,
+            "queryset": qs[:20],
+            "total_registros": total_registros,
+            "produto_origem": produto_origem,
+            "action_checkbox_name": helpers.ACTION_CHECKBOX_NAME,
+            "selected": request.POST.getlist(helpers.ACTION_CHECKBOX_NAME),
+            "select_across": request.POST.get("select_across") == "1",
+            "action": "substituir_produto_em_lote",
+        }
+
+        return render(
+            request,
+            "admin/diamante/aplicacao/substituir_produto_em_lote.html",
+            context,
+        )
 @admin.register(AplicacaoPlantio)
 class AplicacaoPlantioAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
