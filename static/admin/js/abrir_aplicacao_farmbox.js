@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', function () {
     ];
 
     function iniciarSelectAvancado(elemento) {
-        if (elemento.tomselect) return; 
+        if (elemento.tomselect) return;
         new TomSelect(elemento, {
             create: false,
             sortField: {
@@ -31,8 +31,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function normalizeText(str) {
         return (str || "")
-            .normalize("NFD")                   
-            .replace(/[\u0300-\u036f]/g, "")    
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
             .toLowerCase()
             .trim();
     }
@@ -40,7 +40,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function getColorByTipo(tipo) {
         const normalizedTipo = normalizeText(tipo);
         const found = colorDict.find(c => normalizeText(c.tipo) === normalizedTipo);
-        return found ? found.color : "rgb(200,200,200)"; 
+        return found ? found.color : "rgb(200,200,200)";
     }
 
     function atualizarTipo(selectEl) {
@@ -51,7 +51,7 @@ document.addEventListener('DOMContentLoaded', function () {
             inputTipo.value = unidade;
             const cor = getColorByTipo(unidade);
             inputTipo.style.backgroundColor = cor;
-            inputTipo.style.color = "white"; 
+            inputTipo.style.color = "white";
             inputTipo.style.fontWeight = "600";
             inputTipo.style.textAlign = "center";
         }
@@ -76,7 +76,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function calcularAreaTotal() {
-        const total = obterAreaTotal(); 
+        const total = obterAreaTotal();
         const inputTotal = document.getElementById("total-area-display");
         if (inputTotal) inputTotal.value = formatarNumeroBR(total) + " Há";
         return total;
@@ -96,7 +96,7 @@ document.addEventListener('DOMContentLoaded', function () {
             case "l_ha":
                 return " - L/Há";
             default:
-                return unidadeRaw;  
+                return unidadeRaw;
         }
     }
 
@@ -166,10 +166,17 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    function rolarParaFinalDoFormulario() {
+        window.scrollTo({
+            top: document.documentElement.scrollHeight + 200,
+            behavior: "smooth"
+        });
+    }
+
     function duplicarLinha(botao) {
         const container = document.getElementById("defensivos-container");
         const linhaAtual = botao.closest(".defensivo-group");
-        
+
         // Clona a linha inteira
         const novaLinha = linhaAtual.cloneNode(true);
 
@@ -180,29 +187,29 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Pega o <select> original clonado
         const novoSelect = novaLinha.querySelector("select[name='input_id']");
-        
+
         // Restaura todas as classes e limpa os atributos de "escondido" que o Tom Select aplicou
-        novoSelect.className = "form-select form-select-sm select-busca-avancada"; 
+        novoSelect.className = "form-select form-select-sm select-busca-avancada";
         novoSelect.removeAttribute("hidden");
-        novoSelect.removeAttribute("id"); 
+        novoSelect.removeAttribute("id");
         novoSelect.removeAttribute("tabindex");
-        novoSelect.style.display = ""; 
+        novoSelect.style.display = "";
         novoSelect.style.visibility = "visible";
         novoSelect.style.opacity = "1";
         if (novoSelect.tomselect) delete novoSelect.tomselect; // Apaga o rastro do objeto JS antigo
-        
+
         // Limpa os valores
         novoSelect.value = "";
-        
+
         const novoInputDose = novaLinha.querySelector("input[name='dosage_value']");
         if (novoInputDose) novoInputDose.value = "";
-        
+
         const inputTipo = novaLinha.querySelector("input[name='tipo_defensivo']");
         if (inputTipo) {
             inputTipo.value = "";
-            inputTipo.style.backgroundColor = ""; 
+            inputTipo.style.backgroundColor = "";
         }
-        
+
         const divResultado = novaLinha.querySelector(".dose-result");
         if (divResultado) divResultado.textContent = "0,00";
 
@@ -223,10 +230,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Foca automaticamente no campo do defensivo recém criado
         setTimeout(() => {
+            rolarParaFinalDoFormulario();
+
             if (novoSelect.tomselect) {
                 novoSelect.tomselect.focus();
             }
-        }, 50);
+        }, 120);
     }
 
     function removerLinha(botao) {
@@ -359,7 +368,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 break;
             }
         }
-        
+
         if (found) {
             if (selectEl.tomselect) {
                 selectEl.tomselect.setValue(valStr);
@@ -391,7 +400,7 @@ document.addEventListener('DOMContentLoaded', function () {
             g.querySelector("input[name='dosage_value']").value = "";
             const res = g.querySelector(".dose-result");
             if (res) res.textContent = "0,00";
-            
+
             const sel = g.querySelector("select[name='input_id']");
             if (sel.tomselect) {
                 sel.tomselect.clear();
@@ -460,10 +469,10 @@ document.addEventListener('DOMContentLoaded', function () {
             const grupo = grupos[i];
             const select = grupo.querySelector("select[name='input_id']");
             const doseInput = grupo.querySelector("input[name='dosage_value']");
-            
+
             if (select.tomselect) select.tomselect.clear();
             else select.selectedIndex = 0;
-            
+
             doseInput.value = "";
             atualizarTipo(select);
         }
@@ -493,11 +502,11 @@ document.addEventListener('DOMContentLoaded', function () {
             const select = unica.querySelector("select[name='input_id']");
             const doseInput = unica.querySelector("input[name='dosage_value']");
             const res = unica.querySelector(".dose-result");
-            
-            if (select) { 
+
+            if (select) {
                 if (select.tomselect) select.tomselect.clear();
                 else select.selectedIndex = 0;
-                atualizarTipo(select); 
+                atualizarTipo(select);
             }
             if (doseInput) doseInput.value = "";
             if (res) res.textContent = "0,00";
