@@ -193,6 +193,7 @@ class OutboundMessage(models.Model):
             ("agenda_summary_director_overview", "Resumo diretoria geral"),
             ("agenda_summary_director_actions", "Ações resumo diretoria"),
             ("daily_meeting_reminder", "Lembrete reunião diária"),
+            ("daily_meeting_reminder_changed", "Lembrete reunião diária alterada"),
         ],
         db_index=True,
     )

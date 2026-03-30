@@ -175,7 +175,7 @@ def start():
                 id="opscheckin_director_agenda_summary_0730", replace_existing=True
             )
             scheduler.add_job(
-                job_run_opscheckin_daily_manager_event_tick, "cron", day_of_week="mon-sat", hour="9-17", minute="*/10",
+                job_run_opscheckin_daily_manager_event_tick, "cron", day_of_week="mon-sat", hour="9-17", minute="*/2",
                 id="opscheckin_daily_manager_event_tick", replace_existing=True
             )
 

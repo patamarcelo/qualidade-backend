@@ -120,6 +120,34 @@ def _build_due_targets(*, now_local, event_dt, allowed_window_minutes):
 
     return due
 
+def _build_schedule_change_target(*, event_dt, allowed_window_minutes, now_local):
+    """
+    Aviso de alteração só pode sair na janela de 2 minutos antes da reunião.
+    """
+    target_dt = event_dt - timedelta(minutes=2)
+    is_due, diff_minutes = _is_due_target(
+        now_local=now_local,
+        target_dt=target_dt,
+        allowed_window_minutes=allowed_window_minutes,
+    )
+    return {
+        "offset": 2,
+        "target_dt": target_dt,
+        "is_due": is_due,
+        "delay_minutes": diff_minutes,
+    }
+
+
+def _manager_had_dispatch_for_other_schedule_today(event, manager, day, scheduled_event_time):
+    return DailyManagerEventDispatch.objects.filter(
+        event=event,
+        manager=manager,
+        event_date=day,
+    ).exclude(
+        scheduled_event_time=scheduled_event_time,
+    ).exists()
+    
+    
 
 def _already_sent(event, manager, day, scheduled_event_time, target_send_time):
     return DailyManagerEventDispatch.objects.filter(
@@ -306,11 +334,18 @@ class Command(BaseCommand):
             event_dt=event_dt,
             allowed_window_minutes=allowed_window_minutes,
         )
+        
+        schedule_change_target = _build_schedule_change_target(
+            now_local=now_local,
+            event_dt=event_dt,
+            allowed_window_minutes=allowed_window_minutes,
+        )
 
         self.stdout.write(
             "[daily_manager_event_tick] "
             f"event_time={event_dt:%H:%M} "
-            f"due_targets={[(x['offset'], x['target_dt'].strftime('%H:%M'), x['is_due']) for x in due_targets]}"
+            f"due_targets={[(x['offset'], x['target_dt'].strftime('%H:%M'), x['is_due']) for x in due_targets]} "
+            f"schedule_change_target={(schedule_change_target['offset'], schedule_change_target['target_dt'].strftime('%H:%M'), schedule_change_target['is_due'])}"
         )
 
         managers = list(
@@ -375,7 +410,9 @@ class Command(BaseCommand):
                 self.stdout.write(
                     f"- {m.name} ({m.phone_e164}) | "
                     f"has_changed_schedule={has_changed_schedule} | "
-                    f"changed_notice_sent={changed_notice_sent}"
+                    f"changed_notice_sent={changed_notice_sent} | "
+                    f"change_due={schedule_change_target['is_due']} | "
+                    f"change_target={schedule_change_target['target_dt']:%H:%M}"
                 )
 
                 for item in due_targets:
@@ -402,7 +439,8 @@ class Command(BaseCommand):
         for manager in managers:
             try:
                 # -------------------------------------------------
-                # 1) Aviso imediato de alteração de horário
+                # 1) Aviso de alteração de horário
+                #    Só pode sair na janela de 2 minutos
                 # -------------------------------------------------
                 has_dispatch_today = _manager_has_any_dispatch_today(
                     event=event,
@@ -417,15 +455,18 @@ class Command(BaseCommand):
                     scheduled_event_time=scheduled_event_time,
                 )
 
+                changed_notice_sent = _reschedule_notice_already_sent(
+                    event=event,
+                    manager=manager,
+                    day=day,
+                    scheduled_event_time=scheduled_event_time,
+                )
+
                 should_send_schedule_changed_notice = (
-                    has_dispatch_today
+                    schedule_change_target["is_due"]
+                    and has_dispatch_today
                     and has_dispatch_for_other_schedule
-                    and not _reschedule_notice_already_sent(
-                        event=event,
-                        manager=manager,
-                        day=day,
-                        scheduled_event_time=scheduled_event_time,
-                    )
+                    and not changed_notice_sent
                 )
 
                 if should_send_schedule_changed_notice:
@@ -434,7 +475,7 @@ class Command(BaseCommand):
                         manager=manager,
                         day=day,
                         scheduled_event_time=scheduled_event_time,
-                        target_send_time=scheduled_event_time,  # marcador sintético
+                        target_send_time=schedule_change_target["target_dt"].time(),
                         status="schedule_changed",
                     )
 
@@ -448,7 +489,7 @@ class Command(BaseCommand):
                                 _sanitize_template_param(meeting_time_str),
                                 _sanitize_template_param(meeting_name),
                                 _sanitize_template_param(meet_link),
-                            ]
+                            ],
                         )
                         provider_id = _extract_provider_id(resp)
 
@@ -466,25 +507,26 @@ class Command(BaseCommand):
 
                         changed_sent += 1
                         logger.warning(
-                            "DAILY_EVENT_SCHEDULE_CHANGED_SENT manager=%s phone=%s event=%s day=%s new_meeting_time=%s provider_id=%s",
+                            "DAILY_EVENT_SCHEDULE_CHANGED_SENT manager=%s phone=%s event=%s day=%s new_meeting_time=%s change_target=%s provider_id=%s",
                             manager.name,
                             manager.phone_e164,
                             event.code,
                             day.isoformat(),
                             meeting_time_str,
+                            schedule_change_target["target_dt"].strftime("%H:%M"),
                             provider_id,
                         )
                     else:
                         skipped_already += 1
                         logger.warning(
-                            "DAILY_EVENT_SCHEDULE_CHANGED_ALREADY_RESERVED manager=%s phone=%s event=%s day=%s new_meeting_time=%s",
+                            "DAILY_EVENT_SCHEDULE_CHANGED_ALREADY_RESERVED manager=%s phone=%s event=%s day=%s new_meeting_time=%s change_target=%s",
                             manager.name,
                             manager.phone_e164,
                             event.code,
                             day.isoformat(),
                             meeting_time_str,
+                            schedule_change_target["target_dt"].strftime("%H:%M"),
                         )
-
                 # -------------------------------------------------
                 # 2) Lembretes normais de 60 e 10 minutos
                 # -------------------------------------------------
