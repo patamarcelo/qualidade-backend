@@ -1,3 +1,5 @@
+let preenchendoProgramaAutomaticamente = false;
+
 document.addEventListener('DOMContentLoaded', function () {
     const appData = document.getElementById("app-data");
 
@@ -167,13 +169,19 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function rolarParaFinalDoFormulario() {
+        if (preenchendoProgramaAutomaticamente) return;
+
         window.scrollTo({
             top: document.documentElement.scrollHeight + 200,
             behavior: "smooth"
         });
     }
 
-    function duplicarLinha(botao) {
+    function duplicarLinha(botao, opcoes = {}) {
+        const {
+            scrollAteFinal = true,
+            focarNovoSelect = true,
+        } = opcoes;
         const container = document.getElementById("defensivos-container");
         const linhaAtual = botao.closest(".defensivo-group");
 
@@ -229,13 +237,17 @@ document.addEventListener('DOMContentLoaded', function () {
         atualizarEstadoBotoesRemoverDefensivo();
 
         // Foca automaticamente no campo do defensivo recém criado
-        setTimeout(() => {
-            rolarParaFinalDoFormulario();
+        if (scrollAteFinal || focarNovoSelect) {
+            setTimeout(() => {
+                if (scrollAteFinal) {
+                    rolarParaFinalDoFormulario();
+                }
 
-            if (novoSelect.tomselect) {
-                novoSelect.tomselect.focus();
-            }
-        }, 120);
+                if (focarNovoSelect && novoSelect.tomselect) {
+                    novoSelect.tomselect.focus();
+                }
+            }, 120);
+        }
     }
 
     function removerLinha(botao) {
@@ -279,6 +291,8 @@ document.addEventListener('DOMContentLoaded', function () {
         if (event.target.matches("select[name='input_id']")) {
             atualizarTipo(event.target);
             verificaDefensivosSelecionados();
+
+            if (preenchendoProgramaAutomaticamente) return;
 
             if (event.target.value) {
                 const linha = event.target.closest('.defensivo-group');
@@ -371,7 +385,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (found) {
             if (selectEl.tomselect) {
-                selectEl.tomselect.setValue(valStr);
+                selectEl.tomselect.setValue(valStr, true);
             } else {
                 selectEl.value = valStr;
             }
@@ -380,18 +394,26 @@ document.addEventListener('DOMContentLoaded', function () {
         return false;
     }
 
-    function ensureRowCount(count) {
+    function ensureRowCount(count, opcoes = {}) {
         const container = document.getElementById("defensivos-container");
+
         while (container.children.length < count) {
             const lastAddBtn = container.lastElementChild?.querySelector('button.btn.btn-outline-primary.btn-sm');
-            if (lastAddBtn) lastAddBtn.click();
-            else {
+            if (lastAddBtn) {
+                duplicarLinha(lastAddBtn, opcoes);
+            } else {
                 const base = container.lastElementChild || container.querySelector('.defensivo-group');
                 container.appendChild(base.cloneNode(true));
             }
         }
+
         while (container.children.length > count && container.children.length > 1) {
-            container.lastElementChild.querySelector('.remove-defensivo-btn')?.click();
+            const removeBtn = container.lastElementChild.querySelector('.remove-defensivo-btn');
+            if (removeBtn) {
+                removerLinha(removeBtn);
+            } else {
+                container.removeChild(container.lastElementChild);
+            }
         }
     }
 
@@ -415,71 +437,81 @@ document.addEventListener('DOMContentLoaded', function () {
     function onEstagioChange() {
         const progId = selPrograma.value.trim();
         const estagioNome = selEstagio.value.trim();
-        if (!progId || !estagioNome) {
-            limparResultadosDasLinhas();
-            return;
-        }
 
-        const prog = PROGRAMAS.find(p => String(p.id) === progId);
-        if (!prog) return;
+        preenchendoProgramaAutomaticamente = true;
 
-        const estagio = prog.estagios.find(e => e.nome === estagioNome);
-        if (!estagio) {
-            limparResultadosDasLinhas();
-            return;
-        }
-
-        const itens = estagio.itens || [];
-        ensureRowCount(itens.length);
-
-        const grupos = document.querySelectorAll("#defensivos-container .defensivo-group");
-        const norm = s => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-
-        const itensOrdenados = itens
-            .map((it, i) => ({ ...it, __idx: i }))
-            .sort((a, b) => {
-                const isAOperacao = norm(a.tipo) === 'operacao';
-                const isBOperacao = norm(b.tipo) === 'operacao';
-                if (isAOperacao && !isBOperacao) return -1;
-                if (!isAOperacao && isBOperacao) return 1;
-
-                const ta = norm(a.tipo);
-                const tb = norm(b.tipo);
-                if (ta !== tb) return ta.localeCompare(tb, 'pt-BR', { sensitivity: 'base' });
-
-                return a.__idx - b.__idx;
-            });
-
-        itensOrdenados.forEach((it, idx) => {
-            const grupo = grupos[idx];
-            const select = grupo.querySelector("select[name='input_id']");
-            const doseInput = grupo.querySelector("input[name='dosage_value']");
-
-            if (setSelectByValue(select, it.id_farmbox)) {
-                atualizarTipo(select);
-            } else {
-                if (select.tomselect) select.tomselect.clear();
-                else select.selectedIndex = 0;
+        try {
+            if (!progId || !estagioNome) {
+                limparResultadosDasLinhas();
+                return;
             }
 
-            doseInput.value = (it.dose ?? "").toString();
-        });
+            const prog = PROGRAMAS.find(p => String(p.id) === progId);
+            if (!prog) return;
 
-        for (let i = itens.length; i < grupos.length; i++) {
-            const grupo = grupos[i];
-            const select = grupo.querySelector("select[name='input_id']");
-            const doseInput = grupo.querySelector("input[name='dosage_value']");
+            const estagio = prog.estagios.find(e => e.nome === estagioNome);
+            if (!estagio) {
+                limparResultadosDasLinhas();
+                return;
+            }
 
-            if (select.tomselect) select.tomselect.clear();
-            else select.selectedIndex = 0;
+            const itens = estagio.itens || [];
+            ensureRowCount(itens.length, {
+                scrollAteFinal: false,
+                focarNovoSelect: false,
+            });
 
-            doseInput.value = "";
-            atualizarTipo(select);
+            const grupos = document.querySelectorAll("#defensivos-container .defensivo-group");
+            const norm = s => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+            const itensOrdenados = itens
+                .map((it, i) => ({ ...it, __idx: i }))
+                .sort((a, b) => {
+                    const isAOperacao = norm(a.tipo) === 'operacao';
+                    const isBOperacao = norm(b.tipo) === 'operacao';
+                    if (isAOperacao && !isBOperacao) return -1;
+                    if (!isAOperacao && isBOperacao) return 1;
+
+                    const ta = norm(a.tipo);
+                    const tb = norm(b.tipo);
+                    if (ta !== tb) return ta.localeCompare(tb, 'pt-BR', { sensitivity: 'base' });
+
+                    return a.__idx - b.__idx;
+                });
+
+            itensOrdenados.forEach((it, idx) => {
+                const grupo = grupos[idx];
+                const select = grupo.querySelector("select[name='input_id']");
+                const doseInput = grupo.querySelector("input[name='dosage_value']");
+
+                if (setSelectByValue(select, it.id_farmbox)) {
+                    atualizarTipo(select);
+                } else {
+                    if (select.tomselect) select.tomselect.clear();
+                    else select.selectedIndex = 0;
+                }
+
+                doseInput.value = (it.dose ?? "").toString();
+            });
+
+            for (let i = itens.length; i < grupos.length; i++) {
+                const grupo = grupos[i];
+                const select = grupo.querySelector("select[name='input_id']");
+                const doseInput = grupo.querySelector("input[name='dosage_value']");
+
+                if (select.tomselect) select.tomselect.clear();
+                else select.selectedIndex = 0;
+
+                doseInput.value = "";
+                atualizarTipo(select);
+            }
+
+            atualizarDoseResultados();
+            verificaDefensivosSelecionados();
+            atualizarEstadoBotoesRemoverDefensivo();
+        } finally {
+            preenchendoProgramaAutomaticamente = false;
         }
-
-        atualizarDoseResultados();
-        verificaDefensivosSelecionados();
-        atualizarEstadoBotoesRemoverDefensivo();
     }
 
     selEstagio?.addEventListener('change', onEstagioChange);
