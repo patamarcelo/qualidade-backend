@@ -1674,6 +1674,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
 
     def get_search_results(self, request, queryset, search_term):
         ciclo_filter = CicloAtual.objects.filter(nome="Colheita").first()
+        ciclo_filter_plantio = CicloAtual.objects.filter(nome="Plantio").first()
 
         negate = False
         term = search_term
@@ -1695,8 +1696,10 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
 
         if model_request and model_request == "plantioextratoarea":
             queryset = queryset.filter(
-                ciclo__ciclo__in=["2", "3"],
-                safra__safra="2025/2026",
+                # ciclo__ciclo__in=["2", "3"],
+                ciclo=ciclo_filter_plantio.ciclo,
+                # safra__safra="2025/2026",
+                safra=ciclo_filter_plantio.safra,
                 finalizado_colheita=False,
                 plantio_descontinuado=False,
                 programa__isnull=False,
