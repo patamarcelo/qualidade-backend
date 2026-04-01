@@ -149,6 +149,9 @@ from .forms import BulkReplaceAplicacaoForm
 from .models import Aplicacao, Defensivo, BackgroundTaskStatus, Programa
 from .utils import processar_programa_em_background
 
+
+from django.utils.dateparse import parse_date
+
 main_path = (
     "http://127.0.0.1:8000"
     if DEBUG == True
@@ -1429,34 +1432,64 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         except Exception:
             logger.exception("Falha no update_farmbox_data (id_farmbox=%s)", id_farmbox)
 
+
     def update_data_prevista_view(self, request):
         print("Entrou na view custom de update")
-        next_url = request.GET.get('next', '..')
+
+        next_url = request.GET.get('next') or request.POST.get('next') or '..'
         ids = request.GET.get('ids', '')
-        pks = ids.split(',')
+
+        if request.method == 'POST':
+            raw_ids = request.POST.getlist("row_plantio_ids")
+            pks = []
+            invalid_ids = []
+
+            for raw in raw_ids:
+                try:
+                    clean = int(str(raw).replace(".", "").strip())
+                    pks.append(clean)
+                except Exception:
+                    invalid_ids.append(raw)
+
+            print("IDs limpos:", pks)
+            print("IDs inválidos:", invalid_ids)
+        else:
+            raw_ids = [pk for pk in ids.split(',') if pk]
+
+            pks = []
+            for raw in raw_ids:
+                try:
+                    pks.append(int(str(raw).replace(".", "").strip()))
+                except Exception:
+                    pass
+
         queryset = self.model.objects.filter(pk__in=pks).select_related(
             'programa',
             'variedade',
+            'variedade__cultura',
             'talhao',
             'talhao__fazenda',
-        ).only(
-            'programa__nome',
-            'variedade__variedade',
-            'talhao__id_talhao',
-            'talhao__fazenda__nome',
-            'safra',
-            'ciclo',
-            'area_colheita',
-            'data_prevista_plantio'
         )
-        total_area = queryset.aggregate(total_area_colheita=Sum('area_colheita'))['total_area_colheita']
+
+        total_area = queryset.aggregate(
+            total_area_colheita=Sum('area_colheita')
+        )['total_area_colheita']
 
         if request.method == 'POST':
+            print("POST RECEBIDO")
+            print("GET ids no POST:", request.GET.get('ids'))
+            print("POST:", request.POST)
+
             form = UpdateDataPrevistaPlantioForm(request.POST)
+
             if not form.is_valid():
                 print("FORM ERRORS:", form.errors)
-            if form.is_valid():
-                nova_data = form.cleaned_data.get('data_prevista_plantio')
+                self.message_user(
+                    request,
+                    f"Form inválido: {form.errors}",
+                    level=messages.ERROR
+                )
+            else:
                 novo_programa = form.cleaned_data.get('programa')
                 nova_variedade = form.cleaned_data.get('variedade')
 
@@ -1468,53 +1501,98 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
 
                 should_update_on_farm = form.cleaned_data.get('should_update_on_farm')
 
-                updated_count = 0
+                row_plantio_ids = request.POST.getlist("row_plantio_ids")
+                per_row_dates = {}
+                invalid_rows = []
 
-                for instance in queryset:
-                    print('id Farm: ', instance.id_farmbox)
+                for row_id_raw in row_plantio_ids:
+                    row_id_key = str(row_id_raw).replace(".", "").strip()
+                    raw_value = (request.POST.get(f"row_data_prevista_plantio_{row_id_raw}") or "").strip()
 
-                    old_programa = instance.programa
+                    print("row bruto:", row_id_raw, "row limpo:", row_id_key, "raw_value:", raw_value)
 
-                    if nova_data:
-                        print('nova Data: ', nova_data)
-                        instance.data_prevista_plantio = nova_data
+                    if not raw_value:
+                        per_row_dates[row_id_key] = None
+                        continue
 
-                    if clear_prog:
-                        instance.programa = None
-                        instance.cronograma_programa = None
-                    elif sent_prog and novo_programa:
-                        if old_programa != novo_programa:
+                    try:
+                        per_row_dates[row_id_key] = datetime.strptime(raw_value, "%d/%m/%Y").date()
+                    except ValueError:
+                        invalid_rows.append(row_id_key)
+
+                print("per_row_dates:", per_row_dates)
+
+                if invalid_rows:
+                    self.message_user(
+                        request,
+                        f"Existem datas inválidas nas linhas: {', '.join(invalid_rows)}.",
+                        level=messages.ERROR
+                    )
+                else:
+                    updated_count = 0
+
+                    for instance in queryset:
+                        old_programa = instance.programa
+                        old_variedade = instance.variedade
+
+                        final_date = per_row_dates.get(str(instance.pk), None)
+
+                        changed = False
+
+                        if instance.data_prevista_plantio != final_date:
                             print(
-                                'Programa alterado: ',
-                                'antes =', old_programa.id if old_programa else None,
-                                'depois =', novo_programa.id
+                                f"Plantio {instance.pk} alterando data de "
+                                f"{instance.data_prevista_plantio} para {final_date}"
                             )
-                            instance.programa = novo_programa
-                            instance.cronograma_programa = None
+                            instance.data_prevista_plantio = final_date
+                            changed = True
 
-                    if clear_var:
-                        instance.variedade = None
-                    elif sent_var and nova_variedade:
-                        print(
-                            'id Farm: ', instance.id_farmbox,
-                            'planned_variety_id', nova_variedade.id_farmbox,
-                            'planned_culture_id', nova_variedade.cultura.id_farmbox
-                        )
-                        instance.variedade = nova_variedade
+                        if clear_prog:
+                            if instance.programa is not None or instance.cronograma_programa is not None:
+                                instance.programa = None
+                                instance.cronograma_programa = None
+                                changed = True
+                        elif sent_prog and novo_programa:
+                            if old_programa != novo_programa:
+                                print(
+                                    'Programa alterado: ',
+                                    'antes =', old_programa.id if old_programa else None,
+                                    'depois =', novo_programa.id
+                                )
+                                instance.programa = novo_programa
+                                instance.cronograma_programa = None
+                                changed = True
 
-                    instance.save()
-                    updated_count += 1
+                        if clear_var:
+                            if instance.variedade is not None:
+                                instance.variedade = None
+                                changed = True
+                        elif sent_var and nova_variedade:
+                            if old_variedade != nova_variedade:
+                                print(
+                                    'Variedade alterada: ',
+                                    'antes =', old_variedade.id if old_variedade else None,
+                                    'depois =', nova_variedade.id
+                                )
+                                instance.variedade = nova_variedade
+                                changed = True
 
-                    if should_update_on_farm:
-                        transaction.on_commit(lambda i=instance: self._enqueue_farmbox_call(
-                            i.id_farmbox,
-                            str(i.data_prevista_plantio) if i.data_prevista_plantio else None,
-                            i.variedade.id_farmbox if i.variedade else None,
-                            i.variedade.cultura.id_farmbox if (i.variedade and i.variedade.cultura) else None,
-                        ))
+                        if changed:
+                            instance.save()
+                            updated_count += 1
 
-                self.message_user(request, f'{updated_count} registros atualizados com sucesso.')
-                return redirect(next_url)
+                            if should_update_on_farm:
+                                transaction.on_commit(
+                                    lambda i=instance: self._enqueue_farmbox_call(
+                                        i.id_farmbox,
+                                        str(i.data_prevista_plantio) if i.data_prevista_plantio else None,
+                                        i.variedade.id_farmbox if i.variedade else None,
+                                        i.variedade.cultura.id_farmbox if (i.variedade and i.variedade.cultura) else None,
+                                    )
+                                )
+
+                    self.message_user(request, f'{updated_count} registros atualizados com sucesso.')
+                    return redirect(next_url)
         else:
             form = UpdateDataPrevistaPlantioForm()
 
@@ -1525,8 +1603,11 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
             total_area_selected=total_area,
             title='Atualizar Data Prevista de Plantio',
             next_url=next_url,
+            ids=ids,
         )
         return render(request, 'admin/update_data_prevista.html', context)
+
+
 
     def view_cronograma_programa(self, request, obj_id):
         plantio = get_object_or_404(Plantio, id=obj_id)
