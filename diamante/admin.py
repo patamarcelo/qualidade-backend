@@ -5032,19 +5032,25 @@ class AlertRuleAdmin(admin.ModelAdmin):
 
 @admin.register(FarmPolygon)
 class FarmPolygonAdmin(admin.ModelAdmin):
+    change_list_template = "admin/teste_farmpolygon.html"
+
     list_display = (
-        "id",
-        "name",
-        "farm_name",
-        "user_name",
-        "submitted_email",
-        "mode",
-        "is_closed",
-        "is_active",
-        "points_count",
-        "created_at",
-        "updated_at",
-    )
+    "id",
+    "name",
+    "farm_name",
+    "user_name",
+    "submitted_email",
+    "mode_badge",
+    "is_closed_badge",
+    "is_active_badge",
+    "points_count",
+    "area_ha",
+    "preview_button",
+    "export_kml_button",
+    "created_at",
+    "updated_at",
+)
+
     list_filter = (
         "mode",
         "is_closed",
@@ -5052,16 +5058,19 @@ class FarmPolygonAdmin(admin.ModelAdmin):
         "created_at",
         "updated_at",
     )
+
     search_fields = (
         "name",
         "farm_name",
         "user_name",
         "submitted_email",
     )
+
     readonly_fields = (
         "created_at",
         "updated_at",
         "points_pretty",
+        "map_preview",
     )
 
     fieldsets = (
@@ -5078,6 +5087,7 @@ class FarmPolygonAdmin(admin.ModelAdmin):
         }),
         ("Geometria", {
             "fields": (
+                "map_preview",
                 "points",
                 "points_pretty",
                 "area_m2",
@@ -5097,11 +5107,167 @@ class FarmPolygonAdmin(admin.ModelAdmin):
         }),
     )
 
+    class Media:
+        css = {
+            "all": (
+                "admin/farmpolygon/farmpolygon_admin.css",
+            )
+        }
+        js = (
+            "admin/farmpolygon/farmpolygon_admin.js",
+        )
+    def preview_button(self, obj):
+        url = reverse("admin:diamante_farmpolygon_preview", args=[obj.pk])
+        return format_html(
+            '<button type="button" class="button fp-preview-btn" data-preview-url="{}">Preview</button>',
+            url,
+        )
+    preview_button.short_description = "Mapa"
+    
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path(
+                "<int:polygon_id>/preview/",
+                self.admin_site.admin_view(self.preview_polygon_view),
+                name="diamante_farmpolygon_preview",
+            ),
+            path(
+                "<int:polygon_id>/export-kml/",
+                self.admin_site.admin_view(self.export_kml_view),
+                name="diamante_farmpolygon_export_kml",
+            ),
+        ]
+        return custom_urls + urls
+
+    def preview_polygon_view(self, request, polygon_id):
+        obj = self.get_object(request, polygon_id)
+        if not obj:
+            return JsonResponse({"error": "Polígono não encontrado"}, status=404)
+
+        return JsonResponse(
+            {
+                "id": obj.id,
+                "name": obj.name,
+                "farm_name": obj.farm_name,
+                "user_name": obj.user_name,
+                "submitted_email": obj.submitted_email,
+                "mode": obj.get_mode_display() if hasattr(obj, "get_mode_display") else obj.mode,
+                "is_closed": obj.is_closed,
+                "is_active": obj.is_active,
+                "area_m2": float(obj.area_m2) if obj.area_m2 is not None else None,
+                "perimeter_m": float(obj.perimeter_m) if obj.perimeter_m is not None else None,
+                "observation": obj.observation or "",
+                "points": obj.points or [],
+            },
+            encoder=DjangoJSONEncoder,
+        )
+
+    def export_kml_view(self, request, polygon_id):
+        obj = self.get_object(request, polygon_id)
+        if not obj:
+            return HttpResponse("Polígono não encontrado", status=404)
+
+        points = obj.points or []
+        if not points:
+            return HttpResponse("Polígono sem pontos", status=400)
+
+        coordinates = []
+        for p in points:
+            lng = p.get("lng") or p.get("longitude") or p.get("lon")
+            lat = p.get("lat") or p.get("latitude")
+            if lat is None or lng is None:
+                continue
+            coordinates.append(f"{lng},{lat},0")
+
+        if obj.is_closed and coordinates:
+            if coordinates[0] != coordinates[-1]:
+                coordinates.append(coordinates[0])
+
+        kml = f'''<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>{obj.name}</name>
+    <Placemark>
+      <name>{obj.name}</name>
+      <description>Fazenda: {obj.farm_name}</description>
+      {"<Polygon><outerBoundaryIs><LinearRing><coordinates>" + " ".join(coordinates) + "</coordinates></LinearRing></outerBoundaryIs></Polygon>" if obj.is_closed else "<LineString><coordinates>" + " ".join(coordinates) + "</coordinates></LineString>"}
+    </Placemark>
+  </Document>
+</kml>'''
+
+        response = HttpResponse(kml, content_type="application/vnd.google-earth.kml+xml")
+        response["Content-Disposition"] = f'attachment; filename="{obj.name}.kml"'
+        return response
+
     def points_count(self, obj):
         return len(obj.points or [])
     points_count.short_description = "Qtd. pontos"
 
+    def area_ha(self, obj):
+        if not obj.area_m2:
+            return "-"
+        return f"{float(obj.area_m2) / 10000:.2f} ha"
+    area_ha.short_description = "Área"
+
     def points_pretty(self, obj):
-        import json
         return json.dumps(obj.points or [], indent=2, ensure_ascii=False)
     points_pretty.short_description = "Points formatado"
+
+    def mode_badge(self, obj):
+        color = "#2563eb" if obj.mode == FarmPolygon.MODE_MANUAL else "#7c3aed"
+        label = obj.get_mode_display() if hasattr(obj, "get_mode_display") else obj.mode
+        return format_html(
+            '<span class="fp-badge" style="background:{}15;color:{};">{}</span>',
+            color,
+            color,
+            label,
+        )
+    mode_badge.short_description = "Modo"
+
+    def is_closed_badge(self, obj):
+        if obj.is_closed:
+            return format_html('<span class="fp-badge" style="background:#16a34a15;color:#16a34a;">Fechado</span>')
+        return format_html('<span class="fp-badge" style="background:#f59e0b15;color:#b45309;">Aberto</span>')
+    is_closed_badge.short_description = "Fechado"
+
+    def is_active_badge(self, obj):
+        if obj.is_active:
+            return format_html('<span class="fp-badge" style="background:#16a34a15;color:#16a34a;">Ativo</span>')
+        return format_html('<span class="fp-badge" style="background:#ef444415;color:#b91c1c;">Inativo</span>')
+    is_active_badge.short_description = "Status"
+
+    def preview_button(self, obj):
+        url = reverse("admin:diamante_farmpolygon_preview", args=[obj.pk])
+        return format_html(
+            '<button type="button" class="button fp-preview-btn" data-preview-url="{}">Preview</button>',
+            url,
+        )
+    preview_button.short_description = "Mapa"
+
+    def export_kml_button(self, obj):
+        url = reverse("admin:diamante_farmpolygon_export_kml", args=[obj.pk])
+        return format_html(
+            '<a class="button fp-kml-btn" href="{}">KML</a>',
+            url,
+        )
+    export_kml_button.short_description = "Exportar"
+
+    def map_preview(self, obj):
+        if not obj.pk:
+            return "Salve o objeto para visualizar o mapa."
+        preview_url = reverse("admin:diamante_farmpolygon_preview", args=[obj.pk])
+        return format_html(
+            '''
+            <div class="fp-form-preview-wrap">
+                <div class="fp-form-preview-header">
+                    <strong>Preview do polígono</strong>
+                </div>
+                <div id="fp-form-map"
+                     class="fp-form-map"
+                     data-preview-url="{}"></div>
+            </div>
+            ''',
+            preview_url,
+        )
+    map_preview.short_description = "Mapa"
