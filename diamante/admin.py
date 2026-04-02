@@ -3835,45 +3835,6 @@ class AplicacaoAdmin(admin.ModelAdmin):
                     app.save()
                     atualizados += 1
 
-                    if app.operacao and app.operacao.programa_id:
-                        programas_afetados.add(app.operacao.programa_id)
-
-            tasks_disparadas = 0
-            tasks_ignoradas = 0
-
-            for programa_id in programas_afetados:
-                programa = Programa.objects.filter(pk=programa_id).first()
-                if not programa:
-                    continue
-
-                task_name = programa.nome
-
-                exists_running = BackgroundTaskStatus.objects.filter(
-                    task_name=task_name,
-                    status__in=["pending", "running"],
-                ).exists()
-
-                if exists_running:
-                    tasks_ignoradas += 1
-                    continue
-
-                task_id = str(uuid.uuid4())
-                BackgroundTaskStatus.objects.create(
-                    task_id=task_id,
-                    task_name=task_name,
-                    status="pending",
-                )
-
-                Thread(
-                    target=processar_programa_em_background,
-                    args=(task_id, programa_id),
-                    daemon=True,
-                ).start()
-
-                tasks_disparadas += 1
-                request.session["task_id"] = str(task_id)
-                request.session["executou_task"] = True
-                request.session.modified = True
 
             if atualizados:
                 self.message_user(
@@ -3893,20 +3854,6 @@ class AplicacaoAdmin(admin.ModelAdmin):
                 self.message_user(
                     request,
                     f"{erros} aplicação(ões) tiveram erro de preenchimento no preço.",
-                    level=messages.WARNING,
-                )
-
-            if tasks_disparadas:
-                self.message_user(
-                    request,
-                    f"{tasks_disparadas} tarefa(s) de reprocessamento de programa disparada(s).",
-                    level=messages.SUCCESS,
-                )
-
-            if tasks_ignoradas:
-                self.message_user(
-                    request,
-                    f"{tasks_ignoradas} programa(s) já tinham tarefa em andamento e foram ignorados.",
                     level=messages.WARNING,
                 )
 
