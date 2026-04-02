@@ -5107,15 +5107,6 @@ class FarmPolygonAdmin(admin.ModelAdmin):
         }),
     )
 
-    class Media:
-        css = {
-            "all": (
-                "admin/farmpolygon/farmpolygon_admin.css",
-            )
-        }
-        js = (
-            "admin/farmpolygon/farmpolygon_admin.js",
-        )
     def preview_button(self, obj):
         url = reverse("admin:diamante_farmpolygon_preview", args=[obj.pk])
         return format_html(
