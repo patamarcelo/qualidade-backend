@@ -3348,6 +3348,24 @@ class DefensivoAdmin(admin.ModelAdmin):
     exclude = ('observacao',)  # <-- aqui você informa o campo a excluir
 
 
+class TipoDefensivoFilter(SimpleListFilter):
+    title = "Tipo Defensivo"
+    parameter_name = "tipo_defensivo"
+
+    def lookups(self, request, model_admin):
+        return (
+            ("insumos", "Somente insumos (≠ Operação)"),
+            ("operacao", "Somente Operação"),
+        )
+
+    def queryset(self, request, queryset):
+        if self.value() == "insumos":
+            return queryset.exclude(defensivo__tipo="operacao")
+
+        if self.value() == "operacao":
+            return queryset.filter(defensivo__tipo="Operação")
+
+        return queryset
 
 def _normalizar_nome_produto(nome):
     return " ".join((nome or "").strip().upper().split())
@@ -3388,6 +3406,7 @@ class AplicacaoAdmin(admin.ModelAdmin):
         ProgramaAplicacaoFilter,
         PrecoPreenchidoFilter,
         DefensivoIdFarmboxFilter,
+        TipoDefensivoFilter,
     ]
 
     def get_queryset(self, request):
