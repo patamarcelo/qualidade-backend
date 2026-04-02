@@ -1,0 +1,662 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+  :root {
+    --card-bg: #fff;
+    --card-border: #e5e7eb;
+    --muted: #6b7280;
+    --text: #111827;
+    --primary: #2563eb;
+    --primary-hover: #1d4ed8;
+    --success: #059669;
+    --bg-soft: #f8fafc;
+    --row-hover: #f3f7ff;
+    --warning-bg: #fff7ed;
+    --shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+    --radius: 14px;
+  }
+
+  #content-main {
+    max-width: 100%;
+  }
+
+  .bulk-page {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .page-header-card,
+  .bulk-fill-card,
+  .table-card,
+  .footer-actions {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+  }
+
+  .page-header-card {
+    padding: 20px 22px;
+    background: linear-gradient(135deg, #ffffff 0%, #f8fbff 100%);
+  }
+
+  .page-header-top {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+  }
+
+  .page-title {
+    margin: 0;
+    font-size: 26px;
+    line-height: 1.2;
+    color: var(--text);
+  }
+
+  .page-subtitle {
+    margin: 8px 0 0 0;
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  .stats-wrap {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .stat-box {
+    min-width: 150px;
+    background: #fff;
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 12px 14px;
+  }
+
+  .stat-label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+
+  .stat-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .bulk-fill-card {
+    padding: 18px 20px;
+  }
+
+  .bulk-fill-title {
+    margin: 0 0 6px 0;
+    font-size: 18px;
+    color: var(--text);
+  }
+
+  .bulk-fill-desc {
+    margin: 0 0 16px 0;
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  .bulk-toolbar {
+    display: grid;
+    grid-template-columns: 160px 160px auto;
+    gap: 12px;
+    align-items: end;
+  }
+
+  .field-group label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+
+  .field-group input,
+  .field-group select {
+    width: 100%;
+    height: 42px;
+    border: 1px solid #d1d5db;
+    border-radius: 10px;
+    padding: 0 12px;
+    font-size: 14px;
+    background: #fff;
+    box-sizing: border-box;
+  }
+
+  .field-group input:focus,
+  .field-group select:focus,
+  .table-input:focus,
+  .table-select:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  }
+
+  .bulk-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .btn {
+    height: 42px;
+    border: 0;
+    border-radius: 10px;
+    padding: 0 16px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 14px;
+    transition: 0.18s ease;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+  }
+
+  .btn-primary {
+    background: var(--primary);
+    color: #fff;
+  }
+
+  .btn-primary:hover {
+    background: var(--primary-hover);
+  }
+
+  .btn-secondary {
+    background: #eef2ff;
+    color: #1e3a8a;
+  }
+
+  .btn-secondary:hover {
+    background: #dbeafe;
+  }
+
+  .btn-success {
+    background: var(--success);
+    color: #fff;
+  }
+
+  .btn-success:hover {
+    filter: brightness(0.95);
+  }
+
+  .btn-light {
+    background: #f3f4f6;
+    color: #111827;
+  }
+
+  .btn-light:hover {
+    background: #e5e7eb;
+  }
+
+  .btn[disabled] {
+    opacity: 0.75;
+    cursor: not-allowed;
+  }
+
+  .hint-box {
+    margin-top: 14px;
+    background: var(--warning-bg);
+    border: 1px solid #fed7aa;
+    border-radius: 12px;
+    padding: 12px 14px;
+    color: #9a3412;
+    font-size: 13px;
+  }
+
+  .table-card {
+    overflow: hidden;
+  }
+
+  .table-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--card-border);
+    background: #fcfcfd;
+  }
+
+  .table-header h3 {
+    margin: 0;
+    font-size: 17px;
+    color: var(--text);
+  }
+
+  .table-header p {
+    margin: 4px 0 0 0;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .table-wrapper {
+    overflow: auto;
+    max-height: 70vh;
+  }
+
+  table.bulk-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    min-width: 1450px;
+  }
+
+  .bulk-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    background: #f8fafc;
+    color: #374151;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 12px 10px;
+    border-bottom: 1px solid var(--card-border);
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  .bulk-table tbody td {
+    padding: 10px;
+    border-bottom: 1px solid #eef2f7;
+    vertical-align: middle;
+    background: #fff;
+  }
+
+  .bulk-table tbody tr:nth-child(even) td {
+    background: #fcfdff;
+  }
+
+  .bulk-table tbody tr:hover td {
+    background: var(--row-hover);
+  }
+
+  .sticky-col {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: inherit !important;
+    box-shadow: 1px 0 0 #eef2f7;
+  }
+
+  .sticky-col-header {
+    position: sticky !important;
+    left: 0;
+    z-index: 5 !important;
+    background: #f8fafc !important;
+    box-shadow: 1px 0 0 #e5e7eb;
+  }
+
+  .id-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 52px;
+    padding: 5px 10px;
+    background: #eff6ff;
+    color: #1d4ed8;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 12px;
+  }
+
+  .main-text {
+    font-weight: 600;
+    color: #111827;
+  }
+
+  .sub-text {
+    display: block;
+    margin-top: 3px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .table-input,
+  .table-select {
+    width: 100%;
+    min-width: 110px;
+    height: 38px;
+    border: 1px solid #d1d5db;
+    border-radius: 10px;
+    padding: 0 10px;
+    font-size: 14px;
+    box-sizing: border-box;
+    background: #fff;
+  }
+
+  .money-col {
+    width: 130px;
+  }
+
+  .readonly-money {
+    font-weight: 700;
+    color: #0f172a;
+  }
+
+  .footer-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 6;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    background: rgba(255, 255, 255, 0.96);
+    backdrop-filter: blur(10px);
+  }
+
+  .footer-left {
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .footer-right {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255,255,255,0.45);
+    border-top-color: #fff;
+    border-radius: 50%;
+    display: inline-block;
+    animation: spin 0.8s linear infinite;
+    margin-right: 8px;
+  }
+
+  .hidden {
+    display: none !important;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  @media (max-width: 1100px) {
+    .bulk-toolbar {
+      grid-template-columns: 1fr;
+    }
+
+    .footer-actions {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .footer-right {
+      width: 100%;
+    }
+
+    .footer-right .btn,
+    .bulk-actions .btn {
+      width: 100%;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="bulk-page">
+  <form method="post" id="bulk-price-form" action="">
+    {% csrf_token %}
+    <input type="hidden" name="ids" value="{{ ids }}">
+    <input type="hidden" name="next" value="{{ next }}">
+    <input type="hidden" name="bulk_preco_submit" id="bulk_preco_submit">
+    <input type="hidden" name="bulk_moeda_submit" id="bulk_moeda_submit">
+
+
+    <section class="bulk-fill-card">
+      <div class="page-header-top">
+        <div>
+          <h1 class="page-title">{{ title }}</h1>
+          <p class="page-subtitle">
+            Edite vários preços de uma vez, em formato de tabela, sem depender do POST da action padrão do admin.
+          </p>
+        </div>
+
+        <div class="stats-wrap">
+          <div class="stat-box">
+            <div class="stat-label">Selecionados</div>
+            <div class="stat-value">{{ total_registros }}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bulk-toolbar">
+        <div class="field-group">
+          <label for="bulk_preco">Preço para todos</label>
+          <input
+            type="number"
+            step="0.0001"
+            id="bulk_preco"
+            placeholder="Ex.: 125.5000"
+          >
+        </div>
+
+        <div class="field-group">
+          <label for="bulk_moeda">Moeda para todos</label>
+          <select id="bulk_moeda">
+            <option value="">Selecione</option>
+            {% for value, label in moeda_choices %}
+              <option value="{{ value }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="bulk-actions">
+          <button type="button" class="btn btn-secondary" id="apply-price-all">
+            Aplicar preço em todos
+          </button>
+          <button type="button" class="btn btn-secondary" id="apply-currency-all">
+            Aplicar moeda em todos
+          </button>
+          <button type="button" class="btn btn-primary" id="apply-both-all">
+            Aplicar preço + moeda
+          </button>
+          <button type="button" class="btn btn-light" id="clear-bulk-fields">
+            Limpar topo
+          </button>
+        </div>
+      </div>
+
+      <div class="hint-box">
+        Você pode usar o topo de 2 formas: clicar em “Aplicar...” para refletir visualmente na tabela, ou simplesmente preencher e salvar, porque agora o backend também considera esses campos.
+      </div>
+    </section>
+
+    <section class="table-card">
+      <div class="table-header">
+        <div>
+          <h3>Tabela de edição</h3>
+          <p>Altere individualmente onde precisar antes de salvar.</p>
+        </div>
+      </div>
+
+      <div class="table-wrapper">
+        <table class="bulk-table">
+          <thead>
+            <tr>
+              <th class="sticky-col-header">Defensivo</th>
+              <th>Programa</th>
+              <th>Safra</th>
+              <th>Ciclo</th>
+              <th>Estágio</th>
+              <th>Dose</th>
+              <th>Preço atual</th>
+              <th>Moeda atual</th>
+              <th class="money-col">Novo preço</th>
+              <th>Nova moeda</th>
+              <th>Valor final</th>
+              <th>Valor aplicação</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for obj in queryset %}
+              <tr>
+                <td class="sticky-col">
+                  <span class="main-text">{{ obj.defensivo }}</span>
+                </td>
+
+                <td>
+                  <span class="main-text">{{ obj.operacao.programa.nome }}</span>
+                  {% if obj.operacao.programa.nome_fantasia %}
+                    <span class="sub-text">{{ obj.operacao.programa.nome_fantasia }}</span>
+                  {% endif %}
+                </td>
+
+                <td><span class="main-text">{{ obj.operacao.programa.safra }}</span></td>
+                <td><span class="main-text">{{ obj.operacao.programa.ciclo }}</span></td>
+                <td><span class="main-text">{{ obj.operacao.estagio }}</span></td>
+                <td><span class="main-text">{{ obj.dose }}</span></td>
+                <td><span class="readonly-money">{{ obj.preco|default_if_none:"-" }}</span></td>
+                <td><span class="main-text">{{ obj.moeda|default_if_none:"-" }}</span></td>
+
+                <td class="money-col">
+                  <input
+                    type="number"
+                    step="0.0001"
+                    name="row_{{ obj.pk }}_preco"
+                    value="{{ obj.preco|default_if_none:'' }}"
+                    class="table-input js-preco-input"
+                    placeholder="Preço"
+                  >
+                </td>
+
+                <td>
+                  <select
+                    name="row_{{ obj.pk }}_moeda"
+                    class="table-select js-moeda-input"
+                  >
+                    {% for value, label in moeda_choices %}
+                      <option value="{{ value }}" {% if obj.moeda == value %}selected{% endif %}>
+                        {{ label }}
+                      </option>
+                    {% endfor %}
+                  </select>
+                </td>
+
+                <td><span class="readonly-money">{{ obj.valor_final|default_if_none:"-" }}</span></td>
+                <td><span class="readonly-money">{{ obj.valor_aplicacao|default_if_none:"-" }}</span></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="footer-actions">
+      <div class="footer-left">
+        Revise os valores e clique em salvar para atualizar todas as linhas alteradas.
+      </div>
+
+      <div class="footer-right">
+        <a href="{{ changelist_url }}" class="btn btn-light" id="cancel-btn">Cancelar</a>
+
+        <button type="submit" class="btn btn-success" id="save-btn">
+          <span class="spinner hidden" id="save-spinner"></span>
+          <span id="save-btn-text">Salvar alterações</span>
+        </button>
+      </div>
+    </section>
+  </form>
+</div>
+
+<script>
+  (function () {
+    const form = document.getElementById("bulk-price-form");
+
+    const bulkPreco = document.getElementById("bulk_preco");
+    const bulkMoeda = document.getElementById("bulk_moeda");
+    const bulkPrecoSubmit = document.getElementById("bulk_preco_submit");
+    const bulkMoedaSubmit = document.getElementById("bulk_moeda_submit");
+
+    const applyPriceBtn = document.getElementById("apply-price-all");
+    const applyCurrencyBtn = document.getElementById("apply-currency-all");
+    const applyBothBtn = document.getElementById("apply-both-all");
+    const clearBulkBtn = document.getElementById("clear-bulk-fields");
+
+    const precoInputs = document.querySelectorAll(".js-preco-input");
+    const moedaInputs = document.querySelectorAll(".js-moeda-input");
+
+    const saveBtn = document.getElementById("save-btn");
+    const cancelBtn = document.getElementById("cancel-btn");
+    const saveSpinner = document.getElementById("save-spinner");
+    const saveBtnText = document.getElementById("save-btn-text");
+
+    function syncBulkHiddenFields() {
+      bulkPrecoSubmit.value = bulkPreco.value || "";
+      bulkMoedaSubmit.value = bulkMoeda.value || "";
+    }
+
+    function applyPriceToAll() {
+      const value = bulkPreco.value;
+      if (value === "") return;
+      precoInputs.forEach((input) => {
+        input.value = value;
+      });
+      syncBulkHiddenFields();
+    }
+
+    function applyCurrencyToAll() {
+      const value = bulkMoeda.value;
+      if (value === "") return;
+      moedaInputs.forEach((select) => {
+        select.value = value;
+      });
+      syncBulkHiddenFields();
+    }
+
+    function applyBothToAll() {
+      applyPriceToAll();
+      applyCurrencyToAll();
+    }
+
+    function clearBulkFields() {
+      bulkPreco.value = "";
+      bulkMoeda.value = "";
+      syncBulkHiddenFields();
+    }
+
+    bulkPreco.addEventListener("input", syncBulkHiddenFields);
+    bulkMoeda.addEventListener("change", syncBulkHiddenFields);
+
+    applyPriceBtn.addEventListener("click", applyPriceToAll);
+    applyCurrencyBtn.addEventListener("click", applyCurrencyToAll);
+    applyBothBtn.addEventListener("click", applyBothToAll);
+    clearBulkBtn.addEventListener("click", clearBulkFields);
+
+    form.addEventListener("submit", function () {
+      syncBulkHiddenFields();
+
+      saveBtn.disabled = true;
+      applyPriceBtn.disabled = true;
+      applyCurrencyBtn.disabled = true;
+      applyBothBtn.disabled = true;
+      clearBulkBtn.disabled = true;
+      if (cancelBtn) cancelBtn.style.pointerEvents = "none";
+
+      saveSpinner.classList.remove("hidden");
+      saveBtnText.textContent = "Salvando...";
+    });
+  })();
+</script>
+{% endblock %}

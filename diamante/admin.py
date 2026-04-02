@@ -101,7 +101,7 @@ from django.utils import timezone
 from uuid import UUID
 
 
-from decimal import Decimal, DivisionByZero
+from decimal import Decimal, DivisionByZero, InvalidOperation
 from django.shortcuts import render, redirect, get_object_or_404
 from types import SimpleNamespace
 
@@ -3351,10 +3351,9 @@ class DefensivoAdmin(admin.ModelAdmin):
 
 def _normalizar_nome_produto(nome):
     return " ".join((nome or "").strip().upper().split())
-
 @admin.register(Aplicacao)
 class AplicacaoAdmin(admin.ModelAdmin):
-    actions = [export_programa, "substituir_produto_em_lote"]
+    actions = [export_programa, "substituir_produto_em_lote", "editar_precos_em_lote"]
 
     show_full_result_count = False
     autocomplete_fields = ["defensivo", "operacao"]
@@ -3404,6 +3403,18 @@ class AplicacaoAdmin(admin.ModelAdmin):
                 "operacao__programa__cultura",
             )
         )
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path(
+                "editar-precos-em-lote/",
+                self.admin_site.admin_view(self.editar_precos_em_lote_view),
+                name="diamante_aplicacao_editar_precos_em_lote",
+            ),
+        ]
+        return custom_urls + urls
+
     def operacao_link(self, obj):
         if not obj.operacao_id:
             return "-"
@@ -3442,7 +3453,14 @@ class AplicacaoAdmin(admin.ModelAdmin):
         if select_across:
             return queryset
 
-        return self.model.objects.filter(pk__in=selected_ids)
+        valid_ids = []
+        for _id in selected_ids:
+            try:
+                valid_ids.append(int(_id))
+            except (ValueError, TypeError):
+                continue
+
+        return self.model.objects.filter(pk__in=valid_ids)
 
     def _get_produto_origem_da_selecao(self, qs):
         itens_origem = list(
@@ -3557,7 +3575,6 @@ class AplicacaoAdmin(admin.ModelAdmin):
                             ignorados += 1
                             continue
 
-                        # importante: mantém a lógica do save() de Aplicacao
                         app.save()
                         atualizados += 1
 
@@ -3658,6 +3675,258 @@ class AplicacaoAdmin(admin.ModelAdmin):
         return render(
             request,
             "admin/diamante/aplicacao/substituir_produto_em_lote.html",
+            context,
+        )
+        
+        
+
+    @admin.action(description="Editar preços em lote")
+    def editar_precos_em_lote(self, request, queryset):
+        qs = (
+            self._get_action_queryset(request, queryset)
+            .select_related(
+                "defensivo",
+                "operacao",
+                "operacao__programa",
+                "operacao__programa__safra",
+                "operacao__programa__ciclo",
+            )
+            .order_by("operacao__programa__nome", "operacao__estagio", "defensivo__produto", "id")
+        )
+
+        ids = list(qs.values_list("id", flat=True))
+
+        if not ids:
+            self.message_user(
+                request,
+                "Nenhuma aplicação válida foi selecionada.",
+                level=messages.WARNING,
+            )
+            return HttpResponseRedirect(request.get_full_path())
+
+        base_url = reverse("admin:diamante_aplicacao_editar_precos_em_lote")
+        query_string = urlencode({
+            "ids": ",".join(map(str, ids)),
+            "next": request.get_full_path(),
+        })
+
+        return redirect(f"{base_url}?{query_string}")
+
+
+    def editar_precos_em_lote_view(self, request):
+        ids_raw = request.POST.get("ids") or request.GET.get("ids", "")
+        next_url = request.POST.get("next") or request.GET.get("next") or reverse("admin:diamante_aplicacao_changelist")
+
+        ids = []
+        for item in (ids_raw or "").split(","):
+            item = (item or "").strip()
+            if not item:
+                continue
+            try:
+                ids.append(int(item))
+            except (ValueError, TypeError):
+                continue
+
+        qs = (
+            self.model.objects.filter(pk__in=ids)
+            .select_related(
+                "defensivo",
+                "operacao",
+                "operacao__programa",
+                "operacao__programa__safra",
+                "operacao__programa__ciclo",
+            )
+            .order_by("operacao__programa__nome", "operacao__estagio", "defensivo__produto", "id")
+        )
+
+        total_registros = qs.count()
+
+        if not total_registros:
+            self.message_user(
+                request,
+                "Nenhuma aplicação válida foi encontrada para edição.",
+                level=messages.WARNING,
+            )
+            return redirect(next_url)
+
+        if request.method == "POST":
+            atualizados = 0
+            ignorados = 0
+            erros = 0
+            programas_afetados = set()
+
+            # agora o topo também vale no backend
+            bulk_preco_raw = request.POST.get("bulk_preco_submit")
+            bulk_moeda = request.POST.get("bulk_moeda_submit")
+
+            bulk_preco = None
+            has_bulk_preco = False
+            has_bulk_moeda = bool(bulk_moeda)
+
+            try:
+                if bulk_preco_raw not in [None, ""]:
+                    bulk_preco = Decimal(str(bulk_preco_raw).replace(",", "."))
+                    has_bulk_preco = True
+            except (InvalidOperation, ValueError):
+                self.message_user(
+                    request,
+                    "O preço informado no preenchimento em massa é inválido.",
+                    level=messages.ERROR,
+                )
+                context = {
+                    **self.admin_site.each_context(request),
+                    "opts": self.model._meta,
+                    "title": "Editar preços em lote",
+                    "queryset": qs,
+                    "total_registros": total_registros,
+                    "moeda_choices": self.model._meta.get_field("moeda").choices,
+                    "ids": ",".join(map(str, ids)),
+                    "next": next_url,
+                    "changelist_url": next_url,
+                }
+                return render(
+                    request,
+                    "admin/diamante/aplicacao/editar_precos_em_lote.html",
+                    context,
+                )
+
+            with transaction.atomic():
+                for app in qs:
+                    prefix = f"row_{app.pk}_"
+
+                    # prioridade:
+                    # 1) se vier preenchimento em massa, usa ele
+                    # 2) senão usa o valor individual da linha
+                    if has_bulk_preco:
+                        preco_novo = bulk_preco
+                    else:
+                        preco_raw = request.POST.get(f"{prefix}preco")
+                        try:
+                            if preco_raw in [None, ""]:
+                                preco_novo = None
+                            else:
+                                preco_novo = Decimal(str(preco_raw).replace(",", "."))
+                        except (InvalidOperation, ValueError):
+                            erros += 1
+                            continue
+
+                    if has_bulk_moeda:
+                        moeda_nova = bulk_moeda
+                    else:
+                        moeda_nova = request.POST.get(f"{prefix}moeda")
+
+                    preco_antigo = app.preco
+                    moeda_antiga = app.moeda
+
+                    mudou_algo = False
+
+                    if preco_antigo != preco_novo:
+                        app.preco = preco_novo
+                        mudou_algo = True
+
+                    if moeda_nova and moeda_antiga != moeda_nova:
+                        app.moeda = moeda_nova
+                        mudou_algo = True
+
+                    if not mudou_algo:
+                        ignorados += 1
+                        continue
+
+                    app.save()
+                    atualizados += 1
+
+                    if app.operacao and app.operacao.programa_id:
+                        programas_afetados.add(app.operacao.programa_id)
+
+            tasks_disparadas = 0
+            tasks_ignoradas = 0
+
+            for programa_id in programas_afetados:
+                programa = Programa.objects.filter(pk=programa_id).first()
+                if not programa:
+                    continue
+
+                task_name = programa.nome
+
+                exists_running = BackgroundTaskStatus.objects.filter(
+                    task_name=task_name,
+                    status__in=["pending", "running"],
+                ).exists()
+
+                if exists_running:
+                    tasks_ignoradas += 1
+                    continue
+
+                task_id = str(uuid.uuid4())
+                BackgroundTaskStatus.objects.create(
+                    task_id=task_id,
+                    task_name=task_name,
+                    status="pending",
+                )
+
+                Thread(
+                    target=processar_programa_em_background,
+                    args=(task_id, programa_id),
+                    daemon=True,
+                ).start()
+
+                tasks_disparadas += 1
+                request.session["task_id"] = str(task_id)
+                request.session["executou_task"] = True
+                request.session.modified = True
+
+            if atualizados:
+                self.message_user(
+                    request,
+                    f"{atualizados} aplicação(ões) atualizada(s) com sucesso.",
+                    level=messages.SUCCESS,
+                )
+
+            if ignorados:
+                self.message_user(
+                    request,
+                    f"{ignorados} aplicação(ões) não tinham alteração e foram ignoradas.",
+                    level=messages.INFO,
+                )
+
+            if erros:
+                self.message_user(
+                    request,
+                    f"{erros} aplicação(ões) tiveram erro de preenchimento no preço.",
+                    level=messages.WARNING,
+                )
+
+            if tasks_disparadas:
+                self.message_user(
+                    request,
+                    f"{tasks_disparadas} tarefa(s) de reprocessamento de programa disparada(s).",
+                    level=messages.SUCCESS,
+                )
+
+            if tasks_ignoradas:
+                self.message_user(
+                    request,
+                    f"{tasks_ignoradas} programa(s) já tinham tarefa em andamento e foram ignorados.",
+                    level=messages.WARNING,
+                )
+
+            return redirect(next_url)
+
+        context = {
+            **self.admin_site.each_context(request),
+            "opts": self.model._meta,
+            "title": "Editar preços em lote",
+            "queryset": qs,
+            "total_registros": total_registros,
+            "moeda_choices": self.model._meta.get_field("moeda").choices,
+            "ids": ",".join(map(str, ids)),
+            "next": next_url,
+            "changelist_url": next_url,
+        }
+
+        return render(
+            request,
+            "admin/diamante/aplicacao/editar_precos_em_lote.html",
             context,
         )
 @admin.register(AplicacaoPlantio)
