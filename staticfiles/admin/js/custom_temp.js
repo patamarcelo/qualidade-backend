@@ -1,61 +1,93 @@
-const filterVariedades = plantio.map((data, i) => {
+const filterVariedades = plantio.map((data) => {
 	return data.variedade__cultura__cultura;
 });
 
-const filterVariedadesDif = plantio.map((data, i) => {
+const filterVariedadesDif = plantio.map((data) => {
 	return `${data.variedade__cultura__cultura} - ${data.variedade__variedade}`;
 });
 
 const filterVar = ["Todas", ...filterVariedades];
 const filterVarDif = ["Todas", ...filterVariedadesDif];
 
-console.log(colheita);
+const currentUrl = new URL(window.location.href);
+const getParam = (key, fallback = "") => currentUrl.searchParams.get(key) || fallback;
+
 var app = new Vue({
 	delimiters: ["[[", "]]"],
 	el: "#app",
 	data: {
+		generatedAt: new Date().toLocaleString("pt-BR"),
 		message: "Hello Vue!",
 		ciclos: ["1", "2", "3"],
-		selectedCiclo: url?.search?.length > 0 ? url.search.split("&")[0].split("=")[1] : "",
-		selecredSafra: url?.search?.length > 0 ? url.search.split("&")[1].split("=")[1].replace("_",'/') : "",
-		safras: ["2022/2023", "2023/2024","2024/2025", "2025/2026", "2026/2027"],
-		plantio: plantio,
+		selectedCiclo: getParam("ciclo", ""),
+		selecredSafra: getParam("safra", "").replace("_", "/"),
+		safras: ["2022/2023", "2023/2024", "2024/2025", "2025/2026", "2026/2027"],
+
+		createdAtGte: getParam("created_at_gte", ""),
+		createdAtLte: getParam("created_at_lte", ""),
+		dataGte: getParam("data_gte", ""),
+		dataLte: getParam("data_lte", ""),
+
+		plantioOriginal: [...plantio],
+		plantio: [...plantio],
 		colheita: colheita,
+
 		variedades: [...new Set(filterVar)],
 		variedadesDif: [...new Set(filterVarDif)],
+
 		filteredCutulre: "Todas",
-		filteredCutulreDif: "",
+		filteredCutulreDif: "Todas",
 		selected: "",
 		viewAllVareidades: false,
 		excludeFarm: [],
+
+		isSubmittingFilter: false,
+		isClearingFilter: false,
+
 		style: {
 			color: "whitesmoke",
 			backgroundColor: "blue"
 		},
 		styleTitle: {
 			color: "whitesmoke",
-			backgroundColor: "grenn"
+			backgroundColor: "green"
 		},
 		imageField: "soy",
-		disabledBtn: true, 
+		disabledBtn: true,
 	},
 	methods: {
 		navGo() {
-			console.log("gogogo");
+			if (this.disabledBtn || this.isSubmittingFilter) return;
+			this.isSubmittingFilter = true;
 			window.location = this.customUrl;
 		},
-		resetPlantio() {
-			this.plantio = plantio;
+
+		formatDate(dateStr) {
+			if (!dateStr) return "";
+
+			const [y, m, d] = dateStr.split("-");
+			return `${d}/${m}/${y}`;
 		},
+		clearFilters() {
+			if (this.isClearingFilter) return;
+			this.isClearingFilter = true;
+			window.location = "/admin/diamante/plantiodetail/";
+		},
+
+		resetPlantio() {
+			this.excludeFarm = [];
+			this.plantio = [...this.plantioOriginal];
+		},
+
 		viewVaris() {
-			console.log("Working");
-			console.log(this.getFilteredChildren("Cervo"));
 			this.viewAllVareidades = !this.viewAllVareidades;
 		},
-		greet: function (name) {
+
+		greet() {
 			console.log(this.excludeFarm);
-			console.log(plantio);
+			console.log(this.plantio);
 		},
+
 		customIcon(cultura) {
 			if (cultura === "Soja") {
 				return "/static/images/icons/soy.png";
@@ -69,100 +101,129 @@ var app = new Vue({
 			if (cultura === "Algodão") {
 				return "/static/images/icons/cotton.png";
 			}
+			return "";
 		},
+
 		getFilteredChildren(filter) {
 			console.log(filter);
 			console.log(this.filteredArrayByVariedade);
 			return "teste 1 ";
 		},
+
 		getwidth(size) {
 			return `width: ${size}% ; background-color: yellow`;
 		},
+
 		getClass(size) {
-			if (size < 25) {
+			if (Number(size) < 25) {
 				return "progress-bar bg-warning";
 			}
-			if (size < 80) {
+			if (Number(size) < 80) {
 				return "progress-bar bg-info";
 			}
 			return "progress-bar bg-success";
+		},
+
+		updateDisabledButton() {
+			this.disabledBtn = !(this.selectedCiclo.length > 0 && this.selecredSafra.length > 0);
 		}
 	},
+
 	watch: {
-		selectedCiclo (){
-			if(this.selectedCiclo.length > 0 && this.selecredSafra.length > 0){
-				this.disabledBtn = false
-				console.log('selected Ciclo cicko: ', this.selectedCiclo);
-				console.log('selected safra safra: ', this.selecredSafra);
-			} else {
-				this.disabledBtn = true
-			}
+		selectedCiclo() {
+			this.updateDisabledButton();
 		},
-		selecredSafra (){
-			if(this.selectedCiclo.length > 0 && this.selecredSafra.length > 0){
-				console.log('selected Ciclo: ', this.selectedCiclo);
-				console.log('selected safra: ', this.selecredSafra);
-				this.disabledBtn = false
-			} else {
-				this.disabledBtn = true
-			}
+
+		selecredSafra() {
+			this.updateDisabledButton();
 		},
+
 		excludeFarm() {
 			if (this.excludeFarm.length > 0) {
 				this.excludeFarm.map((data) => {
-					console.log("excluiir a fazenda", data);
+					console.log("excluir a fazenda", data);
 				});
 			}
 		},
+
 		filteredCutulre() {
 			if (this.filteredCutulre === "Todas") {
-				console.log("todas", this.filteredCutulre);
 				this.style.backgroundColor = "blue";
+				this.filteredCutulreDif = "Todas";
+				return;
 			}
+
 			if (this.filteredCutulre === "Soja") {
-				console.log("Soja", this.filteredCutulre);
 				this.style.backgroundColor = "green";
 			}
 			if (this.filteredCutulre === "Feijão") {
-				console.log("Feijão", this.filteredCutulre);
 				this.style.backgroundColor = "rgb(119,63,27)";
 			}
 			if (this.filteredCutulre === "Arroz") {
 				this.style.backgroundColor = "rgb(214, 220, 38)";
 			}
-			if (this.filteredCutulre === "Todas") {
-				this.filteredCutulreDif = "";
-			} else {
-				console.log(
-					"thisvar",
-					this.variedadesDif
-						.filter((data) =>
-							data.includes(this.filteredCutulre)
-						)[0]
-						.split("-")[1]
-						.trim()
-				);
-				this.filteredCutulreDif = this.variedadesDif
-					.filter((data) => data.includes(this.filteredCutulre))[0]
-					.split("-")[1]
-					.trim();
+
+			const variedadesDaCultura = this.filterVariedadesDif.filter(
+				(data) => data !== "Todas" && data.includes(this.filteredCutulre)
+			);
+
+			if (
+				this.filteredCutulreDif === "Todas" ||
+				!variedadesDaCultura.some((item) => item.split("-")[1]?.trim() === this.filteredCutulreDif)
+			) {
+				const firstVariedade = variedadesDaCultura[0];
+
+				if (firstVariedade && firstVariedade.includes("-")) {
+					this.filteredCutulreDif = firstVariedade.split("-")[1].trim();
+				} else {
+					this.filteredCutulreDif = "Todas";
+				}
 			}
 		}
 	},
+
 	computed: {
 		customUrl() {
-			return `/admin/diamante/plantiodetail/?ciclo=${this.selectedCiclo}&safra=${this.selecredSafra.replace('/','_')}`;
+			const params = new URLSearchParams();
+
+			if (this.selectedCiclo) {
+				params.set("ciclo", this.selectedCiclo);
+			}
+
+			if (this.selecredSafra) {
+				params.set("safra", this.selecredSafra.replace("/", "_"));
+			}
+
+			if (this.createdAtGte) {
+				params.set("created_at_gte", this.createdAtGte);
+			}
+
+			if (this.createdAtLte) {
+				params.set("created_at_lte", this.createdAtLte);
+			}
+
+			if (this.dataGte) {
+				params.set("data_gte", this.dataGte);
+			}
+
+			if (this.dataLte) {
+				params.set("data_lte", this.dataLte);
+			}
+
+			return `/admin/diamante/plantiodetail/?${params.toString()}`;
 		},
+
 		onlyFarmWhitoutVariedade() {
-			const onlyFarmSetSOut = this.plantio.map((data) => {
-				const name = data.talhao__fazenda__nome;
-				return name;
+			const sourcePlantio = this.plantioOriginal || [];
+			const onlyFarmSetSOut = sourcePlantio.map((data) => {
+				return data.talhao__fazenda__nome;
 			});
 			return [...new Set(onlyFarmSetSOut)];
 		},
+
 		onlyFarm() {
-			const onlyFarmSetS = this.plantio.map((data) => {
-				console.log(data);
+			const sourcePlantio = this.filteredPlantioBase;
+			const onlyFarmSetS = sourcePlantio.map((data) => {
 				const name =
 					data.talhao__fazenda__nome +
 					"|" +
@@ -171,8 +232,9 @@ var app = new Vue({
 			});
 			return [...new Set(onlyFarmSetS)];
 		},
+
 		titleAcomp() {
-			if (this.filteredCutulreDif) {
+			if (this.filteredCutulreDif && this.filteredCutulreDif !== "Todas") {
 				return this.filteredCutulreDif;
 			}
 
@@ -182,60 +244,64 @@ var app = new Vue({
 
 			return " ";
 		},
+
+		filteredPlantioBase() {
+			let base = [...this.plantioOriginal];
+
+			if (this.excludeFarm.length > 0) {
+				base = base.filter(
+					(data) => !this.excludeFarm.includes(data.talhao__fazenda__nome)
+				);
+			}
+
+			return base;
+		},
+
 		filteredArray() {
 			let filtPlantio = [];
-			if (this.excludeFarm.length > 0) {
-				this.plantio = this.plantio.filter(
-					(data) =>
-						!this.excludeFarm.includes(data.talhao__fazenda__nome)
-				);
-			}
-			if (this.filteredCutulreDif) {
-				filtPlantio = this.plantio.filter(
-					(data) =>
-						data.variedade__variedade ===
-						this.filteredCutulreDif.trim()
+
+			if (this.filteredCutulreDif && this.filteredCutulreDif !== "Todas") {
+				filtPlantio = this.filteredPlantioBase.filter(
+					(data) => data.variedade__variedade === this.filteredCutulreDif.trim()
 				);
 			} else {
-				filtPlantio = this.plantio;
+				filtPlantio = this.filteredPlantioBase;
 			}
+
 			const newDict = filtPlantio
 				.filter((data) =>
-					this.filteredCutulre == "Todas"
+					this.filteredCutulre === "Todas"
 						? data.variedade__cultura__cultura !== "nenhuma"
-						: data.variedade__cultura__cultura ===
-						  this.filteredCutulre
+						: data.variedade__cultura__cultura === this.filteredCutulre
 				)
 				.reduce((acc, curr) => {
 					const newObj =
 						curr.talhao__fazenda__nome +
 						"|" +
 						curr.variedade__cultura__cultura;
+
 					if (!acc[newObj]) {
 						acc[newObj] = {
 							variedade: curr.variedade__cultura__cultura,
 							areaTotal: Number(curr.area_total),
 							areaColheita: Number(curr.area_finalizada),
 							saldoColheita:
-								Number(curr.area_total) -
-								Number(curr.area_finalizada),
+								Number(curr.area_total) - Number(curr.area_finalizada),
 							pesoColhido: 0,
 							produtividade: 0
 						};
 					} else {
 						acc[newObj]["areaTotal"] += Number(curr.area_total);
-						acc[newObj]["areaColheita"] += Number(
-							curr.area_finalizada
-						);
+						acc[newObj]["areaColheita"] += Number(curr.area_finalizada);
 						acc[newObj]["saldoColheita"] +=
-							Number(curr.area_total) -
-							Number(curr.area_finalizada);
+							Number(curr.area_total) - Number(curr.area_finalizada);
 					}
 					return acc;
 				}, {});
 
 			let filtColheita = [];
-			if (this.filteredCutulreDif) {
+
+			if (this.filteredCutulreDif && this.filteredCutulreDif !== "Todas") {
 				filtColheita = this.colheita.filter(
 					(data) =>
 						data.plantio__variedade__variedade ===
@@ -253,41 +319,38 @@ var app = new Vue({
 
 				if (newDict[nameDict]) {
 					if (newDict[nameDict]["pesoColhido"] > 0) {
-						newDict[nameDict]["pesoColhido"] += Number(
-							filtColheita[i].peso_scs
-						);
+						newDict[nameDict]["pesoColhido"] += Number(filtColheita[i].peso_scs);
 						newDict[nameDict]["produtividade"] =
 							newDict[nameDict]["pesoColhido"] /
-							Number(newDict[nameDict]["areaColheita"]);
+							Number(newDict[nameDict]["areaColheita"] || 0);
 					} else {
-						newDict[nameDict]["pesoColhido"] = Number(
-							filtColheita[i].peso_scs
-						);
+						newDict[nameDict]["pesoColhido"] = Number(filtColheita[i].peso_scs);
 						newDict[nameDict]["produtividade"] =
 							Number(filtColheita[i].peso_scs) /
-							Number(newDict[nameDict]["areaColheita"]);
+							Number(newDict[nameDict]["areaColheita"] || 0);
 					}
 				}
 			}
+
 			return newDict;
 		},
+
 		filteredArrayByVariedade() {
 			let filtPlantio = [];
-			if (this.filteredCutulreDif) {
-				filtPlantio = this.plantio.filter(
-					(data) =>
-						data.variedade__variedade ===
-						this.filteredCutulreDif.trim()
+
+			if (this.filteredCutulreDif && this.filteredCutulreDif !== "Todas") {
+				filtPlantio = this.filteredPlantioBase.filter(
+					(data) => data.variedade__variedade === this.filteredCutulreDif.trim()
 				);
 			} else {
-				filtPlantio = this.plantio;
+				filtPlantio = this.filteredPlantioBase;
 			}
+
 			const newDict = filtPlantio
 				.filter((data) =>
-					this.filteredCutulre == "Todas"
+					this.filteredCutulre === "Todas"
 						? data.variedade__cultura__cultura !== "nenhuma"
-						: data.variedade__cultura__cultura ===
-						  this.filteredCutulre
+						: data.variedade__cultura__cultura === this.filteredCutulre
 				)
 				.reduce((acc, curr) => {
 					const newObj =
@@ -296,6 +359,7 @@ var app = new Vue({
 						curr.variedade__cultura__cultura +
 						"|" +
 						curr.variedade__variedade;
+
 					if (!acc[newObj]) {
 						acc[newObj] = {
 							cultura: curr.variedade__cultura__cultura,
@@ -303,25 +367,22 @@ var app = new Vue({
 							areaTotal: Number(curr.area_total),
 							areaColheita: Number(curr.area_finalizada),
 							saldoColheita:
-								Number(curr.area_total) -
-								Number(curr.area_finalizada),
+								Number(curr.area_total) - Number(curr.area_finalizada),
 							pesoColhido: 0,
 							produtividade: 0
 						};
 					} else {
 						acc[newObj]["areaTotal"] += Number(curr.area_total);
-						acc[newObj]["areaColheita"] += Number(
-							curr.area_finalizada
-						);
+						acc[newObj]["areaColheita"] += Number(curr.area_finalizada);
 						acc[newObj]["saldoColheita"] +=
-							Number(curr.area_total) -
-							Number(curr.area_finalizada);
+							Number(curr.area_total) - Number(curr.area_finalizada);
 					}
 					return acc;
 				}, {});
 
 			let filtColheita = [];
-			if (this.filteredCutulreDif) {
+
+			if (this.filteredCutulreDif && this.filteredCutulreDif !== "Todas") {
 				filtColheita = this.colheita.filter(
 					(data) =>
 						data.plantio__variedade__variedade ===
@@ -341,27 +402,26 @@ var app = new Vue({
 
 				if (newDict[nameDict]) {
 					if (newDict[nameDict]["pesoColhido"] > 0) {
-						newDict[nameDict]["pesoColhido"] += Number(
-							filtColheita[i].peso_scs
-						);
+						newDict[nameDict]["pesoColhido"] += Number(filtColheita[i].peso_scs);
 						newDict[nameDict]["produtividade"] =
 							newDict[nameDict]["pesoColhido"] /
-							Number(newDict[nameDict]["areaColheita"]);
+							Number(newDict[nameDict]["areaColheita"] || 0);
 					} else {
-						newDict[nameDict]["pesoColhido"] = Number(
-							filtColheita[i].peso_scs
-						);
+						newDict[nameDict]["pesoColhido"] = Number(filtColheita[i].peso_scs);
 						newDict[nameDict]["produtividade"] =
 							Number(filtColheita[i].peso_scs) /
-							Number(newDict[nameDict]["areaColheita"]);
+							Number(newDict[nameDict]["areaColheita"] || 0);
 					}
 				}
 			}
+
 			return newDict;
 		},
+
 		newTotals() {
 			let newTotals = {};
-			for (const [key, value] of Object.entries(this.filteredArray)) {
+
+			for (const [, value] of Object.entries(this.filteredArray)) {
 				if (!newTotals["areaColhida"]) {
 					newTotals["areaColhida"] = value.areaColheita;
 				} else {
@@ -386,16 +446,34 @@ var app = new Vue({
 					newTotals["pesoColhido"] += Number(value.pesoColhido);
 				}
 			}
+
 			return newTotals;
 		},
+
 		filterVariedadesDif() {
-			var filteVar =
+			const filteVar =
 				this.filteredCutulre === "Todas"
 					? this.variedadesDif
 					: this.variedadesDif.filter((data) =>
-							data.includes(this.filteredCutulre)
-					  );
-			return filteVar.map((data) => data.split("-")[1]);
+						data === "Todas" || data.includes(this.filteredCutulre)
+					);
+
+			return filteVar
+				.map((data) => {
+					if (!data) return "";
+					if (data === "Todas") return "Todas";
+
+					const parts = data.split("-");
+					return parts.length > 1 ? parts[1].trim() : data;
+				})
+				.filter(Boolean);
+		}
+	},
+
+	mounted() {
+		this.updateDisabledButton();
+		if (!this.filteredCutulreDif) {
+			this.filteredCutulreDif = "Todas";
 		}
 	}
 });

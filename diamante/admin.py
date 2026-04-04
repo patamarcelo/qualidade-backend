@@ -152,6 +152,53 @@ from .utils import processar_programa_em_background
 
 from django.utils.dateparse import parse_date
 
+from datetime import datetime, time
+from django.utils.timezone import make_aware, is_naive
+from django.db.models import Q, Sum, F, Case, When, Value, DecimalField
+from django.db.models.functions import Coalesce, Round
+
+
+def parse_date_start(date_str):
+    if not date_str:
+        return None
+    dt = datetime.strptime(date_str, "%Y-%m-%d")
+    dt = datetime.combine(dt.date(), time.min)
+    return make_aware(dt) if is_naive(dt) else dt
+
+
+def parse_date_end(date_str):
+    if not date_str:
+        return None
+    dt = datetime.strptime(date_str, "%Y-%m-%d")
+    dt = datetime.combine(dt.date(), time.max)
+    return make_aware(dt) if is_naive(dt) else dt
+
+
+def build_created_filters(created_at_gte=None, created_at_lte=None, field_name="criados"):
+    filters = Q()
+    dt_gte = parse_date_start(created_at_gte)
+    dt_lte = parse_date_end(created_at_lte)
+
+    if dt_gte:
+        filters &= Q(**{f"{field_name}__gte": dt_gte})
+    if dt_lte:
+        filters &= Q(**{f"{field_name}__lte": dt_lte})
+
+    return filters
+
+
+def build_date_filters(data_gte=None, data_lte=None, field_name="data_colheita"):
+    filters = Q()
+
+    if data_gte:
+        filters &= Q(**{f"{field_name}__gte": data_gte})
+    if data_lte:
+        filters &= Q(**{f"{field_name}__lte": data_lte})
+
+    return filters
+
+
+
 main_path = (
     "http://127.0.0.1:8000"
     if DEBUG == True
@@ -159,25 +206,56 @@ main_path = (
 )
 
 
-def get_cargas_model(safra_filter, ciclo_filter, list_ids=[]):
-    cargas_model = [
-        x
-        for x in Colheita.objects.values(
+def get_cargas_model(
+    safra_filter,
+    ciclo_filter,
+    list_ids=None,
+    created_at_gte=None,
+    created_at_lte=None,
+    data_gte=None,
+    data_lte=None,
+):
+    list_ids = list_ids or []
+
+    created_filters = build_created_filters(
+        created_at_gte=created_at_gte,
+        created_at_lte=created_at_lte,
+        field_name="criados",
+    )
+
+    data_filters = build_date_filters(
+        data_gte=data_gte,
+        data_lte=data_lte,
+        field_name="data_colheita",
+    )
+
+    cargas_qs = (
+        Colheita.objects.values(
             "plantio__talhao__fazenda__nome",
             "plantio__variedade__cultura__cultura",
             "plantio__variedade__variedade",
         )
         .annotate(
             peso_kg=Sum(F("peso_liquido") * 60),
-            peso_scs=Round((Sum("peso_scs_limpo_e_seco")), precision=2),
+            peso_scs=Round(Sum("peso_scs_limpo_e_seco"), precision=2),
         )
         .order_by("plantio__talhao__fazenda__nome")
         .filter(~Q(plantio__variedade__cultura__cultura="Milheto"))
-        .filter(plantio__safra__safra=safra_filter, plantio__ciclo__ciclo=ciclo_filter)
+        .filter(
+            plantio__safra__safra=safra_filter,
+            plantio__ciclo__ciclo=ciclo_filter,
+        )
         .filter(~Q(plantio__id_farmbox__in=list_ids))
         .filter(plantio__acompanhamento_medias=True)
-    ]
-    return cargas_model
+    )
+
+    if created_at_gte or created_at_lte:
+        cargas_qs = cargas_qs.filter(created_filters)
+
+    if data_gte or data_lte:
+        cargas_qs = cargas_qs.filter(data_filters)
+
+    return [x for x in cargas_qs]
 
 
 
@@ -198,31 +276,29 @@ class PlantioDetailAdmin(admin.ModelAdmin):
     model = PlantioDetail
     change_list_template = "admin/custom_temp.html"
 
-    # cargas_model = [
-    #     x
-    #     for x in Colheita.objects.values(
-    #         "plantio__talhao__id_talhao", "plantio__id", "peso_liquido", "data_colheita"
-    #     )
-    # ]
     cicle_filter = None
     safra_filter = None
-    
-    
-    # ids parcelas J
+
     exclude_j = False
-    # exclude_j = True
     if exclude_j:
-        list_ids = [263066,264740]
+        list_ids = [263066, 264740]
     else:
         list_ids = []
 
     def get_queryset(self, request):
         global cicle_filter, safra_filter
+
         request.GET = request.GET.copy()
+
         ciclo = request.GET.pop("ciclo", None)
         safra = request.GET.pop("safra", None)
-        print('ciclo: ', ciclo)
-        print('safra: ', safra)
+
+        # remove também os filtros customizados para o admin não tentar processar
+        request.GET.pop("created_at_gte", None)
+        request.GET.pop("created_at_lte", None)
+        request.GET.pop("data_gte", None)
+        request.GET.pop("data_lte", None)
+
         if ciclo:
             ciclo_index = ciclo[0]
             safra_filter = safra[0].replace("_", "/").strip()
@@ -243,11 +319,9 @@ class PlantioDetailAdmin(admin.ModelAdmin):
                 .order_by("data_plantio")
             )
         else:
-            cicle_filter = CicloAtual.objects.filter(nome="Colheita")[0]
-            cicle_filter = cicle_filter.ciclo
-            safra_filter = CicloAtual.objects.filter(nome="Colheita")[0]
-            safra_filter = safra_filter.safra
-            print('retornando estes valores')
+            cicle_filter = CicloAtual.objects.filter(nome="Colheita")[0].ciclo
+            safra_filter = CicloAtual.objects.filter(nome="Colheita")[0].safra
+
         return (
             super(PlantioDetailAdmin, self)
             .get_queryset(request)
@@ -259,88 +333,208 @@ class PlantioDetailAdmin(admin.ModelAdmin):
                 "variedade",
                 "programa",
             )
-            # .filter(ciclo=cicle_filter, safra=safra_filter)
             .order_by("data_plantio")
         )
-
+        
     def changelist_view(self, request, extra_context=None):
-        
-        
         request.GET = request.GET.copy()
-        ciclo = request.GET.pop("ciclo", None)
-        safra = request.GET.pop("safra", None)
-        print('cicle here: ', ciclo)
-        print('safra here: ', safra)
-        
+
+        ciclo = request.GET.get("ciclo")
+        safra = request.GET.get("safra")
+
+        created_at_gte = request.GET.get("created_at_gte")
+        created_at_lte = request.GET.get("created_at_lte")
+        data_gte = request.GET.get("data_gte")
+        data_lte = request.GET.get("data_lte")
+
+        print("GET COMPLETO ORIGINAL:", dict(request.GET))
+        print("created_at_gte:", created_at_gte)
+        print("created_at_lte:", created_at_lte)
+        print("data_gte:", data_gte)
+        print("data_lte:", data_lte)
+
+        # limpa parâmetros customizados antes do admin padrão processar
+        clean_get = request.GET.copy()
+        clean_get.pop("ciclo", None)
+        clean_get.pop("safra", None)
+        clean_get.pop("created_at_gte", None)
+        clean_get.pop("created_at_lte", None)
+        clean_get.pop("data_gte", None)
+        clean_get.pop("data_lte", None)
+        request.GET = clean_get
+
         response = super().changelist_view(
             request,
             extra_context=extra_context,
         )
+
         safra_ciclo = CicloAtual.objects.filter(nome="Colheita")[0]
         safra_filter = safra_ciclo.safra.safra
         cicle_filter = safra_ciclo.ciclo.ciclo
-        
-        print('self cicle filter', cicle_filter)
+
         if ciclo and safra:
-            print('filter here: ')
-            safra_filter = safra[0].replace('_', '/')
-            cicle_filter = ciclo[0]
-        # ciclo_filter = "1"
-        # cicle_filter = Ciclo.objects.all()[0]
+            safra_filter = safra.replace("_", "/")
+            cicle_filter = ciclo
+
         try:
             qs = response.context_data["cl"].queryset
         except (AttributeError, KeyError):
             return response
 
-        metrics = {
-            "area_total": Sum("area_colheita"),
-            "area_finalizada": Case(
-                When(finalizado_colheita=True, then=Coalesce(Sum("area_colheita"), 0)),
-                When(finalizado_colheita=False, then=Coalesce(Sum("area_parcial"), 0)),
-                default=Value(0),
-                output_field=DecimalField(),
-                # ),
-                # "area_parcial": Case(
-                #     When(finalizado_colheita=False, then=Coalesce(Sum("area_parcial"), 0)),
-                #     default=Value(0),
-                #     output_field=DecimalField(),
-            ),
-        }
-        
-        query_data = (
+        # =========================================================
+        # BASE DO PLANTIO -> ÁREA TOTAL (SEM FILTRO DE DATA/CRIADO)
+        # =========================================================
+        base_qs = (
             qs.filter(
                 safra__safra=safra_filter,
                 ciclo__ciclo=cicle_filter,
                 finalizado_plantio=True,
                 plantio_descontinuado=False,
-                acompanhamento_medias=True
+                acompanhamento_medias=True,
             )
             .filter(~Q(variedade__cultura__cultura="Milheto"))
             .filter(~Q(variedade__cultura__cultura="Algodão"))
             .filter(~Q(id_farmbox__in=self.list_ids))
-            # .filter(~Q(talhao__fazenda__nome="Projeto Lago Verde"))
-            .values(
+        )
+
+        print("base_qs count:", base_qs.count())
+
+        area_total_qs = (
+            base_qs.values(
                 "talhao__fazenda__nome",
                 "variedade__cultura__cultura",
                 "variedade__variedade",
             )
-            .annotate(**metrics)
+            .annotate(
+                area_total=Coalesce(
+                    Sum("area_colheita"),
+                    Value(0),
+                    output_field=DecimalField(),
+                )
+            )
             .order_by("talhao__fazenda__nome")
         )
-        
-        print(query_data)
+
+        # =========================================================
+        # ÁREA COLHIDA -> VEM DO EXTRATO DE COLHEITA
+        # =========================================================
+        colheita_extrato_qs = (
+            ColheitaPlantioExtratoArea.objects.filter(
+                ativo=True,
+                plantio__safra__safra=safra_filter,
+                plantio__ciclo__ciclo=cicle_filter,
+                plantio__plantio_descontinuado=False,
+                plantio__acompanhamento_medias=True,
+            )
+            .filter(~Q(plantio__variedade__cultura__cultura="Milheto"))
+            .filter(~Q(plantio__variedade__cultura__cultura="Algodão"))
+            .filter(~Q(plantio__id_farmbox__in=self.list_ids))
+        )
+
+        if created_at_gte or created_at_lte:
+            created_q = build_created_filters(
+                created_at_gte=created_at_gte,
+                created_at_lte=created_at_lte,
+                field_name="criados",
+            )
+            print("created_q area extrato:", created_q)
+            colheita_extrato_qs = colheita_extrato_qs.filter(created_q)
+
+        if data_gte or data_lte:
+            data_q = build_date_filters(
+                data_gte=data_gte,
+                data_lte=data_lte,
+                field_name="data_colheita",
+            )
+            print("data_q area extrato:", data_q)
+            colheita_extrato_qs = colheita_extrato_qs.filter(data_q)
+
+        print("colheita_extrato_qs count:", colheita_extrato_qs.count())
+
+        area_colhida_qs = (
+            colheita_extrato_qs.values(
+                "plantio__talhao__fazenda__nome",
+                "plantio__variedade__cultura__cultura",
+                "plantio__variedade__variedade",
+            )
+            .annotate(
+                area_finalizada=Coalesce(
+                    Sum("area_colhida"),
+                    Value(0),
+                    output_field=DecimalField(),
+                )
+            )
+            .order_by("plantio__talhao__fazenda__nome")
+        )
+
+        print("NEW AREA COLHIDA QS:::", area_colhida_qs)
+
+        # =========================================================
+        # JUNTA ÁREA TOTAL + ÁREA COLHIDA FILTRADA
+        # =========================================================
+        summary_dict = {}
+
+        for item in area_total_qs:
+            key = (
+                item["talhao__fazenda__nome"],
+                item["variedade__cultura__cultura"],
+                item["variedade__variedade"],
+            )
+            summary_dict[key] = {
+                "talhao__fazenda__nome": item["talhao__fazenda__nome"],
+                "variedade__cultura__cultura": item["variedade__cultura__cultura"],
+                "variedade__variedade": item["variedade__variedade"],
+                "area_total": item["area_total"] or 0,
+                "area_finalizada": 0,
+            }
+
+        for item in area_colhida_qs:
+            key = (
+                item["plantio__talhao__fazenda__nome"],
+                item["plantio__variedade__cultura__cultura"],
+                item["plantio__variedade__variedade"],
+            )
+
+            if key not in summary_dict:
+                summary_dict[key] = {
+                    "talhao__fazenda__nome": item["plantio__talhao__fazenda__nome"],
+                    "variedade__cultura__cultura": item["plantio__variedade__cultura__cultura"],
+                    "variedade__variedade": item["plantio__variedade__variedade"],
+                    "area_total": 0,
+                    "area_finalizada": 0,
+                }
+
+            summary_dict[key]["area_finalizada"] = item["area_finalizada"] or 0
+
+        summary_list = list(summary_dict.values())
+
+        print("summary_list len:", len(summary_list))
 
         response.context_data["summary_2"] = json.dumps(
-            list(query_data), cls=DjangoJSONEncoder
+            summary_list,
+            cls=DjangoJSONEncoder,
         )
 
         response.context_data["colheita_2"] = json.dumps(
-            get_cargas_model(safra_filter, cicle_filter, self.list_ids), cls=DjangoJSONEncoder
+            get_cargas_model(
+                safra_filter,
+                cicle_filter,
+                self.list_ids,
+                created_at_gte=created_at_gte,
+                created_at_lte=created_at_lte,
+                data_gte=data_gte,
+                data_lte=data_lte,
+            ),
+            cls=DjangoJSONEncoder,
         )
 
+        response.context_data["created_at_gte"] = created_at_gte or ""
+        response.context_data["created_at_lte"] = created_at_lte or ""
+        response.context_data["data_gte"] = data_gte or ""
+        response.context_data["data_lte"] = data_lte or ""
+
         return response
-
-
+    
 @admin.register(PlantioDetailPlantio)
 class PlantioDetailPlantioAdmin(admin.ModelAdmin):
     model = PlantioDetailPlantio
@@ -5030,26 +5224,32 @@ class AlertRuleAdmin(admin.ModelAdmin):
         return date_format(obj.modificado, format="SHORT_DATETIME_FORMAT", use_l10n=True)
     get_modificado_br.short_description = "Atualizado em"
 
+from django.contrib import admin
+from django.http import JsonResponse, HttpResponse
+from django.urls import path, reverse
+from django.utils.html import format_html
+from django.core.serializers.json import DjangoJSONEncoder
+import json
+
+from .models import FarmPolygon
+
+
 @admin.register(FarmPolygon)
 class FarmPolygonAdmin(admin.ModelAdmin):
     change_list_template = "admin/teste_farmpolygon.html"
 
     list_display = (
-    "id",
-    "name",
-    "farm_name",
-    "user_name",
-    "submitted_email",
-    "mode_badge",
-    "is_closed_badge",
-    "is_active_badge",
-    "points_count",
-    "area_ha",
-    "preview_button",
-    "export_kml_button",
-    "created_at",
-    "updated_at",
-)
+        "name",
+        "farm_name",
+        "user_name",
+        "mode_badge",
+        "status_badges",
+        "area_ha",
+        "perimeter_pretty",
+        "points_count",
+        "updated_at",
+        "row_actions",
+    )
 
     list_filter = (
         "mode",
@@ -5064,6 +5264,7 @@ class FarmPolygonAdmin(admin.ModelAdmin):
         "farm_name",
         "user_name",
         "submitted_email",
+        "observation",
     )
 
     readonly_fields = (
@@ -5107,14 +5308,6 @@ class FarmPolygonAdmin(admin.ModelAdmin):
         }),
     )
 
-    def preview_button(self, obj):
-        url = reverse("admin:diamante_farmpolygon_preview", args=[obj.pk])
-        return format_html(
-            '<button type="button" class="button fp-preview-btn" data-preview-url="{}">Preview</button>',
-            url,
-        )
-    preview_button.short_description = "Mapa"
-    
     def get_urls(self):
         urls = super().get_urls()
         custom_urls = [
@@ -5150,6 +5343,11 @@ class FarmPolygonAdmin(admin.ModelAdmin):
                 "perimeter_m": float(obj.perimeter_m) if obj.perimeter_m is not None else None,
                 "observation": obj.observation or "",
                 "points": obj.points or [],
+                "edit_url": reverse(
+                    f"admin:{obj._meta.app_label}_{obj._meta.model_name}_change",
+                    args=[obj.pk]
+                ),
+                "kml_url": reverse("admin:diamante_farmpolygon_export_kml", args=[obj.pk]),
             },
             encoder=DjangoJSONEncoder,
         )
@@ -5171,9 +5369,18 @@ class FarmPolygonAdmin(admin.ModelAdmin):
                 continue
             coordinates.append(f"{lng},{lat},0")
 
-        if obj.is_closed and coordinates:
-            if coordinates[0] != coordinates[-1]:
-                coordinates.append(coordinates[0])
+        if obj.is_closed and coordinates and coordinates[0] != coordinates[-1]:
+            coordinates.append(coordinates[0])
+
+        geometry = (
+            "<Polygon><outerBoundaryIs><LinearRing><coordinates>"
+            + " ".join(coordinates)
+            + "</coordinates></LinearRing></outerBoundaryIs></Polygon>"
+            if obj.is_closed
+            else "<LineString><coordinates>"
+            + " ".join(coordinates)
+            + "</coordinates></LineString>"
+        )
 
         kml = f'''<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
@@ -5182,7 +5389,7 @@ class FarmPolygonAdmin(admin.ModelAdmin):
     <Placemark>
       <name>{obj.name}</name>
       <description>Fazenda: {obj.farm_name}</description>
-      {"<Polygon><outerBoundaryIs><LinearRing><coordinates>" + " ".join(coordinates) + "</coordinates></LinearRing></outerBoundaryIs></Polygon>" if obj.is_closed else "<LineString><coordinates>" + " ".join(coordinates) + "</coordinates></LineString>"}
+      {geometry}
     </Placemark>
   </Document>
 </kml>'''
@@ -5191,15 +5398,29 @@ class FarmPolygonAdmin(admin.ModelAdmin):
         response["Content-Disposition"] = f'attachment; filename="{obj.name}.kml"'
         return response
 
+    def mini_map(self, obj):
+        return format_html(
+            '<div class="fp-mini-map" data-points=\'{}\' data-closed="{}"></div>',
+            json.dumps(obj.points or [], ensure_ascii=False),
+            "true" if obj.is_closed else "false",
+        )
+    mini_map.short_description = "Mapa"
+
     def points_count(self, obj):
         return len(obj.points or [])
-    points_count.short_description = "Qtd. pontos"
+    points_count.short_description = "Pontos"
 
     def area_ha(self, obj):
         if not obj.area_m2:
             return "-"
         return f"{float(obj.area_m2) / 10000:.2f} ha"
     area_ha.short_description = "Área"
+
+    def perimeter_pretty(self, obj):
+        if not obj.perimeter_m:
+            return "-"
+        return f"{float(obj.perimeter_m):.2f} m"
+    perimeter_pretty.short_description = "Perímetro"
 
     def points_pretty(self, obj):
         return json.dumps(obj.points or [], indent=2, ensure_ascii=False)
@@ -5216,33 +5437,38 @@ class FarmPolygonAdmin(admin.ModelAdmin):
         )
     mode_badge.short_description = "Modo"
 
-    def is_closed_badge(self, obj):
-        if obj.is_closed:
-            return format_html('<span class="fp-badge" style="background:#16a34a15;color:#16a34a;">Fechado</span>')
-        return format_html('<span class="fp-badge" style="background:#f59e0b15;color:#b45309;">Aberto</span>')
-    is_closed_badge.short_description = "Fechado"
-
-    def is_active_badge(self, obj):
-        if obj.is_active:
-            return format_html('<span class="fp-badge" style="background:#16a34a15;color:#16a34a;">Ativo</span>')
-        return format_html('<span class="fp-badge" style="background:#ef444415;color:#b91c1c;">Inativo</span>')
-    is_active_badge.short_description = "Status"
-
-    def preview_button(self, obj):
-        url = reverse("admin:diamante_farmpolygon_preview", args=[obj.pk])
-        return format_html(
-            '<button type="button" class="button fp-preview-btn" data-preview-url="{}">Preview</button>',
-            url,
+    def status_badges(self, obj):
+        closed = (
+            '<span class="fp-badge" style="background:#16a34a15;color:#16a34a;">Fechado</span>'
+            if obj.is_closed else
+            '<span class="fp-badge" style="background:#f59e0b15;color:#b45309;">Aberto</span>'
         )
-    preview_button.short_description = "Mapa"
-
-    def export_kml_button(self, obj):
-        url = reverse("admin:diamante_farmpolygon_export_kml", args=[obj.pk])
-        return format_html(
-            '<a class="button fp-kml-btn" href="{}">KML</a>',
-            url,
+        active = (
+            '<span class="fp-badge" style="background:#16a34a15;color:#16a34a;">Ativo</span>'
+            if obj.is_active else
+            '<span class="fp-badge" style="background:#ef444415;color:#b91c1c;">Inativo</span>'
         )
-    export_kml_button.short_description = "Exportar"
+        return format_html('{} {}', format_html(closed), format_html(active))
+    status_badges.short_description = "Status"
+
+    def row_actions(self, obj):
+        preview_url = reverse("admin:diamante_farmpolygon_preview", args=[obj.pk])
+        kml_url = reverse("admin:diamante_farmpolygon_export_kml", args=[obj.pk])
+        edit_url = reverse(f"admin:{obj._meta.app_label}_{obj._meta.model_name}_change", args=[obj.pk])
+
+        return format_html(
+            '''
+            <div class="fp-row-actions">
+                <button type="button" class="button fp-preview-btn" data-preview-url="{}">Preview</button>
+                <a class="button fp-kml-btn" href="{}">KML</a>
+                <a class="button fp-edit-btn" href="{}">Editar</a>
+            </div>
+            ''',
+            preview_url,
+            kml_url,
+            edit_url,
+        )
+    row_actions.short_description = "Ações"
 
     def map_preview(self, obj):
         if not obj.pk:

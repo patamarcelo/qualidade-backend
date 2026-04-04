@@ -7,42 +7,43 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <style>
-        /* barra de teste para confirmar que esse template carregou */
         .fp-template-loaded {
             background: linear-gradient(135deg, #0f172a, #1e293b);
             color: #fff;
             padding: 14px 18px;
-            border-radius: 16px;
+            border-radius: 18px;
             margin-bottom: 16px;
             font-size: 18px;
             font-weight: 700;
             box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
         }
 
-        /* melhora geral da listagem */
         #changelist {
             background: #f8fafc;
-            border-radius: 20px;
-            padding: 12px;
+            border-radius: 24px;
+            padding: 14px;
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
         }
 
         #changelist table thead th {
             background: #ffffff;
             border-bottom: 1px solid #e2e8f0;
+            padding-top: 12px;
+            padding-bottom: 12px;
+        }
+
+        #changelist table tbody td {
+            vertical-align: middle;
+            padding-top: 14px;
+            padding-bottom: 14px;
         }
 
         #changelist table tbody tr {
-            transition: all 0.18s ease;
+            transition: all .18s ease;
         }
 
         #changelist table tbody tr:hover {
             background: #f8fbff !important;
-        }
-
-        #changelist table tbody td,
-        #changelist table thead th {
-            padding-top: 12px;
-            padding-bottom: 12px;
         }
 
         .fp-badge {
@@ -56,26 +57,55 @@
             font-weight: 700;
             line-height: 1;
             white-space: nowrap;
+            margin-right: 6px;
+            margin-bottom: 4px;
+        }
+
+        .fp-row-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
         }
 
         .fp-preview-btn,
-        .fp-kml-btn {
+        .fp-kml-btn,
+        .fp-edit-btn {
             border-radius: 999px !important;
-            padding: 6px 14px !important;
+            padding: 7px 14px !important;
             font-weight: 600 !important;
             border: 1px solid #dbe3ee !important;
             background: #fff !important;
             box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
             cursor: pointer;
+            text-decoration: none !important;
+            color: #0f172a !important;
         }
 
         .fp-preview-btn:hover,
-        .fp-kml-btn:hover {
+        .fp-kml-btn:hover,
+        .fp-edit-btn:hover {
             background: #f8fafc !important;
             border-color: #cbd5e1 !important;
         }
 
-        /* drawer lateral */
+        .fp-mini-map {
+            width: 82px;
+            height: 62px;
+            border-radius: 14px;
+            background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+            border: 1px solid #dbe3ee;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .fp-mini-map svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
         .fp-drawer-backdrop {
             position: fixed;
             inset: 0;
@@ -98,12 +128,12 @@
             top: 16px;
             right: 16px;
             bottom: 16px;
-            width: min(560px, calc(100vw - 32px));
-            background: rgba(255, 255, 255, 0.92);
+            width: min(720px, calc(100vw - 32px));
+            background: rgba(255, 255, 255, 0.94);
             backdrop-filter: blur(18px);
             -webkit-backdrop-filter: blur(18px);
             border: 1px solid rgba(255, 255, 255, 0.55);
-            border-radius: 28px;
+            border-radius: 30px;
             box-shadow: 0 20px 60px rgba(2, 6, 23, 0.25);
             z-index: 9999;
             transform: translateX(105%);
@@ -119,45 +149,66 @@
 
         .fp-drawer-header {
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             justify-content: space-between;
-            padding: 18px 20px;
+            gap: 16px;
+            padding: 20px 22px;
             border-bottom: 1px solid rgba(148, 163, 184, 0.18);
         }
 
         .fp-drawer-title {
-            font-size: 20px;
-            font-weight: 700;
+            font-size: 24px;
+            font-weight: 800;
             color: #0f172a;
             margin: 0;
+            line-height: 1.15;
         }
 
         .fp-drawer-subtitle {
-            font-size: 13px;
+            font-size: 14px;
             color: #64748b;
-            margin-top: 4px;
+            margin-top: 6px;
+        }
+
+        .fp-drawer-header-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .fp-drawer-header-btn {
+            border: 1px solid #dbe3ee;
+            background: #fff;
+            color: #0f172a;
+            border-radius: 999px;
+            padding: 8px 14px;
+            font-size: 13px;
+            font-weight: 700;
+            text-decoration: none;
+            cursor: pointer;
         }
 
         .fp-drawer-close {
             border: 0;
             background: rgba(15, 23, 42, 0.06);
-            width: 38px;
-            height: 38px;
+            width: 40px;
+            height: 40px;
             border-radius: 999px;
             cursor: pointer;
             font-size: 18px;
+            flex-shrink: 0;
         }
 
         .fp-drawer-body {
-            padding: 18px 20px 20px;
+            padding: 20px 22px 22px;
             overflow: auto;
             display: grid;
-            gap: 16px;
+            gap: 18px;
         }
 
         .fp-drawer-map {
-            height: 360px;
-            border-radius: 22px;
+            height: 430px;
+            border-radius: 24px;
             overflow: hidden;
             border: 1px solid rgba(148, 163, 184, 0.20);
             background: #e5e7eb;
@@ -165,12 +216,12 @@
 
         .fp-info-grid {
             display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
+            grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 12px;
         }
 
         .fp-info-card {
-            background: rgba(255, 255, 255, 0.82);
+            background: rgba(255, 255, 255, 0.86);
             border: 1px solid rgba(148, 163, 184, 0.18);
             border-radius: 18px;
             padding: 14px;
@@ -186,35 +237,97 @@
 
         .fp-info-value {
             font-size: 16px;
-            font-weight: 700;
+            font-weight: 800;
             color: #0f172a;
         }
 
-        .fp-observation {
-            background: rgba(255, 255, 255, 0.82);
+        .fp-observation,
+        .fp-coords-box {
+            background: rgba(255, 255, 255, 0.86);
             border: 1px solid rgba(148, 163, 184, 0.18);
             border-radius: 18px;
             padding: 14px;
             color: #334155;
-            white-space: pre-wrap;
+        }
+
+        .fp-section-title {
+            font-size: 14px;
+            font-weight: 800;
+            color: #0f172a;
+            margin-bottom: 10px;
+        }
+
+        .fp-coords-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .fp-coords-table th,
+        .fp-coords-table td {
+            padding: 8px 10px;
+            border-bottom: 1px solid #e2e8f0;
+            text-align: left;
+            font-size: 13px;
+        }
+
+        .fp-coords-table th {
+            color: #64748b;
+            font-weight: 700;
+        }
+
+        .fp-coords-scroll {
+            max-height: 220px;
+            overflow: auto;
+        }
+
+        .fp-toggle-coords {
+            border: 1px solid #dbe3ee;
+            background: #fff;
+            border-radius: 999px;
+            padding: 7px 12px;
+            cursor: pointer;
+            font-weight: 700;
+        }
+
+        .fp-inline-statuses {
+            margin-top: 10px;
+        }
+
+        @media (max-width: 900px) {
+            .fp-info-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .fp-drawer {
+                width: calc(100vw - 16px);
+                right: 8px;
+                top: 8px;
+                bottom: 8px;
+            }
         }
     </style>
 {% endblock %}
 
 {% block content %}
     
-
     {{ block.super }}
 
     <div id="fpDrawerBackdrop" class="fp-drawer-backdrop"></div>
 
     <aside id="fpDrawer" class="fp-drawer" aria-hidden="true">
         <div class="fp-drawer-header">
-            <div>
+            <div style="flex:1;">
                 <h3 id="fpDrawerTitle" class="fp-drawer-title">Preview</h3>
                 <div id="fpDrawerSubtitle" class="fp-drawer-subtitle"></div>
+                <div id="fpDrawerStatuses" class="fp-inline-statuses"></div>
             </div>
-            <button type="button" id="fpDrawerClose" class="fp-drawer-close">✕</button>
+
+            <div class="fp-drawer-header-actions">
+                <a id="fpDrawerEditBtn" href="#" class="fp-drawer-header-btn">Editar</a>
+                <a id="fpDrawerKmlBtn" href="#" class="fp-drawer-header-btn">KML</a>
+                <button type="button" id="fpToggleCoords" class="fp-drawer-header-btn">Coordenadas</button>
+                <button type="button" id="fpDrawerClose" class="fp-drawer-close">✕</button>
+            </div>
         </div>
 
         <div class="fp-drawer-body">
@@ -242,7 +355,7 @@
                 </div>
 
                 <div class="fp-info-card">
-                    <div class="fp-info-label">Fechado</div>
+                    <div class="fp-info-label">Fechamento</div>
                     <div id="fpInfoClosed" class="fp-info-value">-</div>
                 </div>
 
@@ -253,8 +366,24 @@
             </div>
 
             <div id="fpObservationWrap" class="fp-observation" style="display:none;">
-                <strong>Observação</strong>
-                <div id="fpObservationText" style="margin-top:8px;"></div>
+                <div class="fp-section-title">Observação</div>
+                <div id="fpObservationText"></div>
+            </div>
+
+            <div id="fpCoordsWrap" class="fp-coords-box" style="display:none;">
+                <div class="fp-section-title">Coordenadas</div>
+                <div class="fp-coords-scroll">
+                    <table class="fp-coords-table">
+                        <thead>
+                            <tr>
+                                <th>Ponto</th>
+                                <th>Latitude</th>
+                                <th>Longitude</th>
+                            </tr>
+                        </thead>
+                        <tbody id="fpCoordsTableBody"></tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </aside>
@@ -263,6 +392,21 @@
         (function () {
             let drawerMap = null;
             let drawerLayerGroup = null;
+
+            function normalizePoints(points) {
+                if (!Array.isArray(points)) return [];
+                return points
+                    .map((p) => {
+                        const lat = p.lat ?? p.latitude;
+                        const lng = p.lng ?? p.longitude ?? p.lon;
+                        if (lat == null || lng == null) return null;
+                        return {
+                            lat: Number(lat),
+                            lng: Number(lng),
+                        };
+                    })
+                    .filter(Boolean);
+            }
 
             function formatArea(areaM2) {
                 if (!areaM2) return "-";
@@ -273,19 +417,6 @@
             function formatPerimeter(perimeterM) {
                 if (!perimeterM) return "-";
                 return `${Number(perimeterM).toFixed(2)} m`;
-            }
-
-            function normalizePoints(points) {
-                if (!Array.isArray(points)) return [];
-
-                return points
-                    .map((p) => {
-                        const lat = p.lat ?? p.latitude;
-                        const lng = p.lng ?? p.longitude ?? p.lon;
-                        if (lat == null || lng == null) return null;
-                        return [Number(lat), Number(lng)];
-                    })
-                    .filter(Boolean);
             }
 
             function initSatelliteMap(el) {
@@ -306,7 +437,9 @@
             }
 
             function drawPolygonOnMap(map, layerGroup, data) {
-                const latlngs = normalizePoints(data.points);
+                const pts = normalizePoints(data.points);
+                const latlngs = pts.map((p) => [p.lat, p.lng]);
+
                 layerGroup.clearLayers();
 
                 if (!latlngs.length) {
@@ -329,7 +462,7 @@
                             weight: 1,
                             fillColor: "#ffffff",
                             fillOpacity: 1,
-                        }).addTo(layerGroup).bindTooltip(`Ponto ${index + 1}`);
+                        }).addTo(layerGroup).bindTooltip(`P${index + 1}`);
                     });
 
                     map.fitBounds(polygon.getBounds(), { padding: [24, 24] });
@@ -346,11 +479,61 @@
                             weight: 1,
                             fillColor: "#ffffff",
                             fillOpacity: 1,
-                        }).addTo(layerGroup).bindTooltip(`Ponto ${index + 1}`);
+                        }).addTo(layerGroup).bindTooltip(`P${index + 1}`);
                     });
 
                     map.fitBounds(polyline.getBounds(), { padding: [24, 24] });
                 }
+            }
+
+            function buildMiniMap(el) {
+                const raw = el.dataset.points || "[]";
+                const isClosed = el.dataset.closed === "true";
+                let points = [];
+
+                try {
+                    points = JSON.parse(raw);
+                } catch (e) {
+                    points = [];
+                }
+
+                const pts = normalizePoints(points);
+                if (!pts.length) {
+                    el.innerHTML = '<span style="font-size:11px;color:#64748b;">sem pontos</span>';
+                    return;
+                }
+
+                const lats = pts.map(p => p.lat);
+                const lngs = pts.map(p => p.lng);
+
+                const minLat = Math.min(...lats);
+                const maxLat = Math.max(...lats);
+                const minLng = Math.min(...lngs);
+                const maxLng = Math.max(...lngs);
+
+                const pad = 6;
+                const w = 82;
+                const h = 62;
+
+                const latRange = (maxLat - minLat) || 1;
+                const lngRange = (maxLng - minLng) || 1;
+
+                const mapped = pts.map((p) => {
+                    const x = pad + ((p.lng - minLng) / lngRange) * (w - pad * 2);
+                    const y = h - (pad + ((p.lat - minLat) / latRange) * (h - pad * 2));
+                    return [x, y];
+                });
+
+                const d = mapped.map((p, i) => `${i === 0 ? "M" : "L"} ${p[0].toFixed(2)} ${p[1].toFixed(2)}`).join(" ");
+                const close = isClosed ? " Z" : "";
+
+                el.innerHTML = `
+                    <svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="0" y="0" width="${w}" height="${h}" fill="#eef2f7"></rect>
+                        <path d="${d}${close}" fill="${isClosed ? "rgba(59,130,246,0.18)" : "none"}" stroke="#2563eb" stroke-width="2.2" stroke-linejoin="round" />
+                        ${mapped.map((p) => `<circle cx="${p[0].toFixed(2)}" cy="${p[1].toFixed(2)}" r="2.4" fill="#0f172a" stroke="#fff" stroke-width="1" />`).join("")}
+                    </svg>
+                `;
             }
 
             function openDrawer() {
@@ -377,20 +560,58 @@
                 drawer.setAttribute("aria-hidden", "true");
             }
 
+            function badgeHtml(label, bg, color) {
+                return `<span class="fp-badge" style="background:${bg};color:${color};">${label}</span>`;
+            }
+
+            function fillCoordsTable(points) {
+                const body = document.getElementById("fpCoordsTableBody");
+                if (!body) return;
+
+                const pts = normalizePoints(points);
+
+                body.innerHTML = pts.map((p, i) => `
+                    <tr>
+                        <td>P${i + 1}</td>
+                        <td>${p.lat.toFixed(7)}</td>
+                        <td>${p.lng.toFixed(7)}</td>
+                    </tr>
+                `).join("");
+            }
+
             function fillDrawerInfo(data) {
                 const title = document.getElementById("fpDrawerTitle");
                 const subtitle = document.getElementById("fpDrawerSubtitle");
+                const statuses = document.getElementById("fpDrawerStatuses");
+
                 const area = document.getElementById("fpInfoArea");
                 const perimeter = document.getElementById("fpInfoPerimeter");
                 const points = document.getElementById("fpInfoPoints");
                 const mode = document.getElementById("fpInfoMode");
                 const closed = document.getElementById("fpInfoClosed");
                 const active = document.getElementById("fpInfoActive");
+
                 const obsWrap = document.getElementById("fpObservationWrap");
                 const obsText = document.getElementById("fpObservationText");
 
+                const editBtn = document.getElementById("fpDrawerEditBtn");
+                const kmlBtn = document.getElementById("fpDrawerKmlBtn");
+
                 if (title) title.textContent = data.name || "Preview";
-                if (subtitle) subtitle.textContent = data.farm_name || "Sem fazenda";
+                if (subtitle) subtitle.textContent = `${data.farm_name || "Sem fazenda"} • ${data.user_name || "Sem usuário"}`;
+
+                if (statuses) {
+                    statuses.innerHTML = [
+                        badgeHtml(data.mode || "-", "#2563eb15", "#2563eb"),
+                        data.is_closed
+                            ? badgeHtml("Fechado", "#16a34a15", "#16a34a")
+                            : badgeHtml("Aberto", "#f59e0b15", "#b45309"),
+                        data.is_active
+                            ? badgeHtml("Ativo", "#16a34a15", "#16a34a")
+                            : badgeHtml("Inativo", "#ef444415", "#b91c1c")
+                    ].join(" ");
+                }
+
                 if (area) area.textContent = formatArea(data.area_m2);
                 if (perimeter) perimeter.textContent = formatPerimeter(data.perimeter_m);
                 if (points) points.textContent = Array.isArray(data.points) ? data.points.length : "-";
@@ -405,6 +626,11 @@
                     obsWrap.style.display = "none";
                     obsText.textContent = "";
                 }
+
+                if (editBtn && data.edit_url) editBtn.href = data.edit_url;
+                if (kmlBtn && data.kml_url) kmlBtn.href = data.kml_url;
+
+                fillCoordsTable(data.points || []);
             }
 
             async function handlePreviewClick(url) {
@@ -444,11 +670,7 @@
                 if (previewBtn) {
                     event.preventDefault();
                     const url = previewBtn.dataset.previewUrl;
-                    if (url) {
-                        handlePreviewClick(url);
-                    } else {
-                        alert("Botão sem data-preview-url.");
-                    }
+                    if (url) handlePreviewClick(url);
                 }
 
                 if (
@@ -456,6 +678,13 @@
                     event.target.id === "fpDrawerBackdrop"
                 ) {
                     closeDrawer();
+                }
+
+                if (event.target.id === "fpToggleCoords") {
+                    const coordsWrap = document.getElementById("fpCoordsWrap");
+                    if (!coordsWrap) return;
+
+                    coordsWrap.style.display = coordsWrap.style.display === "none" ? "block" : "none";
                 }
             });
 
@@ -465,7 +694,9 @@
                 }
             });
 
-            console.log("farmpolygon template inline carregado");
+            document.addEventListener("DOMContentLoaded", function () {
+                document.querySelectorAll(".fp-mini-map").forEach(buildMiniMap);
+            });
         })();
     </script>
 {% endblock %}
