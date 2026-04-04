@@ -28,6 +28,7 @@ from admin_extra_buttons.utils import HttpResponseRedirectToReferrer
 from django import forms
 from django.conf import settings
 from django.contrib import admin, messages
+from django.contrib.admin import DateFieldListFilter
 from django.contrib.admin import SimpleListFilter, helpers
 from django.contrib.admin.helpers import ActionForm as AdminActionForm
 from django.core import serializers
