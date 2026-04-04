@@ -1,53 +1,22 @@
 from __future__ import annotations
-from typing import Any
-from django.contrib import admin
-from django import forms
-from django.db.models.query import QuerySet
-from django.http.request import HttpRequest
 
-from django.utils.formats import date_format
-from django.utils.html import format_html
-
-
-# Register your models here.
-from django.contrib import admin
-from .models import *
-from .forms import AplicacoesProgramaInlineFormSet
-
-
-import json
-from django.core.serializers.json import DjangoJSONEncoder
-from django.utils.safestring import mark_safe
-
-
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.views.generic.detail import DetailView
-from django.urls import path, reverse
-
-from django_json_widget.widgets import JSONEditorWidget
-
-import csv
-from django.http import HttpResponse
 import codecs
+import csv
+import json
+import logging
+import time
+import uuid
+from collections import defaultdict
+from datetime import date, datetime, time as dt_time, timedelta
+from decimal import Decimal, DivisionByZero, InvalidOperation
+from threading import Thread
+from types import SimpleNamespace
+from typing import Any
+from uuid import UUID
 
-from django.db.models import Q, Sum, F, Exists, CharField
-
-from django.db.models import Subquery, OuterRef
-from django.utils.formats import localize
-
-
-from django.db.models import Case, When, DecimalField, Value, IntegerField
-from django.db.models.functions import Coalesce, Round
-
-from django.core import serializers
-from django.contrib.admin import SimpleListFilter
-from datetime import datetime, timedelta, date
-
-from django.contrib import messages
-
-from django.utils.html import escape
-
-
+import dropbox
+import requests
+from admin_confirm.admin import AdminConfirmMixin, confirm_action
 from admin_extra_buttons.api import (
     ExtraButtonsMixin,
     button,
@@ -56,113 +25,81 @@ from admin_extra_buttons.api import (
     view,
 )
 from admin_extra_buttons.utils import HttpResponseRedirectToReferrer
-from django.http import HttpResponseRedirect
-
-from django.http import HttpResponse, JsonResponse
-from django.contrib import admin
+from django import forms
+from django.conf import settings
+from django.contrib import admin, messages
+from django.contrib.admin import SimpleListFilter, helpers
+from django.contrib.admin.helpers import ActionForm as AdminActionForm
+from django.core import serializers
+from django.core.cache import cache
+from django.core.exceptions import ValidationError
+from django.core.files.base import ContentFile
+from django.core.files.storage import FileSystemStorage, default_storage
+from django.db import connection, transaction, close_old_connections
+from django.db.models import (
+    Q,
+    Sum,
+    F,
+    Exists,
+    CharField,
+    Subquery,
+    OuterRef,
+    Case,
+    When,
+    DecimalField,
+    Value,
+    IntegerField,
+)
+from django.db.models.functions import Coalesce, Round
+from django.db.models.query import QuerySet
+from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
+from django.http.request import HttpRequest
+from django.shortcuts import render, redirect, get_object_or_404
+from django.template.response import TemplateResponse
+from django.urls import path, reverse
+from django.utils import timezone
+from django.utils.dateparse import parse_date
+from django.utils.formats import date_format, localize
+from django.utils.html import escape, format_html
+from django.utils.http import urlencode
+from django.utils.safestring import mark_safe
+from django.utils.timezone import is_naive, make_aware
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.views.decorators.csrf import csrf_exempt
+from django.views.generic.detail import DetailView
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django_json_widget.widgets import JSONEditorWidget
+from rest_framework.authtoken.models import Token
+
+from qualidade_project.settings import DEBUG
+from usuario.models import CustomUsuario as User
+
+from .forms import (
+    AplicacoesProgramaInlineFormSet,
+    BulkReplaceAplicacaoForm,
+    PlantioExtratoAreaForm,
+    ProgramaAdminForm,
+    UpdateDataPrevistaPlantioForm,
+)
+from .models import *
+from .services.generate_kml import create_kml
 from .utils import (
     admin_form_alter_programa_and_save,
     admin_form_remove_index,
     close_plantation_and_productivity,
-    duplicate_existing_operations_program_and_applications, 
-    update_farmbox_data
+    duplicate_existing_operations_program_and_applications,
+    processar_programa_em_background,
+    update_farmbox_data,
 )
-
-import requests
-
-from admin_confirm.admin import AdminConfirmMixin, confirm_action
-from django.urls import path
-
-
-from usuario.models import CustomUsuario as User
-from rest_framework.authtoken.models import Token
-
-
-from qualidade_project.settings import DEBUG
-from django.conf import settings
-import dropbox
-
-from django.core.files.storage import default_storage
-from django.core.files.base import ContentFile
-from django.core.files.storage import FileSystemStorage
-
-from django.contrib.admin import DateFieldListFilter
-
-from .forms import PlantioExtratoAreaForm, ProgramaAdminForm, UpdateDataPrevistaPlantioForm
-from django.db import connection
-
-import uuid
-from threading import Thread
-
-from django.core.exceptions import ValidationError
-from django.utils import timezone
-from uuid import UUID
-
-
-from decimal import Decimal, DivisionByZero, InvalidOperation
-from django.shortcuts import render, redirect, get_object_or_404
-from types import SimpleNamespace
-
-import time
 from .views_api import save_from_protheus_logic
-from django.utils.http import urlencode
 
-
-
-from django.db import transaction
-import logging
 logger = logging.getLogger(__name__)
-
-from .services.generate_kml import create_kml
-from django.contrib.admin.helpers import ActionForm as AdminActionForm
-
-from collections import defaultdict
-
-from django.core.cache import cache
-
-from django.contrib.admin import helpers
-from django.template.response import TemplateResponse
-
-from django.db import close_old_connections
-
-
-from django.contrib import messages
-from django.contrib.admin import helpers
-from django.db import transaction
-from django.http import HttpResponseRedirect
-from django.shortcuts import render
-from .forms import BulkReplaceAplicacaoForm
-
-import uuid
-from threading import Thread
-
-from django.contrib import admin, messages
-from django.contrib.admin import helpers
-from django.core.exceptions import ValidationError
-from django.db import transaction
-from django.http import HttpResponseRedirect
-from django.shortcuts import render
-
-from .forms import BulkReplaceAplicacaoForm
-from .models import Aplicacao, Defensivo, BackgroundTaskStatus, Programa
-from .utils import processar_programa_em_background
-
-
-from django.utils.dateparse import parse_date
-
-from datetime import datetime, time
-from django.utils.timezone import make_aware, is_naive
-from django.db.models import Q, Sum, F, Case, When, Value, DecimalField
-from django.db.models.functions import Coalesce, Round
-
 
 def parse_date_start(date_str):
     if not date_str:
         return None
     dt = datetime.strptime(date_str, "%Y-%m-%d")
-    dt = datetime.combine(dt.date(), time.min)
+    dt = datetime.combine(dt.date(), dt_time.min)
     return make_aware(dt) if is_naive(dt) else dt
 
 
@@ -170,7 +107,7 @@ def parse_date_end(date_str):
     if not date_str:
         return None
     dt = datetime.strptime(date_str, "%Y-%m-%d")
-    dt = datetime.combine(dt.date(), time.max)
+    dt = datetime.combine(dt.date(), dt_time.max)
     return make_aware(dt) if is_naive(dt) else dt
 
 
