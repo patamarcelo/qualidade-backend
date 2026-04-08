@@ -6153,6 +6153,227 @@ class DefensivoViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK,
         )
         
+    
+    @action(detail=False, methods=["POST"])
+    def resumo_pre_st_protheus_analista(self, request):
+        try:
+            raw_body = request.body.decode("utf-8") if request.body else ""
+        except Exception as e:
+            raw_body = f"Erro ao tentar ler o body: {e}"
+
+        try:
+            payload_data = request.data
+        except Exception:
+            payload_data = None
+
+        query_params = request.query_params
+        parsed_data = None
+
+        # 1) usa request.data se vier certo
+        if isinstance(payload_data, dict) and payload_data:
+            parsed_data = payload_data
+            logger.warning("resumo_pre_st_protheus_analista: usando request.data parseado pelo DRF.")
+
+        # 2) fallback robusto via raw_body
+        if not parsed_data:
+            parsed_data = _parse_protheus_payload(raw_body)
+            logger.warning("resumo_pre_st_protheus_analista: usando parse robusto do raw_body.")
+
+        # 3) garantia
+        if not isinstance(parsed_data, dict):
+            parsed_data = {}
+
+        logger.warning("PAYLOAD FINAL resumo_pre_st_protheus_analista: %s", parsed_data)
+
+        received_at = timezone.now()
+
+        headers_dict = dict(request.headers) if hasattr(request, "headers") else {}
+        safe_headers = self._mask_sensitive_headers(headers_dict)
+
+        print("\n================ RESUMO PRE ST PROTHEUS ANALISTA ================")
+        print(f"Content-Type recebido: {request.content_type}")
+        print(f"Headers (masked): {safe_headers}")
+        print("---------------------------------------------------------------")
+        print(f"1. request.body (Texto BRUTO lido primeiro): {raw_body}")
+        print(f"2. request.data (Parseado pelo DRF): {payload_data}")
+        print(f"3. request.query_params (URL): {query_params}")
+        print(f"4. parsed_data final: {parsed_data}")
+        print("================================================================\n")
+
+        email_sent = False
+        email_error = ""
+        gmail_result = None
+
+        try:
+            html = render_to_string(
+                "email/protheus_payload_analise.html",
+                {
+                    "received_at": received_at,
+                    "content_type": request.content_type,
+                    "query_params": dict(request.query_params),
+                    "headers": safe_headers,
+                    "raw_body": raw_body,
+                    "payload_rows": self._dict_to_rows(parsed_data)
+                    if isinstance(parsed_data, (dict, list))
+                    else [("payload", parsed_data)],
+                    "payload": parsed_data,
+                    "doc": parsed_data.get("doc") or "-",
+                    "filial_origem": parsed_data.get("filial_origem") or "-",
+                    "itens": parsed_data.get("itens") or [],
+                    "itens_count": len(parsed_data.get("itens") or []),
+                    "sucesso_count": 0,
+                    "erro_count": 0,
+                    "total_quantidade": 0,
+                },
+            )
+
+            subject = f"[Protheus] Resumo Pré ST Analista ({received_at.strftime('%Y-%m-%d %H:%M:%S')})"
+            to_emails = ["marcelo@gdourado.com.br"]
+
+            gmail_result = send_mail_gmail_api(
+                subject=subject,
+                body_html=html,
+                from_email=getattr(settings, "DEFAULT_FROM_EMAIL", ""),
+                to_emails=to_emails,
+                cc_emails=[],
+                attachments=[],
+                fail_silently=False,
+            )
+
+            email_sent = True
+
+        except Exception as e:
+            email_sent = False
+            email_error = str(e)
+            logger.exception("Erro ao enviar e-mail do payload resumo_pre_st_protheus_analista")
+
+        return Response(
+            {
+                "received": True,
+                "endpoint": "resumo_pre_st_protheus_analista",
+                "received_at": received_at,
+                "payload_type": type(parsed_data).__name__,
+                "keys": list(parsed_data.keys()) if isinstance(parsed_data, dict) else None,
+                "email_sent": email_sent,
+                "email_error": email_error,
+                "gmail_result": gmail_result,
+                "payload": parsed_data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+    @action(detail=False, methods=["POST"])
+    def confirmacao_st_protheus_ubs(self, request):
+        try:
+            raw_body = request.body.decode("utf-8") if request.body else ""
+        except Exception as e:
+            raw_body = f"Erro ao tentar ler o body: {e}"
+
+        try:
+            payload_data = request.data
+        except Exception:
+            payload_data = None
+
+        query_params = request.query_params
+        parsed_data = None
+
+        # 1) usa request.data se vier certo
+        if isinstance(payload_data, dict) and payload_data:
+            parsed_data = payload_data
+            logger.warning("confirmacao_st_protheus_ubs: usando request.data parseado pelo DRF.")
+
+        # 2) fallback robusto via raw_body
+        if not parsed_data:
+            parsed_data = _parse_protheus_payload(raw_body)
+            logger.warning("confirmacao_st_protheus_ubs: usando parse robusto do raw_body.")
+
+        # 3) garantia
+        if not isinstance(parsed_data, dict):
+            parsed_data = {}
+
+        logger.warning("PAYLOAD FINAL confirmacao_st_protheus_ubs: %s", parsed_data)
+
+        received_at = timezone.now()
+
+        headers_dict = dict(request.headers) if hasattr(request, "headers") else {}
+        safe_headers = self._mask_sensitive_headers(headers_dict)
+
+        print("\n================ CONFIRMACAO ST PROTHEUS UBS ================")
+        print(f"Content-Type recebido: {request.content_type}")
+        print(f"Headers (masked): {safe_headers}")
+        print("------------------------------------------------------------")
+        print(f"1. request.body (Texto BRUTO lido primeiro): {raw_body}")
+        print(f"2. request.data (Parseado pelo DRF): {payload_data}")
+        print(f"3. request.query_params (URL): {query_params}")
+        print(f"4. parsed_data final: {parsed_data}")
+        print("============================================================\n")
+
+        email_sent = False
+        email_error = ""
+        gmail_result = None
+
+        try:
+            html = render_to_string(
+                "email/protheus_payload_analise.html",
+                {
+                    "received_at": received_at,
+                    "content_type": request.content_type,
+                    "query_params": dict(request.query_params),
+                    "headers": safe_headers,
+                    "raw_body": raw_body,
+                    "payload_rows": self._dict_to_rows(parsed_data)
+                    if isinstance(parsed_data, (dict, list))
+                    else [("payload", parsed_data)],
+                    "payload": parsed_data,
+                    "doc": parsed_data.get("doc") or "-",
+                    "filial_origem": parsed_data.get("filial_origem") or "-",
+                    "itens": parsed_data.get("itens") or [],
+                    "itens_count": len(parsed_data.get("itens") or []),
+                    "sucesso_count": 0,
+                    "erro_count": 0,
+                    "total_quantidade": 0,
+                },
+            )
+
+            
+            subject = f"[Protheus] Confirmação ST UBS ({received_at.strftime('%Y-%m-%d %H:%M:%S')})"
+            
+            to_emails = ["marcelo@gdourado.com.br"]
+
+            gmail_result = send_mail_gmail_api(
+                subject=subject,
+                body_html=html,
+                from_email=getattr(settings, "DEFAULT_FROM_EMAIL", ""),
+                to_emails=to_emails,
+                cc_emails=[],
+                attachments=[],
+                fail_silently=False,
+            )
+
+            email_sent = True
+
+        except Exception as e:
+            email_sent = False
+            email_error = str(e)
+            logger.exception("Erro ao enviar e-mail do payload confirmacao_st_protheus_ubs")
+
+        return Response(
+            {
+                "received": True,
+                "endpoint": "confirmacao_st_protheus_ubs",
+                "received_at": received_at,
+                "payload_type": type(parsed_data).__name__,
+                "keys": list(parsed_data.keys()) if isinstance(parsed_data, dict) else None,
+                "email_sent": email_sent,
+                "email_error": email_error,
+                "gmail_result": gmail_result,
+                "payload": parsed_data,
+            },
+            status=status.HTTP_200_OK,
+        )
+        
+        
     def processar_em_background(self, task_id):
         # ✅ threads precisam disso (evita usar conexão herdada do request)
         close_old_connections()

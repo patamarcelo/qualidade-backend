@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Análise de Payload Protheus</title>
+</head>
+
+<body style="margin:0;padding:0;background-color:#f4f6f9;font-family:Arial,Helvetica,sans-serif;">
+
+  <div
+    style="max-width:1100px;margin:30px auto;background:#ffffff;border-radius:10px;padding:28px;box-shadow:0 4px 12px rgba(0,0,0,0.08);">
+
+    <h2 style="margin:0 0 8px 0;color:#111827;">
+      🔎 Análise de payload recebido do Protheus
+    </h2>
+
+    <p style="margin:0 0 18px 0;color:#4b5563;font-size:14px;line-height:1.6;">
+      Este e-mail foi gerado para análise estrutural inicial do payload recebido.
+    </p>
+
+    <!-- METADADOS -->
+    <div style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;margin:0 0 22px 0;">
+      <div style="background:#f9fafb;padding:12px 14px;border-bottom:1px solid #e5e7eb;">
+        <h3 style="margin:0;color:#111827;font-size:15px;">📌 Metadados da requisição</h3>
+      </div>
+
+      <table style="border-collapse:collapse;width:100%;font-size:14px;">
+        <tbody>
+          <tr>
+            <td style="width:220px;padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;">
+              <strong>endpoint</strong>
+            </td>
+            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;font-family:monospace;color:#111827;">
+              {{ endpoint_name|default:"-" }}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;">
+              <strong>recebido em</strong>
+            </td>
+            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#111827;">
+              {{ received_at }}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;">
+              <strong>content-type</strong>
+            </td>
+            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;font-family:monospace;color:#111827;">
+              {{ content_type|default:"-" }}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;">
+              <strong>query params</strong>
+            </td>
+            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;font-family:monospace;color:#111827;">
+              {{ query_params|default:"-" }}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:10px 12px;color:#374151;">
+              <strong>chaves do payload</strong>
+            </td>
+            <td style="padding:10px 12px;font-family:monospace;color:#111827;">
+              {{ payload_keys|default:"-" }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- RESUMO GERAL -->
+    <div style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;margin:0 0 22px 0;">
+      <div style="background:#f9fafb;padding:12px 14px;border-bottom:1px solid #e5e7eb;">
+        <h3 style="margin:0;color:#111827;font-size:15px;">✅ Resumo geral</h3>
+        <p style="margin:6px 0 0 0;color:#6b7280;font-size:12px;">
+          Visão inicial dos principais dados recebidos.
+        </p>
+      </div>
+
+      <table style="border-collapse:collapse;width:100%;font-size:14px;">
+        <tbody>
+          <tr>
+            <td style="width:220px;padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;">
+              <strong>doc</strong>
+            </td>
+            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;font-family:monospace;color:#111827;">
+              {{ doc|default:"-" }}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;">
+              <strong>filial_origem</strong>
+            </td>
+            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;font-family:monospace;color:#111827;">
+              {{ filial_origem|default:"-" }}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;">
+              <strong>quantidade de itens</strong>
+            </td>
+            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;font-family:monospace;color:#111827;">
+              {{ itens_count|default:0 }}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:10px 12px;color:#374151;">
+              <strong>tipo do payload</strong>
+            </td>
+            <td style="padding:10px 12px;font-family:monospace;color:#111827;">
+              {{ payload_type|default:"-" }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ITENS -->
+    <h3 style="margin:0 0 10px 0;color:#111827;">📋 Itens recebidos</h3>
+
+    <table style="border-collapse:collapse;width:100%;font-size:13px;margin-bottom:22px;">
+      <thead>
+        <tr style="background:#f3f4f6;">
+          <th style="text-align:left;padding:10px;border:1px solid #e5e7eb;">#</th>
+          <th style="text-align:left;padding:10px;border:1px solid #e5e7eb;">Produto</th>
+          <th style="text-align:left;padding:10px;border:1px solid #e5e7eb;">Descrição</th>
+          <th style="text-align:left;padding:10px;border:1px solid #e5e7eb;">Quantidade</th>
+          <th style="text-align:left;padding:10px;border:1px solid #e5e7eb;">Filial destino</th>
+          <th style="text-align:left;padding:10px;border:1px solid #e5e7eb;">Armazém destino</th>
+          <th style="text-align:left;padding:10px;border:1px solid #e5e7eb;">Sucesso</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if itens %}
+          {% for item in itens %}
+            <tr>
+              <td style="padding:8px;border:1px solid #e5e7eb;font-family:monospace;">
+                {{ forloop.counter }}
+              </td>
+              <td style="padding:8px;border:1px solid #e5e7eb;font-family:monospace;">
+                {{ item.produto|default:"-" }}
+              </td>
+              <td style="padding:8px;border:1px solid #e5e7eb;">
+                {{ item.produto_desc|default:"-" }}
+              </td>
+              <td style="padding:8px;border:1px solid #e5e7eb;font-family:monospace;">
+                {{ item.quantidade|default:"-" }}
+              </td>
+              <td style="padding:8px;border:1px solid #e5e7eb;font-family:monospace;">
+                {{ item.filial_destino|default:"-" }}
+              </td>
+              <td style="padding:8px;border:1px solid #e5e7eb;font-family:monospace;">
+                {{ item.armazem_destino|default:"-" }}
+              </td>
+              <td style="padding:8px;border:1px solid #e5e7eb;font-family:monospace;">
+                {% if item.sucesso is not None %}
+                  {{ item.sucesso }}
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+            </tr>
+
+            <tr style="background:#fafafa;">
+              <td colspan="7" style="padding:10px;border:1px solid #e5e7eb;">
+                <div style="font-size:12px;color:#374151;margin-bottom:6px;">
+                  <strong>Item completo:</strong>
+                </div>
+                <div style="
+                    background:#111827;
+                    color:#f9fafb;
+                    padding:12px;
+                    border-radius:8px;
+                    font-family:monospace;
+                    font-size:12px;
+                    white-space:pre-wrap;
+                    word-break:break-word;
+                  ">
+                  {{ item }}
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="7" style="padding:10px;border:1px solid #e5e7eb;text-align:center;">
+              Nenhum item recebido
+            </td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+
+    <!-- HEADERS -->
+    <h3 style="margin:0 0 10px 0;color:#111827;">🧾 Headers da requisição</h3>
+
+    <div style="
+      background:#111827;
+      color:#f9fafb;
+      padding:15px;
+      border-radius:8px;
+      font-family:monospace;
+      font-size:13px;
+      white-space:pre-wrap;
+      word-break:break-word;
+      margin-bottom:22px;
+    ">
+      {{ headers }}
+    </div>
+
+    <!-- PAYLOAD PARSEADO -->
+    <h3 style="margin:0 0 10px 0;color:#111827;">🗂 Payload parseado</h3>
+
+    <div style="
+      background:#111827;
+      color:#f9fafb;
+      padding:15px;
+      border-radius:8px;
+      font-family:monospace;
+      font-size:13px;
+      white-space:pre-wrap;
+      word-break:break-word;
+      margin-bottom:22px;
+    ">
+      {{ payload }}
+    </div>
+
+    <!-- RAW BODY -->
+    <h3 style="margin:0 0 10px 0;color:#111827;">📄 Raw body</h3>
+
+    <div style="
+      background:#111827;
+      color:#f9fafb;
+      padding:15px;
+      border-radius:8px;
+      font-family:monospace;
+      font-size:13px;
+      white-space:pre-wrap;
+      word-break:break-word;
+    ">
+      {{ raw_body }}
+    </div>
+
+    <p style="margin:20px 0 0 0;font-size:12px;color:#9ca3af;">
+      Este e-mail foi gerado automaticamente por um endpoint de análise de integração com Protheus.
+    </p>
+
+  </div>
+
+</body>
+
+</html>
