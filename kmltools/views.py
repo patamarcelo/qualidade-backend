@@ -907,9 +907,14 @@ class KMLUnionView(APIView):
         weekly_used = None
         request_id = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
 
+        FREE_MAX_FILES = 20
+        PAID_MAX_FILES = 300
+        MAX_TOTAL_SIZE_BYTES = 20 * 1024 * 1024  # 20 MB
+
         files = request.FILES.getlist("files")
         mode = request.data.get("merge_mode", "union")
         print('[MODE] - ', mode)
+
         if not files:
             return Response(
                 {"detail": "Nenhum arquivo enviado. Use o campo 'files'."},
@@ -918,6 +923,33 @@ class KMLUnionView(APIView):
 
         user = request.user if getattr(request.user, "is_authenticated", False) else None
         bp = ensure_billing_profile(user, request=request) if user else None
+
+        plan_for_limits = (getattr(bp, "plan", None) or "free").lower().strip()
+        is_paid_plan = bool(getattr(bp, "is_unlimited", False)) or plan_for_limits in (
+            "pro_monthly",
+            "pro_yearly",
+            "prepaid",
+            "prepaid_unlimited",
+        )
+
+        max_files_allowed = PAID_MAX_FILES if is_paid_plan else FREE_MAX_FILES
+
+        if len(files) > max_files_allowed:
+            return Response(
+                {
+                    "detail": f"Máximo de {max_files_allowed} arquivos por merge para o seu plano."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        total_size = sum((getattr(f, "size", 0) or 0) for f in files)
+        if total_size > MAX_TOTAL_SIZE_BYTES:
+            return Response(
+                {"detail": "Tamanho total excede 20 MB por merge."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # segue o fluxo normal
 
         anon_id = (request.headers.get("X-ANON-ID") or "").strip() or None
         visitor_country = None
