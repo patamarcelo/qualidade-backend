@@ -53,6 +53,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+from django.http import JsonResponse
+from django.views import View
+
+from .emailer import send_reactivation_email
+
+
 
 
 def get_client_ip(request):
@@ -2499,3 +2505,19 @@ class UnlockFreeCreditView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+        
+
+
+class SendTestReactivationEmailView(View):
+    def get(self, request, *args, **kwargs):
+        test_email = getattr(settings, "KML_TEST_EMAIL", None) or "patamarcelo@gmail.com"
+
+        result = send_reactivation_email(
+            to=test_email,
+        )
+
+        return JsonResponse({
+            "ok": True,
+            "sent_to": test_email,
+            "result": result,
+        })

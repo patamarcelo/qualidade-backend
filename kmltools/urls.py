@@ -1,5 +1,6 @@
 from django.urls import path
 from .views import ClaimJobsView,  KMLUnionView, MeView, UsageView, CreateCheckoutSessionView, StripeWebhookView, CreateBillingPortalSessionView, KMLHistoryDownloadView, KMLHistoryView, CreatePrepaidCheckoutSessionView, KMLDownloadView, ProfileOnboardingView, UnlockFreeCreditView
+from .views import SendTestReactivationEmailView
 from .views_feedback import MergeFeedbackView
 
 urlpatterns = [
@@ -18,6 +19,9 @@ urlpatterns += [
     path("profile/onboarding/", ProfileOnboardingView.as_view(), name="profile-onboarding"),
 
     path("jobs/claim/", ClaimJobsView.as_view()),
+    
+
+    path("email/test-reactivation/", SendTestReactivationEmailView.as_view(), name="email_test_reactivation"),
 
 
 

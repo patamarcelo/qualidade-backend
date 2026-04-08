@@ -42,6 +42,7 @@ class BillingProfileAdmin(admin.ModelAdmin):
         "free_monthly_credits",
         "prepaid_credits",
         "credits_used_total",
+        "remove_from_mail_list",
         "onboarding_completed_at", # Útil para ver ativação
         "created_at",
         "stripe_customer_id",
@@ -57,6 +58,7 @@ class BillingProfileAdmin(admin.ModelAdmin):
         "cancel_at_period_end",
         "created_at",
         "updated_at",
+        "remove_from_mail_list",
     )
 
     search_fields = (
@@ -83,7 +85,7 @@ class BillingProfileAdmin(admin.ModelAdmin):
         (
             "User",
             {
-                "fields": ("user", "firebase_uid"),
+                "fields": ("user", "firebase_uid", 'remove_from_mail_list'),
             },
         ),
         (

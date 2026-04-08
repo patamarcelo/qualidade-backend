@@ -46,6 +46,8 @@ class BillingProfile(models.Model):
         ],
         default="free",
     )
+    
+    remove_from_mail_list = models.BooleanField(default=False)
 
     # Stripe
     stripe_customer_id = models.CharField(max_length=255, blank=True, null=True)
