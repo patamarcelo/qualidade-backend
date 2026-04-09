@@ -200,10 +200,14 @@ class WeeklyUsage(models.Model):
 class KMLMergeJob(models.Model):
     STATUS_SUCCESS = "success"
     STATUS_ERROR = "error"
+    STATUS_QUEUED = "queued"
+    STATUS_PROCESSING = "processing"
 
     STATUS_CHOICES = (
         (STATUS_SUCCESS, "Success"),
         (STATUS_ERROR, "Error"),
+        (STATUS_QUEUED, "Queued"),
+        (STATUS_PROCESSING, "Processing"),
     )
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

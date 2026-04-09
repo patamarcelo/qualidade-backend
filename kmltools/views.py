@@ -59,7 +59,313 @@ from django.views import View
 from .emailer import send_reactivation_email
 
 
+from threading import Thread
+from django.db import close_old_connections
 
+def start_kml_merge_thread(job_id):
+    logger.warning("[ASYNC] on_commit fired for job_id=%s", job_id)
+    t = Thread(target=run_kml_merge_job, args=(str(job_id),), daemon=True)
+    t.start()
+    logger.warning("[ASYNC] thread started for job_id=%s alive=%s", job_id, t.is_alive())
+
+def _safe_storage_url(path):
+    try:
+        return default_storage.url(path) if path else None
+    except Exception:
+        return None
+
+
+def run_kml_merge_job(job_id):
+    close_old_connections()
+    logger.warning("[ASYNC] worker start job_id=%s", job_id)
+
+    try:
+        job = KMLMergeJob.objects.get(id=job_id)
+        logger.warning("[ASYNC] job loaded job_id=%s status=%s total_files=%s", job_id, job.status, job.total_files)
+    except KMLMergeJob.DoesNotExist:
+        return
+
+    try:
+        job.status = getattr(KMLMergeJob, "STATUS_PROCESSING", "processing")
+        job.save(update_fields=["status"])
+
+        view = KMLUnionView()
+
+        request_id = job.request_id
+        tol_m = float(job.tol_m or 20.0)
+        corridor_width_m = float(job.corridor_width_m or 0.0)
+
+        parcelas = []
+        total_polygons = 0
+        file_reports = []
+        markers = []
+
+        input_storage_paths = list(job.input_storage_paths or [])
+        input_filenames = list(job.input_filenames or [])
+        
+        logger.warning("[ASYNC] starting file loop job_id=%s files=%s", job_id, len(input_storage_paths))
+        for idx, input_path in enumerate(input_storage_paths, start=1):
+            with default_storage.open(input_path, "rb") as f:
+                raw_bytes = f.read()
+
+            safe_name = os.path.basename(input_path)
+            raw_bytes = view._maybe_extract_kml_from_kmz(raw_bytes)
+
+            try:
+                resolved_bytes, netinfo = view._resolve_networklink_if_needed(raw_bytes, safe_name)
+            except Exception as e:
+                resolved_bytes, netinfo = raw_bytes, {
+                    "networklink_detected": True,
+                    "networklink_resolved": False,
+                    "networklink_href": None,
+                    "networklink_error": f"resolver_crash: {type(e).__name__}: {e}",
+                }
+
+            poly_idx_file = 0
+            cad_lines_file = 0
+
+            try:
+                root = ET.fromstring(resolved_bytes)
+
+                try:
+                    base_marker_name = os.path.splitext(safe_name)[0]
+                    markers.extend(
+                        view._extract_point_placemarks_as_geojson(
+                            root,
+                            fallback_name=base_marker_name,
+                        )
+                    )
+                except Exception:
+                    pass
+
+                placemarks = list(view._findall_anyns(root, "Placemark"))
+                if not placemarks:
+                    placemarks = [root]
+
+                for placemark in placemarks:
+                    name_el = view._first_anyns(placemark, "name")
+                    talhao_name_base = (name_el.text or "").strip() if name_el is not None else ""
+                    if not talhao_name_base:
+                        talhao_name_base = os.path.splitext(safe_name)[0]
+
+                    has_poly = any(True for _ in view._findall_anyns(placemark, "Polygon"))
+                    poly_idx_pm = 0
+
+                    for poly in view._findall_anyns(placemark, "Polygon"):
+                        outer = view._first_anyns(poly, "outerBoundaryIs")
+                        if outer is None:
+                            continue
+
+                        lr = view._first_anyns(outer, "LinearRing")
+                        if lr is None:
+                            continue
+
+                        coord_el = view._first_anyns(lr, "coordinates")
+                        if coord_el is None or not (coord_el.text and coord_el.text.strip()):
+                            continue
+
+                        coords = view._parse_kml_coordinates_text(coord_el.text)
+                        if len(coords) < 3:
+                            continue
+
+                        poly_idx_pm += 1
+                        poly_idx_file += 1
+                        total_polygons += 1
+
+                        talhao_name = talhao_name_base if poly_idx_pm == 1 else f"{talhao_name_base}_{poly_idx_pm}"
+                        parcelas.append({"talhao": talhao_name, "coords": coords})
+
+                    if not has_poly:
+                        line_geoms = []
+
+                        for ls in view._findall_anyns(placemark, "LineString"):
+                            coord_el = view._first_anyns(ls, "coordinates")
+                            if coord_el is None or not (coord_el.text and coord_el.text.strip()):
+                                continue
+
+                            coords_ll = view._parse_kml_coordinates_text(coord_el.text)
+                            if len(coords_ll) < 2:
+                                continue
+
+                            pts = [(float(p["longitude"]), float(p["latitude"])) for p in coords_ll]
+                            if len(pts) >= 2:
+                                line_geoms.append(LineString(pts))
+                                cad_lines_file += 1
+
+                        for lr in view._findall_anyns(placemark, "LinearRing"):
+                            coord_el = view._first_anyns(lr, "coordinates")
+                            if coord_el is None or not (coord_el.text and coord_el.text.strip()):
+                                continue
+
+                            coords_ll = view._parse_kml_coordinates_text(coord_el.text)
+                            if len(coords_ll) < 2:
+                                continue
+
+                            pts = [(float(p["longitude"]), float(p["latitude"])) for p in coords_ll]
+                            if len(pts) >= 2:
+                                line_geoms.append(LineString(pts))
+                                cad_lines_file += 1
+
+                        if line_geoms:
+                            parcelas.append({"talhao": talhao_name_base, "geoms": line_geoms})
+
+                file_reports.append({
+                    "filename": input_filenames[idx - 1] if idx - 1 < len(input_filenames) else safe_name,
+                    "polygons_extracted": poly_idx_file,
+                    "cad_lines_extracted": cad_lines_file,
+                    **netinfo,
+                })
+
+            except ET.ParseError as e:
+                file_reports.append({
+                    "filename": input_filenames[idx - 1] if idx - 1 < len(input_filenames) else safe_name,
+                    "polygons_extracted": 0,
+                    **netinfo,
+                    "parse_error": str(e),
+                })
+            except Exception as e:
+                file_reports.append({
+                    "filename": input_filenames[idx - 1] if idx - 1 < len(input_filenames) else safe_name,
+                    "polygons_extracted": 0,
+                    **netinfo,
+                    "process_error": str(e),
+                })
+
+        if not parcelas and markers:
+            kml_str = """<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>KML Unifier — markers</name>
+  </Document>
+</kml>"""
+            preview_geojson = {"type": "FeatureCollection", "features": markers}
+            input_preview_geojson = {"type": "FeatureCollection", "features": markers}
+            metrics = {
+                "output_polygons": 0,
+                "merged_polygons": 0,
+                "input_area_m2": 0,
+                "input_area_ha": 0,
+                "output_area_m2": 0,
+                "output_area_ha": 0,
+            }
+        elif not parcelas and not markers:
+            raise ValueError("Nenhum polígono ou marcador válido encontrado nos arquivos KML.")
+        else:
+            
+            job_metrics = job.metrics or {}
+            merge_mode = "no_union" if job_metrics.get("merge_mode") == "no_union" else "union"
+
+            if merge_mode == "no_union":
+                kml_str, metrics, debug_geojson = merge_no_flood_not_union(
+                    parcelas,
+                    tol_m=tol_m,
+                    corridor_width_m=corridor_width_m,
+                    return_metrics=True,
+                )
+            else:
+                kml_str, metrics = merge_no_flood(
+                    parcelas,
+                    tol_m=tol_m,
+                    corridor_width_m=corridor_width_m,
+                    return_metrics=True,
+                )
+                debug_geojson = None
+
+            preview_geojson = view._kml_str_to_geojson(kml_str)
+            if markers:
+                preview_geojson["features"] = (preview_geojson.get("features") or []) + markers
+            if debug_geojson:
+                extra_feats = (debug_geojson.get("features") or [])
+                if extra_feats:
+                    preview_geojson["features"] = (preview_geojson.get("features") or []) + extra_feats
+
+            input_preview_geojson = view._parcelas_to_geojson(parcelas)
+            if markers:
+                input_preview_geojson["features"] = (input_preview_geojson.get("features") or []) + markers
+
+        kml_str = view._append_marker_placemarks_to_kml(kml_str, markers)
+
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"kml_unions/union_{ts}_{uuid.uuid4().hex[:6]}.kml"
+        saved_path = default_storage.save(filename, ContentFile((kml_str or "").encode("utf-8")))
+        
+        # -----------------------
+        # Analytics: WeeklyUsage (somente sucesso)
+        # -----------------------
+        weekly_used = None
+        if job.user_id:
+            today = timezone.localdate()
+            year, week_num, _ = today.isocalendar()
+            week_key = f"{year}{week_num:02d}"
+
+            with transaction.atomic():
+                usage, _ = WeeklyUsage.objects.select_for_update().get_or_create(
+                    user=job.user,
+                    week=week_key,
+                    defaults={"count": 0},
+                )
+                usage.count += 1
+                usage.save(update_fields=["count", "updated_at"])
+                weekly_used = usage.count
+
+        meta = {
+            "request_id": request_id,
+            "created_at": timezone.now().isoformat(),
+            "tol_m": tol_m,
+            "corridor_width_m": corridor_width_m,
+            "total_files": len(input_storage_paths),
+            "total_polygons": total_polygons,
+            "metrics": metrics or {},
+            "files_report": file_reports or [],
+            "input_filenames": input_filenames,
+            "input_storage_paths": input_storage_paths,
+            "output_storage_path": saved_path,
+            "total_markers": len([f for f in markers if (f.get("geometry") or {}).get("type") == "Point"]),
+            "preview_geojson": preview_geojson,
+            "input_preview_geojson": input_preview_geojson,
+        }
+
+        meta_path = f"kml_unions/{request_id}/meta/meta.json"
+        default_storage.save(
+            meta_path,
+            ContentFile(json.dumps(meta, ensure_ascii=False, indent=2).encode("utf-8")),
+        )
+
+        job.status = getattr(KMLMergeJob, "STATUS_SUCCESS", "success")
+        job.total_polygons = total_polygons
+        job.output_polygons = (metrics or {}).get("output_polygons")
+        job.merged_polygons = (metrics or {}).get("merged_polygons")
+        job.input_area_m2 = (metrics or {}).get("input_area_m2")
+        job.input_area_ha = (metrics or {}).get("input_area_ha")
+        job.output_area_m2 = (metrics or {}).get("output_area_m2")
+        job.output_area_ha = (metrics or {}).get("output_area_ha")
+        job.storage_path = saved_path
+        job.meta_storage_path = meta_path
+        job.metrics = {
+            **(job.metrics or {}),
+            **(metrics or {}),
+            "files_report": file_reports,
+            "preview_geojson": preview_geojson,
+            "input_preview_geojson": input_preview_geojson,
+            "total_markers": len([f for f in markers if (f.get("geometry") or {}).get("type") == "Point"]),
+            "weekly_used": weekly_used,
+        }
+        job.save()
+
+    except Exception as e:
+        try:
+            job = KMLMergeJob.objects.get(id=job_id)
+            job.status = getattr(KMLMergeJob, "STATUS_ERROR", "error")
+            if hasattr(job, "error_message"):
+                job.error_message = str(e)[:2000]
+                job.save(update_fields=["status", "error_message"])
+            else:
+                job.metrics = {**(job.metrics or {}), "error_message": str(e)}
+                job.save(update_fields=["status", "metrics"])
+        except Exception:
+            pass
+    finally:
+        close_old_connections()
 
 def get_client_ip(request):
     # Cloudflare / proxies comuns
@@ -902,6 +1208,596 @@ class KMLUnionView(APIView):
     # Aqui nós apenas chamamos: self._resolve_networklink_if_needed(...)
     # ----------------------------------------------------------
 
+    # def post(self, request, *args, **kwargs):
+    #     week_key = None
+    #     weekly_used = None
+    #     request_id = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
+
+    #     FREE_MAX_FILES = 20
+    #     PAID_MAX_FILES = 300
+    #     MAX_TOTAL_SIZE_BYTES = 20 * 1024 * 1024  # 20 MB
+
+    #     files = request.FILES.getlist("files")
+    #     mode = request.data.get("merge_mode", "union")
+    #     print('[MODE] - ', mode)
+
+    #     if not files:
+    #         return Response(
+    #             {"detail": "Nenhum arquivo enviado. Use o campo 'files'."},
+    #             status=status.HTTP_400_BAD_REQUEST,
+    #         )
+
+    #     user = request.user if getattr(request.user, "is_authenticated", False) else None
+    #     bp = ensure_billing_profile(user, request=request) if user else None
+
+    #     plan_for_limits = (getattr(bp, "plan", None) or "free").lower().strip()
+    #     is_paid_plan = bool(getattr(bp, "is_unlimited", False)) or plan_for_limits in (
+    #         "pro_monthly",
+    #         "pro_yearly",
+    #         "prepaid",
+    #         "prepaid_unlimited",
+    #     )
+
+    #     max_files_allowed = PAID_MAX_FILES if is_paid_plan else FREE_MAX_FILES
+
+    #     if len(files) > max_files_allowed:
+    #         return Response(
+    #             {
+    #                 "detail": f"Máximo de {max_files_allowed} arquivos por merge para o seu plano."
+    #             },
+    #             status=status.HTTP_400_BAD_REQUEST,
+    #         )
+
+    #     total_size = sum((getattr(f, "size", 0) or 0) for f in files)
+    #     if total_size > MAX_TOTAL_SIZE_BYTES:
+    #         return Response(
+    #             {"detail": "Tamanho total excede 20 MB por merge."},
+    #             status=status.HTTP_400_BAD_REQUEST,
+    #         )
+
+    #     # segue o fluxo normal
+
+    #     anon_id = (request.headers.get("X-ANON-ID") or "").strip() or None
+    #     visitor_country = None
+    #     visitor_country_name = None
+    #     visitor_ip = None
+
+    #     try:
+    #         visitor_ip = get_client_ip(request)
+    #         if visitor_ip:
+    #             try:
+    #                 if ipaddress.ip_address(visitor_ip).is_global:
+    #                     cc, cn = geo_country_from_ip(visitor_ip)
+    #                     visitor_country, visitor_country_name = cc, cn
+    #             except Exception:
+    #                 pass
+    #     except Exception:
+    #         pass
+
+
+    #     # Semana (analytics)
+    #     today = timezone.localdate()
+    #     year, week_num, _ = today.isocalendar()
+    #     week_key = f"{year}{week_num:02d}"
+
+    #     debug_enabled = False
+    #     try:
+    #         debug_enabled = _debug_enabled()
+    #     except Exception:
+    #         debug_enabled = False
+
+    #     # tol_m
+    #     try:
+    #         tol_m = float(request.data.get("tol_m", 20.0))
+    #         print("[TOL_M] tol_m received from FrontEnd:", tol_m)
+    #     except (TypeError, ValueError):
+    #         tol_m = 20.0
+    #     tol_m = self.clamp(tol_m, min_value=1.0)
+
+    #     # corridor_width_m
+    #     # corridor_width_m
+    #     raw_corridor = request.data.get("corridor_width_m", None)
+
+    #     if raw_corridor is None or str(raw_corridor).strip() == "":
+    #         corridor_width_m = 0.0
+    #     else:
+    #         try:
+    #             corridor_width_m = float(raw_corridor)
+    #         except (TypeError, ValueError):
+    #             corridor_width_m = 0.0
+
+    #     corridor_width_m = self.clamp(corridor_width_m, min_value=0.0, max_value=500.0)
+
+
+    #     parcelas = []
+    #     total_polygons = 0
+    #     debug_files = []
+    #     file_reports = []
+    #     input_storage_paths = []  # paths dos inputs persistidos
+    #     markers = []   # <-- NOVO: features Point preservadas
+
+    #     try:
+    #         # -----------------------
+    #         # Processar cada input
+    #         # -----------------------
+    #         for idx, uploaded in enumerate(files, start=1):
+    #             raw_bytes = uploaded.read()
+                
+    #             raw_bytes = self._maybe_extract_kml_from_kmz(raw_bytes)
+                
+    #             try:
+    #                 # Se o arquivo original era .kmz, trocamos para .kml no nome salvo, 
+    #                 # já que extraímos o conteúdo.
+    #                 original_name = uploaded.name
+    #                 if original_name.lower().endswith(".kmz"):
+    #                     safe_name = os.path.splitext(original_name)[0] + ".kml"
+    #                 else:
+    #                     safe_name = self._safe_filename(original_name)
+    #             except Exception:
+    #                 safe_name = f"input_{idx}.kml"
+
+    #             print("\n" + "=" * 60)
+    #             print("arquivo recebido Nº:", idx)
+    #             print(f"📄 Recebido arquivo: {uploaded.name}")
+    #             print(f"📦 Tamanho: {uploaded.size} bytes")
+    #             print("-" * 60)
+    #             try:
+    #                 snippet = raw_bytes[:500].decode("utf-8", errors="ignore")
+    #             except Exception:
+    #                 snippet = str(raw_bytes[:200])
+    #             print("🔍 Início do arquivo (snippet):")
+    #             print(snippet)
+    #             print("-" * 60)
+
+    #             if debug_enabled:
+    #                 debug_files.append((uploaded.name, raw_bytes))
+
+    #             # --- NetworkLink support ---
+    #             try:
+    #                 resolved_bytes, netinfo = self._resolve_networklink_if_needed(raw_bytes, uploaded.name)
+    #             except Exception as e:
+    #                 resolved_bytes, netinfo = raw_bytes, {
+    #                     "networklink_detected": True,
+    #                     "networklink_resolved": False,
+    #                     "networklink_href": None,
+    #                     "networklink_error": f"resolver_crash: {type(e).__name__}: {e}",
+    #                 }
+
+    #             if netinfo.get("networklink_detected"):
+    #                 print(
+    #                     f"[NETLINK] detected={netinfo.get('networklink_detected')} "
+    #                     f"resolved={netinfo.get('networklink_resolved')} "
+    #                     f"href={netinfo.get('networklink_href')}"
+    #                 )
+    #                 if netinfo.get("networklink_error"):
+    #                     print(f"[NETLINK] error={netinfo.get('networklink_error')}")
+
+    #             # -----------------------
+    #             # Persistir input resolvido no storage
+    #             # -----------------------
+    #             input_path = f"kml_unions/{request_id}/inputs/{idx:02d}_{safe_name}"
+    #             try:
+    #                 default_storage.save(input_path, ContentFile(resolved_bytes))
+    #                 input_storage_paths.append(input_path)
+    #             except Exception as e:
+    #                 print(f"[INPUT_SAVE] Falha ao salvar input {uploaded.name}: {e}")
+
+    #             # -----------------------
+    #             # Extrair polígonos
+    #             # -----------------------
+    #             poly_idx_file = 0
+    #             cad_lines_file = 0
+    #             try:
+    #                 root = ET.fromstring(resolved_bytes)
+    #                 # ✅ NOVO: extrai markers (Point) e preserva
+    #                 try:
+    #                     base_marker_name = os.path.splitext(uploaded.name)[0]
+    #                     markers.extend(self._extract_point_placemarks_as_geojson(root, fallback_name=base_marker_name))
+    #                 except Exception as e:
+    #                     print(f"⚠️ Falha ao extrair markers de {uploaded.name}: {e}")
+
+
+    #                 placemarks = list(self._findall_anyns(root, "Placemark"))
+    #                 if not placemarks:
+    #                     placemarks = [root]
+
+    #                 for placemark in placemarks:
+    #                     name_el = self._first_anyns(placemark, "name")
+    #                     talhao_name_base = (name_el.text or "").strip() if name_el is not None else ""
+
+    #                     if not talhao_name_base:
+    #                         talhao_name_base = os.path.splitext(uploaded.name)[0]
+
+    #                     # ✅ detecta se tem Polygon nesse placemark
+    #                     has_poly = any(True for _ in self._findall_anyns(placemark, "Polygon"))
+
+    #                     poly_idx_pm = 0
+
+    #                     # -----------------------
+    #                     # 1) fluxo atual: Polygon -> coords
+    #                     # -----------------------
+    #                     for poly in self._findall_anyns(placemark, "Polygon"):
+    #                         outer = self._first_anyns(poly, "outerBoundaryIs")
+    #                         if outer is None:
+    #                             continue
+
+    #                         lr = self._first_anyns(outer, "LinearRing")
+    #                         if lr is None:
+    #                             continue
+
+    #                         coord_el = self._first_anyns(lr, "coordinates")
+    #                         if coord_el is None or not (coord_el.text and coord_el.text.strip()):
+    #                             continue
+
+    #                         coords = self._parse_kml_coordinates_text(coord_el.text)
+    #                         if len(coords) < 3:
+    #                             continue
+
+    #                         poly_idx_pm += 1
+    #                         poly_idx_file += 1
+    #                         total_polygons += 1
+
+    #                         talhao_name = talhao_name_base if poly_idx_pm == 1 else f"{talhao_name_base}_{poly_idx_pm}"
+    #                         parcelas.append({"talhao": talhao_name, "coords": coords})
+
+    #                     # -----------------------
+    #                     # 2) ✅ NOVO: fallback CAD (LineString/LinearRing)
+    #                     #    Só entra se NÃO houver Polygon no placemark.
+    #                     # -----------------------
+    #                     if not has_poly:
+    #                         line_geoms = []
+
+    #                         # CAD costuma vir como <LineString><coordinates>...</coordinates></LineString>
+    #                         for ls in self._findall_anyns(placemark, "LineString"):
+    #                             coord_el = self._first_anyns(ls, "coordinates")
+    #                             if coord_el is None or not (coord_el.text and coord_el.text.strip()):
+    #                                 continue
+
+    #                             coords_ll = self._parse_kml_coordinates_text(coord_el.text)
+    #                             if len(coords_ll) < 2:
+    #                                 continue
+
+    #                             pts = [(float(p["longitude"]), float(p["latitude"])) for p in coords_ll]
+    #                             if len(pts) >= 2:
+    #                                 line_geoms.append(LineString(pts))
+    #                                 cad_lines_file += 1
+
+    #                         # Às vezes CAD vem como <LinearRing> SOLTO (sem Polygon)
+    #                         for lr in self._findall_anyns(placemark, "LinearRing"):
+    #                             coord_el = self._first_anyns(lr, "coordinates")
+    #                             if coord_el is None or not (coord_el.text and coord_el.text.strip()):
+    #                                 continue
+
+    #                             coords_ll = self._parse_kml_coordinates_text(coord_el.text)
+    #                             if len(coords_ll) < 2:
+    #                                 continue
+
+    #                             pts = [(float(p["longitude"]), float(p["latitude"])) for p in coords_ll]
+    #                             if len(pts) >= 2:
+    #                                 line_geoms.append(LineString(pts))
+    #                                 cad_lines_file += 1
+
+    #                         # ✅ se achou linhas, cria 1 “parcela CAD” para o geo_merge converter em Polygon(s)
+    #                         if line_geoms:
+    #                             parcelas.append({"talhao": talhao_name_base, "geoms": line_geoms})
+
+    #                             # opcional: report (não mexe no total_polygons pq ainda não sabemos quantos polígonos vai gerar)
+    #                             # você pode contabilizar como "cad_shapes" se quiser debugar:
+    #                             # poly_idx_file += 0
+    #                 print(f"✅ Polígonos extraídos desse arquivo: {poly_idx_file}")
+
+    #                 file_reports.append(
+    #                     {
+    #                         "filename": uploaded.name,
+    #                         "polygons_extracted": poly_idx_file,
+    #                         "cad_lines_extracted": cad_lines_file,
+    #                         **netinfo,
+    #                     }
+    #                 )
+
+    #             except ET.ParseError as e:
+    #                 print(f"❌ Erro de parse XML em {uploaded.name}: {e}")
+    #                 file_reports.append(
+    #                     {
+    #                         "filename": uploaded.name,
+    #                         "polygons_extracted": 0,
+    #                         **netinfo,
+    #                         "parse_error": str(e),
+    #                     }
+    #                 )
+    #             except Exception as e:
+    #                 print(f"❌ Erro ao processar KML {uploaded.name}: {e}")
+    #                 file_reports.append(
+    #                     {
+    #                         "filename": uploaded.name,
+    #                         "polygons_extracted": 0,
+    #                         **netinfo,
+    #                         "process_error": str(e),
+    #                     }
+    #                 )
+
+    #         print("=" * 60)
+    #         print(f"📊 Total de polígonos extraídos de todos os arquivos: {total_polygons}")
+    #         print(f"📊 Total de parcelas geradas: {len(parcelas)}")
+    #         print("=" * 60)
+
+    #         # ✅ Se não há polígonos, mas há markers, exporta markers-only
+    #         if not parcelas and markers:
+    #             # gera KML só com markers (sem merge)
+    #             kml_str = """<?xml version="1.0" encoding="UTF-8"?>
+    #                 <kml xmlns="http://www.opengis.net/kml/2.2">
+    #                     <Document>
+    #                         <name>KML Unifier — markers</name>
+    #                     </Document>
+    #                 </kml>
+    #             """
+
+    #             # previews
+    #             preview_geojson = {"type": "FeatureCollection", "features": markers}
+    #             input_preview_geojson = {"type": "FeatureCollection", "features": markers}
+
+    #             metrics = {
+    #                 "output_polygons": 0,
+    #                 "merged_polygons": 0,
+    #                 "input_area_m2": 0,
+    #                 "input_area_ha": 0,
+    #                 "output_area_m2": 0,
+    #                 "output_area_ha": 0,
+    #             }
+
+    #             # segue para salvar output e responder (pula merge)
+    #             goto_merge = False
+    #         else:
+    #             goto_merge = True
+
+    #         # ✅ Se não há nada (nem polygon, nem marker)
+    #         if not parcelas and not markers:
+    #             return Response(
+    #                 {
+    #                     "detail": "Nenhum polígono ou marcador válido encontrado nos arquivos KML.",
+    #                     "request_id": request_id,
+    #                     "files_report": file_reports,
+    #                 },
+    #                 status=status.HTTP_400_BAD_REQUEST,
+    #             )
+
+
+    #         ## -----------------------
+    #         # Merge
+    #         # -----------------------
+    #         if goto_merge:
+    #             ## -----------------------
+    #             # Merge
+    #             # -----------------------
+    #             try:
+    #                 merge_mode = (mode or "union").lower().strip()
+    #                 print("[MERGE HERE MODE] -", merge_mode)
+
+    #                 debug_geojson = None
+
+    #                 if merge_mode == "no_union":
+    #                     kml_str, metrics, debug_geojson = merge_no_flood_not_union(
+    #                         parcelas,
+    #                         tol_m=tol_m,
+    #                         corridor_width_m=corridor_width_m,
+    #                         return_metrics=True,
+    #                     )
+    #                 else:
+    #                     kml_str, metrics = merge_no_flood(
+    #                         parcelas,
+    #                         tol_m=tol_m,
+    #                         corridor_width_m=corridor_width_m,
+    #                         return_metrics=True,
+    #                     )
+
+    #                 print("[KML_OUT] snippet:", (kml_str or "")[:500])
+
+    #                 preview_geojson = self._kml_str_to_geojson(kml_str)
+
+    #                 # ✅ adiciona markers no preview
+    #                 if markers:
+    #                     preview_geojson["features"] = (preview_geojson.get("features") or []) + markers
+
+    #                 # ✅ injeta as linhas se existirem
+    #                 if debug_geojson:
+    #                     extra_feats = (debug_geojson.get("features") or [])
+    #                     if extra_feats:
+    #                         preview_geojson["features"] = (preview_geojson.get("features") or []) + extra_feats
+
+    #                 input_preview_geojson = self._parcelas_to_geojson(parcelas)
+    #                 if markers:
+    #                     input_preview_geojson["features"] = (input_preview_geojson.get("features") or []) + markers
+
+    #             except Exception as e:
+    #                 print(f"❌ Erro interno no merge_no_flood: {e}")
+    #                 return Response(
+    #                     {
+    #                         "detail": "Erro interno ao unificar polígonos.",
+    #                         "request_id": request_id,
+    #                         "files_report": file_reports,
+    #                     },
+    #                     status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+    #                 )
+
+    #         # ✅ NOVO: adiciona markers no KML para download
+    #         kml_str = self._append_marker_placemarks_to_kml(kml_str, markers)
+
+    #         # -----------------------
+    #         # Salvar output
+    #         # -----------------------
+    #         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    #         filename = f"kml_unions/union_{ts}_{uuid.uuid4().hex[:6]}.kml"
+    #         saved_path = default_storage.save(filename, ContentFile((kml_str or "").encode("utf-8")))
+            
+            
+
+
+    #         # URL (fallback)
+    #         try:
+    #             download_url = default_storage.url(saved_path)
+    #         except NotImplementedError:
+    #             media_url = settings.MEDIA_URL
+    #             if not media_url.endswith("/"):
+    #                 media_url += "/"
+    #             download_url = request.build_absolute_uri(media_url + saved_path)
+    #         except Exception:
+    #             download_url = None
+
+    #         # -----------------------
+    #         # Analytics: WeeklyUsage
+    #         # -----------------------
+    #         if user:
+    #             with transaction.atomic():
+    #                 usage, _ = WeeklyUsage.objects.select_for_update().get_or_create(
+    #                     user=user,
+    #                     week=week_key,
+    #                     defaults={"count": 0},
+    #                 )
+    #                 usage.count += 1
+    #                 usage.save(update_fields=["count", "updated_at"])
+    #                 weekly_used = usage.count
+    #         else:
+    #             weekly_used = None
+
+
+    #         # -----------------------
+    #         # Persistir Job + Meta
+    #         # -----------------------
+    #         job = None
+    #         try:
+    #             import json  # garante import aqui
+    #             input_filenames = [getattr(f, "name", "") for f in files]
+    #             plan_now = getattr(bp, "plan", None) if bp else ("anonymous" if not user else "free")
+
+    #             meta = {
+    #                 "request_id": request_id,
+    #                 "user_email": getattr(request.user, "email", None),
+    #                 "created_at": timezone.now().isoformat(),
+    #                 "tol_m": tol_m,
+    #                 "corridor_width_m": corridor_width_m,
+    #                 "total_files": len(files),
+    #                 "total_polygons": total_polygons,
+    #                 "metrics": metrics or {},
+    #                 "files_report": file_reports or [],
+    #                 "input_filenames": input_filenames,
+    #                 "input_storage_paths": input_storage_paths,
+    #                 "output_storage_path": saved_path,
+    #                 "total_markers": len([f for f in markers if (f.get("geometry") or {}).get("type") == "Point"])
+    #             }
+                
+
+    #             meta_path = f"kml_unions/{request_id}/meta/meta.json"
+    #             default_storage.save(
+    #                 meta_path,
+    #                 ContentFile(json.dumps(meta, ensure_ascii=False, indent=2).encode("utf-8")),
+    #             )
+
+    #             job = KMLMergeJob.objects.create(
+    #                 user=user,
+    #                 anon_id=anon_id,
+    #                 plan=(plan_now or getattr(bp, "plan", "anonymous") or "anonymous"),
+    #                 request_id=request_id,
+    #                 status=KMLMergeJob.STATUS_SUCCESS,
+    #                 tol_m=tol_m,
+    #                 corridor_width_m=corridor_width_m,
+    #                 total_files=len(files),
+    #                 total_polygons=total_polygons,
+    #                 output_polygons=(metrics or {}).get("output_polygons"),
+    #                 merged_polygons=(metrics or {}).get("merged_polygons"),
+    #                 input_area_m2=(metrics or {}).get("input_area_m2"),
+    #                 input_area_ha=(metrics or {}).get("input_area_ha"),
+    #                 output_area_m2=(metrics or {}).get("output_area_m2"),
+    #                 output_area_ha=(metrics or {}).get("output_area_ha"),
+    #                 storage_path=saved_path,
+    #                 metrics=metrics or {},
+    #                 input_filenames=input_filenames,
+    #                 input_storage_paths=input_storage_paths,
+    #                 meta_storage_path=meta_path,
+
+    #                 visitor_ip=visitor_ip,
+    #                 visitor_country=visitor_country,
+    #                 visitor_country_name=visitor_country_name,
+    #             )
+    #         except Exception as e:
+    #             print(f"[KML_HISTORY] Falha ao salvar histórico do merge {request_id}: {e}")
+
+    #         # -----------------------
+    #         # Debug bundle (opcional)
+    #         # -----------------------
+    #         if debug_enabled:
+    #             try:
+    #                 Thread(
+    #                     target=_save_kml_debug_bundle_storage,
+    #                     args=(request_id, tol_m, corridor_width_m, debug_files, kml_str, metrics),
+    #                     daemon=True,
+    #                 ).start()
+    #             except Exception:
+    #                 pass
+
+    #         # -----------------------
+    #         # Resposta / gating
+    #         # -----------------------
+    #         if bp and getattr(bp, "pk", None):
+    #             try:
+    #                 bp.refresh_from_db()
+    #             except Exception:
+    #                 pass
+
+    #         plan = (getattr(bp, "plan", None) or "free").lower().strip()
+    #         prepaid_left = int(getattr(bp, "prepaid_credits", 0) or 0)
+    #         free_left = int(getattr(bp, "free_monthly_credits", 0) or 0)
+    #         credits_used_total = int(getattr(bp, "credits_used_total", 0) or 0)
+
+    #         is_unlimited = bool(getattr(bp, "is_unlimited", False)) or plan in ("pro_monthly", "pro_yearly")
+
+    #         download_available = bool(is_unlimited) or prepaid_left > 0
+    #         download_url_out = download_url if download_available else None
+            
+    #         if not user:
+    #             plan = (getattr(bp, "plan", None) or "anonymous").lower().strip() if bp else "anonymous"
+    #             download_available = False
+    #             download_url_out = None
+
+    #         return Response(
+    #             {
+    #                 "request_id": request_id,
+    #                 "job_id": str(job.id) if job else None,
+    #                 "download_available": download_available,
+    #                 "download_url": download_url_out,  # null para free
+
+    #                 "total_polygons": total_polygons,
+    #                 "total_files": len(files),
+    #                 "tol_m": tol_m,
+    #                 "corridor_width_m": corridor_width_m,
+    #                 "output_polygons": (metrics or {}).get("output_polygons"),
+    #                 "merged_polygons": (metrics or {}).get("merged_polygons"),
+    #                 "input_area_m2": (metrics or {}).get("input_area_m2"),
+    #                 "input_area_ha": (metrics or {}).get("input_area_ha"),
+    #                 "output_area_m2": (metrics or {}).get("output_area_m2"),
+    #                 "output_area_ha": (metrics or {}).get("output_area_ha"),
+
+    #                 "plan": plan,
+    #                 "week": week_key,
+    #                 "weekly_used": weekly_used,
+    #                 "free_monthly_credits": free_left,
+    #                 "prepaid_credits": prepaid_left,
+    #                 "credits_used_total": credits_used_total,
+
+    #                 "files_report": file_reports,
+    #                 "input_preview_geojson": input_preview_geojson,
+    #                 "preview_geojson": preview_geojson,
+    #                 "total_markers": len([f for f in markers if (f.get("geometry") or {}).get("type") == "Point"]),
+
+    #             },
+    #             status=status.HTTP_200_OK,
+    #         )
+
+    #     except Exception as e:
+    #         return Response(
+    #             {"detail": str(e) or "Merge failed.", "code": "MERGE_FAILED"},
+    #             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+    #         )
+
     def post(self, request, *args, **kwargs):
         week_key = None
         weekly_used = None
@@ -913,7 +1809,7 @@ class KMLUnionView(APIView):
 
         files = request.FILES.getlist("files")
         mode = request.data.get("merge_mode", "union")
-        print('[MODE] - ', mode)
+        print("[MODE] - ", mode)
 
         if not files:
             return Response(
@@ -949,8 +1845,6 @@ class KMLUnionView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # segue o fluxo normal
-
         anon_id = (request.headers.get("X-ANON-ID") or "").strip() or None
         visitor_country = None
         visitor_country_name = None
@@ -968,17 +1862,10 @@ class KMLUnionView(APIView):
         except Exception:
             pass
 
-
         # Semana (analytics)
         today = timezone.localdate()
         year, week_num, _ = today.isocalendar()
         week_key = f"{year}{week_num:02d}"
-
-        debug_enabled = False
-        try:
-            debug_enabled = _debug_enabled()
-        except Exception:
-            debug_enabled = False
 
         # tol_m
         try:
@@ -988,7 +1875,6 @@ class KMLUnionView(APIView):
             tol_m = 20.0
         tol_m = self.clamp(tol_m, min_value=1.0)
 
-        # corridor_width_m
         # corridor_width_m
         raw_corridor = request.data.get("corridor_width_m", None)
 
@@ -1002,434 +1888,61 @@ class KMLUnionView(APIView):
 
         corridor_width_m = self.clamp(corridor_width_m, min_value=0.0, max_value=500.0)
 
-
-        parcelas = []
-        total_polygons = 0
-        debug_files = []
-        file_reports = []
-        input_storage_paths = []  # paths dos inputs persistidos
-        markers = []   # <-- NOVO: features Point preservadas
+        input_storage_paths = []
+        input_filenames = []
 
         try:
             # -----------------------
-            # Processar cada input
+            # Persistir inputs para processamento async
             # -----------------------
             for idx, uploaded in enumerate(files, start=1):
                 raw_bytes = uploaded.read()
-                
-                raw_bytes = self._maybe_extract_kml_from_kmz(raw_bytes)
-                
+
                 try:
-                    # Se o arquivo original era .kmz, trocamos para .kml no nome salvo, 
-                    # já que extraímos o conteúdo.
                     original_name = uploaded.name
-                    if original_name.lower().endswith(".kmz"):
-                        safe_name = os.path.splitext(original_name)[0] + ".kml"
-                    else:
-                        safe_name = self._safe_filename(original_name)
+                    safe_name = self._safe_filename(original_name)
                 except Exception:
                     safe_name = f"input_{idx}.kml"
 
-                print("\n" + "=" * 60)
-                print("arquivo recebido Nº:", idx)
-                print(f"📄 Recebido arquivo: {uploaded.name}")
-                print(f"📦 Tamanho: {uploaded.size} bytes")
-                print("-" * 60)
-                try:
-                    snippet = raw_bytes[:500].decode("utf-8", errors="ignore")
-                except Exception:
-                    snippet = str(raw_bytes[:200])
-                print("🔍 Início do arquivo (snippet):")
-                print(snippet)
-                print("-" * 60)
-
-                if debug_enabled:
-                    debug_files.append((uploaded.name, raw_bytes))
-
-                # --- NetworkLink support ---
-                try:
-                    resolved_bytes, netinfo = self._resolve_networklink_if_needed(raw_bytes, uploaded.name)
-                except Exception as e:
-                    resolved_bytes, netinfo = raw_bytes, {
-                        "networklink_detected": True,
-                        "networklink_resolved": False,
-                        "networklink_href": None,
-                        "networklink_error": f"resolver_crash: {type(e).__name__}: {e}",
-                    }
-
-                if netinfo.get("networklink_detected"):
-                    print(
-                        f"[NETLINK] detected={netinfo.get('networklink_detected')} "
-                        f"resolved={netinfo.get('networklink_resolved')} "
-                        f"href={netinfo.get('networklink_href')}"
-                    )
-                    if netinfo.get("networklink_error"):
-                        print(f"[NETLINK] error={netinfo.get('networklink_error')}")
-
-                # -----------------------
-                # Persistir input resolvido no storage
-                # -----------------------
                 input_path = f"kml_unions/{request_id}/inputs/{idx:02d}_{safe_name}"
-                try:
-                    default_storage.save(input_path, ContentFile(resolved_bytes))
-                    input_storage_paths.append(input_path)
-                except Exception as e:
-                    print(f"[INPUT_SAVE] Falha ao salvar input {uploaded.name}: {e}")
+                default_storage.save(input_path, ContentFile(raw_bytes))
 
-                # -----------------------
-                # Extrair polígonos
-                # -----------------------
-                poly_idx_file = 0
-                cad_lines_file = 0
-                try:
-                    root = ET.fromstring(resolved_bytes)
-                    # ✅ NOVO: extrai markers (Point) e preserva
-                    try:
-                        base_marker_name = os.path.splitext(uploaded.name)[0]
-                        markers.extend(self._extract_point_placemarks_as_geojson(root, fallback_name=base_marker_name))
-                    except Exception as e:
-                        print(f"⚠️ Falha ao extrair markers de {uploaded.name}: {e}")
-
-
-                    placemarks = list(self._findall_anyns(root, "Placemark"))
-                    if not placemarks:
-                        placemarks = [root]
-
-                    for placemark in placemarks:
-                        name_el = self._first_anyns(placemark, "name")
-                        talhao_name_base = (name_el.text or "").strip() if name_el is not None else ""
-
-                        if not talhao_name_base:
-                            talhao_name_base = os.path.splitext(uploaded.name)[0]
-
-                        # ✅ detecta se tem Polygon nesse placemark
-                        has_poly = any(True for _ in self._findall_anyns(placemark, "Polygon"))
-
-                        poly_idx_pm = 0
-
-                        # -----------------------
-                        # 1) fluxo atual: Polygon -> coords
-                        # -----------------------
-                        for poly in self._findall_anyns(placemark, "Polygon"):
-                            outer = self._first_anyns(poly, "outerBoundaryIs")
-                            if outer is None:
-                                continue
-
-                            lr = self._first_anyns(outer, "LinearRing")
-                            if lr is None:
-                                continue
-
-                            coord_el = self._first_anyns(lr, "coordinates")
-                            if coord_el is None or not (coord_el.text and coord_el.text.strip()):
-                                continue
-
-                            coords = self._parse_kml_coordinates_text(coord_el.text)
-                            if len(coords) < 3:
-                                continue
-
-                            poly_idx_pm += 1
-                            poly_idx_file += 1
-                            total_polygons += 1
-
-                            talhao_name = talhao_name_base if poly_idx_pm == 1 else f"{talhao_name_base}_{poly_idx_pm}"
-                            parcelas.append({"talhao": talhao_name, "coords": coords})
-
-                        # -----------------------
-                        # 2) ✅ NOVO: fallback CAD (LineString/LinearRing)
-                        #    Só entra se NÃO houver Polygon no placemark.
-                        # -----------------------
-                        if not has_poly:
-                            line_geoms = []
-
-                            # CAD costuma vir como <LineString><coordinates>...</coordinates></LineString>
-                            for ls in self._findall_anyns(placemark, "LineString"):
-                                coord_el = self._first_anyns(ls, "coordinates")
-                                if coord_el is None or not (coord_el.text and coord_el.text.strip()):
-                                    continue
-
-                                coords_ll = self._parse_kml_coordinates_text(coord_el.text)
-                                if len(coords_ll) < 2:
-                                    continue
-
-                                pts = [(float(p["longitude"]), float(p["latitude"])) for p in coords_ll]
-                                if len(pts) >= 2:
-                                    line_geoms.append(LineString(pts))
-                                    cad_lines_file += 1
-
-                            # Às vezes CAD vem como <LinearRing> SOLTO (sem Polygon)
-                            for lr in self._findall_anyns(placemark, "LinearRing"):
-                                coord_el = self._first_anyns(lr, "coordinates")
-                                if coord_el is None or not (coord_el.text and coord_el.text.strip()):
-                                    continue
-
-                                coords_ll = self._parse_kml_coordinates_text(coord_el.text)
-                                if len(coords_ll) < 2:
-                                    continue
-
-                                pts = [(float(p["longitude"]), float(p["latitude"])) for p in coords_ll]
-                                if len(pts) >= 2:
-                                    line_geoms.append(LineString(pts))
-                                    cad_lines_file += 1
-
-                            # ✅ se achou linhas, cria 1 “parcela CAD” para o geo_merge converter em Polygon(s)
-                            if line_geoms:
-                                parcelas.append({"talhao": talhao_name_base, "geoms": line_geoms})
-
-                                # opcional: report (não mexe no total_polygons pq ainda não sabemos quantos polígonos vai gerar)
-                                # você pode contabilizar como "cad_shapes" se quiser debugar:
-                                # poly_idx_file += 0
-                    print(f"✅ Polígonos extraídos desse arquivo: {poly_idx_file}")
-
-                    file_reports.append(
-                        {
-                            "filename": uploaded.name,
-                            "polygons_extracted": poly_idx_file,
-                            "cad_lines_extracted": cad_lines_file,
-                            **netinfo,
-                        }
-                    )
-
-                except ET.ParseError as e:
-                    print(f"❌ Erro de parse XML em {uploaded.name}: {e}")
-                    file_reports.append(
-                        {
-                            "filename": uploaded.name,
-                            "polygons_extracted": 0,
-                            **netinfo,
-                            "parse_error": str(e),
-                        }
-                    )
-                except Exception as e:
-                    print(f"❌ Erro ao processar KML {uploaded.name}: {e}")
-                    file_reports.append(
-                        {
-                            "filename": uploaded.name,
-                            "polygons_extracted": 0,
-                            **netinfo,
-                            "process_error": str(e),
-                        }
-                    )
-
-            print("=" * 60)
-            print(f"📊 Total de polígonos extraídos de todos os arquivos: {total_polygons}")
-            print(f"📊 Total de parcelas geradas: {len(parcelas)}")
-            print("=" * 60)
-
-            # ✅ Se não há polígonos, mas há markers, exporta markers-only
-            if not parcelas and markers:
-                # gera KML só com markers (sem merge)
-                kml_str = """<?xml version="1.0" encoding="UTF-8"?>
-                    <kml xmlns="http://www.opengis.net/kml/2.2">
-                        <Document>
-                            <name>KML Unifier — markers</name>
-                        </Document>
-                    </kml>
-                """
-
-                # previews
-                preview_geojson = {"type": "FeatureCollection", "features": markers}
-                input_preview_geojson = {"type": "FeatureCollection", "features": markers}
-
-                metrics = {
-                    "output_polygons": 0,
-                    "merged_polygons": 0,
-                    "input_area_m2": 0,
-                    "input_area_ha": 0,
-                    "output_area_m2": 0,
-                    "output_area_ha": 0,
-                }
-
-                # segue para salvar output e responder (pula merge)
-                goto_merge = False
-            else:
-                goto_merge = True
-
-            # ✅ Se não há nada (nem polygon, nem marker)
-            if not parcelas and not markers:
-                return Response(
-                    {
-                        "detail": "Nenhum polígono ou marcador válido encontrado nos arquivos KML.",
-                        "request_id": request_id,
-                        "files_report": file_reports,
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-
-            ## -----------------------
-            # Merge
-            # -----------------------
-            if goto_merge:
-                ## -----------------------
-                # Merge
-                # -----------------------
-                try:
-                    merge_mode = (mode or "union").lower().strip()
-                    print("[MERGE HERE MODE] -", merge_mode)
-
-                    debug_geojson = None
-
-                    if merge_mode == "no_union":
-                        kml_str, metrics, debug_geojson = merge_no_flood_not_union(
-                            parcelas,
-                            tol_m=tol_m,
-                            corridor_width_m=corridor_width_m,
-                            return_metrics=True,
-                        )
-                    else:
-                        kml_str, metrics = merge_no_flood(
-                            parcelas,
-                            tol_m=tol_m,
-                            corridor_width_m=corridor_width_m,
-                            return_metrics=True,
-                        )
-
-                    print("[KML_OUT] snippet:", (kml_str or "")[:500])
-
-                    preview_geojson = self._kml_str_to_geojson(kml_str)
-
-                    # ✅ adiciona markers no preview
-                    if markers:
-                        preview_geojson["features"] = (preview_geojson.get("features") or []) + markers
-
-                    # ✅ injeta as linhas se existirem
-                    if debug_geojson:
-                        extra_feats = (debug_geojson.get("features") or [])
-                        if extra_feats:
-                            preview_geojson["features"] = (preview_geojson.get("features") or []) + extra_feats
-
-                    input_preview_geojson = self._parcelas_to_geojson(parcelas)
-                    if markers:
-                        input_preview_geojson["features"] = (input_preview_geojson.get("features") or []) + markers
-
-                except Exception as e:
-                    print(f"❌ Erro interno no merge_no_flood: {e}")
-                    return Response(
-                        {
-                            "detail": "Erro interno ao unificar polígonos.",
-                            "request_id": request_id,
-                            "files_report": file_reports,
-                        },
-                        status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    )
-
-            # ✅ NOVO: adiciona markers no KML para download
-            kml_str = self._append_marker_placemarks_to_kml(kml_str, markers)
-
-            # -----------------------
-            # Salvar output
-            # -----------------------
-            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"kml_unions/union_{ts}_{uuid.uuid4().hex[:6]}.kml"
-            saved_path = default_storage.save(filename, ContentFile((kml_str or "").encode("utf-8")))
+                input_storage_paths.append(input_path)
+                input_filenames.append(getattr(uploaded, "name", safe_name))
             
+            weekly_used = None
+            # -----------------------
+            # Criar job em estado queued
+            # -----------------------
+            plan_now = getattr(bp, "plan", None) if bp else ("anonymous" if not user else "free")
             
-
-
-            # URL (fallback)
-            try:
-                download_url = default_storage.url(saved_path)
-            except NotImplementedError:
-                media_url = settings.MEDIA_URL
-                if not media_url.endswith("/"):
-                    media_url += "/"
-                download_url = request.build_absolute_uri(media_url + saved_path)
-            except Exception:
-                download_url = None
-
-            # -----------------------
-            # Analytics: WeeklyUsage
-            # -----------------------
-            if user:
-                with transaction.atomic():
-                    usage, _ = WeeklyUsage.objects.select_for_update().get_or_create(
-                        user=user,
-                        week=week_key,
-                        defaults={"count": 0},
-                    )
-                    usage.count += 1
-                    usage.save(update_fields=["count", "updated_at"])
-                    weekly_used = usage.count
-            else:
-                weekly_used = None
-
-
-            # -----------------------
-            # Persistir Job + Meta
-            # -----------------------
-            job = None
-            try:
-                import json  # garante import aqui
-                input_filenames = [getattr(f, "name", "") for f in files]
-                plan_now = getattr(bp, "plan", None) if bp else ("anonymous" if not user else "free")
-
-                meta = {
-                    "request_id": request_id,
-                    "user_email": getattr(request.user, "email", None),
-                    "created_at": timezone.now().isoformat(),
-                    "tol_m": tol_m,
-                    "corridor_width_m": corridor_width_m,
-                    "total_files": len(files),
-                    "total_polygons": total_polygons,
-                    "metrics": metrics or {},
-                    "files_report": file_reports or [],
-                    "input_filenames": input_filenames,
-                    "input_storage_paths": input_storage_paths,
-                    "output_storage_path": saved_path,
-                    "total_markers": len([f for f in markers if (f.get("geometry") or {}).get("type") == "Point"])
-                }
-                
-
-                meta_path = f"kml_unions/{request_id}/meta/meta.json"
-                default_storage.save(
-                    meta_path,
-                    ContentFile(json.dumps(meta, ensure_ascii=False, indent=2).encode("utf-8")),
-                )
-
+            with transaction.atomic():
                 job = KMLMergeJob.objects.create(
                     user=user,
                     anon_id=anon_id,
                     plan=(plan_now or getattr(bp, "plan", "anonymous") or "anonymous"),
                     request_id=request_id,
-                    status=KMLMergeJob.STATUS_SUCCESS,
+                    status=getattr(KMLMergeJob, "STATUS_QUEUED", "queued"),
                     tol_m=tol_m,
                     corridor_width_m=corridor_width_m,
                     total_files=len(files),
-                    total_polygons=total_polygons,
-                    output_polygons=(metrics or {}).get("output_polygons"),
-                    merged_polygons=(metrics or {}).get("merged_polygons"),
-                    input_area_m2=(metrics or {}).get("input_area_m2"),
-                    input_area_ha=(metrics or {}).get("input_area_ha"),
-                    output_area_m2=(metrics or {}).get("output_area_m2"),
-                    output_area_ha=(metrics or {}).get("output_area_ha"),
-                    storage_path=saved_path,
-                    metrics=metrics or {},
+                    total_polygons=0,
+                    metrics={
+                        "merge_mode": (mode or "union").lower().strip(),
+                        "queued_at": timezone.now().isoformat(),
+                    },
                     input_filenames=input_filenames,
                     input_storage_paths=input_storage_paths,
-                    meta_storage_path=meta_path,
-
                     visitor_ip=visitor_ip,
                     visitor_country=visitor_country,
                     visitor_country_name=visitor_country_name,
                 )
-            except Exception as e:
-                print(f"[KML_HISTORY] Falha ao salvar histórico do merge {request_id}: {e}")
 
+                # dispara a thread só depois do commit do banco
+                transaction.on_commit(lambda: start_kml_merge_thread(job.id))
+            
             # -----------------------
-            # Debug bundle (opcional)
-            # -----------------------
-            if debug_enabled:
-                try:
-                    Thread(
-                        target=_save_kml_debug_bundle_storage,
-                        args=(request_id, tol_m, corridor_width_m, debug_files, kml_str, metrics),
-                        daemon=True,
-                    ).start()
-                except Exception:
-                    pass
-
-            # -----------------------
-            # Resposta / gating
+            # Resposta async imediata
             # -----------------------
             if bp and getattr(bp, "pk", None):
                 try:
@@ -1442,56 +1955,50 @@ class KMLUnionView(APIView):
             free_left = int(getattr(bp, "free_monthly_credits", 0) or 0)
             credits_used_total = int(getattr(bp, "credits_used_total", 0) or 0)
 
-            is_unlimited = bool(getattr(bp, "is_unlimited", False)) or plan in ("pro_monthly", "pro_yearly")
-
-            download_available = bool(is_unlimited) or prepaid_left > 0
-            download_url_out = download_url if download_available else None
-            
             if not user:
                 plan = (getattr(bp, "plan", None) or "anonymous").lower().strip() if bp else "anonymous"
-                download_available = False
-                download_url_out = None
 
             return Response(
                 {
                     "request_id": request_id,
-                    "job_id": str(job.id) if job else None,
-                    "download_available": download_available,
-                    "download_url": download_url_out,  # null para free
+                    "job_id": str(job.id),
+                    "status": getattr(job, "status", "queued"),
+                    "message": "Your merge has been queued and is processing in the background.",
 
-                    "total_polygons": total_polygons,
+                    "download_available": False,
+                    "download_url": None,
+
+                    "total_polygons": 0,
                     "total_files": len(files),
                     "tol_m": tol_m,
                     "corridor_width_m": corridor_width_m,
-                    "output_polygons": (metrics or {}).get("output_polygons"),
-                    "merged_polygons": (metrics or {}).get("merged_polygons"),
-                    "input_area_m2": (metrics or {}).get("input_area_m2"),
-                    "input_area_ha": (metrics or {}).get("input_area_ha"),
-                    "output_area_m2": (metrics or {}).get("output_area_m2"),
-                    "output_area_ha": (metrics or {}).get("output_area_ha"),
+                    "output_polygons": None,
+                    "merged_polygons": None,
+                    "input_area_m2": None,
+                    "input_area_ha": None,
+                    "output_area_m2": None,
+                    "output_area_ha": None,
 
                     "plan": plan,
                     "week": week_key,
-                    "weekly_used": weekly_used,
+                    "weekly_used": None,
                     "free_monthly_credits": free_left,
                     "prepaid_credits": prepaid_left,
                     "credits_used_total": credits_used_total,
 
-                    "files_report": file_reports,
-                    "input_preview_geojson": input_preview_geojson,
-                    "preview_geojson": preview_geojson,
-                    "total_markers": len([f for f in markers if (f.get("geometry") or {}).get("type") == "Point"]),
-
+                    "files_report": [],
+                    "input_preview_geojson": None,
+                    "preview_geojson": None,
+                    "total_markers": 0,
                 },
-                status=status.HTTP_200_OK,
+                status=status.HTTP_202_ACCEPTED,
             )
 
         except Exception as e:
             return Response(
-                {"detail": str(e) or "Merge failed.", "code": "MERGE_FAILED"},
+                {"detail": str(e) or "Failed to queue merge job.", "code": "MERGE_QUEUE_FAILED"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-
 
 class KMLDownloadView(APIView):
     authentication_classes = (FirebaseAuthentication,)
@@ -1509,7 +2016,30 @@ class KMLDownloadView(APIView):
 
         if not job:
             raise NotFound("Não encontrado.")
+    
+        if job.status in (
+            getattr(KMLMergeJob, "STATUS_QUEUED", "queued"),
+            getattr(KMLMergeJob, "STATUS_PROCESSING", "processing"),
+        ):
+            return Response(
+                {
+                    "detail": "Your merge is still processing.",
+                    "code": "JOB_NOT_READY",
+                    "status": job.status,
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
 
+        if job.status == getattr(KMLMergeJob, "STATUS_ERROR", "error"):
+            return Response(
+                {
+                    "detail": "This merge failed and cannot be downloaded.",
+                    "code": "JOB_FAILED",
+                    "status": job.status,
+                    "error_message": getattr(job, "error_message", None) or (job.metrics or {}).get("error_message"),
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
         # ✅ opcional (recomendado): “claim” no primeiro download
         if job.user_id is None:
             job.user = request.user
@@ -2250,7 +2780,7 @@ class KMLHistoryView(APIView):
 
         # filtros opcionais
         status_ = (request.query_params.get("status") or "").strip().lower()
-        if status_ in ("success", "error"):
+        if status_ in ("queued", "processing", "success", "error"):
             qs = qs.filter(status=status_)
 
         paginator = KMLHistoryPagination()
@@ -2266,6 +2796,7 @@ class KMLHistoryView(APIView):
 
             items.append({
                 "id": str(job.id),
+                "job_id": str(job.id),
                 "request_id": job.request_id,
                 "status": job.status,
                 "plan": job.plan,
@@ -2284,7 +2815,14 @@ class KMLHistoryView(APIView):
                 "output_area_ha": job.output_area_ha,
 
                 "download_url": url,
+                "download_available": bool(url),
                 "input_filenames": job.input_filenames,
+
+                "preview_geojson": (job.metrics or {}).get("preview_geojson"),
+                "input_preview_geojson": (job.metrics or {}).get("input_preview_geojson"),
+                "files_report": (job.metrics or {}).get("files_report", []),
+                "total_markers": (job.metrics or {}).get("total_markers", 0),
+                "error_message": getattr(job, "error_message", None) or (job.metrics or {}).get("error_message"),
             })
 
         return paginator.get_paginated_response(items)
@@ -2553,3 +3091,64 @@ class SendTestReactivationEmailView(View):
             "sent_to": test_email,
             "result": result,
         })
+        
+
+class KMLJobStatusView(APIView):
+    authentication_classes = (FirebaseAuthentication,)
+    permission_classes = (AllowAny,)
+
+    def get(self, request, job_id):
+        anon_id = (request.headers.get("X-ANON-ID") or "").strip() or None
+        user = request.user if getattr(request.user, "is_authenticated", False) else None
+
+        qs = KMLMergeJob.objects.filter(id=job_id)
+
+        if user:
+            qs = qs.filter(Q(user=user) | (Q(anon_id=anon_id) if anon_id else Q(pk=None)))
+        else:
+            if not anon_id:
+                raise NotFound("Not found.")
+            qs = qs.filter(anon_id=anon_id)
+
+        job = qs.first()
+        if not job:
+            raise NotFound("Not found.")
+
+        try:
+            url = default_storage.url(job.storage_path) if job.storage_path else None
+        except Exception:
+            url = None
+
+        return Response(
+            {
+                "id": str(job.id),
+                "job_id": str(job.id),
+                "request_id": job.request_id,
+                "status": job.status,
+                "plan": job.plan,
+                "created_at": job.created_at.isoformat(),
+
+                "total_files": job.total_files,
+                "total_polygons": job.total_polygons,
+                "tol_m": job.tol_m,
+                "corridor_width_m": job.corridor_width_m,
+
+                "output_polygons": job.output_polygons,
+                "merged_polygons": job.merged_polygons,
+                "input_area_m2": job.input_area_m2,
+                "input_area_ha": job.input_area_ha,
+                "output_area_m2": job.output_area_m2,
+                "output_area_ha": job.output_area_ha,
+
+                "download_url": url,
+                "download_available": bool(url),
+                "input_filenames": job.input_filenames,
+
+                "preview_geojson": (job.metrics or {}).get("preview_geojson"),
+                "input_preview_geojson": (job.metrics or {}).get("input_preview_geojson"),
+                "files_report": (job.metrics or {}).get("files_report", []),
+                "total_markers": (job.metrics or {}).get("total_markers", 0),
+                "error_message": getattr(job, "error_message", None) or (job.metrics or {}).get("error_message"),
+            },
+            status=status.HTTP_200_OK,
+        )

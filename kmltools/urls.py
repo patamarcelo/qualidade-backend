@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import ClaimJobsView,  KMLUnionView, MeView, UsageView, CreateCheckoutSessionView, StripeWebhookView, CreateBillingPortalSessionView, KMLHistoryDownloadView, KMLHistoryView, CreatePrepaidCheckoutSessionView, KMLDownloadView, ProfileOnboardingView, UnlockFreeCreditView
-from .views import SendTestReactivationEmailView
+from .views import SendTestReactivationEmailView, KMLJobStatusView
 from .views_feedback import MergeFeedbackView
 
 urlpatterns = [
@@ -29,6 +29,8 @@ urlpatterns += [
     # Histórico
     path("kml/history/", KMLHistoryView.as_view(), name="kml-history"),
     path("kml/history/<uuid:job_id>/download/", KMLHistoryDownloadView.as_view(), name="kml-history-download"),
+    
+    path("kml/job-status/<uuid:job_id>/", KMLJobStatusView.as_view(), name="kml-job-status"),
 ]
 
 urlpatterns += [
@@ -39,3 +41,5 @@ urlpatterns += [
 urlpatterns += [
     path("billing/webhook/stripe/", StripeWebhookView.as_view(), name="stripe-webhook"),
 ]
+
+
