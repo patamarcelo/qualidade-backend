@@ -267,7 +267,8 @@ def resolve_farm_and_harvest_by_storage(storage_id, projetos_by_storage):
     farm_id = projeto.id_farmbox
 
     # ajustar depois conforme a regra real da safra
-    harvest_id = None
+    # safra id 5643 2026/2027
+    harvest_id = 5643
 
     return farm_id, harvest_id
     
@@ -5947,7 +5948,7 @@ class DefensivoViewSet(viewsets.ModelViewSet):
         # =========================================================
         # NOVO: montagem / print / envio para Farmbox input_values
         # =========================================================
-        SEND_TO_FARMBOX_INPUT_VALUES = False
+        SEND_TO_FARMBOX_INPUT_VALUES = True
 
         farmbox_input_values_url = "https://farmbox.cc/api/v1/input_values"
         farmbox_input_values_payloads = []
