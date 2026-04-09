@@ -74,7 +74,121 @@ def _safe_storage_url(path):
     except Exception:
         return None
 
+def build_concat_only_kml(file_entries):
+    """
+    file_entries = [
+        {
+            "filename": "...",
+            "xml_bytes": b"..."
+        }
+    ]
+    """
+    view = KMLUnionView()
 
+    document_parts = []
+    preview_features = []
+    total_polygons = 0
+    total_markers = 0
+
+    for idx, entry in enumerate(file_entries, start=1):
+        filename = entry.get("filename") or f"file_{idx}.kml"
+        xml_bytes = entry.get("xml_bytes") or b""
+
+        try:
+            root = ET.fromstring(xml_bytes)
+        except Exception:
+            continue
+
+        base_name = os.path.splitext(filename)[0] or f"File {idx}"
+
+        # 1) tenta preservar folders inteiros
+        folders = list(view._findall_anyns(root, "Folder"))
+        if folders:
+            for folder in folders:
+                try:
+                    xml_str = ET.tostring(folder, encoding="unicode")
+                    if xml_str:
+                        document_parts.append(xml_str)
+                except Exception:
+                    pass
+        else:
+            # 2) se não houver Folder, agrupa os placemarks num Folder por arquivo
+            placemarks = list(view._findall_anyns(root, "Placemark"))
+            if placemarks:
+                folder_parts = [f"<Folder><name>{view._xml_escape(base_name)}</name>"]
+                for pm in placemarks:
+                    try:
+                        xml_str = ET.tostring(pm, encoding="unicode")
+                        if xml_str:
+                            folder_parts.append(xml_str)
+                    except Exception:
+                        pass
+                folder_parts.append("</Folder>")
+                document_parts.append("\n".join(folder_parts))
+            else:
+                # 3) fallback: tenta pegar conteúdo do Document
+                doc = view._first_anyns(root, "Document")
+                if doc is not None:
+                    try:
+                        for child in list(doc):
+                            xml_str = ET.tostring(child, encoding="unicode")
+                            if xml_str:
+                                document_parts.append(xml_str)
+                    except Exception:
+                        pass
+
+        # preview polygons
+        try:
+            gj = view._kml_str_to_geojson(xml_bytes.decode("utf-8", errors="ignore"))
+            feats = gj.get("features") or []
+            preview_features.extend(feats)
+            total_polygons += sum(
+                1 for f in feats if (f.get("geometry") or {}).get("type") == "Polygon"
+            )
+        except Exception:
+            pass
+
+        # preview markers
+        try:
+            markers = view._extract_point_placemarks_as_geojson(root, fallback_name=base_name)
+            preview_features.extend(markers)
+            total_markers += len(markers)
+        except Exception:
+            pass
+
+    kml_str = f'''<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>KML Unifier — combined</name>
+    {"".join(document_parts)}
+  </Document>
+</kml>'''
+
+    preview_geojson = {
+        "type": "FeatureCollection",
+        "features": preview_features,
+    }
+
+    metrics = {
+        "output_polygons": total_polygons,
+        "merged_polygons": 0,
+        "input_area_m2": 0,
+        "input_area_ha": 0,
+        "output_area_m2": 0,
+        "output_area_ha": 0,
+        "concat_only": True,
+    }
+
+    return (
+        kml_str,
+        metrics,
+        preview_geojson,
+        preview_geojson,
+        total_polygons,
+        total_markers,
+    )
+    
+    
 def run_kml_merge_job(job_id):
     close_old_connections()
     logger.warning("[ASYNC] worker start job_id=%s", job_id)
@@ -103,6 +217,8 @@ def run_kml_merge_job(job_id):
         input_storage_paths = list(job.input_storage_paths or [])
         input_filenames = list(job.input_filenames or [])
         
+        resolved_file_entries = []
+        
         logger.warning("[ASYNC] starting file loop job_id=%s files=%s", job_id, len(input_storage_paths))
         for idx, input_path in enumerate(input_storage_paths, start=1):
             with default_storage.open(input_path, "rb") as f:
@@ -113,6 +229,10 @@ def run_kml_merge_job(job_id):
 
             try:
                 resolved_bytes, netinfo = view._resolve_networklink_if_needed(raw_bytes, safe_name)
+                resolved_file_entries.append({
+                    "filename": input_filenames[idx - 1] if idx - 1 < len(input_filenames) else safe_name,
+                    "xml_bytes": resolved_bytes,
+                })
             except Exception as e:
                 resolved_bytes, netinfo = raw_bytes, {
                     "networklink_detected": True,
@@ -253,15 +373,44 @@ def run_kml_merge_job(job_id):
         else:
             
             job_metrics = job.metrics or {}
-            merge_mode = "no_union" if job_metrics.get("merge_mode") == "no_union" else "union"
+            merge_mode = (job_metrics.get("merge_mode") or "union").lower().strip()
 
-            if merge_mode == "no_union":
+            if merge_mode not in ("union", "no_union", "concat_only"):
+                merge_mode = "union"
+
+            if merge_mode == "concat_only":
+                (
+                    kml_str,
+                    metrics,
+                    preview_geojson,
+                    input_preview_geojson,
+                    total_polygons_concat,
+                    total_markers_concat,
+                ) = build_concat_only_kml(resolved_file_entries)
+
+                total_polygons = total_polygons_concat
+                debug_geojson = None
+
+            elif merge_mode == "no_union":
                 kml_str, metrics, debug_geojson = merge_no_flood_not_union(
                     parcelas,
                     tol_m=tol_m,
                     corridor_width_m=corridor_width_m,
                     return_metrics=True,
                 )
+
+                preview_geojson = view._kml_str_to_geojson(kml_str)
+                if markers:
+                    preview_geojson["features"] = (preview_geojson.get("features") or []) + markers
+                if debug_geojson:
+                    extra_feats = (debug_geojson.get("features") or [])
+                    if extra_feats:
+                        preview_geojson["features"] = (preview_geojson.get("features") or []) + extra_feats
+
+                input_preview_geojson = view._parcelas_to_geojson(parcelas)
+                if markers:
+                    input_preview_geojson["features"] = (input_preview_geojson.get("features") or []) + markers
+
             else:
                 kml_str, metrics = merge_no_flood(
                     parcelas,
@@ -271,17 +420,14 @@ def run_kml_merge_job(job_id):
                 )
                 debug_geojson = None
 
-            preview_geojson = view._kml_str_to_geojson(kml_str)
-            if markers:
-                preview_geojson["features"] = (preview_geojson.get("features") or []) + markers
-            if debug_geojson:
-                extra_feats = (debug_geojson.get("features") or [])
-                if extra_feats:
-                    preview_geojson["features"] = (preview_geojson.get("features") or []) + extra_feats
+                preview_geojson = view._kml_str_to_geojson(kml_str)
+                if markers:
+                    preview_geojson["features"] = (preview_geojson.get("features") or []) + markers
 
-            input_preview_geojson = view._parcelas_to_geojson(parcelas)
-            if markers:
-                input_preview_geojson["features"] = (input_preview_geojson.get("features") or []) + markers
+                input_preview_geojson = view._parcelas_to_geojson(parcelas)
+                if markers:
+                    input_preview_geojson["features"] = (input_preview_geojson.get("features") or []) + markers
+                    
 
         kml_str = view._append_marker_placemarks_to_kml(kml_str, markers)
 
