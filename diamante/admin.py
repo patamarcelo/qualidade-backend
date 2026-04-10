@@ -7,12 +7,15 @@ import logging
 import time
 import uuid
 from collections import defaultdict
-from datetime import date, datetime, time as dt_time, timedelta
+import datetime as py_datetime
+from datetime import date, time as dt_time, timedelta
 from decimal import Decimal, DivisionByZero, InvalidOperation
 from threading import Thread
 from types import SimpleNamespace
 from typing import Any
 from uuid import UUID
+from django.core.serializers.json import DjangoJSONEncoder
+
 
 import dropbox
 import requests
@@ -37,6 +40,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.storage import FileSystemStorage, default_storage
 from django.db import connection, transaction, close_old_connections
+from django.db import models
 from django.db.models import (
     Q,
     Sum,
@@ -75,6 +79,46 @@ from rest_framework.authtoken.models import Token
 from qualidade_project.settings import DEBUG
 from usuario.models import CustomUsuario as User
 
+from .models import (
+    Aplicacao,
+    AppFarmboxIntegration,
+    BackgroundTaskStatus,
+    BuyProducts,
+    Ciclo,
+    CicloAtual,
+    Colheita,
+    ColheitaPlantioExtratoArea,
+    CotacaoDolar,
+    Cultura,
+    Defensivo,
+    Deposito,
+    EmailAberturaST,
+    Fazenda,
+    HeaderPlanejamentoAgricola,
+    Maquina,
+    Operacao,
+    PlannerPlantio,
+    Plantio,
+    PlantioDetail,
+    PlantioDetailPlantio,
+    PlantioExtratoArea,
+    Programa,
+    Projeto,
+    RegistroVisitas,
+    Safra,
+    SeedConfig,
+    SeedStock,
+    SentSeeds,
+    StProtheusIntegration,
+    Talhao,
+    TiposAtividadeEmails,
+    Variedade,
+    Visitas,
+    AlertRule,
+    FarmPolygon,
+    TIPO_CHOICES,
+)
+
 from .forms import (
     AplicacoesProgramaInlineFormSet,
     BulkReplaceAplicacaoForm,
@@ -82,7 +126,7 @@ from .forms import (
     ProgramaAdminForm,
     UpdateDataPrevistaPlantioForm,
 )
-from .models import *
+
 from .services.generate_kml import create_kml
 from .utils import (
     admin_form_alter_programa_and_save,
@@ -102,7 +146,7 @@ def parse_date_start(date_str):
     parsed = parse_date(date_str)
     if not parsed:
         return None
-    dt = datetime.combine(parsed, dt_time.min)
+    dt = py_datetime.datetime.combine(parsed, dt_time.min)
     return make_aware(dt) if is_naive(dt) else dt
 
 
@@ -112,7 +156,7 @@ def parse_date_end(date_str):
     parsed = parse_date(date_str)
     if not parsed:
         return None
-    dt = datetime.combine(parsed, dt_time.max)
+    dt = py_datetime.datetime.combine(parsed, dt_time.max)
     return make_aware(dt) if is_naive(dt) else dt
 
 def build_created_filters(created_at_gte=None, created_at_lte=None, field_name="criados"):
@@ -1651,7 +1695,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
                         continue
 
                     try:
-                        per_row_dates[row_id_key] = datetime.strptime(raw_value, "%d/%m/%Y").date()
+                        per_row_dates[row_id_key] = py_datetime.datetime.strptime(raw_value, "%d/%m/%Y").date()
                     except ValueError:
                         invalid_rows.append(row_id_key)
 
@@ -1790,7 +1834,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
             if len(sorted_list) > 0:
                 closed_date = sorted_list[0]
             else:
-                today = str(datetime.now()).split(" ")[0].strip()
+                today = str(py_datetime.datetime.now()).split(" ")[0].strip()
                 closed_date = today
 
             total_filt_list = sum(
@@ -2126,7 +2170,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
                 if len(sorted_list) > 0:
                     closed_date = sorted_list[0]
                 else:
-                    today = str(datetime.now()).split(" ")[0].strip()
+                    today = str(py_datetime.datetime.now()).split(" ")[0].strip()
                     closed_date = today
 
                 total_filt_list = sum(
