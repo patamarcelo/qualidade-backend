@@ -99,18 +99,21 @@ logger = logging.getLogger(__name__)
 def parse_date_start(date_str):
     if not date_str:
         return None
-    dt = datetime.strptime(date_str, "%Y-%m-%d")
-    dt = datetime.combine(dt.date(), dt_time.min)
+    parsed = parse_date(date_str)
+    if not parsed:
+        return None
+    dt = datetime.combine(parsed, dt_time.min)
     return make_aware(dt) if is_naive(dt) else dt
 
 
 def parse_date_end(date_str):
     if not date_str:
         return None
-    dt = datetime.strptime(date_str, "%Y-%m-%d")
-    dt = datetime.combine(dt.date(), dt_time.max)
+    parsed = parse_date(date_str)
+    if not parsed:
+        return None
+    dt = datetime.combine(parsed, dt_time.max)
     return make_aware(dt) if is_naive(dt) else dt
-
 
 def build_created_filters(created_at_gte=None, created_at_lte=None, field_name="criados"):
     filters = Q()
