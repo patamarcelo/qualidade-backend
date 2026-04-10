@@ -116,6 +116,7 @@ from .models import (
     Visitas,
     AlertRule,
     FarmPolygon,
+    AplicacaoPlantio,
     TIPO_CHOICES,
 )
 
