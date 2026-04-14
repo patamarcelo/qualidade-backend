@@ -210,7 +210,7 @@ class ManagerAdmin(admin.ModelAdmin):
                     '">'
                     "{}"
                     "</span>"
-                ).format(p.nome)  # ajuste se não for "nome"
+                ).format(p.nome.replace('Projeto', '').strip())  # ajuste se não for "nome"
                 for p in projetos
             )
         )
