@@ -1436,14 +1436,213 @@ class AppFarmboxIntegration(Base):
         verbose_name = 'Aps Integração'
         verbose_name_plural = 'Aps Integrações'
 
-class StProtheusIntegration(Base):
-    st_numero = models.CharField('ST Número', max_length=200, null=True, blank=True)
-    st_fazenda = models.CharField('Fazenda ST', max_length=200, null=True, blank=True)
-    app         = models.JSONField('Detalhes', null=True, blank=True)
-    
+#------------------------------------------------ ## ------------------------------------------------#
+#--------------- LOGICA PARA OS LEMBRETES DO WHATSAPP DAS PRE ST ------------------------------------#
+#------------------------------------------------ ## ------------------------------------------------#
+
+class Base(models.Model):
+    criados = models.DateTimeField("Criação", auto_now_add=True)
+    modificado = models.DateTimeField("Atualização", auto_now=True)
+    ativo = models.BooleanField("Ativo", default=True)
+    observacao = models.TextField("Observação", blank=True, null=True)
+
     class Meta:
-        verbose_name = 'ST Integração'
-        verbose_name_plural = 'STs Integrações'
+        abstract = True
+
+
+class StProtheusIntegration(Base):
+    STATUS_ABERTA = "aberta"
+    STATUS_AGUARDANDO_BASE = "aguardando_base"
+    STATUS_CONCLUIDA = "concluida"
+
+    STATUS_CHOICES = [
+        (STATUS_ABERTA, "Aberta"),
+        (STATUS_AGUARDANDO_BASE, "Aguardando base"),
+        (STATUS_CONCLUIDA, "Concluída"),
+    ]
+
+    st_numero = models.CharField("ST Número", max_length=200, null=True, blank=True, db_index=True)
+    st_fazenda = models.CharField("Fazenda ST", max_length=200, null=True, blank=True)
+    app = models.JSONField("Detalhes", null=True, blank=True)
+    
+    integracao_ativa = models.BooleanField(
+        "Integração ativa",
+        default=False,
+        help_text="Enquanto falso, a ST será tratada como concluída para não gerar atrasos falsos.",
+        db_index=True,
+    )
+
+    status_fluxo = models.CharField(
+        "Status do fluxo",
+        max_length=30,
+        choices=STATUS_CHOICES,
+        default=STATUS_ABERTA,
+        db_index=True,
+    )
+
+    # marco 1: analista ajustou quantidades e disparou a ação
+    analista_disparou_em = models.DateTimeField(
+        "Analista disparou em",
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+    analista_payload = models.JSONField(
+        "Payload analista",
+        null=True,
+        blank=True,
+    )
+
+    # marco 2: base gerou a ST / separou / enviou
+    base_enviou_em = models.DateTimeField(
+        "Base enviou em",
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+    base_payload = models.JSONField(
+        "Payload base",
+        null=True,
+        blank=True,
+    )
+
+    # dados que podem vir no segundo movimento
+    st_gerada = models.CharField(
+        "ST gerada",
+        max_length=200,
+        null=True,
+        blank=True,
+    )
+    nf_numero = models.CharField(
+        "NF número",
+        max_length=200,
+        null=True,
+        blank=True,
+    )
+
+    # janelas em horas, para não deixar tudo travado em 24h
+    prazo_primeira_etapa_horas = models.PositiveIntegerField(
+        "Prazo 1ª etapa (horas)",
+        default=24,
+    )
+    prazo_segunda_etapa_horas = models.PositiveIntegerField(
+        "Prazo 2ª etapa (horas)",
+        default=24,
+    )
+
+    # controle de aviso, para o cron não reenviar
+    alerta_primeira_etapa_enviado_em = models.DateTimeField(
+        "Alerta 1ª etapa enviado em",
+        null=True,
+        blank=True,
+    )
+    alerta_segunda_etapa_enviado_em = models.DateTimeField(
+        "Alerta 2ª etapa enviado em",
+        null=True,
+        blank=True,
+    )
+
+    concluido_em = models.DateTimeField("Concluído em", null=True, blank=True)
+
+    class Meta:
+        verbose_name = "ST Integração"
+        verbose_name_plural = "STs Integrações"
+        ordering = ["-criados"]
+
+    def __str__(self):
+        return f"{self.st_numero or '-'}"
+
+    @property
+    def prazo_primeira_etapa_limite(self):
+        return self.criados + timedelta(hours=self.prazo_primeira_etapa_horas)
+
+    @property
+    def prazo_segunda_etapa_limite(self):
+        if not self.analista_disparou_em:
+            return None
+        return self.analista_disparou_em + timedelta(hours=self.prazo_segunda_etapa_horas)
+
+    @property
+    def tempo_ate_primeira_etapa(self):
+        if not self.analista_disparou_em:
+            return None
+        return self.analista_disparou_em - self.criados
+
+    @property
+    def tempo_ate_segunda_etapa(self):
+        if not self.analista_disparou_em or not self.base_enviou_em:
+            return None
+        return self.base_enviou_em - self.analista_disparou_em
+
+    @property
+    def primeira_etapa_em_atraso(self):
+        if self.analista_disparou_em:
+            return self.analista_disparou_em > self.prazo_primeira_etapa_limite
+        return timezone.now() > self.prazo_primeira_etapa_limite
+
+    @property
+    def segunda_etapa_em_atraso(self):
+        limite = self.prazo_segunda_etapa_limite
+        if not limite:
+            return False
+        if self.base_enviou_em:
+            return self.base_enviou_em > limite
+        return timezone.now() > limite
+
+    def registrar_analista_disparo(self, payload=None, save=True, ocorrido_em=None):
+        ocorreu = ocorrido_em or timezone.now()
+
+        if not self.analista_disparou_em:
+            self.analista_disparou_em = ocorreu
+
+        if payload is not None:
+            self.analista_payload = payload
+
+        self.status_fluxo = self.STATUS_AGUARDANDO_BASE
+
+        if save:
+            self.save(update_fields=[
+                "analista_disparou_em",
+                "analista_payload",
+                "status_fluxo",
+                "modificado",
+            ])
+
+    def registrar_base_envio(
+        self,
+        payload=None,
+        st_gerada=None,
+        nf_numero=None,
+        save=True,
+        ocorrido_em=None,
+    ):
+        ocorreu = ocorrido_em or timezone.now()
+
+        if not self.base_enviou_em:
+            self.base_enviou_em = ocorreu
+
+        if payload is not None:
+            self.base_payload = payload
+
+        if st_gerada is not None:
+            self.st_gerada = st_gerada
+
+        if nf_numero is not None:
+            self.nf_numero = nf_numero
+
+        self.status_fluxo = self.STATUS_CONCLUIDA
+        self.concluido_em = self.base_enviou_em
+
+        if save:
+            self.save(update_fields=[
+                "base_enviou_em",
+                "base_payload",
+                "st_gerada",
+                "nf_numero",
+                "status_fluxo",
+                "concluido_em",
+                "modificado",
+            ])
 
 class HeaderPlanejamentoAgricola(Base):
     projeto = models.ForeignKey(Projeto, on_delete=models.PROTECT)
@@ -1705,3 +1904,4 @@ class FarmPolygon(models.Model):
 
     def __str__(self):
         return f"{self.name} - {self.farm_name or 'Sem fazenda'}"
+    

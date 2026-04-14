@@ -4318,41 +4318,159 @@ class AppFarmBoxIntegrationAdmin(admin.ModelAdmin):
 
 @admin.register(StProtheusIntegration)
 class StProtheusIntegrationAdmin(admin.ModelAdmin):
-    
-    list_display = ("st_numero", "get_data", "st_fazenda")
-    search_fields = ("criados", 'st_numero', 'st_fazenda')
-    list_filter = (
-        ("criados", DateFieldListFilter),  # Filters by the 'criados' date field
+
+    list_display = (
+        "st_numero",
+        "get_data",
+        "st_fazenda",
+        "status_fluxo",
+        "integracao_ativa",
+        "get_analista_disparou_em",
+        "get_base_enviou_em",
+        "get_primeira_etapa_status",
+        "get_segunda_etapa_status",
     )
-    readonly_fields = ("criados","modificado")
-    
+    search_fields = (
+        "st_numero",
+        "st_fazenda",
+        "st_gerada",
+        "nf_numero",
+        "observacao",
+    )
+    list_filter = (
+        "status_fluxo",
+        "integracao_ativa",
+        "ativo",
+        ("criados", DateFieldListFilter),
+        ("analista_disparou_em", DateFieldListFilter),
+        ("base_enviou_em", DateFieldListFilter),
+        ("concluido_em", DateFieldListFilter),
+    )
+    readonly_fields = (
+        "criados",
+        "modificado",
+        "get_primeira_etapa_status",
+        "get_segunda_etapa_status",
+        "get_tempo_primeira_etapa",
+        "get_tempo_segunda_etapa",
+        "get_prazo_primeira_etapa_limite",
+        "get_prazo_segunda_etapa_limite",
+    )
+
     formfield_overrides = {
         models.JSONField: {
             "widget": JSONEditorWidget(width="200%", height="75vh", mode="tree")
         },
     }
+
     fieldsets = (
         (
             "Dados",
             {
                 "fields": (
-                    ("criados"),
-                    ("ativo"),
-                    ("st_numero",),
-                    ("st_fazenda",),
-                    ("app",),
+                    "criados",
+                    "modificado",
+                    "integracao_ativa",
+                    "ativo",
+                    "status_fluxo",
+                    "st_numero",
+                    "st_fazenda",
+                    "app",
+                    "observacao",
+                )
+            },
+        ),
+        (
+            "Primeira etapa",
+            {
+                "fields": (
+                    "analista_disparou_em",
+                    "prazo_primeira_etapa_horas",
+                    "get_prazo_primeira_etapa_limite",
+                    "get_tempo_primeira_etapa",
+                    "get_primeira_etapa_status",
+                    "alerta_primeira_etapa_enviado_em",
+                    "analista_payload",
+                )
+            },
+        ),
+        (
+            "Segunda etapa",
+            {
+                "fields": (
+                    "base_enviou_em",
+                    "prazo_segunda_etapa_horas",
+                    "get_prazo_segunda_etapa_limite",
+                    "get_tempo_segunda_etapa",
+                    "get_segunda_etapa_status",
+                    "alerta_segunda_etapa_enviado_em",
+                    "st_gerada",
+                    "nf_numero",
+                    "base_payload",
+                    "concluido_em",
                 )
             },
         ),
     )
-    
-    
+
     def get_data(self, obj):
         if obj.criados:
             return date_format(obj.criados, format="DATETIME_FORMAT", use_l10n=True)
-        return " - "
+        return "-"
 
     get_data.short_description = "Data Abertura"
+
+    def get_analista_disparou_em(self, obj):
+        if obj.analista_disparou_em:
+            return date_format(obj.analista_disparou_em, format="DATETIME_FORMAT", use_l10n=True)
+        return "-"
+    get_analista_disparou_em.short_description = "Analista disparou"
+
+    def get_base_enviou_em(self, obj):
+        if obj.base_enviou_em:
+            return date_format(obj.base_enviou_em, format="DATETIME_FORMAT", use_l10n=True)
+        return "-"
+    get_base_enviou_em.short_description = "Base enviou"
+
+    def get_prazo_primeira_etapa_limite(self, obj):
+        if obj.prazo_primeira_etapa_limite:
+            return date_format(obj.prazo_primeira_etapa_limite, format="DATETIME_FORMAT", use_l10n=True)
+        return "-"
+    get_prazo_primeira_etapa_limite.short_description = "Limite 1ª etapa"
+
+    def get_prazo_segunda_etapa_limite(self, obj):
+        if obj.prazo_segunda_etapa_limite:
+            return date_format(obj.prazo_segunda_etapa_limite, format="DATETIME_FORMAT", use_l10n=True)
+        return "-"
+    get_prazo_segunda_etapa_limite.short_description = "Limite 2ª etapa"
+
+    def get_tempo_primeira_etapa(self, obj):
+        return obj.tempo_ate_primeira_etapa or "-"
+    get_tempo_primeira_etapa.short_description = "Tempo até 1ª etapa"
+
+    def get_tempo_segunda_etapa(self, obj):
+        return obj.tempo_ate_segunda_etapa or "-"
+    get_tempo_segunda_etapa.short_description = "Tempo até 2ª etapa"
+
+    def get_primeira_etapa_status(self, obj):
+        if not obj.integracao_ativa:
+            return "Integração inativa"
+        if obj.analista_disparou_em:
+            return "Recebida com atraso" if obj.primeira_etapa_em_atraso else "Recebida no prazo"
+        return "Pendente com atraso" if obj.primeira_etapa_em_atraso else "Pendente no prazo"
+    get_primeira_etapa_status.short_description = "Status 1ª etapa"
+    
+
+    def get_segunda_etapa_status(self, obj):
+        if not obj.integracao_ativa:
+            return "Integração inativa"
+        if not obj.analista_disparou_em:
+            return "Aguardando 1ª etapa"
+        if obj.base_enviou_em:
+            return "Recebida com atraso" if obj.segunda_etapa_em_atraso else "Recebida no prazo"
+        return "Pendente com atraso" if obj.segunda_etapa_em_atraso else "Pendente no prazo"
+    get_segunda_etapa_status.short_description = "Status 2ª etapa"
+    
     
 
 @admin.action(description="Exportar Plantio para Excel")
