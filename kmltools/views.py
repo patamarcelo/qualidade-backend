@@ -95,7 +95,7 @@ def build_concat_only_kml(file_entries):
         xml_bytes = entry.get("xml_bytes") or b""
 
         try:
-            root = ET.fromstring(xml_bytes)
+            root = view._safe_parse_xml(xml_bytes)
         except Exception:
             continue
 
@@ -245,7 +245,7 @@ def run_kml_merge_job(job_id):
             cad_lines_file = 0
 
             try:
-                root = ET.fromstring(resolved_bytes)
+                root = view._safe_parse_xml(resolved_bytes)
 
                 try:
                     base_marker_name = os.path.splitext(safe_name)[0]
@@ -914,6 +914,55 @@ class KMLUnionView(APIView):
             value = min(max_value, value)
         return value
 
+    def _sanitize_kml_xml_bytes(self, xml_bytes: bytes) -> bytes:
+        """
+        Corrige KMLs malformados que usam `xsi:*` (ex.: xsi:schemaLocation)
+        sem declarar `xmlns:xsi` na tag <kml>.
+
+        Não altera arquivos válidos.
+        """
+        if not xml_bytes:
+            return xml_bytes
+
+        try:
+            text = xml_bytes.decode("utf-8", errors="ignore")
+        except Exception:
+            return xml_bytes
+
+        # Só tenta corrigir se houver uso de xsi: e não existir declaração do namespace
+        has_xsi_usage = ("xsi:" in text)
+        has_xsi_decl = ('xmlns:xsi=' in text)
+
+        if has_xsi_usage and not has_xsi_decl:
+            fixed_text = re.sub(
+                r"<kml\b",
+                '<kml xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"',
+                text,
+                count=1,
+                flags=re.IGNORECASE,
+            )
+            if fixed_text != text:
+                logger.warning("[KML] XML sanitizado automaticamente: xmlns:xsi adicionado.")
+                return fixed_text.encode("utf-8")
+
+        return xml_bytes
+
+
+    def _safe_parse_xml(self, xml_bytes: bytes):
+        """
+        Faz parse normal. Se falhar por XML/KML malformado simples,
+        tenta sanitizar e parsear novamente.
+
+        Mantém o comportamento antigo para arquivos válidos.
+        """
+        try:
+            return ET.fromstring(xml_bytes)
+        except ET.ParseError:
+            fixed_bytes = self._sanitize_kml_xml_bytes(xml_bytes)
+            if fixed_bytes == xml_bytes:
+                raise
+            return ET.fromstring(fixed_bytes)
+
     # ---------- helpers namespace-agnostic ----------
     def _extract_point_placemarks_as_geojson(self, root, fallback_name="Marker"):
         feats = []
@@ -1034,7 +1083,7 @@ class KMLUnionView(APIView):
             return {"type": "FeatureCollection", "features": []}
 
         try:
-            root = ET.fromstring(kml_str.encode("utf-8", errors="ignore"))
+            root = self._safe_parse_xml(kml_str.encode("utf-8", errors="ignore"))
         except Exception:
             return {"type": "FeatureCollection", "features": []}
 
