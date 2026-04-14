@@ -141,6 +141,8 @@ from .views_api import save_from_protheus_logic
 
 logger = logging.getLogger(__name__)
 
+from opscheckin.models import Manager
+
 def parse_date_start(date_str):
     if not date_str:
         return None
@@ -1371,6 +1373,17 @@ def abrir_aplicacao_farmbox(self, request, queryset):
     response_id = first.talhao.fazenda.fazenda.id_responsavel_farmbox
     farm_id_farmbox = first.talhao.fazenda.id_farmbox
     harvest_id_farm = first.safra.id_farmbox
+    
+    
+    managers = list(
+        Manager.objects
+        .filter(
+            is_active=True,
+            id_responsavel_farmbox__isnull=False,
+        )
+        .order_by("name")
+        .values("id", "name", "phone_e164", "id_responsavel_farmbox")
+    )
 
     # Contexto para renderização
     context = dict(
@@ -1387,6 +1400,7 @@ def abrir_aplicacao_farmbox(self, request, queryset):
         FARM_ID=int(farm_id_farmbox),
         HARVEST_ID=int(harvest_id_farm),
         programa_data_json=mark_safe(json.dumps(programas_data)),  # passa como JSON seguro
+        managers_json=mark_safe(json.dumps(managers)),
     )
 
     return render(request, 'admin/abrir_aplicacao_farmbox.html', context)

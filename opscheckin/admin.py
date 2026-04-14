@@ -135,6 +135,7 @@ class ManagerAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "name",
+        "id_responsavel_farmbox",
         "phone_display",
         "projetos_badges",
         "is_active",

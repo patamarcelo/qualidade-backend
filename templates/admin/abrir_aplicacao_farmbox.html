@@ -99,6 +99,7 @@
     <hr />
 
     <script id="programas-json" type="application/json">{{ programa_data_json|safe }}</script>
+    <script id="managers-json" type="application/json">{{ managers_json|safe }}</script>
 
     <div class="row g-3 mb-3">
     <div class="col-md-6">
@@ -110,18 +111,35 @@
     </div>
 
    <div class="col-md-6 d-flex align-items-end gap-2">
-  <div class="flex-grow-1">
-    <label class="form-label"><strong>Estágio</strong></label>
-    <select id="select-estagio" class="form-select" disabled>
-      <option value="">-- Selecione um estágio --</option>
-    </select>
-  </div>
+        <div class="flex-grow-1">
+            <label class="form-label"><strong>Estágio</strong></label>
+            <select id="select-estagio" class="form-select" disabled>
+            <option value="">-- Selecione um estágio --</option>
+            </select>
+        </div>
 
-  <button type="button" id="btn-reset-programa" class="btn btn-outline-danger" title="Limpar programa/estágio/itens">
-    <span class="me-1">Limpar</span> 🗑️
-  </button>
-</div>
+        <button type="button" id="btn-reset-programa" class="btn btn-outline-danger" title="Limpar programa/estágio/itens">
+            <span class="me-1">Limpar</span> 🗑️
+        </button>
+    </div>
     
+    </div>
+    <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            <label class="form-label"><strong>Responsável</strong></label>
+            <select id="select-responsible" class="form-select">
+                <option value="">-- Usar responsável padrão --</option>
+            </select>
+            <small class="text-muted">Se não selecionar, usa o responsável padrão da fazenda.</small>
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label"><strong>Encarregado</strong></label>
+            <select id="select-charge" class="form-select">
+                <option value="">-- Usar encarregado padrão --</option>
+            </select>
+            <small class="text-muted">Se não selecionar, usa o encarregado padrão da fazenda.</small>
+        </div>
     </div>
 
     <hr />

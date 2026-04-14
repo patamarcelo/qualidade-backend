@@ -312,6 +312,42 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
+
+    function parseFarmboxId(value) {
+        if (value === null || value === undefined) return null;
+
+        const cleaned = String(value).trim().replace(/\D/g, '');
+        if (!cleaned) return null;
+
+        return parseInt(cleaned, 10);
+    }
+
+    // Evento global para pegar os managers
+    const managersRaw = document.getElementById('managers-json')?.textContent || '[]';
+    const MANAGERS = JSON.parse(managersRaw);
+
+    const selResponsible = document.getElementById('select-responsible');
+    const selCharge = document.getElementById('select-charge');
+
+    function montarSelectManagers() {
+        if (!selResponsible || !selCharge) return;
+
+        MANAGERS.forEach(manager => {
+            const label = `${manager.name}`;
+
+            const optResp = document.createElement('option');
+            optResp.value = String(manager.id_responsavel_farmbox);
+            optResp.textContent = label;
+            selResponsible.appendChild(optResp);
+
+            const optCharge = document.createElement('option');
+            optCharge.value = String(manager.id_responsavel_farmbox);
+            optCharge.textContent = label;
+            selCharge.appendChild(optCharge);
+        });
+    }
+
+
     // Evento global para remover plantio (delegação)
     document.addEventListener('click', function (e) {
         if (e.target && e.target.classList.contains('remove-plantio-btn')) {
@@ -323,6 +359,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
     });
+
 
     // =========== PARTE NOVA: Programa → Estágio → Itens ===========
     const programasRaw = document.getElementById('programas-json')?.textContent || '[]';
@@ -592,13 +629,23 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
 
+        const responsibleIdFinal =
+            selResponsible?.value?.trim()
+                ? parseFarmboxId(selResponsible.value)
+                : parseFarmboxId(appData.dataset.responseId);
+
+        const chargeIdFinal =
+            selCharge?.value?.trim()
+                ? parseFarmboxId(selCharge.value)
+                : parseFarmboxId(appData.dataset.chargeId);
+
         const payload = {
             date: new Date().toISOString().slice(0, 10),
             end_date: new Date(Date.now() + 6 * 86400000).toISOString().slice(0, 10),
             harvest_id: parseInt(String(appData.dataset.harvestId).replace('.', '')),
             farm_id: parseInt(String(appData.dataset.farmId).replace('.', '')),
-            responsible_id: parseInt(String(appData.dataset.responseId).replace('.', '')),
-            charge_id: parseInt(String(appData.dataset.chargeId).replace('.', '')),
+            responsible_id: responsibleIdFinal,
+            charge_id: chargeIdFinal,
             plantations: plantations,
             inputs: inputs,
             observations: "Aplicação Aberta via Django-Admin"
@@ -658,6 +705,16 @@ document.addEventListener('DOMContentLoaded', function () {
     atualizarEstadoBotoesRemoverPlantio();
     atualizarEstadoBotoesRemoverDefensivo();
     atualizarDoseResultados();
+    montarSelectManagers();
+
+
+    if (selResponsible && appData.dataset.responseId) {
+        selResponsible.value = String(parseFarmboxId(appData.dataset.responseId) ?? '');
+    }
+
+    if (selCharge && appData.dataset.chargeId) {
+        selCharge.value = String(parseFarmboxId(appData.dataset.chargeId) ?? '');
+    }
 
     // Inicializa os selects avançados na carga da página
     document.querySelectorAll('.select-busca-avancada').forEach(iniciarSelectAvancado);
