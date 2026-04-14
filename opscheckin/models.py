@@ -3,6 +3,7 @@ import re
 from django.db import models
 from django.utils import timezone
 from django.core.exceptions import ValidationError
+from diamante.models import Projeto
 
 
 def only_digits(v: str) -> str:
@@ -77,6 +78,15 @@ class Manager(models.Model):
         blank=True,
         related_name="managers",
     )
+    
+    
+    id_responsavel_farmbox = models.IntegerField("ID FarmBox",  blank=True, null=True, unique=True)
+    projeto = models.ManyToManyField(Projeto, blank=True, default=None, related_name="projeto_manager")
+    
+    
+    
+    
+    
     
     
     

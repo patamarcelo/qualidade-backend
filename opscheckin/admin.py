@@ -91,7 +91,7 @@ class ManagerAdminForm(forms.ModelForm):
 
     class Meta:
         model = Manager
-        fields = ("name", "country", "ddd", "number", "is_active", "is_active_resume_agenda", 'is_active_for_meetings')
+        fields = ("name", "country", "ddd", "number", "is_active", "is_active_resume_agenda", 'is_active_for_meetings', "id_responsavel_farmbox","projeto",)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -136,6 +136,7 @@ class ManagerAdmin(admin.ModelAdmin):
         "id",
         "name",
         "phone_display",
+        "projetos_badges",
         "is_active",
         "is_active_resume_agenda",
         "is_active_for_meetings",
@@ -145,17 +146,23 @@ class ManagerAdmin(admin.ModelAdmin):
     )
     list_filter = (
         "is_active",
+        "is_active_resume_agenda",
+        "is_active_for_meetings",
+        "projeto",
         "notification_subscriptions__is_active",
         "notification_subscriptions__notification_type",
     )
     search_fields = (
         "name",
         "phone_e164",
+        "id_responsavel_farmbox",
+        "projeto__nome",  # ajuste se o campo do Projeto tiver outro nome
         "notification_subscriptions__notification_type__code",
         "notification_subscriptions__notification_type__name",
     )
     ordering = ("name",)
     inlines = [ManagerNotificationSubscriptionInline]
+    filter_horizontal = ("projeto",)
 
     class Media:
         js = ("opscheckin/admin_phone_mask.js",)
@@ -163,6 +170,7 @@ class ManagerAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         qs = qs.prefetch_related(
+            "projeto",
             "notification_subscriptions__notification_type",
             "checkins",
         ).annotate(
@@ -173,12 +181,41 @@ class ManagerAdmin(admin.ModelAdmin):
             )
         )
         return qs
-    
+
     def phone_display(self, obj):
         return format_phone_br(obj.phone_e164)
 
     phone_display.short_description = "Telefone"
     phone_display.admin_order_field = "phone_e164"
+
+    def projetos_badges(self, obj):
+        projetos = obj.projeto.all().order_by("nome")  # ajuste se não for "nome"
+        if not projetos:
+            return "-"
+
+        return format_html(
+            "".join(
+                (
+                    '<span style="'
+                    'display:inline-block;'
+                    'margin:2px 6px 2px 0;'
+                    'padding:4px 10px;'
+                    'border-radius:999px;'
+                    'background:#E8F0FE;'
+                    'color:#1A73E8;'
+                    'font-size:12px;'
+                    'font-weight:600;'
+                    'line-height:1.4;'
+                    'white-space:nowrap;'
+                    '">'
+                    "{}"
+                    "</span>"
+                ).format(p.nome)  # ajuste se não for "nome"
+                for p in projetos
+            )
+        )
+
+    projetos_badges.short_description = "Projetos"
 
     def notification_codes(self, obj):
         subs = obj.notification_subscriptions.select_related("notification_type").order_by(
@@ -196,7 +233,11 @@ class ManagerAdmin(admin.ModelAdmin):
     notification_codes.short_description = "Notificações"
 
     def notifications_count(self, obj):
-        return getattr(obj, "notifications_total", obj.notification_subscriptions.filter(is_active=True).count())
+        return getattr(
+            obj,
+            "notifications_total",
+            obj.notification_subscriptions.filter(is_active=True).count(),
+        )
 
     notifications_count.short_description = "Qtd. notif."
 
@@ -205,10 +246,14 @@ class ManagerAdmin(admin.ModelAdmin):
         if not last:
             return "-"
         url = reverse("admin:opscheckin_dailycheckin_change", args=[last.id])
-        return format_html('<a href="{}">{} ({})</a>', url, last.date, last.questions.count())
+        return format_html(
+            '<a href="{}">{} ({})</a>',
+            url,
+            last.date,
+            last.questions.count(),
+        )
 
     last_checkin_link.short_description = "Último check-in"
-
 
 @admin.register(NotificationType)
 class NotificationTypeAdmin(admin.ModelAdmin):
