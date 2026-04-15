@@ -257,7 +257,7 @@ class KMLMergeJob(models.Model):
     download_email_sent_at = models.DateTimeField(blank=True, null=True)
     
     
-    visitor_ip = models.GenericIPAddressField(null=True, blank=True)
+    visitor_ip = models.GenericIPAddressField(null=True, blank=True, db_index=True)
     visitor_country = models.CharField(max_length=2, null=True, blank=True, db_index=True)
     visitor_country_name = models.CharField(max_length=64, null=True, blank=True)
 
@@ -265,6 +265,11 @@ class KMLMergeJob(models.Model):
         indexes = [
             models.Index(fields=["user", "-created_at"]),
             models.Index(fields=["request_id"]),
+            models.Index(fields=["-created_at", "-id"]),
+            models.Index(fields=["anon_id"]),
+            models.Index(fields=["visitor_ip"]),
+            models.Index(fields=["plan"]),
+            models.Index(fields=["visitor_country"]),
         ]
 
     def __str__(self):

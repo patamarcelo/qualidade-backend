@@ -9,6 +9,7 @@ from .models import BillingProfile, WeeklyUsage, KMLMergeJob, MergeFeedback, Unl
 from django.db.models import OuterRef, Subquery, IntegerField, Value, Case, When, F,  CharField, Count, Sum, TextField
 from django.db.models.functions import Coalesce, Trim, Cast
 from django.db.models.expressions import Func
+from django.db.models import Count
 
 
 
@@ -266,6 +267,9 @@ class WeeklyUsageAdmin(admin.ModelAdmin):
 # =========================
 @admin.register(KMLMergeJob)
 class KMLMergeJobAdmin(admin.ModelAdmin):
+    show_full_result_count = False
+    list_per_page = 100
+    
     list_display = (
         "created_at",
         "user_email",
@@ -394,82 +398,86 @@ class KMLMergeJobAdmin(admin.ModelAdmin):
     )
 
     def get_queryset(self, request):
-        qs = super().get_queryset(request).select_related("user")
+        request._kml_admin_anon_counts = {}
+        request._kml_admin_ip_counts = {}
 
-        qs = qs.annotate(
-            visitor_ip_normalized_annotated=Trim(
-                SplitPart(
-                    Cast(F("visitor_ip"), TextField()),
-                    Value(","),
-                    Value(1),
-                )
+        return (
+            super()
+            .get_queryset(request)
+            .select_related("user")
+            .defer(
+                "metrics",
+                "input_filenames",
+                "input_storage_paths",
+                "storage_path",
+                "meta_storage_path",
             )
         )
 
-        anon_count_subquery = (
-            KMLMergeJob.objects
-            .filter(anon_id=OuterRef("anon_id"))
-            .exclude(anon_id__isnull=True)
-            .exclude(anon_id="")
-            .values("anon_id")
-            .annotate(total=Count("id"))
-            .values("total")[:1]
-        )
+    def changelist_view(self, request, extra_context=None):
+        response = super().changelist_view(request, extra_context=extra_context)
 
-        ip_count_subquery = (
-            KMLMergeJob.objects
-            .annotate(
-                visitor_ip_normalized_inner=Trim(
-                    SplitPart(
-                        Cast(F("visitor_ip"), TextField()),
-                        Value(","),
-                        Value(1),
-                    )
+        try:
+            cl = response.context_data["cl"]
+            result_list = list(cl.result_list)
+        except Exception:
+            return response
+
+        anon_ids = sorted({
+            obj.anon_id for obj in result_list
+            if obj.anon_id
+        })
+
+        visitor_ips = sorted({
+            obj.visitor_ip for obj in result_list
+            if obj.visitor_ip
+        })
+
+        anon_counts = {}
+        if anon_ids:
+            anon_counts = {
+                row["anon_id"]: row["total"]
+                for row in (
+                    KMLMergeJob.objects
+                    .filter(anon_id__in=anon_ids)
+                    .values("anon_id")
+                    .annotate(total=Count("id"))
                 )
-            )
-            .filter(visitor_ip_normalized_inner=OuterRef("visitor_ip_normalized_annotated"))
-            .exclude(visitor_ip__isnull=True)
-            .values("visitor_ip_normalized_inner")
-            .annotate(total=Count("id"))
-            .values("total")[:1]
-        )
+            }
 
-        return qs.annotate(
-            anon_id_total_jobs_annotated=Coalesce(
-                Subquery(anon_count_subquery, output_field=IntegerField()),
-                Value(0),
-            ),
-            visitor_ip_total_jobs_annotated=Coalesce(
-                Subquery(ip_count_subquery, output_field=IntegerField()),
-                Value(0),
-            ),
-        )
+        ip_counts = {}
+        if visitor_ips:
+            ip_counts = {
+                row["visitor_ip"]: row["total"]
+                for row in (
+                    KMLMergeJob.objects
+                    .filter(visitor_ip__in=visitor_ips)
+                    .values("visitor_ip")
+                    .annotate(total=Count("id"))
+                )
+            }
+
+        for obj in result_list:
+            obj._anon_id_total_jobs = anon_counts.get(obj.anon_id, 0)
+            obj._visitor_ip_total_jobs = ip_counts.get(obj.visitor_ip, 0)
+
+        cl.result_list = result_list
+        return response
+    
 
     def user_email(self, obj):
         return obj.user.email if obj.user else "—"
-
     user_email.short_description = "Email"
     user_email.admin_order_field = "user__email"
 
     def anon_id_total_jobs(self, obj):
-        return obj.anon_id_total_jobs_annotated
-
+        return getattr(obj, "_anon_id_total_jobs", 0)
     anon_id_total_jobs.short_description = "Merges / anon_id"
-    anon_id_total_jobs.admin_order_field = "anon_id_total_jobs_annotated"
-
-    def visitor_ip_normalized(self, obj):
-        return obj.visitor_ip_normalized_annotated or "—"
-
-    visitor_ip_normalized.short_description = "IP normalizado"
-    visitor_ip_normalized.admin_order_field = "visitor_ip_normalized_annotated"
 
     def visitor_ip_total_jobs(self, obj):
-        return obj.visitor_ip_total_jobs_annotated
-
+        return getattr(obj, "_visitor_ip_total_jobs", 0)
     visitor_ip_total_jobs.short_description = "Merges / IP"
-    visitor_ip_total_jobs.admin_order_field = "visitor_ip_total_jobs_annotated"
-    
-    
+
 @admin.register(MergeFeedback)
 class MergeFeedbackAdmin(admin.ModelAdmin):
     list_display = ("id", "user", "merge_job", "source", "created_at")
