@@ -898,7 +898,7 @@ class Plantio(Base):
         return f"{self.talhao.id_talhao} | {self.talhao.fazenda.nome} | {self.safra}-{self.ciclo} | {str(self.area_colheita)}"
 
 class PlantioExtratoArea(Base):
-    plantio = models.ForeignKey(Plantio,on_delete=models.PROTECT)
+    plantio = models.ForeignKey(Plantio, on_delete=models.PROTECT)
 
     area_plantada = models.DecimalField(
         "Area plantada",
@@ -919,59 +919,120 @@ class PlantioExtratoArea(Base):
         default=False,
         help_text="Apontar caso o Plantio esteja aguardando a chuva",
     )
-    
+
     finalizado_plantio = models.BooleanField(
         "Plantio da parcela finalizado",
         default=False,
         help_text="Informar se o plantio da parcela encerrou",
     )
 
+    # =========================
+    # KML / Geometria
+    # =========================
+    kml_file = models.FileField(
+        "Arquivo KML",
+        upload_to="plantio_extrato_area/kml/",
+        blank=True,
+        null=True,
+    )
+
+    kml_name = models.CharField(
+        "Nome do KML",
+        max_length=255,
+        blank=True,
+        null=True,
+    )
+
+    kml_content = models.TextField(
+        "Conteúdo do KML",
+        blank=True,
+        null=True,
+    )
+
+    kml_points = models.JSONField(
+        "Pontos do KML",
+        blank=True,
+        null=True,
+        default=list,
+        help_text="Lista normalizada de pontos no formato [{'lat': ..., 'lng': ...}]",
+    )
+
+    kml_area_m2 = models.DecimalField(
+        "Área do KML (m²)",
+        max_digits=14,
+        decimal_places=2,
+        blank=True,
+        null=True,
+    )
+
+    kml_perimeter_m = models.DecimalField(
+        "Perímetro do KML (m)",
+        max_digits=14,
+        decimal_places=2,
+        blank=True,
+        null=True,
+    )
+
+    kml_is_closed = models.BooleanField(
+        "Geometria fechada",
+        default=True,
+    )
+
+    def has_kml(self):
+        return bool(self.kml_points)
+
+    has_kml.boolean = True
+    has_kml.short_description = "KML"
+
     def save(self, *args, **kwargs):
-        
-        if self.ativo == True:
-            print('Extrato ativo')
+        if self.ativo is True:
             plantio = self.plantio
             area_informada = self.area_plantada if self.area_plantada else 0
+
             if self.pk:
-                total_area = PlantioExtratoArea.objects.filter(plantio=plantio, ativo=True).exclude(pk=self.pk).aggregate(
+                total_area = PlantioExtratoArea.objects.filter(
+                    plantio=plantio,
+                    ativo=True
+                ).exclude(pk=self.pk).aggregate(
                     total_area_plantada=Sum("area_plantada")
-                )['total_area_plantada'] or 0
+                )["total_area_plantada"] or 0
             else:
-                # For new instances, include all areas
-                total_area = PlantioExtratoArea.objects.filter(plantio=plantio, ativo=True).aggregate(
+                total_area = PlantioExtratoArea.objects.filter(
+                    plantio=plantio,
+                    ativo=True
+                ).aggregate(
                     total_area_plantada=Sum("area_plantada")
-                )['total_area_plantada'] or 0
-            
-            # print("Plantio to update: ", plantio)
-            # print('salvando area plantada para o plantio', total_area)
-            # print('area informada: ', self.area_plantada)
+                )["total_area_plantada"] or 0
+
             if self.finalizado_plantio:
                 plantio.area_colheita = plantio.area_planejamento_plantio
                 plantio.finalizado_plantio = True
-                if self.area_plantada:
-                    pass
-                else:
+                if not self.area_plantada:
                     self.area_plantada = plantio.area_planejamento_plantio - total_area
-                
             else:
                 plantio.area_colheita = total_area + area_informada
+
             plantio.inicializado_plantio = True
-            
-            # if data plantio is NONE, ADD DATA PLANTIO AND GENERATE PROGRAM
+
             if plantio.data_plantio is None:
-                print('plantio sem data até o momento ', plantio.data_plantio)
-                print('Nova data plantio: ', self.data_plantio)
                 plantio.data_plantio = self.data_plantio
+
             plantio.save()
-        super(PlantioExtratoArea, self).save(*args, **kwargs)
+
+        super().save(*args, **kwargs)
 
     def __str__(self):
-        return f'{self.plantio.talhao.fazenda.nome} | {self.plantio.talhao.id_talhao} | {self.plantio.safra}-{self.plantio.ciclo} | {str(self.area_plantada)}'
+        return (
+            f"{self.plantio.talhao.fazenda.nome} | "
+            f"{self.plantio.talhao.id_talhao} | "
+            f"{self.plantio.safra}-{self.plantio.ciclo} | "
+            f"{str(self.area_plantada)}"
+        )
 
     class Meta:
-        ordering = ["data_plantio", 'plantio']
-        verbose_name = 'Extrato do Plantio'
-        verbose_name_plural = 'Extrato dos Plantios'
+        ordering = ["data_plantio", "plantio"]
+        verbose_name = "Extrato do Plantio"
+        verbose_name_plural = "Extrato dos Plantios"
 
 
 class ColheitaPlantioExtratoArea(Base):

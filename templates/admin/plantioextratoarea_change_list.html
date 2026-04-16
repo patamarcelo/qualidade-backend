@@ -1,0 +1,757 @@
+{% extends "admin/change_list.html" %}
+{% load static %}
+
+{% block extrahead %}
+    {{ block.super }}
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <style>
+        .fp-template-loaded {
+            background: linear-gradient(135deg, #0f172a, #1e293b);
+            color: #fff;
+            padding: 14px 18px;
+            border-radius: 18px;
+            margin-bottom: 16px;
+            font-size: 18px;
+            font-weight: 700;
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
+        }
+
+        #changelist {
+            background: #f8fafc;
+            border-radius: 24px;
+            padding: 14px;
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+        }
+
+        #changelist table thead th {
+            background: #ffffff;
+            border-bottom: 1px solid #e2e8f0;
+            padding-top: 12px;
+            padding-bottom: 12px;
+        }
+
+        #changelist table tbody td {
+            vertical-align: middle;
+            padding-top: 14px;
+            padding-bottom: 14px;
+        }
+
+        #changelist table tbody tr {
+            transition: all .18s ease;
+        }
+
+        #changelist table tbody tr:hover {
+            background: #f8fbff !important;
+        }
+
+        .fp-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 28px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            line-height: 1;
+            white-space: nowrap;
+            margin-right: 6px;
+            margin-bottom: 4px;
+        }
+
+        .fp-row-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .fp-preview-btn,
+        .fp-kml-btn,
+        .fp-edit-btn {
+            border-radius: 999px !important;
+            padding: 7px 14px !important;
+            font-weight: 600 !important;
+            border: 1px solid #dbe3ee !important;
+            background: #fff !important;
+            box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
+            cursor: pointer;
+            text-decoration: none !important;
+            color: #0f172a !important;
+        }
+
+        .fp-preview-btn:hover,
+        .fp-kml-btn:hover,
+        .fp-edit-btn:hover {
+            background: #f8fafc !important;
+            border-color: #cbd5e1 !important;
+        }
+
+        .fp-mini-map {
+            width: 82px;
+            height: 62px;
+            border-radius: 14px;
+            background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+            border: 1px solid #dbe3ee;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .fp-mini-map svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .fp-drawer-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.28);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            z-index: 9998;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity .25s ease;
+        }
+
+        .fp-drawer-backdrop.open {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .fp-drawer {
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            bottom: 16px;
+            width: min(720px, calc(100vw - 32px));
+            background: rgba(255, 255, 255, 0.94);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border: 1px solid rgba(255, 255, 255, 0.55);
+            border-radius: 30px;
+            box-shadow: 0 20px 60px rgba(2, 6, 23, 0.25);
+            z-index: 9999;
+            transform: translateX(105%);
+            transition: transform .28s ease;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .fp-drawer.open {
+            transform: translateX(0);
+        }
+
+        .fp-drawer-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 20px 22px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+        }
+
+        .fp-drawer-title {
+            font-size: 24px;
+            font-weight: 800;
+            color: #0f172a;
+            margin: 0;
+            line-height: 1.15;
+        }
+
+        .fp-drawer-subtitle {
+            font-size: 14px;
+            color: #64748b;
+            margin-top: 6px;
+        }
+
+        .fp-drawer-header-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .fp-drawer-header-btn {
+            border: 1px solid #dbe3ee;
+            background: #fff;
+            color: #0f172a;
+            border-radius: 999px;
+            padding: 8px 14px;
+            font-size: 13px;
+            font-weight: 700;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .fp-drawer-close {
+            border: 0;
+            background: rgba(15, 23, 42, 0.06);
+            width: 40px;
+            height: 40px;
+            border-radius: 999px;
+            cursor: pointer;
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        .fp-drawer-body {
+            padding: 20px 22px 22px;
+            overflow: auto;
+            display: grid;
+            gap: 18px;
+        }
+
+        .fp-drawer-map {
+            height: 430px;
+            border-radius: 24px;
+            overflow: hidden;
+            border: 1px solid rgba(148, 163, 184, 0.20);
+            background: #e5e7eb;
+        }
+
+        .fp-info-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .fp-info-card {
+            background: rgba(255, 255, 255, 0.86);
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            border-radius: 18px;
+            padding: 14px;
+        }
+
+        .fp-info-label {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            color: #64748b;
+            margin-bottom: 6px;
+        }
+
+        .fp-info-value {
+            font-size: 16px;
+            font-weight: 800;
+            color: #0f172a;
+        }
+
+        .fp-observation,
+        .fp-coords-box {
+            background: rgba(255, 255, 255, 0.86);
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            border-radius: 18px;
+            padding: 14px;
+            color: #334155;
+        }
+
+        .fp-section-title {
+            font-size: 14px;
+            font-weight: 800;
+            color: #0f172a;
+            margin-bottom: 10px;
+        }
+
+        .fp-coords-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .fp-coords-table th,
+        .fp-coords-table td {
+            padding: 8px 10px;
+            border-bottom: 1px solid #e2e8f0;
+            text-align: left;
+            font-size: 13px;
+        }
+
+        .fp-coords-table th {
+            color: #64748b;
+            font-weight: 700;
+        }
+
+        .fp-coords-scroll {
+            max-height: 220px;
+            overflow: auto;
+        }
+
+        .fp-toggle-coords {
+            border: 1px solid #dbe3ee;
+            background: #fff;
+            border-radius: 999px;
+            padding: 7px 12px;
+            cursor: pointer;
+            font-weight: 700;
+        }
+
+        .fp-inline-statuses {
+            margin-top: 10px;
+        }
+
+        @media (max-width: 900px) {
+            .fp-info-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .fp-drawer {
+                width: calc(100vw - 16px);
+                right: 8px;
+                top: 8px;
+                bottom: 8px;
+            }
+        }
+
+
+        
+        .fp-row-actions {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: flex-start !important;
+            gap: 8px !important;
+            flex-wrap: nowrap !important;
+            white-space: nowrap !important;
+        }
+
+        .fp-row-actions .fp-preview-btn,
+        .fp-row-actions .fp-kml-btn,
+        .fp-row-actions .fp-edit-btn,
+        .fp-row-actions a,
+        .fp-row-actions button {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            width: auto !important;
+            min-width: unset !important;
+            max-width: none !important;
+            flex: 0 0 auto !important;
+            white-space: nowrap !important;
+            vertical-align: middle !important;
+            margin: 0 !important;
+        }
+
+        .fp-preview-btn,
+        .fp-kml-btn,
+        .fp-edit-btn {
+            border-radius: 999px !important;
+            padding: 7px 14px !important;
+            font-weight: 600 !important;
+            border: 1px solid #dbe3ee !important;
+            background: #fff !important;
+            box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
+            cursor: pointer;
+            text-decoration: none !important;
+            color: #0f172a !important;
+            line-height: 1.1 !important;
+        }
+
+        .fp-preview-btn:hover,
+        .fp-kml-btn:hover,
+        .fp-edit-btn:hover {
+            background: #f8fafc !important;
+            border-color: #cbd5e1 !important;
+        }
+
+        #changelist table tbody td .fp-row-actions {
+            display: inline-flex !important;
+        }
+
+    </style>
+{% endblock %}
+
+{% block content %}
+    
+    {{ block.super }}
+
+    <div id="fpDrawerBackdrop" class="fp-drawer-backdrop"></div>
+
+    <aside id="fpDrawer" class="fp-drawer" aria-hidden="true">
+        <div class="fp-drawer-header">
+            <div style="flex:1;">
+                <h3 id="fpDrawerTitle" class="fp-drawer-title">Preview</h3>
+                <div id="fpDrawerSubtitle" class="fp-drawer-subtitle"></div>
+                <div id="fpDrawerStatuses" class="fp-inline-statuses"></div>
+            </div>
+
+            <div class="fp-drawer-header-actions">
+                <a id="fpDrawerEditBtn" href="#" class="fp-drawer-header-btn">Editar</a>
+                <a id="fpDrawerKmlBtn" href="#" class="fp-drawer-header-btn">KML</a>
+                <button type="button" id="fpToggleCoords" class="fp-drawer-header-btn">Coordenadas</button>
+                <button type="button" id="fpDrawerClose" class="fp-drawer-close">✕</button>
+            </div>
+        </div>
+
+        <div class="fp-drawer-body">
+            <div id="fpDrawerMap" class="fp-drawer-map"></div>
+
+            <div class="fp-info-grid">
+                <div class="fp-info-card">
+                    <div class="fp-info-label">Área</div>
+                    <div id="fpInfoArea" class="fp-info-value">-</div>
+                </div>
+
+                <div class="fp-info-card">
+                    <div class="fp-info-label">Perímetro</div>
+                    <div id="fpInfoPerimeter" class="fp-info-value">-</div>
+                </div>
+
+                <div class="fp-info-card">
+                    <div class="fp-info-label">Qtd. pontos</div>
+                    <div id="fpInfoPoints" class="fp-info-value">-</div>
+                </div>
+
+                <div class="fp-info-card">
+                    <div class="fp-info-label">Modo</div>
+                    <div id="fpInfoMode" class="fp-info-value">-</div>
+                </div>
+
+                <div class="fp-info-card">
+                    <div class="fp-info-label">Fechamento</div>
+                    <div id="fpInfoClosed" class="fp-info-value">-</div>
+                </div>
+
+                <div class="fp-info-card">
+                    <div class="fp-info-label">Status</div>
+                    <div id="fpInfoActive" class="fp-info-value">-</div>
+                </div>
+            </div>
+
+            <div id="fpObservationWrap" class="fp-observation" style="display:none;">
+                <div class="fp-section-title">Observação</div>
+                <div id="fpObservationText"></div>
+            </div>
+
+            <div id="fpCoordsWrap" class="fp-coords-box" style="display:none;">
+                <div class="fp-section-title">Coordenadas</div>
+                <div class="fp-coords-scroll">
+                    <table class="fp-coords-table">
+                        <thead>
+                            <tr>
+                                <th>Ponto</th>
+                                <th>Latitude</th>
+                                <th>Longitude</th>
+                            </tr>
+                        </thead>
+                        <tbody id="fpCoordsTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <script>
+        (function () {
+            let drawerMap = null;
+            let drawerLayerGroup = null;
+
+            function normalizePoints(points) {
+                if (!Array.isArray(points)) return [];
+                return points
+                    .map((p) => {
+                        const lat = p.lat ?? p.latitude;
+                        const lng = p.lng ?? p.longitude ?? p.lon;
+                        if (lat == null || lng == null) return null;
+                        return {
+                            lat: Number(lat),
+                            lng: Number(lng),
+                        };
+                    })
+                    .filter(Boolean);
+            }
+
+            function formatArea(areaM2) {
+                if (!areaM2) return "-";
+                const ha = areaM2 / 10000;
+                return `${ha.toFixed(2)} ha`;
+            }
+
+            function formatPerimeter(perimeterM) {
+                if (!perimeterM) return "-";
+                return `${Number(perimeterM).toFixed(2)} m`;
+            }
+
+            function initSatelliteMap(el) {
+                const map = L.map(el, {
+                    zoomControl: true,
+                    attributionControl: true,
+                });
+
+                L.tileLayer(
+                    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+                    {
+                        maxZoom: 19,
+                        attribution: "Tiles © Esri",
+                    }
+                ).addTo(map);
+
+                return map;
+            }
+
+            function drawPolygonOnMap(map, layerGroup, data) {
+                const pts = normalizePoints(data.points);
+                const latlngs = pts.map((p) => [p.lat, p.lng]);
+
+                layerGroup.clearLayers();
+
+                if (!latlngs.length) {
+                    map.setView([-14.235, -51.9253], 4);
+                    return;
+                }
+
+                if (data.is_closed && latlngs.length >= 3) {
+                    const polygon = L.polygon(latlngs, {
+                        color: "#2563eb",
+                        weight: 2.5,
+                        fillColor: "#3b82f6",
+                        fillOpacity: 0.22,
+                    }).addTo(layerGroup);
+
+                    latlngs.forEach((latlng, index) => {
+                        L.circleMarker(latlng, {
+                            radius: 4,
+                            color: "#0f172a",
+                            weight: 1,
+                            fillColor: "#ffffff",
+                            fillOpacity: 1,
+                        }).addTo(layerGroup).bindTooltip(`P${index + 1}`);
+                    });
+
+                    map.fitBounds(polygon.getBounds(), { padding: [24, 24] });
+                } else {
+                    const polyline = L.polyline(latlngs, {
+                        color: "#2563eb",
+                        weight: 3,
+                    }).addTo(layerGroup);
+
+                    latlngs.forEach((latlng, index) => {
+                        L.circleMarker(latlng, {
+                            radius: 4,
+                            color: "#0f172a",
+                            weight: 1,
+                            fillColor: "#ffffff",
+                            fillOpacity: 1,
+                        }).addTo(layerGroup).bindTooltip(`P${index + 1}`);
+                    });
+
+                    map.fitBounds(polyline.getBounds(), { padding: [24, 24] });
+                }
+            }
+
+            function buildMiniMap(el) {
+                const raw = el.dataset.points || "[]";
+                const isClosed = el.dataset.closed === "true";
+                let points = [];
+
+                try {
+                    points = JSON.parse(raw);
+                } catch (e) {
+                    points = [];
+                }
+
+                const pts = normalizePoints(points);
+                if (!pts.length) {
+                    el.innerHTML = '<span style="font-size:11px;color:#64748b;">sem pontos</span>';
+                    return;
+                }
+
+                const lats = pts.map(p => p.lat);
+                const lngs = pts.map(p => p.lng);
+
+                const minLat = Math.min(...lats);
+                const maxLat = Math.max(...lats);
+                const minLng = Math.min(...lngs);
+                const maxLng = Math.max(...lngs);
+
+                const pad = 6;
+                const w = 82;
+                const h = 62;
+
+                const latRange = (maxLat - minLat) || 1;
+                const lngRange = (maxLng - minLng) || 1;
+
+                const mapped = pts.map((p) => {
+                    const x = pad + ((p.lng - minLng) / lngRange) * (w - pad * 2);
+                    const y = h - (pad + ((p.lat - minLat) / latRange) * (h - pad * 2));
+                    return [x, y];
+                });
+
+                const d = mapped.map((p, i) => `${i === 0 ? "M" : "L"} ${p[0].toFixed(2)} ${p[1].toFixed(2)}`).join(" ");
+                const close = isClosed ? " Z" : "";
+
+                el.innerHTML = `
+                    <svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="0" y="0" width="${w}" height="${h}" fill="#eef2f7"></rect>
+                        <path d="${d}${close}" fill="${isClosed ? "rgba(59,130,246,0.18)" : "none"}" stroke="#2563eb" stroke-width="2.2" stroke-linejoin="round" />
+                        ${mapped.map((p) => `<circle cx="${p[0].toFixed(2)}" cy="${p[1].toFixed(2)}" r="2.4" fill="#0f172a" stroke="#fff" stroke-width="1" />`).join("")}
+                    </svg>
+                `;
+            }
+
+            function openDrawer() {
+                const drawer = document.getElementById("fpDrawer");
+                const backdrop = document.getElementById("fpDrawerBackdrop");
+                if (!drawer || !backdrop) return;
+
+                drawer.classList.add("open");
+                backdrop.classList.add("open");
+                drawer.setAttribute("aria-hidden", "false");
+
+                setTimeout(() => {
+                    if (drawerMap) drawerMap.invalidateSize();
+                }, 300);
+            }
+
+            function closeDrawer() {
+                const drawer = document.getElementById("fpDrawer");
+                const backdrop = document.getElementById("fpDrawerBackdrop");
+                if (!drawer || !backdrop) return;
+
+                drawer.classList.remove("open");
+                backdrop.classList.remove("open");
+                drawer.setAttribute("aria-hidden", "true");
+            }
+
+            function badgeHtml(label, bg, color) {
+                return `<span class="fp-badge" style="background:${bg};color:${color};">${label}</span>`;
+            }
+
+            function fillCoordsTable(points) {
+                const body = document.getElementById("fpCoordsTableBody");
+                if (!body) return;
+
+                const pts = normalizePoints(points);
+
+                body.innerHTML = pts.map((p, i) => `
+                    <tr>
+                        <td>P${i + 1}</td>
+                        <td>${p.lat.toFixed(7)}</td>
+                        <td>${p.lng.toFixed(7)}</td>
+                    </tr>
+                `).join("");
+            }
+
+            function fillDrawerInfo(data) {
+                const title = document.getElementById("fpDrawerTitle");
+                const subtitle = document.getElementById("fpDrawerSubtitle");
+                const statuses = document.getElementById("fpDrawerStatuses");
+
+                const area = document.getElementById("fpInfoArea");
+                const perimeter = document.getElementById("fpInfoPerimeter");
+                const points = document.getElementById("fpInfoPoints");
+                const mode = document.getElementById("fpInfoMode");
+                const closed = document.getElementById("fpInfoClosed");
+                const active = document.getElementById("fpInfoActive");
+
+                const obsWrap = document.getElementById("fpObservationWrap");
+                const obsText = document.getElementById("fpObservationText");
+
+                const editBtn = document.getElementById("fpDrawerEditBtn");
+                const kmlBtn = document.getElementById("fpDrawerKmlBtn");
+
+                if (title) title.textContent = data.name || "Preview";
+                if (subtitle) subtitle.textContent = `${data.farm_name || "Sem fazenda"} • ${data.user_name || "Sem usuário"}`;
+
+                if (statuses) {
+                    statuses.innerHTML = [
+                        badgeHtml(data.mode || "-", "#2563eb15", "#2563eb"),
+                        data.is_closed
+                            ? badgeHtml("Fechado", "#16a34a15", "#16a34a")
+                            : badgeHtml("Aberto", "#f59e0b15", "#b45309"),
+                        data.is_active
+                            ? badgeHtml("Ativo", "#16a34a15", "#16a34a")
+                            : badgeHtml("Inativo", "#ef444415", "#b91c1c")
+                    ].join(" ");
+                }
+
+                if (area) area.textContent = formatArea(data.area_m2);
+                if (perimeter) perimeter.textContent = formatPerimeter(data.perimeter_m);
+                if (points) points.textContent = Array.isArray(data.points) ? data.points.length : "-";
+                if (mode) mode.textContent = data.mode || "-";
+                if (closed) closed.textContent = data.is_closed ? "Fechado" : "Aberto";
+                if (active) active.textContent = data.is_active ? "Ativo" : "Inativo";
+
+                if (data.observation) {
+                    obsWrap.style.display = "block";
+                    obsText.textContent = data.observation;
+                } else {
+                    obsWrap.style.display = "none";
+                    obsText.textContent = "";
+                }
+
+                if (editBtn && data.edit_url) editBtn.href = data.edit_url;
+                if (kmlBtn && data.kml_url) kmlBtn.href = data.kml_url;
+
+                fillCoordsTable(data.points || []);
+            }
+
+            async function handlePreviewClick(url) {
+                try {
+                    const response = await fetch(url, {
+                        headers: {
+                            "X-Requested-With": "XMLHttpRequest",
+                        },
+                    });
+
+                    if (!response.ok) {
+                        throw new Error("Falha ao carregar preview");
+                    }
+
+                    const data = await response.json();
+
+                    fillDrawerInfo(data);
+
+                    const mapEl = document.getElementById("fpDrawerMap");
+                    if (!mapEl) return;
+
+                    if (!drawerMap) {
+                        drawerMap = initSatelliteMap(mapEl);
+                        drawerLayerGroup = L.layerGroup().addTo(drawerMap);
+                    }
+
+                    drawPolygonOnMap(drawerMap, drawerLayerGroup, data);
+                    openDrawer();
+                } catch (error) {
+                    console.error(error);
+                    alert("Não foi possível carregar o preview do polígono.");
+                }
+            }
+
+            document.addEventListener("click", function (event) {
+                const previewBtn = event.target.closest(".fp-preview-btn");
+                if (previewBtn) {
+                    event.preventDefault();
+                    const url = previewBtn.dataset.previewUrl;
+                    if (url) handlePreviewClick(url);
+                }
+
+                if (
+                    event.target.id === "fpDrawerClose" ||
+                    event.target.id === "fpDrawerBackdrop"
+                ) {
+                    closeDrawer();
+                }
+
+                if (event.target.id === "fpToggleCoords") {
+                    const coordsWrap = document.getElementById("fpCoordsWrap");
+                    if (!coordsWrap) return;
+
+                    coordsWrap.style.display = coordsWrap.style.display === "none" ? "block" : "none";
+                }
+            });
+
+            document.addEventListener("keydown", function (event) {
+                if (event.key === "Escape") {
+                    closeDrawer();
+                }
+            });
+
+            document.addEventListener("DOMContentLoaded", function () {
+                document.querySelectorAll(".fp-mini-map").forEach(buildMiniMap);
+            });
+        })();
+    </script>
+{% endblock %}

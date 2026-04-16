@@ -16,14 +16,18 @@
 }
 
 .submit-row input {
-    display: block !important;  /* Ensure buttons are visible */
-    width: 100%;                /* Make buttons take full width */
-    margin-bottom: 10px;        /* Add spacing between buttons */
+    display: block !important;
+    /* Ensure buttons are visible */
+    width: 100%;
+    /* Make buttons take full width */
+    margin-bottom: 10px;
+    /* Add spacing between buttons */
 }
 
 @media (min-width: 768px) {
     .submit-row input {
-        width: auto;            /* For medium screens, restore default width */
+        width: auto;
+        /* For medium screens, restore default width */
     }
 }
 
@@ -32,19 +36,41 @@
 }
 
 .form-check .form-check-input {
-    margin-top: 0.3rem;  /* Adjust to vertically align checkbox */
+    margin-top: 0.3rem;
+    /* Adjust to vertically align checkbox */
 }
 
 .form-check .help-text {
-    margin-top: 0.5rem;  /* Ensure there is space between checkbox and help text */
+    margin-top: 0.5rem;
+    /* Ensure there is space between checkbox and help text */
 }
 
 .col-sm-4.p-1:has(.form-check-input.check-custom) {
     padding: 10px;
     display: flex;
-    flex-direction: row; 
+    flex-direction: row;
 }
 
-.check-custom + .help {
+.check-custom+.help {
     margin-top: 20px;
-  }
+}
+
+
+
+fieldset.kml-fieldset.collapsed .form-row,
+fieldset.kml-fieldset.collapsed .fieldBox,
+fieldset.kml-fieldset.collapsed .readonly,
+fieldset.kml-fieldset.collapsed .related-widget-wrapper,
+fieldset.kml-fieldset.collapsed .module,
+fieldset.kml-fieldset.collapsed .flex-container {
+    display: none !important;
+}
+
+
+#changelist table td,
+#changelist table th,
+#changelist table tbody td,
+#changelist table tbody th,
+#changelist table thead th {
+    vertical-align: middle !important;
+}

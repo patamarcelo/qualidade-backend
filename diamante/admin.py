@@ -4523,57 +4523,105 @@ def export_plantio_extrato(modeladmin, request, queryset):
         plantio = tuple(plantio_detail)
         writer.writerow(plantio)
     return response
+import json
+
+
 @admin.register(PlantioExtratoArea)
 class PlantioExtratoAreaAdmin(admin.ModelAdmin):
     form = PlantioExtratoAreaForm
-    actions =[export_plantio_extrato]
-    
-    
-    def save_model(self, request, obj, form, change):
-        # Se for edição de uma instância existente
-        if obj.pk and change:
-            previous = self.model.objects.get(pk=obj.pk)
+    change_list_template = "admin/plantioextratoarea_change_list.html"
+    actions = [export_plantio_extrato]
 
-            # Verifica se estava ativo e agora foi desativado
-            if previous.ativo and not obj.ativo:
-                total_area = self.model.objects.filter(
-                    plantio=obj.plantio, ativo=True
-                ).exclude(pk=obj.pk).aggregate(
-                    total_area_plantada=Sum("area_plantada")
-                )['total_area_plantada'] or 0
+    list_display = (
+        "talhao_description",
+        "get_data",
+        "safra_description",
+        "cultura_description",
+        "variedade_description",
+        "area_plantada",
+        "kml_badge",
+        "kml_area_ha_pretty",
+        "related_link",
+        "get_finalizado_plantio",
+        "ativo",
+        "row_actions",
+    )
 
-                if total_area > obj.plantio.area_planejamento_plantio:
-                    self.message_user(
-                        request,
-                        f"⚠️ A área total já apontada ({total_area:.2f}) excede a área planejada ({obj.plantio.area_planejamento_plantio:.2f}).",
-                        level=messages.WARNING
-                    )
-
-                # Exemplo de atualização
-                obj.plantio.area_colheita = min(total_area, obj.plantio.area_planejamento_plantio)
-                obj.plantio.save()
-
-        super().save_model(request, obj, form, change)
-    
-    
-    list_display = ("talhao_description", "get_data", "safra_description", "cultura_description", "variedade_description", "area_plantada","related_link", 'get_finalizado_plantio', 'ativo')
     autocomplete_fields = ["plantio"]
     raw_id_fields = ["plantio"]
-    readonly_fields = ("criados","modificado")
+
+    readonly_fields = (
+        "criados",
+        "modificado",
+        "kml_file_link",
+        "points_pretty",
+        "map_preview",
+        "kml_area_ha_pretty",
+        "kml_perimeter_pretty",
+    )
+
     ordering = ["-data_plantio"]
-    list_filter = ['aguardando_chuva', 'ativo','plantio__safra__safra', 'plantio__ciclo__ciclo', 'plantio__variedade__cultura']
+
+    list_filter = [
+        "aguardando_chuva",
+        "ativo",
+        "finalizado_plantio",
+        "kml_is_closed",
+        "plantio__safra__safra",
+        "plantio__ciclo__ciclo",
+        "plantio__variedade__cultura",
+    ]
+
     search_fields = [
-        "plantio__variedade__variedade", 
+        "plantio__variedade__variedade",
         "plantio__variedade__cultura__cultura",
         "plantio__talhao__fazenda__nome",
         "plantio__talhao__fazenda__fazenda__nome",
         "plantio__talhao__id_unico",
-        "data_plantio"
-        ]
-    
+        "kml_name",
+        "data_plantio",
+    ]
+
+    fieldsets = (
+        (
+            "Dados",
+            {
+                "fields": (
+                    "ativo",
+                    ("criados", "modificado"),
+                )
+            },
+        ),
+        (
+            "Plantio",
+            {
+                "fields": (
+                    "plantio",
+                    "data_plantio",
+                    "area_plantada",
+                    # "aguardando_chuva",
+                    "finalizado_plantio",
+                )
+            }
+        ),
+        (
+            "KML / Geometria",
+            {
+                "classes": ("collapse", "kml-fieldset"),
+                "fields": (
+                    "kml_upload",
+                    ("kml_file_link", "kml_name"),
+                    "map_preview",
+                    ("kml_area_ha_pretty", "kml_perimeter_pretty"),
+                    "points_pretty",
+                )
+            }
+        ),
+    )
+
     def get_queryset(self, request):
         return (
-            super(PlantioExtratoAreaAdmin, self)
+            super()
             .get_queryset(request)
             .select_related(
                 "plantio__talhao",
@@ -4584,107 +4632,266 @@ class PlantioExtratoAreaAdmin(admin.ModelAdmin):
                 "plantio__variedade__cultura",
             )
         )
-    
-    fieldsets = (
-        (
-            "Dados",
-            {
-                "fields": (
-                    ("ativo"),
-                    ("criados", 'modificado'),
-                )
-            },
-        ),
-        (
-            "Plantio",
-            {
-                'fields': (
-                    ("plantio",),
-                    ("data_plantio"),
-                    ("area_plantada"),
-                    # ("aguardando_chuva",),
-                    ("finalizado_plantio",)
-                )
-            }
-        ),
-    )
-    
-    def get_finalizado_plantio(self, obj):
-        if obj.finalizado_plantio:
-            return True
-        return False
 
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path(
+                "<int:obj_id>/preview-kml/",
+                self.admin_site.admin_view(self.preview_kml_view),
+                name="diamante_plantioextratoarea_preview_kml",
+            ),
+            path(
+                "<int:obj_id>/export-kml/",
+                self.admin_site.admin_view(self.export_kml_view),
+                name="diamante_plantioextratoarea_export_kml",
+            ),
+        ]
+        return custom_urls + urls
+
+    def save_model(self, request, obj, form, change):
+        if obj.pk and change:
+            previous = self.model.objects.get(pk=obj.pk)
+
+            if previous.ativo and not obj.ativo:
+                total_area = self.model.objects.filter(
+                    plantio=obj.plantio,
+                    ativo=True
+                ).exclude(pk=obj.pk).aggregate(
+                    total_area_plantada=Sum("area_plantada")
+                )["total_area_plantada"] or 0
+
+                if total_area > obj.plantio.area_planejamento_plantio:
+                    self.message_user(
+                        request,
+                        f"⚠️ A área total já apontada ({total_area:.2f}) excede a área planejada ({obj.plantio.area_planejamento_plantio:.2f}).",
+                        level=messages.WARNING
+                    )
+
+                obj.plantio.area_colheita = min(total_area, obj.plantio.area_planejamento_plantio)
+                obj.plantio.save()
+
+        super().save_model(request, obj, form, change)
+
+    def preview_kml_view(self, request, obj_id):
+        obj = self.get_object(request, obj_id)
+        if not obj:
+            return JsonResponse({"error": "Registro não encontrado"}, status=404)
+
+        return JsonResponse(
+            {
+                "id": obj.id,
+                "name": obj.kml_name or f"Plantio {obj.id}",
+                "farm_name": getattr(getattr(obj.plantio.talhao, "fazenda", None), "nome", "-"),
+                "user_name": str(obj.plantio),
+                "mode": "Polygon" if obj.kml_is_closed else "LineString",
+                "is_closed": obj.kml_is_closed,
+                "is_active": obj.ativo,
+                "area_m2": float(obj.kml_area_m2) if obj.kml_area_m2 is not None else None,
+                "perimeter_m": float(obj.kml_perimeter_m) if obj.kml_perimeter_m is not None else None,
+                "observation": (
+                    f"Talhão: {obj.plantio.talhao} • "
+                    f"Safra/Ciclo: {obj.plantio.safra.safra}-{obj.plantio.ciclo.ciclo}"
+                ),
+                "points": obj.kml_points or [],
+                "edit_url": reverse(
+                    f"admin:{obj._meta.app_label}_{obj._meta.model_name}_change",
+                    args=[obj.pk]
+                ),
+                "kml_url": reverse(
+                    "admin:diamante_plantioextratoarea_export_kml",
+                    args=[obj.pk]
+                ),
+            },
+            encoder=DjangoJSONEncoder,
+        )
+
+    def export_kml_view(self, request, obj_id):
+        obj = self.get_object(request, obj_id)
+        if not obj:
+            return HttpResponse("Registro não encontrado", status=404)
+
+        points = obj.kml_points or []
+        if not points:
+            return HttpResponse("Registro sem pontos KML", status=400)
+
+        coordinates = []
+        for p in points:
+            lng = p.get("lng") or p.get("longitude") or p.get("lon")
+            lat = p.get("lat") or p.get("latitude")
+            if lat is None or lng is None:
+                continue
+            coordinates.append(f"{lng},{lat},0")
+
+        if obj.kml_is_closed and coordinates and coordinates[0] != coordinates[-1]:
+            coordinates.append(coordinates[0])
+
+        geometry = (
+            "<Polygon><outerBoundaryIs><LinearRing><coordinates>"
+            + " ".join(coordinates)
+            + "</coordinates></LinearRing></outerBoundaryIs></Polygon>"
+            if obj.kml_is_closed
+            else "<LineString><coordinates>"
+            + " ".join(coordinates)
+            + "</coordinates></LineString>"
+        )
+
+        name = obj.kml_name or f"plantio_extrato_{obj.pk}"
+
+        kml = f'''<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>{name}</name>
+    <Placemark>
+      <name>{name}</name>
+      <description>Plantio: {obj.plantio}</description>
+      {geometry}
+    </Placemark>
+  </Document>
+</kml>'''
+
+        response = HttpResponse(kml, content_type="application/vnd.google-earth.kml+xml")
+        response["Content-Disposition"] = f'attachment; filename="{name}.kml"'
+        return response
+
+    def kml_badge(self, obj):
+        if obj.kml_points:
+            return format_html(
+                '<span style="background:#16a34a15;color:#16a34a;padding:4px 10px;border-radius:999px;font-weight:700;">Com KML</span>'
+            )
+        return format_html(
+            '<span style="background:#e5e7eb;color:#475569;padding:4px 10px;border-radius:999px;font-weight:700;">Sem KML</span>'
+        )
+    kml_badge.short_description = "KML"
+
+    def kml_points_count(self, obj):
+        return len(obj.kml_points or [])
+    kml_points_count.short_description = "Pontos"
+
+    def kml_area_ha_pretty(self, obj):
+        if not obj.kml_area_m2:
+            return "-"
+        return f"{float(obj.kml_area_m2) / 10000:.2f} ha"
+    kml_area_ha_pretty.short_description = "Área KML"
+
+    def kml_perimeter_pretty(self, obj):
+        if not obj.kml_perimeter_m:
+            return "-"
+        return f"{float(obj.kml_perimeter_m):.2f} m"
+    kml_perimeter_pretty.short_description = "Perímetro KML"
+
+    def points_pretty(self, obj):
+        return json.dumps(obj.kml_points or [], indent=2, ensure_ascii=False)
+    points_pretty.short_description = "Pontos formatados"
+    
+    def kml_file_link(self, obj):
+        if obj.kml_file:
+            return format_html('<a href="{}" target="_blank">Baixar arquivo salvo</a>', obj.kml_file.url)
+        return "-"
+    kml_file_link.short_description = "Arquivo KML salvo"
+
+    def row_actions(self, obj):
+        if not obj.pk or not obj.kml_points:
+            return "-"
+
+        preview_url = reverse("admin:diamante_plantioextratoarea_preview_kml", args=[obj.pk])
+        kml_url = reverse("admin:diamante_plantioextratoarea_export_kml", args=[obj.pk])
+        # edit_url = reverse(f"admin:{obj._meta.app_label}_{obj._meta.model_name}_change", args=[obj.pk])
+
+        return format_html(
+            '''
+            <div class="fp-row-actions">
+                <button type="button" class="button fp-preview-btn" data-preview-url="{}">Preview</button>
+                <a class="button fp-kml-btn" href="{}">Exportar KML</a>
+            </div>
+            ''',
+            preview_url,
+            kml_url,
+        )
+    row_actions.short_description = "Ações"
+
+    def map_preview(self, obj):
+        if not obj.pk:
+            return "Salve o objeto para visualizar o mapa."
+        if not obj.kml_points:
+            return "Nenhum KML importado para este registro."
+
+        preview_url = reverse("admin:diamante_plantioextratoarea_preview_kml", args=[obj.pk])
+        return format_html(
+            '''
+            <div class="fp-form-preview-wrap">
+                <div class="fp-form-preview-header" style="margin-bottom:10px;">
+                    <strong>Preview do KML</strong>
+                </div>
+                <div id="fp-form-map"
+                     class="fp-form-map"
+                     style="height:420px;border-radius:20px;overflow:hidden;border:1px solid #e2e8f0;"
+                     data-preview-url="{}"></div>
+            </div>
+            ''',
+            preview_url,
+        )
+    map_preview.short_description = "Mapa"
+
+    def get_finalizado_plantio(self, obj):
+        return bool(obj.finalizado_plantio)
     get_finalizado_plantio.boolean = True
     get_finalizado_plantio.short_description = "Plantio Fin."
-    
+
     def talhao_description(self, obj):
         return obj.plantio.talhao
-    talhao_description.short_description = 'Talhão'
-    
+    talhao_description.short_description = "Talhão"
+
     def related_link(self, obj):
         if obj.plantio:
-            url = reverse('admin:diamante_plantio_change', args=[obj.plantio.id])
+            url = reverse("admin:diamante_plantio_change", args=[obj.plantio.id])
             return format_html('<a href="{}">{}</a>', url, obj.plantio)
         return "-"
     related_link.short_description = "Plantio"
 
-    
     def get_data(self, obj):
         if obj.data_plantio:
-            return date_format(
-                obj.data_plantio, format="SHORT_DATE_FORMAT", use_l10n=True
-            )
-        else:
-            return " - "
-
+            return date_format(obj.data_plantio, "d/m/Y")
+        return "-"
     get_data.short_description = "Data Plantio"
-    
-    
+
     def safra_description(self, obj):
         return f"{obj.plantio.safra.safra} - {obj.plantio.ciclo.ciclo}"
-
     safra_description.short_description = "Safra"
-    
+
     def cultura_description(self, obj):
         if obj.plantio.variedade is not None:
-            cultura = (
-                obj.plantio.variedade.cultura.cultura if obj.plantio.variedade.cultura.cultura else "-"
-            )
+            cultura = obj.plantio.variedade.cultura.cultura if obj.plantio.variedade.cultura.cultura else "-"
             cultura_url = None
             if cultura == "Soja":
                 cultura_url = "soy"
-            if cultura == "Feijão":
+            elif cultura == "Feijão":
                 cultura_url = "beans2"
-            if cultura == "Arroz":
+            elif cultura == "Arroz":
                 cultura_url = "rice"
-            image_url = None
-            if cultura_url is not None:
+
+            if cultura_url:
                 image_url = f"/static/images/icons/{cultura_url}.png"
-            if image_url is not None:
                 return format_html(
-                    f'<img style="width: 20px; height: 20px; text-align: center"  src="{image_url}">'
+                    '<img style="width:20px;height:20px;text-align:center" src="{}" />',
+                    image_url
                 )
-        else:
-            cultura = "Não Planejado"
-        return cultura
+            return cultura
+
+        return "Não Planejado"
     cultura_description.short_description = "Cultura"
-    
+
     def variedade_description(self, obj):
         if obj.plantio.variedade:
-            variedade = (
-                obj.plantio.variedade.nome_fantasia if obj.plantio.variedade.nome_fantasia else "-"
-            )
-        else:
-            variedade = "Não Planejado"
-        return variedade
-
+            return obj.plantio.variedade.nome_fantasia or "-"
+        return "Não Planejado"
     variedade_description.short_description = "Variedade"
-    
+
     class Media:
         css = {
-            'all': ('admin/css/custom.css',)  # Path to your custom CSS
+            "all": ("admin/css/custom.css",)
         }
-    
+        js = ("admin/js/plantio_extrato_area_preview.js",)
 
 @admin.register(ColheitaPlantioExtratoArea)
 class ColheitaPlantioExtratoAreaAdmin(admin.ModelAdmin):

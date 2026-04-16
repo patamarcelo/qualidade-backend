@@ -12,6 +12,12 @@ from django.forms.models import BaseInlineFormSet
 from django.core.exceptions import ValidationError
 
 
+from decimal import Decimal
+
+from .models import PlantioExtratoArea
+from .utils_new.utils_kml import parse_kml_content
+
+
 class AdminDateWidgetComOntem(AdminDateWidget):
     template_name = "admin/widgets/data_com_ontem.html"
     
@@ -27,112 +33,138 @@ class ProgramaAdminForm(forms.ModelForm):
     class Meta:
         model = Programa
         fields = "__all__"
+
+
+
 class PlantioExtratoAreaForm(forms.ModelForm):
+    kml_upload = forms.FileField(
+        label="Importar KML",
+        required=False,
+        help_text="Envie um arquivo .kml para salvar e visualizar no admin.",
+    )
+
+    class Meta:
+        model = PlantioExtratoArea
+        fields = [
+            "plantio",
+            "area_plantada",
+            "aguardando_chuva",
+            "data_plantio",
+            "finalizado_plantio",
+            "kml_upload",
+        ]
+        widgets = {
+            "area_plantada": forms.NumberInput(attrs={
+                "class": "form-control",
+                "inputmode": "decimal",
+                "step": "0.01",
+                "placeholder": "Area Plantada",
+            }),
+            "aguardando_chuva": forms.CheckboxInput(attrs={
+                "class": "form-check-input check-custom",
+            }),
+            "finalizado_plantio": forms.CheckboxInput(attrs={
+                "class": "form-check-input check-custom",
+            }),
+            "data_plantio": AdminDateWidgetComOntem(),
+        }
+
     def __init__(self, *args, **kwargs):
-        super(PlantioExtratoAreaForm, self).__init__(*args, **kwargs)
-        print("Custom form loaded!")
-        
-        # Get the instance safely
-        instance = kwargs.get('instance', None)
-        
-        if instance and instance.data_plantio:
-            # Set the date format for existing instances
-            self.fields['data_plantio'].initial = instance.data_plantio.strftime('%Y-%m-%d')
-        
-        # Update widgets here
-        # self.fields['data_plantio'].widget.attrs.update({
-        #     'class': 'form-control',
-        #     'type': 'date',  # HTML5 date input
-        # })
-    
-    
+        super().__init__(*args, **kwargs)
+
+        if self.instance and self.instance.data_plantio:
+            self.fields["data_plantio"].initial = self.instance.data_plantio.strftime("%Y-%m-%d")
+
+    def clean_kml_upload(self):
+        f = self.cleaned_data.get("kml_upload")
+        if not f:
+            return f
+
+        if not f.name.lower().endswith(".kml"):
+            raise ValidationError("Envie um arquivo com extensão .kml")
+
+        return f
+
     def clean(self):
         cleaned_data = super().clean()
-        plantio = cleaned_data.get('plantio')
-        area_plantada_form = cleaned_data.get('area_plantada')
-        plantio_finalizado = cleaned_data.get('finalizado_plantio')
-        area_plantada_form = area_plantada_form if area_plantada_form is not None else 0
-        plantio_add_ativo = cleaned_data.get('ativo')
-        if plantio:
-            # Access fields from the Plantio model, e.g., area_planejamento_plantio
-            area_planejamento = plantio.area_planejamento_plantio
-            # print('Area Disponível conforme planejamento: ', area_planejamento)
-            
-            # print('area Informada: ', area_plantada_form)
-            
-            # If this is an update (not a new instance), exclude the current instance from the total area calculation
-            if self.instance and self.instance.pk:
-                total_area = PlantioExtratoArea.objects.filter(plantio=plantio, ativo=True).exclude(pk=self.instance.pk).aggregate(
-                    total_area_plantada=Sum("area_plantada")
-                )['total_area_plantada'] or 0
-            else:
-                # For new instances, include all areas
-                total_area = PlantioExtratoArea.objects.filter(plantio=plantio, ativo=True).aggregate(
-                    total_area_plantada=Sum("area_plantada")
-                )['total_area_plantada'] or 0
 
-            # print('Total Area Já Apontada: ', total_area)
-            
-            # # You can now use this field for validation or other logic
-            # if area_planejamento and area_planejamento < 50:
-            #     raise ValidationError(
-            #         f'The planned planting area (area_planejamento_plantio) is too small: {area_planejamento}.'
-            #     )
+        plantio = cleaned_data.get("plantio")
+        area_plantada_form = cleaned_data.get("area_plantada") or 0
+        plantio_finalizado = cleaned_data.get("finalizado_plantio")
+        plantio_add_ativo = cleaned_data.get("ativo")
+
+        if plantio:
+            area_planejamento = plantio.area_planejamento_plantio
+
+            if self.instance and self.instance.pk:
+                total_area = PlantioExtratoArea.objects.filter(
+                    plantio=plantio,
+                    ativo=True
+                ).exclude(pk=self.instance.pk).aggregate(
+                    total_area_plantada=Sum("area_plantada")
+                )["total_area_plantada"] or 0
+            else:
+                total_area = PlantioExtratoArea.objects.filter(
+                    plantio=plantio,
+                    ativo=True
+                ).aggregate(
+                    total_area_plantada=Sum("area_plantada")
+                )["total_area_plantada"] or 0
 
             area_total_informada = total_area + area_plantada_form
-            # print('area total informada: ', area_total_informada)
-            # format_area_planejamento = 
-            if self.instance.pk and self.instance.ativo and plantio_add_ativo is False:
-                # Está desativando agora, então pode ajustar alguma lógica
-                print(f'Desativando: removendo {area_plantada_form} da área planejada.')
 
-                # Exemplo: atualizar a área disponível (se aplicável)
-                total_area = PlantioExtratoArea.objects.filter(plantio=plantio, ativo=True).exclude(pk=self.instance.pk).aggregate(
+            if self.instance.pk and self.instance.ativo and plantio_add_ativo is False:
+                total_area = PlantioExtratoArea.objects.filter(
+                    plantio=plantio,
+                    ativo=True
+                ).exclude(pk=self.instance.pk).aggregate(
                     total_area_plantada=Sum("area_plantada")
-                )['total_area_plantada'] or 0
-                new_area = total_area if plantio.area_planejamento_plantio >= total_area else plantio.area_planejamento_plantio
-                # if total_area > plantio.area_planejamento_plantio:
-                #     Adicionar
+                )["total_area_plantada"] or 0
+
+                new_area = (
+                    total_area
+                    if plantio.area_planejamento_plantio >= total_area
+                    else plantio.area_planejamento_plantio
+                )
                 plantio.area_colheita = new_area
                 plantio.save()
             else:
-                # pass
                 if area_planejamento < area_total_informada:
                     raise ValidationError(
-                        f"Area total disponível:  {str(area_planejamento).replace('.', ',')}, Area total já informada plantada:  ({str(total_area).replace('.', ',')}), Area ainda disponível: {str((area_planejamento - total_area)).replace('.', ',')}"
+                        f"Area total disponível: {str(area_planejamento).replace('.', ',')}, "
+                        f"Area total já informada plantada: ({str(total_area).replace('.', ',')}), "
+                        f"Area ainda disponível: {str((area_planejamento - total_area)).replace('.', ',')}"
                     )
-                if area_plantada_form == 0 and plantio_finalizado == False:
+
+                if area_plantada_form == 0 and plantio_finalizado is False:
                     raise ValidationError(
-                        f"Area Precisa ser informada, ou Plantio Finalizado precisa ser informado"
+                        "Area precisa ser informada, ou Plantio Finalizado precisa ser informado"
                     )
 
         return cleaned_data
 
-    class Meta:
-        model = PlantioExtratoArea
-        fields = ['plantio', 'area_plantada', 'aguardando_chuva', 'data_plantio', 'finalizado_plantio']
-        
-        # Customize widgets for responsiveness
-        widgets = {
-            'area_plantada': forms.NumberInput(attrs={
-                'class': 'form-control',
-                'inputmode': 'decimal',  # Number keypad for mobile devices
-                'step': '0.01',
-                'placeholder': 'Area Plantada',
-            }),
-            'aguardando_chuva': forms.CheckboxInput(attrs={
-                'class': 'form-check-input check-custom',
-            }),
-            'finalizado_plantio': forms.CheckboxInput(attrs={
-                'class': 'form-check-input check-custom',
-            }),
-            "data_plantio": AdminDateWidgetComOntem(),
-            # 'data_plantio': forms.DateInput(attrs={
-            #     'class': 'form-control',
-            #     'type': 'date',  # HTML5 date input
-            # }),
-        }
-        
+    def save(self, commit=True):
+        obj = super().save(commit=False)
+
+        kml_upload = self.cleaned_data.get("kml_upload")
+        if kml_upload:
+            raw_content = kml_upload.read().decode("utf-8", errors="ignore")
+            parsed = parse_kml_content(raw_content)
+
+            obj.kml_file = kml_upload
+            obj.kml_name = kml_upload.name
+            obj.kml_content = raw_content
+            obj.kml_points = parsed["points"]
+            obj.kml_is_closed = parsed["is_closed"]
+            obj.kml_area_m2 = Decimal(str(round(parsed["area_m2"], 2)))
+            obj.kml_perimeter_m = Decimal(str(round(parsed["perimeter_m"], 2)))
+
+        if commit:
+            obj.save()
+            self.save_m2m()
+
+        return obj
+
 CLEAR_TOKEN = "__clear__"
 
 class ClearableModelChoiceField(forms.ModelChoiceField):
