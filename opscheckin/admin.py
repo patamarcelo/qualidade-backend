@@ -560,6 +560,7 @@ class DailyManagerEventAdmin(admin.ModelAdmin):
         "default_time",
         "override_date",
         "override_time",
+        "skip_meeting_on",
         "reminder_offset_minutes",
         "allowed_window_minutes",
         "template_enabled",
@@ -587,6 +588,7 @@ class DailyManagerEventAdmin(admin.ModelAdmin):
                 "code",
                 "name",
                 "is_active",
+                "skip_meeting_on"
             )
         }),
         ("Horários", {

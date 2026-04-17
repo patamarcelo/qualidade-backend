@@ -330,6 +330,14 @@ class DailyManagerEvent(models.Model):
     last_reset_at = models.DateTimeField(null=True, blank=True)
 
     updated_at = models.DateTimeField(auto_now=True)
+    
+    skip_meeting_on = models.DateField(
+        "Pular reunião na data",
+        null=True,
+        blank=True,
+        help_text="Se preenchido com a data de hoje, o sistema não envia os lembretes apenas nesse dia.",
+        db_index=True,
+    )
 
     def get_effective_time(self, day):
         if self.override_date == day and self.override_time:

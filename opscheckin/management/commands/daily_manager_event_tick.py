@@ -297,6 +297,14 @@ class Command(BaseCommand):
             )
             return
 
+        if getattr(event, "skip_meeting_on", None) == day:
+            self.stdout.write(
+                self.style.WARNING(
+                    f"[daily_manager_event_tick] evento '{EVENT_CODE}' configurado para não enviar reunião em {day.isoformat()}"
+                )
+            )
+            return
+
         _reset_past_override_if_needed(event, day)
 
         if not getattr(event, "template_enabled", False):
