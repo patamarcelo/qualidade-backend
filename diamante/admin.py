@@ -4539,7 +4539,7 @@ class PlantioExtratoAreaAdmin(admin.ModelAdmin):
         "cultura_description",
         "variedade_description",
         "area_plantada",
-        "kml_badge",
+        # "kml_badge",
         "kml_area_ha_pretty",
         "related_link",
         "get_finalizado_plantio",
