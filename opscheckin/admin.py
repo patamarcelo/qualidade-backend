@@ -186,7 +186,7 @@ class ManagerAdmin(admin.ModelAdmin):
     def phone_display(self, obj):
         return format_phone_br(obj.phone_e164)
 
-    phone_display.short_description = "Telefone"
+    phone_display.short_description = "Telefone "
     phone_display.admin_order_field = "phone_e164"
 
     def projetos_badges(self, obj):
