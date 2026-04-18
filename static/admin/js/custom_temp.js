@@ -36,7 +36,7 @@ var app = new Vue({
 		variedadesDif: [...new Set(filterVarDif)],
 
 		filteredCutulre: "Todas",
-		filteredCutulreDif: "Todas",
+		filteredCutulreDif: [],
 		selected: "",
 		viewAllVareidades: false,
 		excludeFarm: [],
@@ -149,7 +149,7 @@ var app = new Vue({
 		filteredCutulre() {
 			if (this.filteredCutulre === "Todas") {
 				this.style.backgroundColor = "blue";
-				this.filteredCutulreDif = "Todas";
+				this.filteredCutulreDif = [];
 				return;
 			}
 
@@ -164,25 +164,21 @@ var app = new Vue({
 			}
 
 			const variedadesDaCultura = this.filterVariedadesDif.filter(
-				(data) => data !== "Todas" && data.includes(this.filteredCutulre)
+				(data) => data !== "Todas"
 			);
 
-			if (
-				this.filteredCutulreDif === "Todas" ||
-				!variedadesDaCultura.some((item) => item.split("-")[1]?.trim() === this.filteredCutulreDif)
-			) {
-				const firstVariedade = variedadesDaCultura[0];
-
-				if (firstVariedade && firstVariedade.includes("-")) {
-					this.filteredCutulreDif = firstVariedade.split("-")[1].trim();
-				} else {
-					this.filteredCutulreDif = "Todas";
-				}
-			}
-		}
+			this.filteredCutulreDif = this.filteredCutulreDif.filter((item) =>
+				variedadesDaCultura.includes(item)
+			);
+		},
 	},
 
 	computed: {
+		selectedVariedades() {
+			return Array.isArray(this.filteredCutulreDif)
+				? this.filteredCutulreDif.filter((item) => item && item !== "Todas")
+				: [];
+		},
 		customUrl() {
 			const params = new URLSearchParams();
 
@@ -234,8 +230,12 @@ var app = new Vue({
 		},
 
 		titleAcomp() {
-			if (this.filteredCutulreDif && this.filteredCutulreDif !== "Todas") {
-				return this.filteredCutulreDif;
+			if (this.selectedVariedades.length === 1) {
+				return this.selectedVariedades[0];
+			}
+
+			if (this.selectedVariedades.length > 1) {
+				return `${this.selectedVariedades.length} variedades selecionadas`;
 			}
 
 			if (this.filteredCutulre !== "Todas") {
@@ -260,9 +260,9 @@ var app = new Vue({
 		filteredArray() {
 			let filtPlantio = [];
 
-			if (this.filteredCutulreDif && this.filteredCutulreDif !== "Todas") {
-				filtPlantio = this.filteredPlantioBase.filter(
-					(data) => data.variedade__variedade === this.filteredCutulreDif.trim()
+			if (this.selectedVariedades.length > 0) {
+				filtPlantio = this.filteredPlantioBase.filter((data) =>
+					this.selectedVariedades.includes(data.variedade__variedade)
 				);
 			} else {
 				filtPlantio = this.filteredPlantioBase;
@@ -301,11 +301,9 @@ var app = new Vue({
 
 			let filtColheita = [];
 
-			if (this.filteredCutulreDif && this.filteredCutulreDif !== "Todas") {
-				filtColheita = this.colheita.filter(
-					(data) =>
-						data.plantio__variedade__variedade ===
-						this.filteredCutulreDif.trim()
+			if (this.selectedVariedades.length > 0) {
+				filtColheita = this.colheita.filter((data) =>
+					this.selectedVariedades.includes(data.plantio__variedade__variedade)
 				);
 			} else {
 				filtColheita = this.colheita;
@@ -338,9 +336,9 @@ var app = new Vue({
 		filteredArrayByVariedade() {
 			let filtPlantio = [];
 
-			if (this.filteredCutulreDif && this.filteredCutulreDif !== "Todas") {
-				filtPlantio = this.filteredPlantioBase.filter(
-					(data) => data.variedade__variedade === this.filteredCutulreDif.trim()
+			if (this.selectedVariedades.length > 0) {
+				filtPlantio = this.filteredPlantioBase.filter((data) =>
+					this.selectedVariedades.includes(data.variedade__variedade)
 				);
 			} else {
 				filtPlantio = this.filteredPlantioBase;
@@ -382,11 +380,9 @@ var app = new Vue({
 
 			let filtColheita = [];
 
-			if (this.filteredCutulreDif && this.filteredCutulreDif !== "Todas") {
-				filtColheita = this.colheita.filter(
-					(data) =>
-						data.plantio__variedade__variedade ===
-						this.filteredCutulreDif.trim()
+			if (this.selectedVariedades.length > 0) {
+				filtColheita = this.colheita.filter((data) =>
+					this.selectedVariedades.includes(data.plantio__variedade__variedade)
 				);
 			} else {
 				filtColheita = this.colheita;
@@ -467,13 +463,26 @@ var app = new Vue({
 					return parts.length > 1 ? parts[1].trim() : data;
 				})
 				.filter(Boolean);
-		}
+		},
+		footerVariedades() {
+			if (!this.selectedVariedades.length) {
+				return this.filteredCutulre !== "Todas"
+					? `Todas de ${this.filteredCutulre}`
+					: "Todas";
+			}
+
+			if (this.selectedVariedades.length <= 3) {
+				return this.selectedVariedades.join(", ");
+			}
+
+			return `${this.selectedVariedades.slice(0, 3).join(", ")} +${this.selectedVariedades.length - 3}`;
+		},
 	},
 
 	mounted() {
 		this.updateDisabledButton();
-		if (!this.filteredCutulreDif) {
-			this.filteredCutulreDif = "Todas";
+		if (!Array.isArray(this.filteredCutulreDif)) {
+			this.filteredCutulreDif = [];
 		}
 	}
 });

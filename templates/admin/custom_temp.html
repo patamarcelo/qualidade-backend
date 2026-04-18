@@ -61,10 +61,18 @@
                             <div class="field-block">
                                 <label class="field-label">Variedade</label>
                                 <select
-                                    class="form-select form-control-sm"
-                                    v-model="filteredCutulreDif"
-                                >
-                                    <option v-for="variedade in filterVariedadesDif" :value="variedade">[[variedade]]</option>
+                                        class="form-select variety-select"
+                                        v-model="filteredCutulreDif"
+                                        multiple
+                                        size="8"
+                                    >
+                                    <option
+                                        v-for="variedade in filterVariedadesDif"
+                                        :key="variedade"
+                                        :value="variedade"
+                                    >
+                                        [[ variedade ]]
+                                    </option>
                                 </select>
                             </div>
                         </div>
@@ -429,6 +437,7 @@
                 <div class="footer-left">
                     <span><strong>Safra:</strong> [[ selecredSafra || '-' ]]</span>
                     <span><strong>Ciclo:</strong> [[ selectedCiclo || '-' ]]</span>
+                    <span><strong>Variedades:</strong> [[ footerVariedades ]]</span>
                     <span>
                         <strong>Criado:</strong>
                         [[ formatDate(createdAtGte) ]] → [[ formatDate(createdAtLte) ]]
@@ -566,7 +575,6 @@
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 10px;
-        align-items: end;
     }
 
     .form-row-inline {
@@ -723,6 +731,11 @@
         .form-row-4 {
             grid-template-columns: 1fr;
         }
+    }
+
+    .variety-select {
+        min-height: 190px !important;
+        height: 190px !important;
     }
 </style>
 
