@@ -22,6 +22,34 @@ class NotificationType(models.Model):
 
     def __str__(self):
         return f"{self.name} - {self.code}"
+    
+
+class Division(models.Model):
+    code = models.CharField(max_length=40, unique=True)
+    name = models.CharField(max_length=80, unique=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["name"]
+        verbose_name = "Divisão"
+        verbose_name_plural = "Divisões"
+
+    def __str__(self):
+        return self.name
+
+
+class Branch(models.Model):
+    code = models.CharField(max_length=40, unique=True)
+    name = models.CharField(max_length=80, unique=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["name"]
+        verbose_name = "Filial"
+        verbose_name_plural = "Filiais"
+
+    def __str__(self):
+        return self.name
 
 
 class ManagerNotificationSubscription(models.Model):
@@ -77,6 +105,22 @@ class Manager(models.Model):
         through="ManagerNotificationSubscription",
         blank=True,
         related_name="managers",
+    )
+    
+    division = models.ManyToManyField(
+        "Division",
+        blank=True,
+        related_name="managers",
+        verbose_name="Divisões",
+    )
+
+    branch = models.ForeignKey(
+        "Branch",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="managers",
+        verbose_name="Filial",
     )
     
     
@@ -314,9 +358,9 @@ class DailyManagerEvent(models.Model):
 
     is_active = models.BooleanField(default=True)
 
-    default_time = models.TimeField()  # ex: 11:00
+    default_time = models.TimeField()
     override_date = models.DateField(null=True, blank=True)
-    override_time = models.TimeField(null=True, blank=True)  # ex: 17:00 só hoje
+    override_time = models.TimeField(null=True, blank=True)
 
     meet_link = models.URLField(blank=True, default="")
 
@@ -324,19 +368,37 @@ class DailyManagerEvent(models.Model):
     template_language = models.CharField(max_length=20, default="pt_BR")
     template_enabled = models.BooleanField(default=False)
 
-    reminder_offset_minutes = models.PositiveSmallIntegerField(default=60)  # 1 hora antes
-    allowed_window_minutes = models.PositiveSmallIntegerField(default=90)   # dispara se faltar <= 90 min
+    reminder_offset_minutes = models.PositiveSmallIntegerField(default=60)
+    allowed_window_minutes = models.PositiveSmallIntegerField(default=90)
 
     last_reset_at = models.DateTimeField(null=True, blank=True)
-
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     skip_meeting_on = models.DateField(
         "Pular reunião na data",
         null=True,
         blank=True,
         help_text="Se preenchido com a data de hoje, o sistema não envia os lembretes apenas nesse dia.",
         db_index=True,
+    )
+
+    applies_to_all = models.BooleanField(
+        default=True,
+        help_text="Quando ativo, ignora filtros de divisão e filial."
+    )
+
+    target_divisions = models.ManyToManyField(
+        "Division",
+        blank=True,
+        related_name="daily_manager_events",
+        verbose_name="Divisões alvo",
+    )
+
+    target_branches = models.ManyToManyField(
+        "Branch",
+        blank=True,
+        related_name="daily_manager_events",
+        verbose_name="Filiais alvo",
     )
 
     def get_effective_time(self, day):
@@ -349,7 +411,6 @@ class DailyManagerEvent(models.Model):
             self.override_date = None
             self.override_time = None
             self.save(update_fields=["override_date", "override_time"])
-            
             
 class DailyManagerEventDispatch(models.Model):
     event = models.ForeignKey(DailyManagerEvent, on_delete=models.CASCADE, related_name="dispatches")

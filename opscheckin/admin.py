@@ -6,45 +6,20 @@ from django import forms
 import re
 
 from .models import (
-    Manager,
+    Branch,
     DailyCheckin,
-    OutboundQuestion,
-    InboundMessage,
-    NotificationType,
-    ManagerNotificationSubscription,
     DailyManagerEvent,
     DailyManagerEventDispatch,
+    Division,
+    InboundMessage,
+    Manager,
+    ManagerNotificationSubscription,
+    NotificationType,
+    OutboundMessage,
+    OutboundQuestion,
 )
 
 
-def format_phone_br(phone: str) -> str:
-    s = only_digits(phone)
-
-    if not s:
-        return "-"
-
-    # se vier com 55 salvo por algum motivo, remove só para exibição
-    if s.startswith("55") and len(s) > 10:
-        s = s[2:]
-
-    if len(s) < 10:
-        return phone or "-"
-
-    ddd = s[:2]
-    number = s[2:]
-
-    # formato esperado do projeto: 8 dígitos
-    if len(number) == 8:
-        return f"({ddd}) {number[:4]}-{number[4:]}"
-
-    # fallback caso exista algum legado com 9 dígitos
-    if len(number) == 9:
-        return f"({ddd}) {number[:5]}-{number[5:]}"
-
-    return f"({ddd}) {number}"
-
-
-# opscheckin/admin.py
 BR_DDDS = [
     "11", "12", "13", "14", "15", "16", "17", "18", "19",
     "21", "22", "24", "27", "28",
@@ -63,13 +38,54 @@ def only_digits(v: str) -> str:
     return re.sub(r"\D+", "", str(v or ""))
 
 
-def notif_badge(code: str, active: bool = True) -> str:
+def format_phone_br(phone: str) -> str:
+    s = only_digits(phone)
+
+    if not s:
+        return "-"
+
+    if s.startswith("55") and len(s) > 10:
+        s = s[2:]
+
+    if len(s) < 10:
+        return phone or "-"
+
+    ddd = s[:2]
+    number = s[2:]
+
+    if len(number) == 8:
+        return f"({ddd}) {number[:4]}-{number[4:]}"
+
+    if len(number) == 9:
+        return f"({ddd}) {number[:5]}-{number[5:]}"
+
+    return f"({ddd}) {number}"
+
+
+def pill_badge(text: str, *, bg="#E8F0FE", fg="#1A73E8") -> str:
+    return (
+        f'<span style="display:inline-block;'
+        f'margin:2px 6px 2px 0;'
+        f'padding:4px 10px;'
+        f'border-radius:999px;'
+        f'background:{bg};'
+        f'color:{fg};'
+        f'font-size:12px;'
+        f'font-weight:600;'
+        f'line-height:1.4;'
+        f'white-space:nowrap;">'
+        f'{text}'
+        f'</span>'
+    )
+
+
+def notif_badge(text: str, active: bool = True) -> str:
     bg = "#dcfce7" if active else "#e5e7eb"
     fg = "#166534" if active else "#6b7280"
     return (
         f'<span style="display:inline-block;padding:3px 8px;margin:2px;'
         f'border-radius:999px;background:{bg};color:{fg};font-weight:700;'
-        f'font-size:11px;">{code}</span>'
+        f'font-size:11px;">{text}</span>'
     )
 
 
@@ -79,7 +95,7 @@ class ManagerAdminForm(forms.ModelForm):
     number = forms.CharField(
         label="Número",
         required=True,
-        help_text="Informe no máximo 8 dígitos neste campo. Não incluir o 9º Dígito",
+        help_text="Informe 8 ou 9 dígitos. Não incluir o DDI.",
         widget=forms.TextInput(
             attrs={
                 "placeholder": "91234-5678",
@@ -91,10 +107,23 @@ class ManagerAdminForm(forms.ModelForm):
 
     class Meta:
         model = Manager
-        fields = ("name", "country", "ddd", "number", "is_active", "is_active_resume_agenda", 'is_active_for_meetings', "id_responsavel_farmbox","projeto",)
+        fields = (
+            "name",
+            "country",
+            "ddd",
+            "number",
+            "branch",
+            "division",
+            "is_active",
+            "is_active_resume_agenda",
+            "is_active_for_meetings",
+            "id_responsavel_farmbox",
+            "projeto",
+        )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
         if self.instance and self.instance.pk and self.instance.phone_e164:
             s = only_digits(self.instance.phone_e164)
             if s.startswith("55") and len(s) >= 4:
@@ -115,11 +144,9 @@ class ManagerAdminForm(forms.ModelForm):
             self.add_error("number", "Número deve ter 8 (fixo) ou 9 (celular) dígitos.")
             return cleaned
 
-        phone_e164 = f"55{ddd}{number}"
-        self.instance.phone_e164 = phone_e164
+        self.instance.phone_e164 = f"55{ddd}{number}"
         return cleaned
-    
-    
+
 
 class ManagerNotificationSubscriptionInline(admin.StackedInline):
     model = ManagerNotificationSubscription
@@ -127,6 +154,42 @@ class ManagerNotificationSubscriptionInline(admin.StackedInline):
     autocomplete_fields = ("notification_type",)
     fields = ("notification_type", "is_active", "created_at")
     readonly_fields = ("created_at",)
+
+
+@admin.register(Division)
+class DivisionAdmin(admin.ModelAdmin):
+    list_display = ("id", "name", "code", "is_active", "managers_count")
+    list_filter = ("is_active",)
+    search_fields = ("name", "code")
+    ordering = ("name",)
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).annotate(
+            managers_total=Count("managers", distinct=True)
+        )
+
+    def managers_count(self, obj):
+        return getattr(obj, "managers_total", 0)
+
+    managers_count.short_description = "Qtd. managers"
+
+
+@admin.register(Branch)
+class BranchAdmin(admin.ModelAdmin):
+    list_display = ("id", "name", "code", "is_active", "managers_count")
+    list_filter = ("is_active",)
+    search_fields = ("name", "code")
+    ordering = ("name",)
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).annotate(
+            managers_total=Count("managers", distinct=True)
+        )
+
+    def managers_count(self, obj):
+        return getattr(obj, "managers_total", 0)
+
+    managers_count.short_description = "Qtd. managers"
 
 
 @admin.register(Manager)
@@ -137,6 +200,8 @@ class ManagerAdmin(admin.ModelAdmin):
         "name",
         "id_responsavel_farmbox",
         "phone_display",
+        "branch_display",
+        "divisions_badges",
         "projetos_badges",
         "is_active",
         "is_active_resume_agenda",
@@ -149,6 +214,8 @@ class ManagerAdmin(admin.ModelAdmin):
         "is_active",
         "is_active_resume_agenda",
         "is_active_for_meetings",
+        "branch",
+        "division",
         "projeto",
         "notification_subscriptions__is_active",
         "notification_subscriptions__notification_type",
@@ -157,20 +224,24 @@ class ManagerAdmin(admin.ModelAdmin):
         "name",
         "phone_e164",
         "id_responsavel_farmbox",
-        "projeto__nome",  # ajuste se o campo do Projeto tiver outro nome
+        "branch__name",
+        "division__name",
+        "division__code",
+        "projeto__nome",
         "notification_subscriptions__notification_type__code",
         "notification_subscriptions__notification_type__name",
     )
     ordering = ("name",)
     inlines = [ManagerNotificationSubscriptionInline]
-    filter_horizontal = ("projeto",)
+    filter_horizontal = ("projeto", "division")
 
     class Media:
         js = ("opscheckin/admin_phone_mask.js",)
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
-        qs = qs.prefetch_related(
+        qs = qs.select_related("branch").prefetch_related(
+            "division",
             "projeto",
             "notification_subscriptions__notification_type",
             "checkins",
@@ -186,32 +257,40 @@ class ManagerAdmin(admin.ModelAdmin):
     def phone_display(self, obj):
         return format_phone_br(obj.phone_e164)
 
-    phone_display.short_description = "Telefone "
+    phone_display.short_description = "Telefone"
     phone_display.admin_order_field = "phone_e164"
 
+    def branch_display(self, obj):
+        return obj.branch.name if obj.branch else "-"
+
+    branch_display.short_description = "Filial"
+    branch_display.admin_order_field = "branch__name"
+
+    def divisions_badges(self, obj):
+        divisions = obj.division.all().order_by("name")
+        if not divisions:
+            return "-"
+        return format_html(
+            "".join(
+                pill_badge(d.name, bg="#EEF2FF", fg="#4338CA")
+                for d in divisions
+            )
+        )
+
+    divisions_badges.short_description = "Divisões"
+
     def projetos_badges(self, obj):
-        projetos = obj.projeto.all().order_by("nome")  # ajuste se não for "nome"
+        projetos = obj.projeto.all().order_by("nome")
         if not projetos:
             return "-"
 
         return format_html(
             "".join(
-                (
-                    '<span style="'
-                    'display:inline-block;'
-                    'margin:2px 6px 2px 0;'
-                    'padding:4px 10px;'
-                    'border-radius:999px;'
-                    'background:#E8F0FE;'
-                    'color:#1A73E8;'
-                    'font-size:12px;'
-                    'font-weight:600;'
-                    'line-height:1.4;'
-                    'white-space:nowrap;'
-                    '">'
-                    "{}"
-                    "</span>"
-                ).format(p.nome.replace('Projeto', '').strip())  # ajuste se não for "nome"
+                pill_badge(
+                    p.nome.replace("Projeto", "").strip(),
+                    bg="#E8F0FE",
+                    fg="#1A73E8",
+                )
                 for p in projetos
             )
         )
@@ -256,6 +335,7 @@ class ManagerAdmin(admin.ModelAdmin):
 
     last_checkin_link.short_description = "Último check-in"
 
+
 @admin.register(NotificationType)
 class NotificationTypeAdmin(admin.ModelAdmin):
     list_display = (
@@ -292,6 +372,8 @@ class ManagerNotificationSubscriptionAdmin(admin.ModelAdmin):
         "id",
         "manager",
         "manager_phone",
+        "manager_branch",
+        "manager_divisions",
         "notification_type",
         "notification_code",
         "is_active",
@@ -301,10 +383,16 @@ class ManagerNotificationSubscriptionAdmin(admin.ModelAdmin):
         "is_active",
         "notification_type",
         "manager__is_active",
+        "manager__is_active_resume_agenda",
+        "manager__is_active_for_meetings",
+        "manager__branch",
+        "manager__division",
     )
     search_fields = (
         "manager__name",
         "manager__phone_e164",
+        "manager__branch__name",
+        "manager__division__name",
         "notification_type__code",
         "notification_type__name",
     )
@@ -312,14 +400,32 @@ class ManagerNotificationSubscriptionAdmin(admin.ModelAdmin):
     autocomplete_fields = ("manager", "notification_type")
 
     def get_queryset(self, request):
-        return super().get_queryset(request).select_related("manager", "notification_type")
+        return (
+            super()
+            .get_queryset(request)
+            .select_related("manager", "manager__branch", "notification_type")
+            .prefetch_related("manager__division")
+        )
 
     def manager_phone(self, obj):
         return format_phone_br(obj.manager.phone_e164)
 
-
-
     manager_phone.short_description = "Telefone"
+
+    def manager_branch(self, obj):
+        return obj.manager.branch.name if obj.manager and obj.manager.branch else "-"
+
+    manager_branch.short_description = "Filial"
+
+    def manager_divisions(self, obj):
+        divisions = obj.manager.division.all().order_by("name")
+        if not divisions:
+            return "-"
+        return format_html(
+            "".join(pill_badge(d.name, bg="#EEF2FF", fg="#4338CA") for d in divisions)
+        )
+
+    manager_divisions.short_description = "Divisões"
 
     def notification_code(self, obj):
         return obj.notification_type.code
@@ -381,6 +487,7 @@ class DailyCheckinAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "manager",
+        "manager_branch",
         "date",
         "created_at",
         "day_status",
@@ -390,14 +497,25 @@ class DailyCheckinAdmin(admin.ModelAdmin):
         "missed_count",
         "inbound_count",
     )
-    list_filter = ("date", "manager", "manager__is_active")
-    search_fields = ("manager__name", "manager__phone_e164")
+    list_filter = (
+        "date",
+        "manager",
+        "manager__is_active",
+        "manager__branch",
+        "manager__division",
+    )
+    search_fields = (
+        "manager__name",
+        "manager__phone_e164",
+        "manager__branch__name",
+        "manager__division__name",
+    )
     date_hierarchy = "date"
     ordering = ("-date", "-id")
     inlines = [OutboundQuestionInline, InboundMessageInline]
 
     def get_queryset(self, request):
-        qs = super().get_queryset(request).select_related("manager")
+        qs = super().get_queryset(request).select_related("manager", "manager__branch")
         qs = qs.annotate(
             questions_total=Count("questions", distinct=True),
             inbound_total=Count("inbound_messages", distinct=True),
@@ -414,6 +532,11 @@ class DailyCheckinAdmin(admin.ModelAdmin):
             ),
         )
         return qs
+
+    def manager_branch(self, obj):
+        return obj.manager.branch.name if obj.manager and obj.manager.branch else "-"
+
+    manager_branch.short_description = "Filial"
 
     def questions_count(self, obj):
         return getattr(obj, "questions_total", obj.questions.count())
@@ -484,8 +607,20 @@ class OutboundQuestionAdmin(admin.ModelAdmin):
         "short_answer",
         "time_to_answer",
     )
-    list_filter = ("status", "step", "checkin__date")
-    search_fields = ("checkin__manager__name", "checkin__manager__phone_e164", "answer_text")
+    list_filter = (
+        "status",
+        "step",
+        "checkin__date",
+        "checkin__manager__branch",
+        "checkin__manager__division",
+    )
+    search_fields = (
+        "checkin__manager__name",
+        "checkin__manager__phone_e164",
+        "checkin__manager__branch__name",
+        "checkin__manager__division__name",
+        "answer_text",
+    )
     ordering = ("-scheduled_for", "-id")
     readonly_fields = ("sent_at", "answered_at", "last_reminder_at")
 
@@ -518,23 +653,103 @@ class OutboundQuestionAdmin(admin.ModelAdmin):
     time_to_answer.short_description = "T. resposta"
 
 
+@admin.register(OutboundMessage)
+class OutboundMessageAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "sent_at",
+        "manager",
+        "manager_branch",
+        "kind",
+        "to_phone",
+        "provider_message_id",
+        "wa_status",
+        "short_text",
+    )
+    list_filter = (
+        "kind",
+        "wa_status",
+        "sent_at",
+        "manager__branch",
+        "manager__division",
+    )
+    date_hierarchy = "sent_at"
+    search_fields = (
+        "manager__name",
+        "manager__phone_e164",
+        "to_phone",
+        "provider_message_id",
+        "text",
+    )
+    ordering = ("-sent_at", "-id")
+    readonly_fields = (
+        "manager",
+        "checkin",
+        "related_question",
+        "to_phone",
+        "provider_message_id",
+        "kind",
+        "text",
+        "sent_at",
+        "raw_response",
+        "wa_status",
+        "wa_sent_at",
+        "wa_delivered_at",
+        "wa_read_at",
+        "wa_last_status_payload",
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def manager_branch(self, obj):
+        return obj.manager.branch.name if obj.manager and obj.manager.branch else "-"
+
+    manager_branch.short_description = "Filial"
+
+    def short_text(self, obj):
+        t = (obj.text or "").strip()
+        return (t[:120] + "…") if len(t) > 120 else t
+
+    short_text.short_description = "Texto"
+
+
 @admin.register(InboundMessage)
 class InboundMessageAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "received_at",
         "manager",
+        "manager_branch",
         "from_phone",
         "msg_type",
         "linked_question_link",
         "short_text",
         "processed",
     )
-    list_filter = ("processed", "msg_type", "manager")
+    list_filter = (
+        "processed",
+        "msg_type",
+        "manager",
+        "manager__branch",
+        "manager__division",
+    )
     date_hierarchy = "received_at"
-    search_fields = ("from_phone", "text", "wa_message_id", "manager__name")
+    search_fields = (
+        "from_phone",
+        "text",
+        "wa_message_id",
+        "manager__name",
+        "manager__branch__name",
+        "manager__division__name",
+    )
     ordering = ("-received_at", "-id")
     readonly_fields = ("received_at",)
+
+    def manager_branch(self, obj):
+        return obj.manager.branch.name if obj.manager and obj.manager.branch else "-"
+
+    manager_branch.short_description = "Filial"
 
     def linked_question_link(self, obj):
         if not obj.linked_question_id:
@@ -551,12 +766,16 @@ class InboundMessageAdmin(admin.ModelAdmin):
 
     short_text.short_description = "Texto"
 
+
 @admin.register(DailyManagerEvent)
 class DailyManagerEventAdmin(admin.ModelAdmin):
     list_display = (
         "name",
         "code",
         "is_active",
+        "applies_to_all",
+        "target_divisions_summary",
+        "target_branches_summary",
         "default_time",
         "override_date",
         "override_time",
@@ -569,17 +788,26 @@ class DailyManagerEventAdmin(admin.ModelAdmin):
     )
     list_filter = (
         "is_active",
+        "applies_to_all",
         "template_enabled",
+        "target_divisions",
+        "target_branches",
     )
     search_fields = (
         "name",
         "code",
         "template_name",
         "meet_link",
+        "target_divisions__name",
+        "target_branches__name",
     )
     readonly_fields = (
         "updated_at",
         "last_reset_at",
+    )
+    filter_horizontal = (
+        "target_divisions",
+        "target_branches",
     )
 
     fieldsets = (
@@ -588,8 +816,18 @@ class DailyManagerEventAdmin(admin.ModelAdmin):
                 "code",
                 "name",
                 "is_active",
-                "skip_meeting_on"
+                "skip_meeting_on",
             )
+        }),
+        ("Segmentação", {
+            "fields": (
+                "applies_to_all",
+                "target_divisions",
+                "target_branches",
+            ),
+            "description": (
+                "Se 'Aplica para todos' estiver ativo, os filtros de divisão e filial são ignorados."
+            ),
         }),
         ("Horários", {
             "fields": (
@@ -616,12 +854,39 @@ class DailyManagerEventAdmin(admin.ModelAdmin):
         }),
     )
 
+    def get_queryset(self, request):
+        return super().get_queryset(request).prefetch_related(
+            "target_divisions",
+            "target_branches",
+        )
+
+    def target_divisions_summary(self, obj):
+        items = obj.target_divisions.all().order_by("name")
+        if not items:
+            return "Todas" if obj.applies_to_all else "-"
+        return format_html(
+            "".join(pill_badge(x.name, bg="#EEF2FF", fg="#4338CA") for x in items)
+        )
+
+    target_divisions_summary.short_description = "Divisões"
+
+    def target_branches_summary(self, obj):
+        items = obj.target_branches.all().order_by("name")
+        if not items:
+            return "Todas" if obj.applies_to_all else "-"
+        return format_html(
+            "".join(pill_badge(x.name, bg="#ECFDF5", fg="#047857") for x in items)
+        )
+
+    target_branches_summary.short_description = "Filiais"
+
 
 @admin.register(DailyManagerEventDispatch)
 class DailyManagerEventDispatchAdmin(admin.ModelAdmin):
     list_display = (
         "event",
         "manager",
+        "manager_branch",
         "event_date",
         "scheduled_event_time",
         "target_send_time",
@@ -634,10 +899,14 @@ class DailyManagerEventDispatchAdmin(admin.ModelAdmin):
         "status",
         "event_date",
         "scheduled_event_time",
+        "manager__branch",
+        "manager__division",
     )
     search_fields = (
         "manager__name",
         "manager__phone_e164",
+        "manager__branch__name",
+        "manager__division__name",
         "event__name",
         "event__code",
         "provider_message_id",
@@ -653,7 +922,17 @@ class DailyManagerEventDispatchAdmin(admin.ModelAdmin):
         "status",
     )
 
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related(
+            "event",
+            "manager",
+            "manager__branch",
+        ).prefetch_related("manager__division")
+
+    def manager_branch(self, obj):
+        return obj.manager.branch.name if obj.manager and obj.manager.branch else "-"
+
+    manager_branch.short_description = "Filial"
+
     def has_add_permission(self, request):
         return False
-    
-    
