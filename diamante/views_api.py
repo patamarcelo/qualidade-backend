@@ -22,8 +22,6 @@ from .serializers import (
 
 
 
-
-
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -185,6 +183,8 @@ from .utils_new.defensivos_lookup import resolve_defensivo_nome
 
 from django.db import close_old_connections, connection
 from django.db.utils import OperationalError
+
+
 
 
 # Get a named logger
@@ -6616,10 +6616,23 @@ class ProgramasDetails(viewsets.ModelViewSet):
                     .order_by("safra", "ciclo", "nome")
                     .filter(Q(ativo=True))
                 )
+                # qs_area_total_program = (
+                #     Plantio.objects.values("programa__nome")
+                #     .annotate(total=Sum("area_colheita"))
+                #     .filter(~Q(programa=None) & Q(programa__ativo=True))
+                # )
+                
                 qs_area_total_program = (
-                    Plantio.objects.values("programa__nome")
-                    .annotate(total=Sum("area_colheita"))
-                    .filter(~Q(programa=None) & Q(programa__ativo=True))
+                    Programa.objects.filter(ativo=True)
+                    .annotate(
+                        programa__nome=F("nome"),
+                        total=Coalesce(
+                            Sum("programa_related_plantio__area_colheita"),
+                            Value(0, output_field=DecimalField(max_digits=8, decimal_places=2)),
+                        ),
+                    )
+                    .values("programa__nome", "total")
+                    .order_by("programa__nome")
                 )
                 # serializer = AplicacaoSerializer(qs, many=True)
                 response = {
