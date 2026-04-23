@@ -24,6 +24,7 @@ from .models import (
 )
 
 from opscheckin.services.whatsapp import send_buttons, send_text, send_list
+from opscheckin.services.personal_reminders import try_link_personal_reminder_response
 
 logger = logging.getLogger("opscheckin.whatsapp")
 
@@ -1813,6 +1814,22 @@ def whatsapp_webhook(request):
                         wa_message_id="",
                         **inbound_defaults,
                     )
+
+                                # ==========
+                # personal reminders: tenta vincular resposta antes do fluxo de check-in
+                # ==========
+                try:
+                    if try_link_personal_reminder_response(inbound):
+                        _mark_inbound_processed(inbound, now)
+                        continue
+                except Exception:
+                    logger.exception(
+                        "PERSONAL_REMINDER_RESPONSE_LINK_FAILED manager=%s phone=%s msg_id=%s",
+                        getattr(manager, "name", "") if manager else "",
+                        from_phone,
+                        msg_id,
+                    )
+                    
 
                 if not manager:
                     logger.warning(

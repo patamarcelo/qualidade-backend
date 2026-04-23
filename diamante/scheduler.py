@@ -26,6 +26,7 @@ from opscheckin.cron import (
     run_opscheckin_agenda_confirm,
     run_opscheckin_director_agenda_summary,
     run_opscheckin_daily_manager_event_tick,
+    run_opscheckin_manager_personal_reminder_tick,
 )
 
 from .scheduler_lock import acquire_scheduler_lock
@@ -92,6 +93,10 @@ def job_run_opscheckin_daily_manager_event_tick():
 def job_delete_old_job_executions():
     _prepare_db_for_job()
     return delete_old_job_executions()
+
+def job_run_opscheckin_manager_personal_reminder_tick():
+    _prepare_db_for_job()
+    return run_opscheckin_manager_personal_reminder_tick()
 
 # =====================================================================
 # INICIALIZAÇÃO DO SCHEDULER
@@ -177,6 +182,18 @@ def start():
             scheduler.add_job(
                 job_run_opscheckin_daily_manager_event_tick, "cron", day_of_week="mon-sat", hour="9-17", minute="*/2",
                 id="opscheckin_daily_manager_event_tick", replace_existing=True
+            )
+            
+            scheduler.add_job(
+                job_run_opscheckin_manager_personal_reminder_tick,
+                "cron",
+                day_of_week="*",
+                hour="6-18",
+                minute="*/15",
+                id="opscheckin_manager_personal_reminder_tick",
+                replace_existing=True,
+                misfire_grace_time=120,
+                coalesce=True,
             )
 
             # GRUPO G — MANUTENÇÃO

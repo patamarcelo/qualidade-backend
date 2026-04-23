@@ -17,6 +17,8 @@ from .models import (
     NotificationType,
     OutboundMessage,
     OutboundQuestion,
+    ManagerPersonalReminder,
+    ManagerPersonalReminderDispatch
 )
 
 
@@ -88,6 +90,23 @@ def notif_badge(text: str, active: bool = True) -> str:
         f'font-size:11px;">{text}</span>'
     )
 
+
+class ManagerPersonalReminderInline(admin.StackedInline):
+    model = ManagerPersonalReminder
+    extra = 0
+    readonly_fields = ("template_name",)
+    fields = (
+        "title",
+        "is_active",
+        "schedule_type",
+        "time_of_day",
+        "weekday",
+        "day_of_month",
+        "response_mode",
+        "template_name",
+        "message_text",
+    )
+    show_change_link = True
 
 class ManagerAdminForm(forms.ModelForm):
     country = forms.CharField(initial="55", required=False, disabled=True, label="DDI")
@@ -232,7 +251,7 @@ class ManagerAdmin(admin.ModelAdmin):
         "notification_subscriptions__notification_type__name",
     )
     ordering = ("name",)
-    inlines = [ManagerNotificationSubscriptionInline]
+    inlines = [ ManagerNotificationSubscriptionInline, ManagerPersonalReminderInline ]
     filter_horizontal = ("projeto", "division")
 
     class Media:
@@ -336,6 +355,318 @@ class ManagerAdmin(admin.ModelAdmin):
     last_checkin_link.short_description = "Último check-in"
 
 
+
+
+
+
+class ManagerPersonalReminderAdminForm(forms.ModelForm):
+    resumo_operacional = forms.CharField(
+        required=False,
+        label="Resumo do envio",
+        widget=forms.Textarea(attrs={"rows": 3, "readonly": "readonly"}),
+    )
+
+    class Meta:
+        model = ManagerPersonalReminder
+        fields = (
+            "manager",
+            "is_active",
+            "title",
+            "description",
+            "message_text",
+            "schedule_type",
+            "time_of_day",
+            "weekday",
+            "day_of_month",
+            "start_date",
+            "end_date",
+            "response_mode",
+            "allowed_window_minutes",
+        )
+        widgets = {
+            "message_text": forms.Textarea(
+                attrs={
+                    "rows": 6,
+                    "placeholder": (
+                        "Ex.: Olá! Hoje é dia de revisar os extintores do hangar. "
+                        "Confirme aqui assim que concluir a atividade."
+                    ),
+                }
+            ),
+            "description": forms.Textarea(
+                attrs={
+                    "rows": 2,
+                    "placeholder": "Descrição interna opcional para controle do RH.",
+                }
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+
+
+        self.fields["manager"].help_text = "Selecione o manager que receberá este aviso."
+        self.fields["title"].help_text = "Nome curto do aviso para identificação interna."
+        self.fields["message_text"].help_text = (
+            "Texto principal do lembrete. Esse conteúdo será inserido no template do WhatsApp."
+        )
+        self.fields["schedule_type"].help_text = "Escolha se o aviso será diário, semanal ou mensal."
+        self.fields["time_of_day"].help_text = "Horário do envio do lembrete."
+        self.fields["weekday"].help_text = "Usado apenas quando a periodicidade for semanal."
+        self.fields["day_of_month"].help_text = "Usado apenas quando a periodicidade for mensal."
+        self.fields["response_mode"].help_text = (
+            "Sem resposta = só envia. Texto = espera resposta escrita. "
+            "Botão = exige confirmação por botão."
+        )
+        self.fields["allowed_window_minutes"].help_text = (
+            "Janela em minutos para o cron considerar o lembrete elegível."
+        )
+
+        instance = self.instance if self.instance and self.instance.pk else None
+
+        response_mode = None
+        if self.data.get("response_mode"):
+            response_mode = self.data.get("response_mode")
+        elif instance:
+            response_mode = instance.response_mode
+        else:
+            response_mode = ManagerPersonalReminder.RESPONSE_NONE
+
+        schedule_type = None
+        if self.data.get("schedule_type"):
+            schedule_type = self.data.get("schedule_type")
+        elif instance:
+            schedule_type = instance.schedule_type
+        else:
+            schedule_type = ManagerPersonalReminder.SCHEDULE_DAILY
+
+        effective_template = (
+            instance.get_effective_template_name()
+            if instance
+            else (
+                ManagerPersonalReminder.DEFAULT_TEMPLATE_CONFIRM
+                if response_mode == ManagerPersonalReminder.RESPONSE_BUTTON
+                else ManagerPersonalReminder.DEFAULT_TEMPLATE_TEXT
+            )
+        )
+
+
+        resumo = self._build_summary(
+            schedule_type=schedule_type,
+            time_of_day=(
+                self.data.get("time_of_day")
+                or (instance.time_of_day.strftime("%H:%M") if instance and instance.time_of_day else "")
+            ),
+            weekday=(
+                self.data.get("weekday")
+                or (str(instance.weekday) if instance and instance.weekday is not None else "")
+            ),
+            day_of_month=(
+                self.data.get("day_of_month")
+                or (str(instance.day_of_month) if instance and instance.day_of_month is not None else "")
+            ),
+            response_mode=response_mode,
+            template_name=effective_template,
+        )
+        self.fields["resumo_operacional"].initial = resumo
+
+    def _build_summary(self, *, schedule_type, time_of_day, weekday, day_of_month, response_mode, template_name):
+        weekday_labels = {
+            "0": "segunda-feira",
+            "1": "terça-feira",
+            "2": "quarta-feira",
+            "3": "quinta-feira",
+            "4": "sexta-feira",
+            "5": "sábado",
+            "6": "domingo",
+        }
+
+        if schedule_type == ManagerPersonalReminder.SCHEDULE_DAILY:
+            freq = f"Todo dia às {time_of_day or '--:--'}"
+        elif schedule_type == ManagerPersonalReminder.SCHEDULE_WEEKLY:
+            freq = f"Toda {weekday_labels.get(str(weekday), 'semana')} às {time_of_day or '--:--'}"
+        elif schedule_type == ManagerPersonalReminder.SCHEDULE_MONTHLY:
+            freq = f"Todo dia {day_of_month or '--'} do mês às {time_of_day or '--:--'}"
+        else:
+            freq = "Periodicidade não definida"
+
+        if response_mode == ManagerPersonalReminder.RESPONSE_BUTTON:
+            retorno = "Exige confirmação por botão"
+        elif response_mode == ManagerPersonalReminder.RESPONSE_TEXT:
+            retorno = "Espera resposta por texto"
+        else:
+            retorno = "Não exige resposta"
+
+        return (
+            f"Frequência: {freq}\n"
+            f"Retorno esperado: {retorno}\n"
+            f"Template aplicado automaticamente: {template_name}"
+        )
+
+    def clean(self):
+        cleaned = super().clean()
+        return cleaned
+    
+@admin.register(ManagerPersonalReminder)
+class ManagerPersonalReminderAdmin(admin.ModelAdmin):
+    form = ManagerPersonalReminderAdminForm
+
+    list_display = (
+        "id",
+        "manager",
+        "title",
+        "is_active",
+        "schedule_type",
+        "schedule_summary",
+        "response_mode",
+        "template_name",
+        "updated_at",
+    )
+    list_filter = (
+        "is_active",
+        "schedule_type",
+        "response_mode",
+        "manager__branch",
+        "manager__division",
+    )
+    search_fields = (
+        "manager__name",
+        "manager__phone_e164",
+        "title",
+        "code",
+        "message_text",
+        "template_name",
+    )
+    autocomplete_fields = ("manager",)
+    readonly_fields = ("template_name", "template_language", "delivery_mode")
+    fieldsets = (
+        ("Quem vai receber", {
+            "fields": (
+                "manager",
+                "is_active",
+            )
+        }),
+        ("Identificação do aviso", {
+            "fields": (
+                "title",
+                "description",
+                "message_text",
+            )
+        }),
+        ("Quando enviar", {
+            "fields": (
+                "schedule_type",
+                "time_of_day",
+                "weekday",
+                "day_of_month",
+                "start_date",
+                "end_date",
+                "allowed_window_minutes",
+            ),
+            "description": (
+                "Use 'dia da semana' apenas para avisos semanais "
+                "e 'dia do mês' apenas para avisos mensais."
+            ),
+        }),
+        ("Como será a resposta", {
+            "fields": (
+                "response_mode",
+            )
+        }),
+        ("Configuração automática do WhatsApp", {
+            "fields": (
+                "delivery_mode",
+                "template_name",
+                "template_language",
+                "resumo_operacional",
+            ),
+            "description": (
+                "Esses campos são definidos automaticamente pelo sistema para reduzir erro operacional."
+            ),
+        }),
+    )
+
+    class Media:
+        js = ("opscheckin/admin_personal_reminder_form.js",)
+
+    def schedule_summary(self, obj):
+        weekday_labels = {
+            0: "segunda",
+            1: "terça",
+            2: "quarta",
+            3: "quinta",
+            4: "sexta",
+            5: "sábado",
+            6: "domingo",
+        }
+
+        if obj.schedule_type == "daily":
+            return f"Todo dia às {obj.time_of_day:%H:%M}"
+        if obj.schedule_type == "weekly":
+            return f"Toda {weekday_labels.get(obj.weekday, '-') } às {obj.time_of_day:%H:%M}"
+        if obj.schedule_type == "monthly":
+            return f"Dia {obj.day_of_month} às {obj.time_of_day:%H:%M}"
+        return "-"
+
+    schedule_summary.short_description = "Resumo"
+
+    def save_model(self, request, obj, form, change):
+        obj.delivery_mode = ManagerPersonalReminder.DELIVERY_TEMPLATE
+        obj.template_language = "pt_BR"
+        obj.template_name = obj.get_effective_template_name()
+        super().save_model(request, obj, form, change)
+        
+
+
+@admin.register(ManagerPersonalReminderDispatch)
+class ManagerPersonalReminderDispatchAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "manager",
+        "reminder",
+        "reference_date",
+        "scheduled_for",
+        "sent_at",
+        "status",
+        "answered_at",
+        "answer_source",
+        "short_answer",
+    )
+    list_filter = (
+        "status",
+        "answer_source",
+        "reference_date",
+        "manager__branch",
+        "manager__division",
+    )
+    search_fields = (
+        "manager__name",
+        "manager__phone_e164",
+        "reminder__title",
+        "provider_message_id",
+        "answer_text",
+    )
+    readonly_fields = (
+        "reminder",
+        "manager",
+        "reference_date",
+        "scheduled_for",
+        "sent_at",
+        "provider_message_id",
+        "status",
+        "answered_at",
+        "answer_text",
+        "answer_source",
+        "inbound_message",
+        "outbound_message",
+        "raw_response_payload",
+        "created_at",
+    )
+
+    def short_answer(self, obj):
+        t = (obj.answer_text or "").strip()
+        return (t[:100] + "…") if len(t) > 100 else (t or "-")
 @admin.register(NotificationType)
 class NotificationTypeAdmin(admin.ModelAdmin):
     list_display = (
