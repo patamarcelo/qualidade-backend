@@ -1,9 +1,12 @@
 from django.contrib import admin
-from django.db.models import Count, Q
+from datetime import time
+from django.db.models import Count, Q, Case, When, Value, IntegerField, F, TimeField
 from django.urls import reverse
 from django.utils.html import format_html
 from django import forms
 import re
+from django.http import HttpResponseRedirect
+from django.contrib.admin.views.main import ChangeList
 
 from .models import (
     Branch,
@@ -21,6 +24,9 @@ from .models import (
     ManagerPersonalReminderDispatch
 )
 
+
+from django.db.models import OuterRef, Subquery, DateTimeField, CharField
+from django.utils.timezone import localtime
 
 BR_DDDS = [
     "11", "12", "13", "14", "15", "16", "17", "18", "19",
@@ -508,21 +514,40 @@ class ManagerPersonalReminderAdminForm(forms.ModelForm):
         cleaned = super().clean()
         return cleaned
     
+    
+
+class ManagerPersonalReminderChangeList(ChangeList):
+    def get_ordering(self, request, queryset):
+        return [
+            "manager__name",  # 1) manager
+            "sort_group",     # 2) diário -> semanal -> mensal
+            "sort_a",         # 3) regra interna
+            "sort_b",         # 4) horário por último
+            "title",
+        ]
+        
+
 @admin.register(ManagerPersonalReminder)
 class ManagerPersonalReminderAdmin(admin.ModelAdmin):
     form = ManagerPersonalReminderAdminForm
+    sortable_by = ()
 
     list_display = (
         "id",
-        "manager",
+        "manager_summary",
         "title",
-        "is_active",
-        "schedule_type",
-        "schedule_summary",
-        "response_mode",
-        "template_name",
+        "status_badge",
+        "frequency_badge",
+        "schedule_human",
+        "response_mode_badge",
+        "template_badge",
+        "last_sent_display",
+        "last_answered_display",
+        "last_status_badge",
+        "message_preview",
         "updated_at",
     )
+    
     list_filter = (
         "is_active",
         "schedule_type",
@@ -536,10 +561,9 @@ class ManagerPersonalReminderAdmin(admin.ModelAdmin):
         "title",
         "code",
         "message_text",
-        "template_name",
     )
     autocomplete_fields = ("manager",)
-    readonly_fields = ("template_name", "template_language", "delivery_mode")
+
     fieldsets = (
         ("Quem vai receber", {
             "fields": (
@@ -558,15 +582,11 @@ class ManagerPersonalReminderAdmin(admin.ModelAdmin):
             "fields": (
                 "schedule_type",
                 "time_of_day",
-                "weekday",
+                "weekday_display",
                 "day_of_month",
                 "start_date",
                 "end_date",
                 "allowed_window_minutes",
-            ),
-            "description": (
-                "Use 'dia da semana' apenas para avisos semanais "
-                "e 'dia do mês' apenas para avisos mensais."
             ),
         }),
         ("Como será a resposta", {
@@ -576,48 +596,265 @@ class ManagerPersonalReminderAdmin(admin.ModelAdmin):
         }),
         ("Configuração automática do WhatsApp", {
             "fields": (
-                "delivery_mode",
-                "template_name",
-                "template_language",
+                "delivery_mode_preview",
+                "template_name_preview",
+                "template_language_preview",
                 "resumo_operacional",
-            ),
-            "description": (
-                "Esses campos são definidos automaticamente pelo sistema para reduzir erro operacional."
             ),
         }),
     )
 
     class Media:
+        css = {
+            "all": ("opscheckin/admin_personal_reminder.css",)
+        }
         js = ("opscheckin/admin_personal_reminder_form.js",)
+    
+    def get_changelist(self, request, **kwargs):
+        return ManagerPersonalReminderChangeList
 
-    def schedule_summary(self, obj):
-        weekday_labels = {
-            0: "segunda",
-            1: "terça",
-            2: "quarta",
-            3: "quinta",
-            4: "sexta",
-            5: "sábado",
-            6: "domingo",
+    def changelist_view(self, request, extra_context=None):
+        if "o" in request.GET:
+            q = request.GET.copy()
+            q.pop("o", None)
+            url = request.path
+            if q:
+                url = f"{url}?{q.urlencode()}"
+            return HttpResponseRedirect(url)
+        return super().changelist_view(request, extra_context)
+
+    def get_ordering(self, request):
+        return ()
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request).select_related("manager", "manager__branch")
+    
+        latest_dispatch = ManagerPersonalReminderDispatch.objects.filter(
+                reminder=OuterRef("pk")
+            ).order_by("-scheduled_for", "-id")
+    
+        return qs.annotate(
+            sort_group=Case(
+                When(schedule_type="daily", then=Value(0)),
+                When(schedule_type="weekly", then=Value(1)),
+                When(schedule_type="monthly", then=Value(2)),
+                default=Value(99),
+                output_field=IntegerField(),
+            ),
+            sort_a=Case(
+                When(schedule_type="daily", then=Value(0)),
+                When(schedule_type="weekly", then=F("weekday")),
+                When(schedule_type="monthly", then=F("day_of_month")),
+                default=Value(999),
+                output_field=IntegerField(),
+            ),
+            sort_b=Case(
+                When(schedule_type="daily", then=F("time_of_day")),
+                When(schedule_type="weekly", then=F("time_of_day")),
+                When(schedule_type="monthly", then=F("time_of_day")),
+                default=Value(time(23, 59, 59)),
+                output_field=TimeField(),
+            ),
+
+            last_sent_at=Subquery(
+                latest_dispatch.values("sent_at")[:1],
+                output_field=DateTimeField(),
+            ),
+            last_answered_at=Subquery(
+                latest_dispatch.values("answered_at")[:1],
+                output_field=DateTimeField(),
+            ),
+            last_dispatch_status=Subquery(
+                latest_dispatch.values("status")[:1],
+                output_field=CharField(),
+            ),
+        )
+        
+
+    def last_sent_display(self, obj):
+        if not getattr(obj, "last_sent_at", None):
+            return "-"
+        dt = localtime(obj.last_sent_at)
+        return dt.strftime("%d/%m/%Y %H:%M")
+    last_sent_display.short_description = "Últ. disparo"
+
+
+    def last_answered_display(self, obj):
+        if not getattr(obj, "last_answered_at", None):
+            return "-"
+        dt = localtime(obj.last_answered_at)
+        return dt.strftime("%d/%m/%Y %H:%M")
+    last_answered_display.short_description = "Últ. resposta"
+
+
+    def last_status_badge(self, obj):
+        status = getattr(obj, "last_dispatch_status", "") or ""
+
+        styles = {
+            "pending": ("#fef3c7", "#92400e", "Pendente"),
+            "sent": ("#dbeafe", "#1d4ed8", "Enviado"),
+            "answered": ("#dcfce7", "#166534", "Respondido"),
+            "missed": ("#fee2e2", "#991b1b", "Expirado"),
+            "failed": ("#e5e7eb", "#475569", "Falhou"),
         }
 
-        if obj.schedule_type == "daily":
-            return f"Todo dia às {obj.time_of_day:%H:%M}"
-        if obj.schedule_type == "weekly":
-            return f"Toda {weekday_labels.get(obj.weekday, '-') } às {obj.time_of_day:%H:%M}"
-        if obj.schedule_type == "monthly":
-            return f"Dia {obj.day_of_month} às {obj.time_of_day:%H:%M}"
-        return "-"
+        bg, fg, label = styles.get(status, ("#e5e7eb", "#475569", "-"))
 
-    schedule_summary.short_description = "Resumo"
+        return format_html(
+            '<span style="display:inline-block;padding:5px 10px;'
+            'border-radius:999px;background:{};color:{};'
+            'font-weight:800;font-size:11px;">{}</span>',
+            bg, fg, label,
+        )
+    last_status_badge.short_description = "Últ. status"
+    
+    
+    def frequency_badge(self, obj):
+        if obj.schedule_type == obj.SCHEDULE_DAILY:
+            return format_html(
+                '<span style="display:inline-block;padding:5px 10px;'
+                'border-radius:999px;background:#dbeafe;color:#1d4ed8;'
+                'font-weight:800;font-size:11px;">Diário</span>'
+            )
+        if obj.schedule_type == obj.SCHEDULE_WEEKLY:
+            return format_html(
+                '<span style="display:inline-block;padding:5px 10px;'
+                'border-radius:999px;background:#ecfccb;color:#3f6212;'
+                'font-weight:800;font-size:11px;">Semanal</span>'
+            )
+        if obj.schedule_type == obj.SCHEDULE_MONTHLY:
+            return format_html(
+                '<span style="display:inline-block;padding:5px 10px;'
+                'border-radius:999px;background:#fef3c7;color:#92400e;'
+                'font-weight:800;font-size:11px;">Mensal</span>'
+            )
+        return format_html(
+            '<span style="display:inline-block;padding:5px 10px;'
+            'border-radius:999px;background:#e5e7eb;color:#475569;'
+            'font-weight:800;font-size:11px;">-</span>'
+        )
+    frequency_badge.short_description = "Frequência"
+    
+
+    def manager_summary(self, obj):
+        phone = format_phone_br(obj.manager.phone_e164) if obj.manager else "-"
+        branch = obj.manager.branch.name if obj.manager and obj.manager.branch else "Sem filial"
+        return format_html(
+            '<div style="line-height:1.35;">'
+            '<div style="font-weight:800;color:#0f172a;">{}</div>'
+            '<div style="font-size:12px;color:#64748b;">{} · {}</div>'
+            '</div>',
+            obj.manager.name if obj.manager else "-",
+            phone,
+            branch,
+        )
+    manager_summary.short_description = "Manager"
+    
+
+    def status_badge(self, obj):
+        if obj.is_active:
+            return format_html(
+                '<span style="display:inline-block;padding:5px 10px;'
+                'border-radius:999px;background:#dcfce7;color:#166534;'
+                'font-weight:800;font-size:11px;">Ativo</span>'
+            )
+        return format_html(
+            '<span style="display:inline-block;padding:5px 10px;'
+            'border-radius:999px;background:#e5e7eb;color:#6b7280;'
+            'font-weight:800;font-size:11px;">Inativo</span>'
+        )
+    status_badge.short_description = "Status"
+    
+
+    def schedule_human(self, obj):
+        weekday_labels = {
+            0: "Segunda",
+            1: "Terça",
+            2: "Quarta",
+            3: "Quinta",
+            4: "Sexta",
+            5: "Sábado",
+            6: "Domingo",
+        }
+
+        if obj.schedule_type == obj.SCHEDULE_DAILY:
+            text = f"Todo dia às {obj.time_of_day:%H:%M}"
+        elif obj.schedule_type == obj.SCHEDULE_WEEKLY:
+            text = f"{weekday_labels.get(obj.weekday, '-')} às {obj.time_of_day:%H:%M}"
+        elif obj.schedule_type == obj.SCHEDULE_MONTHLY:
+            text = f"Dia {obj.day_of_month} às {obj.time_of_day:%H:%M}"
+        else:
+            text = "-"
+
+        return format_html(
+            '<div style="font-weight:700;color:#0f172a;">{}</div>',
+            text,
+        )
+    schedule_human.short_description = "Quando envia"
+
+    def response_mode_badge(self, obj):
+        if obj.response_mode == obj.RESPONSE_BUTTON:
+            return format_html(
+                '<span style="display:inline-block;padding:5px 10px;'
+                'border-radius:999px;background:#dbeafe;color:#1d4ed8;'
+                'font-weight:800;font-size:11px;">Botão</span>'
+            )
+        if obj.response_mode == obj.RESPONSE_TEXT:
+            return format_html(
+                '<span style="display:inline-block;padding:5px 10px;'
+                'border-radius:999px;background:#fef3c7;color:#92400e;'
+                'font-weight:800;font-size:11px;">Texto</span>'
+            )
+        return format_html(
+            '<span style="display:inline-block;padding:5px 10px;'
+            'border-radius:999px;background:#e5e7eb;color:#475569;'
+            'font-weight:800;font-size:11px;">Sem resposta</span>'
+        )
+    response_mode_badge.short_description = "Retorno"
+
+    def template_badge(self, obj):
+        template_name = obj.get_effective_template_name()
+        if template_name == obj.DEFAULT_TEMPLATE_CONFIRM:
+            return format_html(
+                '<span style="display:inline-block;padding:5px 10px;'
+                'border-radius:999px;background:#ede9fe;color:#6d28d9;'
+                'font-weight:800;font-size:11px;">Confirmação</span>'
+            )
+        return format_html(
+            '<span style="display:inline-block;padding:5px 10px;'
+            'border-radius:999px;background:#e0f2fe;color:#0369a1;'
+            'font-weight:800;font-size:11px;">Aviso simples</span>'
+        )
+    template_badge.short_description = "Template"
+
+    def message_preview(self, obj):
+        t = (obj.message_text or "").strip()
+        if not t:
+            return "-"
+        short = (t[:90] + "…") if len(t) > 90 else t
+        return format_html(
+            '<span style="color:#475569;">{}</span>',
+            short,
+        )
+    message_preview.short_description = "Mensagem"
 
     def save_model(self, request, obj, form, change):
         obj.delivery_mode = ManagerPersonalReminder.DELIVERY_TEMPLATE
         obj.template_language = "pt_BR"
         obj.template_name = obj.get_effective_template_name()
-        super().save_model(request, obj, form, change)
-        
 
+        schedule_type = form.cleaned_data.get("schedule_type")
+        weekday_display = form.cleaned_data.get("weekday_display")
+
+        if schedule_type == ManagerPersonalReminder.SCHEDULE_WEEKLY and weekday_display not in ("", None):
+            obj.weekday = int(weekday_display)
+        else:
+            obj.weekday = None
+
+        if schedule_type != ManagerPersonalReminder.SCHEDULE_MONTHLY:
+            obj.day_of_month = None
+
+        super().save_model(request, obj, form, change)
 
 @admin.register(ManagerPersonalReminderDispatch)
 class ManagerPersonalReminderDispatchAdmin(admin.ModelAdmin):

@@ -1,0 +1,298 @@
+{% extends "admin/change_form.html" %}
+{% load i18n admin_urls static admin_modify %}
+
+{% block breadcrumbs %}{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block extrastyle %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'opscheckin/admin_personal_reminder.css' %}">
+{% endblock %}
+
+{% block extrahead %}
+  {{ block.super }}
+  <script src="{% static 'opscheckin/admin_personal_reminder_form.js' %}" defer></script>
+{% endblock %}
+
+{% block bodyclass %}{{ block.super }} app-personal-reminder-change-form{% endblock %}
+
+
+
+{% block content %}
+<div class="pr-page">
+  <div class="pr-shell">
+
+    <div class="pr-topbar">
+      <div class="pr-topbar__left">
+        <div class="pr-kicker">OpsCheckin · RH</div>
+        <h1 class="pr-title">
+          {% if add %}Novo aviso pessoal{% else %}Editar aviso pessoal{% endif %}
+        </h1>
+        <p class="pr-subtitle">
+          Configure lembretes recorrentes com aparência moderna, regras automáticas e envio por template do WhatsApp.
+        </p>
+      </div>
+
+      <div class="pr-topbar__right">
+        <span class="pr-chip pr-chip--blue">WhatsApp Template</span>
+        <span class="pr-chip pr-chip--green">Fluxo RH</span>
+        <span class="pr-chip pr-chip--dark">{% if add %}Novo cadastro{% else %}Edição{% endif %}</span>
+      </div>
+    </div>
+
+    <form {% if has_file_field %}enctype="multipart/form-data"{% endif %}
+          {% if form_url %}action="{{ form_url }}"{% endif %}
+          method="post"
+          id="{{ opts.model_name }}_form"
+          novalidate>
+      {% csrf_token %}
+
+      {% if errors %}
+        <div class="pr-alert pr-alert--error">
+          <div class="pr-alert__title">Existem erros no formulário</div>
+          <div class="pr-alert__body">
+            {{ adminform.form.non_field_errors }}
+          </div>
+        </div>
+      {% endif %}
+
+      <div class="pr-layout">
+        <div class="pr-main">
+
+          {% for fieldset in adminform %}
+            {% if forloop.counter0 == 0 %}
+              <section class="pr-card pr-card--compact">
+                <div class="pr-card__header">
+                  <div>
+                    <h2>Quem vai receber</h2>
+                    <p>Defina o manager e o status do aviso.</p>
+                  </div>
+                  <div class="pr-card__icon">👤</div>
+                </div>
+                <div class="pr-card__body">
+                  {% for line in fieldset %}
+                    {% for field in line %}
+                      <div class="pr-form-field {% if field.errors %}pr-form-field--error{% endif %}">
+                        {% if field.is_checkbox %}
+                          <div class="pr-checkbox-row">
+                            {{ field.field }} {{ field.label_tag }}
+                          </div>
+                        {% else %}
+                          {{ field.label_tag }}
+                          {{ field.field }}
+                        {% endif %}
+                        {% if field.field.help_text %}
+                          <div class="help">{{ field.field.help_text|safe }}</div>
+                        {% endif %}
+                        {% if field.errors %}
+                          <div class="pr-field-errors">{{ field.errors }}</div>
+                        {% endif %}
+                      </div>
+                    {% endfor %}
+                  {% endfor %}
+                </div>
+              </section>
+            {% endif %}
+
+            {% if forloop.counter0 == 1 %}
+              <section class="pr-card">
+                <div class="pr-card__header">
+                  <div>
+                    <h2>Identificação do aviso</h2>
+                    <p>Escreva o título interno e a mensagem principal.</p>
+                  </div>
+                  <div class="pr-card__icon">✍️</div>
+                </div>
+                <div class="pr-card__body">
+                  {% for line in fieldset %}
+                    {% for field in line %}
+                      <div class="pr-form-field {% if field.errors %}pr-form-field--error{% endif %}">
+                        {% if field.is_checkbox %}
+                          <div class="pr-checkbox-row">
+                            {{ field.field }} {{ field.label_tag }}
+                          </div>
+                        {% else %}
+                          {{ field.label_tag }}
+                          {{ field.field }}
+                        {% endif %}
+                        {% if field.field.help_text %}
+                          <div class="help">{{ field.field.help_text|safe }}</div>
+                        {% endif %}
+                        {% if field.errors %}
+                          <div class="pr-field-errors">{{ field.errors }}</div>
+                        {% endif %}
+                      </div>
+                    {% endfor %}
+                  {% endfor %}
+                </div>
+              </section>
+            {% endif %}
+
+            {% if forloop.counter0 == 2 %}
+              <section class="pr-card">
+                <div class="pr-card__header">
+                  <div>
+                    <h2>Quando enviar</h2>
+                    <p>Configure periodicidade, horário e período de validade.</p>
+                  </div>
+                  <div class="pr-card__icon">🗓️</div>
+                </div>
+                <div class="pr-card__body pr-card__body--grid">
+                  {% for line in fieldset %}
+                    {% for field in line %}
+                      <div class="pr-form-field {% if field.errors %}pr-form-field--error{% endif %}">
+                        {% if field.is_checkbox %}
+                          <div class="pr-checkbox-row">
+                            {{ field.field }} {{ field.label_tag }}
+                          </div>
+                        {% else %}
+                          {{ field.label_tag }}
+                          {{ field.field }}
+                        {% endif %}
+                        {% if field.field.help_text %}
+                          <div class="help">{{ field.field.help_text|safe }}</div>
+                        {% endif %}
+                        {% if field.errors %}
+                          <div class="pr-field-errors">{{ field.errors }}</div>
+                        {% endif %}
+                      </div>
+                    {% endfor %}
+                  {% endfor %}
+                </div>
+              </section>
+            {% endif %}
+
+            {% if forloop.counter0 == 3 %}
+              <section class="pr-card pr-card--compact">
+                <div class="pr-card__header">
+                  <div>
+                    <h2>Como será a resposta</h2>
+                    <p>Defina se o aviso exige retorno.</p>
+                  </div>
+                  <div class="pr-card__icon">💬</div>
+                </div>
+                <div class="pr-card__body">
+                  {% for line in fieldset %}
+                    {% for field in line %}
+                      <div class="pr-form-field {% if field.errors %}pr-form-field--error{% endif %}">
+                        {% if field.is_checkbox %}
+                          <div class="pr-checkbox-row">
+                            {{ field.field }} {{ field.label_tag }}
+                          </div>
+                        {% else %}
+                          {{ field.label_tag }}
+                          {{ field.field }}
+                        {% endif %}
+                        {% if field.field.help_text %}
+                          <div class="help">{{ field.field.help_text|safe }}</div>
+                        {% endif %}
+                        {% if field.errors %}
+                          <div class="pr-field-errors">{{ field.errors }}</div>
+                        {% endif %}
+                      </div>
+                    {% endfor %}
+                  {% endfor %}
+                </div>
+              </section>
+            {% endif %}
+          {% endfor %}
+
+          <section class="pr-card pr-card--full">
+            <div class="pr-card__header">
+              <div>
+                <h2>Configuração automática do WhatsApp</h2>
+                <p>Esses campos são definidos automaticamente pelo sistema para evitar erro operacional.</p>
+              </div>
+              <div class="pr-card__icon">⚙️</div>
+            </div>
+            <div class="pr-card__body">
+              {% for fieldset in adminform %}
+                {% if forloop.counter0 == 4 %}
+                  <div class="pr-auto-grid">
+                    {% for line in fieldset %}
+                      {% for field in line %}
+                        <div class="pr-form-field {% if field.errors %}pr-form-field--error{% endif %}">
+                          {% if field.is_checkbox %}
+                            <div class="pr-checkbox-row">
+                              {{ field.field }} {{ field.label_tag }}
+                            </div>
+                          {% else %}
+                            {{ field.label_tag }}
+                            {{ field.field }}
+                          {% endif %}
+                          {% if field.field.help_text %}
+                            <div class="help">{{ field.field.help_text|safe }}</div>
+                          {% endif %}
+                          {% if field.errors %}
+                            <div class="pr-field-errors">{{ field.errors }}</div>
+                          {% endif %}
+                        </div>
+                      {% endfor %}
+                    {% endfor %}
+                  </div>
+                {% endif %}
+              {% endfor %}
+            </div>
+          </section>
+        </div>
+
+        <aside class="pr-sidebar">
+          <section class="pr-sidecard">
+            <div class="pr-sidecard__header">
+              <h3>Resumo rápido</h3>
+            </div>
+            <div class="pr-sidecard__body">
+              <div class="pr-summary-item">
+                <span class="pr-summary-label">Tipo de envio</span>
+                <strong id="pr-summary-delivery">Template WhatsApp</strong>
+              </div>
+              <div class="pr-summary-item">
+                <span class="pr-summary-label">Template</span>
+                <strong id="pr-summary-template">manager_personal_reminder_text</strong>
+              </div>
+              <div class="pr-summary-item">
+                <span class="pr-summary-label">Periodicidade</span>
+                <strong id="pr-summary-frequency">A definir</strong>
+              </div>
+              <div class="pr-summary-item">
+                <span class="pr-summary-label">Resposta</span>
+                <strong id="pr-summary-response">Não exige resposta</strong>
+              </div>
+            </div>
+          </section>
+
+          <section class="pr-sidecard pr-sidecard--soft">
+            <div class="pr-sidecard__header">
+              <h3>Boas práticas</h3>
+            </div>
+            <div class="pr-sidecard__body">
+              <ul class="pr-tips">
+                <li>Use títulos curtos e objetivos.</li>
+                <li>Escreva a mensagem como uma ação clara.</li>
+                <li>Para avisos semanais, selecione o dia da semana.</li>
+                <li>Para avisos mensais, informe o dia do mês.</li>
+              </ul>
+            </div>
+          </section>
+        </aside>
+      </div>
+
+      {% if adminform.form.errors %}
+        <div class="pr-inline-errors">
+          {% for field in adminform.form %}
+            {% if field.errors %}
+              <div class="pr-inline-errors__item">
+                <strong>{{ field.label }}:</strong> {{ field.errors|striptags }}
+              </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      <div class="pr-actions">
+        {% submit_row %}
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
