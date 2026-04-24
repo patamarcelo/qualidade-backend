@@ -366,11 +366,6 @@ class ManagerAdmin(admin.ModelAdmin):
 
 
 class ManagerPersonalReminderAdminForm(forms.ModelForm):
-    resumo_operacional = forms.CharField(
-        required=False,
-        label="Resumo do envio",
-        widget=forms.Textarea(attrs={"rows": 3, "readonly": "readonly"}),
-    )
 
     class Meta:
         model = ManagerPersonalReminder
@@ -429,53 +424,7 @@ class ManagerPersonalReminderAdminForm(forms.ModelForm):
             "Janela em minutos para o cron considerar o lembrete elegível."
         )
 
-        instance = self.instance if self.instance and self.instance.pk else None
 
-        response_mode = None
-        if self.data.get("response_mode"):
-            response_mode = self.data.get("response_mode")
-        elif instance:
-            response_mode = instance.response_mode
-        else:
-            response_mode = ManagerPersonalReminder.RESPONSE_NONE
-
-        schedule_type = None
-        if self.data.get("schedule_type"):
-            schedule_type = self.data.get("schedule_type")
-        elif instance:
-            schedule_type = instance.schedule_type
-        else:
-            schedule_type = ManagerPersonalReminder.SCHEDULE_DAILY
-
-        effective_template = (
-            instance.get_effective_template_name()
-            if instance
-            else (
-                ManagerPersonalReminder.DEFAULT_TEMPLATE_CONFIRM
-                if response_mode == ManagerPersonalReminder.RESPONSE_BUTTON
-                else ManagerPersonalReminder.DEFAULT_TEMPLATE_TEXT
-            )
-        )
-
-
-        resumo = self._build_summary(
-            schedule_type=schedule_type,
-            time_of_day=(
-                self.data.get("time_of_day")
-                or (instance.time_of_day.strftime("%H:%M") if instance and instance.time_of_day else "")
-            ),
-            weekday=(
-                self.data.get("weekday")
-                or (str(instance.weekday) if instance and instance.weekday is not None else "")
-            ),
-            day_of_month=(
-                self.data.get("day_of_month")
-                or (str(instance.day_of_month) if instance and instance.day_of_month is not None else "")
-            ),
-            response_mode=response_mode,
-            template_name=effective_template,
-        )
-        self.fields["resumo_operacional"].initial = resumo
 
     def _build_summary(self, *, schedule_type, time_of_day, weekday, day_of_month, response_mode, template_name):
         weekday_labels = {
@@ -564,6 +513,13 @@ class ManagerPersonalReminderAdmin(admin.ModelAdmin):
     )
     autocomplete_fields = ("manager",)
 
+    readonly_fields = (
+        "delivery_mode_preview",
+        "template_name_preview",
+        "template_language_preview",
+        "resumo_operacional",
+    )
+
     fieldsets = (
         ("Quem vai receber", {
             "fields": (
@@ -582,7 +538,7 @@ class ManagerPersonalReminderAdmin(admin.ModelAdmin):
             "fields": (
                 "schedule_type",
                 "time_of_day",
-                "weekday_display",
+                "weekday",
                 "day_of_month",
                 "start_date",
                 "end_date",
@@ -603,7 +559,6 @@ class ManagerPersonalReminderAdmin(admin.ModelAdmin):
             ),
         }),
     )
-
     class Media:
         css = {
             "all": ("opscheckin/admin_personal_reminder.css",)
@@ -670,6 +625,71 @@ class ManagerPersonalReminderAdmin(admin.ModelAdmin):
             ),
         )
         
+    def delivery_mode_preview(self, obj):
+        return "Template WhatsApp"
+
+    delivery_mode_preview.short_description = "Modo de envio"
+
+
+    def template_name_preview(self, obj):
+        if not obj:
+            return "-"
+
+        if obj.response_mode == ManagerPersonalReminder.RESPONSE_BUTTON:
+            return ManagerPersonalReminder.DEFAULT_TEMPLATE_CONFIRM
+
+        return ManagerPersonalReminder.DEFAULT_TEMPLATE_TEXT
+
+    template_name_preview.short_description = "Template aplicado"
+
+
+    def template_language_preview(self, obj):
+        return "pt_BR"
+
+    template_language_preview.short_description = "Idioma"
+
+
+    def resumo_operacional(self, obj):
+        if not obj:
+            return "-"
+
+        weekday_labels = {
+            0: "segunda-feira",
+            1: "terça-feira",
+            2: "quarta-feira",
+            3: "quinta-feira",
+            4: "sexta-feira",
+            5: "sábado",
+            6: "domingo",
+        }
+
+        if obj.schedule_type == obj.SCHEDULE_DAILY:
+            freq = f"Todo dia às {obj.time_of_day:%H:%M}" if obj.time_of_day else "Todo dia"
+        elif obj.schedule_type == obj.SCHEDULE_WEEKLY:
+            day = weekday_labels.get(obj.weekday, "-")
+            freq = f"Toda {day} às {obj.time_of_day:%H:%M}" if obj.time_of_day else f"Toda {day}"
+        elif obj.schedule_type == obj.SCHEDULE_MONTHLY:
+            freq = f"Todo dia {obj.day_of_month} do mês às {obj.time_of_day:%H:%M}" if obj.time_of_day else f"Todo dia {obj.day_of_month} do mês"
+        else:
+            freq = "-"
+
+        if obj.response_mode == obj.RESPONSE_BUTTON:
+            retorno = "Exige confirmação por botão"
+            template = obj.DEFAULT_TEMPLATE_CONFIRM
+        elif obj.response_mode == obj.RESPONSE_TEXT:
+            retorno = "Espera resposta por texto"
+            template = obj.DEFAULT_TEMPLATE_TEXT
+        else:
+            retorno = "Não exige resposta"
+            template = obj.DEFAULT_TEMPLATE_TEXT
+
+        return (
+            f"Frequência: {freq}\n"
+            f"Retorno esperado: {retorno}\n"
+            f"Template aplicado automaticamente: {template}"
+        )
+
+    resumo_operacional.short_description = "Resumo do envio"
 
     def last_sent_display(self, obj):
         if not getattr(obj, "last_sent_at", None):
@@ -844,11 +864,8 @@ class ManagerPersonalReminderAdmin(admin.ModelAdmin):
         obj.template_name = obj.get_effective_template_name()
 
         schedule_type = form.cleaned_data.get("schedule_type")
-        weekday_display = form.cleaned_data.get("weekday_display")
 
-        if schedule_type == ManagerPersonalReminder.SCHEDULE_WEEKLY and weekday_display not in ("", None):
-            obj.weekday = int(weekday_display)
-        else:
+        if schedule_type != ManagerPersonalReminder.SCHEDULE_WEEKLY:
             obj.weekday = None
 
         if schedule_type != ManagerPersonalReminder.SCHEDULE_MONTHLY:
