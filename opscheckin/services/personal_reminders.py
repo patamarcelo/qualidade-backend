@@ -26,6 +26,10 @@ from opscheckin.models import (
 
 from opscheckin.services.whatsapp import send_text, send_template
 
+from datetime import date, timedelta
+import calendar
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -40,6 +44,26 @@ class ReminderSendResult:
     dispatch_id: Optional[int] = None
     provider_message_id: str = ""
     detail: str = ""
+
+
+
+def get_effective_monthly_date(reminder, year: int, month: int):
+    if not reminder.day_of_month:
+        return None
+
+    last_day = calendar.monthrange(year, month)[1]
+    raw_day = min(reminder.day_of_month, last_day)
+    target = date(year, month, raw_day)
+
+    # sábado -> sexta
+    if target.weekday() == 5:
+        target = target - timedelta(days=1)
+
+    # domingo -> sexta
+    elif target.weekday() == 6:
+        target = target - timedelta(days=2)
+
+    return target
 
 
 def _local_now() -> datetime:
@@ -83,7 +107,8 @@ def reminder_matches_day(reminder: ManagerPersonalReminder, day) -> bool:
         return reminder.weekday == day.weekday()
 
     if schedule_type == "monthly":
-        return reminder.day_of_month == day.day
+        effective_date = get_effective_monthly_date(reminder, day.year, day.month)
+        return effective_date == day
 
     return False
 

@@ -187,7 +187,7 @@ def start():
             scheduler.add_job(
                 job_run_opscheckin_manager_personal_reminder_tick,
                 "cron",
-                day_of_week="*",
+                day_of_week="mon-fri",
                 hour="6-18",
                 minute="*/15",
                 id="opscheckin_manager_personal_reminder_tick",
