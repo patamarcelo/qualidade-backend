@@ -28,6 +28,21 @@ from .models import (
 from django.db.models import OuterRef, Subquery, DateTimeField, CharField
 from django.utils.timezone import localtime
 
+
+from datetime import timedelta, time
+
+from django.db.models import (
+    DurationField,
+    ExpressionWrapper,
+)
+from django.db.models.functions import Now, ExtractIsoWeekDay, TruncDate
+
+from calendar import monthrange
+from datetime import datetime, timedelta
+from django.utils import timezone
+
+
+
 BR_DDDS = [
     "11", "12", "13", "14", "15", "16", "17", "18", "19",
     "21", "22", "24", "27", "28",
@@ -478,8 +493,123 @@ class ManagerPersonalReminderChangeList(ChangeList):
 
 @admin.register(ManagerPersonalReminder)
 class ManagerPersonalReminderAdmin(admin.ModelAdmin):
+    
+    def _make_aware_local(self, date_value, time_value):
+        dt = datetime.combine(date_value, time_value)
+
+        if timezone.is_naive(dt):
+            dt = timezone.make_aware(dt, timezone.get_current_timezone())
+
+        return dt
+
+
+    def _next_business_day(self, date_value):
+        while date_value.weekday() >= 5:
+            date_value += timedelta(days=1)
+        return date_value
+
+
+    def _monthly_adjust_weekend_to_friday(self, date_value):
+        if date_value.weekday() == 5:
+            return date_value - timedelta(days=1)
+
+        if date_value.weekday() == 6:
+            return date_value - timedelta(days=2)
+
+        return date_value
+
+
+    def _safe_month_date(self, year, month, day):
+        last_day = monthrange(year, month)[1]
+        return datetime(year, month, min(day, last_day)).date()
+
+
+    def _add_month(self, year, month):
+        if month == 12:
+            return year + 1, 1
+        return year, month + 1
+
+
+    def calculate_next_dispatch_for_admin(self, obj):
+        if not obj.is_active:
+            return None
+
+        now = timezone.localtime()
+        today = now.date()
+
+        if not obj.time_of_day:
+            return None
+
+        base_date = today
+
+        if obj.start_date and obj.start_date > base_date:
+            base_date = obj.start_date
+
+        if obj.end_date and base_date > obj.end_date:
+            return None
+
+        if obj.schedule_type == obj.SCHEDULE_DAILY:
+            candidate_date = self._next_business_day(base_date)
+            candidate_dt = self._make_aware_local(candidate_date, obj.time_of_day)
+
+            if candidate_dt <= now:
+                candidate_date = self._next_business_day(candidate_date + timedelta(days=1))
+                candidate_dt = self._make_aware_local(candidate_date, obj.time_of_day)
+
+            if obj.end_date and candidate_date > obj.end_date:
+                return None
+
+            return candidate_dt
+
+        if obj.schedule_type == obj.SCHEDULE_WEEKLY:
+            if obj.weekday is None:
+                return None
+
+            days_ahead = (obj.weekday - base_date.weekday()) % 7
+            candidate_date = base_date + timedelta(days=days_ahead)
+            candidate_dt = self._make_aware_local(candidate_date, obj.time_of_day)
+
+            if candidate_dt <= now:
+                candidate_date = candidate_date + timedelta(days=7)
+                candidate_dt = self._make_aware_local(candidate_date, obj.time_of_day)
+
+            if obj.end_date and candidate_date > obj.end_date:
+                return None
+
+            return candidate_dt
+
+        if obj.schedule_type == obj.SCHEDULE_MONTHLY:
+            if not obj.day_of_month:
+                return None
+
+            year = base_date.year
+            month = base_date.month
+
+            for _ in range(15):
+                raw_date = self._safe_month_date(year, month, obj.day_of_month)
+                candidate_date = self._monthly_adjust_weekend_to_friday(raw_date)
+                candidate_dt = self._make_aware_local(candidate_date, obj.time_of_day)
+
+                if candidate_dt > now:
+                    if obj.start_date and candidate_date < obj.start_date:
+                        year, month = self._add_month(year, month)
+                        continue
+
+                    if obj.end_date and candidate_date > obj.end_date:
+                        return None
+
+                    return candidate_dt
+
+                year, month = self._add_month(year, month)
+
+        return None
+
     form = ManagerPersonalReminderAdminForm
-    sortable_by = ()
+    sortable_by = (
+        "next_order_display",
+        "next_dispatch_display",
+        "updated_at",
+    )
 
     list_display = (
         "id",
@@ -488,6 +618,8 @@ class ManagerPersonalReminderAdmin(admin.ModelAdmin):
         "status_badge",
         "frequency_badge",
         "schedule_human",
+        "next_dispatch_display",
+        "next_order_display",
         "response_mode_badge",
         "template_badge",
         "last_sent_display",
@@ -569,26 +701,50 @@ class ManagerPersonalReminderAdmin(admin.ModelAdmin):
         return ManagerPersonalReminderChangeList
 
     def changelist_view(self, request, extra_context=None):
-        if "o" in request.GET:
-            q = request.GET.copy()
-            q.pop("o", None)
-            url = request.path
-            if q:
-                url = f"{url}?{q.urlencode()}"
-            return HttpResponseRedirect(url)
-        return super().changelist_view(request, extra_context)
+        response = super().changelist_view(request, extra_context)
+
+        try:
+            cl = response.context_data["cl"]
+            result_list = list(cl.result_list)
+
+            enriched = []
+
+            for obj in result_list:
+                next_dt = self.calculate_next_dispatch_for_admin(obj)
+                obj._next_dispatch_admin = next_dt
+
+                enriched.append((next_dt, obj))
+
+            enriched.sort(
+                key=lambda item: (
+                    item[0] is None,
+                    item[0] or timezone.datetime.max.replace(tzinfo=timezone.get_current_timezone()),
+                    str(item[1].manager.name if item[1].manager else ""),
+                    str(item[1].title or ""),
+                )
+            )
+
+            for index, (_, obj) in enumerate(enriched, start=1):
+                obj._next_order_admin = index
+
+            cl.result_list = [obj for _, obj in enriched]
+
+        except Exception:
+            pass
+
+        return response
 
     def get_ordering(self, request):
         return ()
 
     def get_queryset(self, request):
         qs = super().get_queryset(request).select_related("manager", "manager__branch")
-    
+
         latest_dispatch = ManagerPersonalReminderDispatch.objects.filter(
-                reminder=OuterRef("pk")
-            ).order_by("-scheduled_for", "-id")
-    
-        return qs.annotate(
+            reminder=OuterRef("pk")
+        ).order_by("-scheduled_for", "-id")
+
+        qs = qs.annotate(
             sort_group=Case(
                 When(schedule_type="daily", then=Value(0)),
                 When(schedule_type="weekly", then=Value(1)),
@@ -624,11 +780,48 @@ class ManagerPersonalReminderAdmin(admin.ModelAdmin):
                 output_field=CharField(),
             ),
         )
-        
+
+        return qs
+
     def delivery_mode_preview(self, obj):
         return "Template WhatsApp"
 
     delivery_mode_preview.short_description = "Modo de envio"
+    
+    def next_order_display(self, obj):
+        value = getattr(obj, "_next_order_admin", None)
+
+        if not value:
+            return "-"
+
+        return format_html(
+            '<span style="display:inline-flex;align-items:center;justify-content:center;'
+            'min-width:28px;height:28px;border-radius:999px;'
+            'background:#eef2ff;color:#3730a3;font-weight:900;font-size:12px;">{}</span>',
+            value,
+        )
+
+    next_order_display.short_description = "Next order"
+
+
+    def next_dispatch_display(self, obj):
+        dt = getattr(obj, "_next_dispatch_admin", None)
+
+        if not dt:
+            return "-"
+
+        dt = localtime(dt)
+
+        return format_html(
+            '<div style="line-height:1.35;">'
+            '<div style="font-weight:800;color:#0f172a;">{}</div>'
+            '<div style="font-size:12px;color:#64748b;">{}</div>'
+            '</div>',
+            dt.strftime("%d/%m/%Y"),
+            dt.strftime("%H:%M"),
+        )
+
+    next_dispatch_display.short_description = "Próximo disparo"
 
 
     def template_name_preview(self, obj):
