@@ -189,7 +189,7 @@ def start():
                 "cron",
                 day_of_week="mon-fri",
                 hour="6-18",
-                minute="*/15",
+                minute="*/10",
                 id="opscheckin_manager_personal_reminder_tick",
                 replace_existing=True,
                 misfire_grace_time=120,

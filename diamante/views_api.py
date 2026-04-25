@@ -5651,6 +5651,301 @@ class PlantioViewSet(viewsets.ModelViewSet):
 
         except Exception as e:
             return JsonResponse({"detail": f"Erro ao processar: {e}"}, status=400)
+        
+    
+    @action(detail=False, methods=["GET", "POST"])
+    def get_navigation_map_data(self, request, pk=None):
+        if not request.user.is_authenticated:
+            return Response(
+                {"message": "Você precisa estar logado!!!"},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        try:
+            safra_filter = None
+            ciclo_filter = None
+
+            # Aceita POST body e query params
+            if request.method == "POST":
+                safra_filter = request.data.get("safra")
+                ciclo_filter = request.data.get("ciclo")
+            else:
+                safra_filter = request.query_params.get("safra")
+                ciclo_filter = request.query_params.get("ciclo")
+
+            # Fallback usando CicloAtual, igual ao padrão que você já usa
+            if not safra_filter or not ciclo_filter:
+                try:
+                    current_filter = CicloAtual.objects.filter(nome="Colheita").first()
+                    if current_filter:
+                        safra_filter = current_filter.safra.safra
+                        ciclo_filter = str(current_filter.ciclo.ciclo)
+                except Exception as e:
+                    print("Erro ao buscar CicloAtual:", e)
+
+            safra_filter = safra_filter or "2025/2026"
+            ciclo_filter = ciclo_filter or "1"
+
+            # Query base para mapa/navegação
+            qs_plantio = (
+                Plantio.objects
+                .select_related(
+                    "safra",
+                    "ciclo",
+                    "talhao",
+                    "talhao__fazenda",
+                    "talhao__fazenda__fazenda",
+                    "variedade",
+                    "variedade__cultura",
+                )
+                .values(
+                    "id",
+                    "id_farmbox",
+
+                    "safra__safra",
+                    "ciclo__ciclo",
+
+                    "talhao__id_talhao",
+                    "talhao__id_unico",
+                    "talhao_id",
+
+                    "talhao__fazenda__id",
+                    "talhao__fazenda__nome",
+                    "talhao__fazenda__id_farmbox",
+                    "talhao__fazenda__map_centro_id",
+                    "talhao__fazenda__map_zoom",
+
+                    "talhao__fazenda__fazenda__nome",
+
+                    "variedade__nome_fantasia",
+                    "variedade__variedade",
+                    "variedade__dias_ciclo",
+                    "variedade__cultura__cultura",
+                    "variedade__cultura__map_color",
+                    "variedade__cultura__map_color_line",
+
+                    "finalizado_plantio",
+                    "inicializado_plantio",
+                    "finalizado_colheita",
+                    "plantio_descontinuado",
+
+                    "area_colheita",
+                    "area_planejamento_plantio",
+                    "area_parcial",
+
+                    "data_plantio",
+                    "data_prevista_plantio",
+                    "data_prevista_colheita",
+
+                    "map_centro_id",
+                    "map_geo_points",
+                )
+                .filter(
+                    safra__safra=safra_filter,
+                    ciclo__ciclo=ciclo_filter,
+                    plantio_descontinuado=False,
+                )
+                .order_by(
+                    "talhao__fazenda__fazenda__nome",
+                    "talhao__fazenda__nome",
+                    "talhao__id_talhao",
+                )
+            )
+
+            plantio_ids = [x["id"] for x in qs_plantio]
+
+            # Cargas / Colheita agregada por plantio
+            qs_colheita = (
+                Colheita.objects
+                .filter(plantio_id__in=plantio_ids)
+                .values("plantio_id")
+                .annotate(
+                    peso_kg=Round(Sum("peso_liquido"), precision=2),
+                    peso_scs=Round(Sum("peso_scs_limpo_e_seco"), precision=2),
+                    total_romaneio=Count("romaneio"),
+                )
+            )
+
+            colheita_by_plantio = {
+                item["plantio_id"]: item
+                for item in qs_colheita
+            }
+
+            result = []
+
+            total_area = Decimal("0")
+            total_area_plantada = Decimal("0")
+            total_area_colhida = Decimal("0")
+            total_peso_kg = Decimal("0")
+            total_peso_scs = Decimal("0")
+
+            for item in qs_plantio:
+                plantio_id = item["id"]
+
+                area = item["area_colheita"] or Decimal("0")
+                area_planejamento = item["area_planejamento_plantio"] or Decimal("0")
+                area_parcial = item["area_parcial"] or Decimal("0")
+
+                colheita = colheita_by_plantio.get(plantio_id, {})
+
+                peso_kg = colheita.get("peso_kg") or Decimal("0")
+                peso_scs = colheita.get("peso_scs") or Decimal("0")
+                total_romaneio = colheita.get("total_romaneio") or 0
+
+                if item["finalizado_colheita"]:
+                    area_base_produtividade = area
+                else:
+                    area_base_produtividade = area_parcial
+
+                produtividade = 0
+                if area_base_produtividade and peso_scs:
+                    try:
+                        produtividade = round(float(peso_scs) / float(area_base_produtividade), 2)
+                    except Exception:
+                        produtividade = 0
+
+                # Status geral para pintar/filtrar no app
+                if item["finalizado_colheita"]:
+                    status_key = "colhido"
+                    status_label = "Colhido"
+                elif item["finalizado_plantio"]:
+                    status_key = "plantado"
+                    status_label = "Plantado"
+                elif item["inicializado_plantio"]:
+                    status_key = "em_plantio"
+                    status_label = "Em plantio"
+                elif item["variedade__cultura__cultura"]:
+                    status_key = "planejado"
+                    status_label = "Planejado"
+                else:
+                    status_key = "sem_planejamento"
+                    status_label = "Sem planejamento"
+
+                # Cor sugerida
+                fill_color = item["variedade__cultura__map_color"]
+                line_color = item["variedade__cultura__map_color_line"]
+
+                if not fill_color:
+                    if status_key == "sem_planejamento":
+                        fill_color = "#FFFFFF"
+                    elif status_key == "em_plantio":
+                        fill_color = "#FACC15"
+                    elif status_key == "plantado":
+                        fill_color = "#22C55E"
+                    elif status_key == "colhido":
+                        fill_color = "#A16207"
+                    else:
+                        fill_color = "#CBD5E1"
+
+                if not line_color:
+                    line_color = "#334155"
+
+                total_area += area
+                total_area_plantada += area if item["finalizado_plantio"] else Decimal("0")
+                total_area_colhida += area_parcial if area_parcial else Decimal("0")
+                total_peso_kg += peso_kg
+                total_peso_scs += peso_scs
+
+                result.append({
+                    "id": plantio_id,
+                    "id_farmbox": item["id_farmbox"],
+
+                    "safra": item["safra__safra"],
+                    "ciclo": item["ciclo__ciclo"],
+
+                    "fazenda_grupo": item["talhao__fazenda__fazenda__nome"],
+                    "projeto": item["talhao__fazenda__nome"],
+                    "projeto_id": item["talhao__fazenda__id"],
+                    "projeto_id_farmbox": item["talhao__fazenda__id_farmbox"],
+
+                    "parcela": item["talhao__id_talhao"],
+                    "talhao_id": item["talhao_id"],
+                    "talhao_id_unico": item["talhao__id_unico"],
+
+                    "cultura": item["variedade__cultura__cultura"],
+                    "variedade": item["variedade__nome_fantasia"],
+                    "variedade_nome": item["variedade__variedade"],
+                    "dias_ciclo": item["variedade__dias_ciclo"],
+
+                    "status": status_key,
+                    "status_label": status_label,
+
+                    "finalizado_plantio": item["finalizado_plantio"],
+                    "inicializado_plantio": item["inicializado_plantio"],
+                    "finalizado_colheita": item["finalizado_colheita"],
+                    "plantio_descontinuado": item["plantio_descontinuado"],
+
+                    "area": float(area),
+                    "area_planejamento_plantio": float(area_planejamento),
+                    "area_parcial": float(area_parcial),
+
+                    "data_plantio": item["data_plantio"],
+                    "data_prevista_plantio": item["data_prevista_plantio"],
+                    "data_prevista_colheita": item["data_prevista_colheita"],
+
+                    "peso_kg": float(peso_kg),
+                    "peso_scs": float(peso_scs),
+                    "produtividade": produtividade,
+                    "total_romaneio": total_romaneio,
+
+                    "map": {
+                        "center": item["map_centro_id"],
+                        "geo_points": item["map_geo_points"],
+                        "projeto_center": item["talhao__fazenda__map_centro_id"],
+                        "projeto_zoom": item["talhao__fazenda__map_zoom"],
+                        "fill_color": fill_color,
+                        "line_color": line_color,
+                    },
+                })
+
+            filters = {
+                "safras": sorted(list(set([x["safra"] for x in result if x.get("safra")]))),
+                "ciclos": sorted(list(set([x["ciclo"] for x in result if x.get("ciclo")]))),
+                "fazendas": sorted(list(set([x["fazenda_grupo"] for x in result if x.get("fazenda_grupo")]))),
+                "projetos": sorted(list(set([x["projeto"] for x in result if x.get("projeto")]))),
+                "culturas": sorted(list(set([x["cultura"] for x in result if x.get("cultura")]))),
+                "variedades": list({
+                    f'{x.get("cultura")}|{x.get("variedade")}': {
+                        "cultura": x.get("cultura"),
+                        "variedade": x.get("variedade"),
+                    }
+                    for x in result
+                    if x.get("variedade")
+                }.values()),
+                "statuses": [
+                    {"key": "sem_planejamento", "label": "Sem planejamento"},
+                    {"key": "planejado", "label": "Planejado"},
+                    {"key": "em_plantio", "label": "Em plantio"},
+                    {"key": "plantado", "label": "Plantado"},
+                    {"key": "colhido", "label": "Colhido"},
+                ],
+            }
+
+            response = {
+                "msg": "Consulta realizada com sucesso!",
+                "safra": safra_filter,
+                "ciclo": ciclo_filter,
+                "total_return": len(result),
+                "filters": filters,
+                "totals": {
+                    "total_parcelas": len(result),
+                    "area_total": float(total_area),
+                    "area_plantada": float(total_area_plantada),
+                    "area_colhida": float(total_area_colhida),
+                    "peso_kg": float(total_peso_kg),
+                    "peso_scs": float(total_peso_scs),
+                },
+                "data": result,
+            }
+
+            return Response(response, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            print("Erro em get_navigation_map_data:", e)
+            return Response(
+                {"message": f"Ocorreu um Erro: {e}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
 
 class DefensivoViewSet(viewsets.ModelViewSet):
