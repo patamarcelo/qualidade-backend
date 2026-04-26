@@ -5685,6 +5685,94 @@ class PlantioViewSet(viewsets.ModelViewSet):
 
             safra_filter = safra_filter or "2025/2026"
             ciclo_filter = ciclo_filter or "1"
+            
+            qs_filters_index = (
+                Plantio.objects
+                .select_related(
+                    "safra",
+                    "ciclo",
+                    "talhao",
+                    "talhao__fazenda",
+                    "talhao__fazenda__fazenda",
+                    "variedade",
+                    "variedade__cultura",
+                )
+                .values(
+                    "safra__safra",
+                    "ciclo__ciclo",
+                    "talhao__fazenda__fazenda__nome",
+                    "talhao__fazenda__nome",
+                    "talhao__fazenda__id",
+                    "talhao__fazenda__id_farmbox",
+                    "variedade__nome_fantasia",
+                    "variedade__variedade",
+                    "variedade__cultura__cultura",
+                    "finalizado_plantio",
+                    "inicializado_plantio",
+                    "finalizado_colheita",
+                    "plantio_descontinuado",
+                )
+                .filter(plantio_descontinuado=False)
+                .distinct()
+                .order_by(
+                    "talhao__fazenda__fazenda__nome",
+                    "talhao__fazenda__nome",
+                    "safra__safra",
+                    "ciclo__ciclo",
+                    "variedade__cultura__cultura",
+                    "variedade__nome_fantasia",
+                )
+            )
+            
+            filters_index_map = {}
+
+            for item in qs_filters_index:
+                if item["finalizado_colheita"]:
+                    status_key = "colhido"
+                    status_label = "Colhido"
+                elif item["finalizado_plantio"]:
+                    status_key = "plantado"
+                    status_label = "Plantado"
+                elif item["inicializado_plantio"]:
+                    status_key = "em_plantio"
+                    status_label = "Em plantio"
+                elif item["variedade__cultura__cultura"]:
+                    status_key = "planejado"
+                    status_label = "Planejado"
+                else:
+                    status_key = "sem_planejamento"
+                    status_label = "Sem planejamento"
+
+                row = {
+                    "fazenda_grupo": item["talhao__fazenda__fazenda__nome"],
+                    "projeto": item["talhao__fazenda__nome"],
+                    "projeto_id": item["talhao__fazenda__id"],
+                    "projeto_id_farmbox": item["talhao__fazenda__id_farmbox"],
+
+                    "safra": item["safra__safra"],
+                    "ciclo": str(item["ciclo__ciclo"]),
+
+                    "cultura": item["variedade__cultura__cultura"],
+                    "variedade": item["variedade__nome_fantasia"],
+                    "variedade_nome": item["variedade__variedade"],
+
+                    "status": status_key,
+                    "status_label": status_label,
+                }
+
+                key = (
+                    f'{row["fazenda_grupo"]}|'
+                    f'{row["projeto"]}|'
+                    f'{row["safra"]}|'
+                    f'{row["ciclo"]}|'
+                    f'{row["cultura"]}|'
+                    f'{row["variedade"]}|'
+                    f'{row["status"]}'
+                )
+
+                filters_index_map[key] = row
+
+            filters_index = list(filters_index_map.values())
 
             # Query base para mapa/navegação
             qs_plantio = (
@@ -5899,17 +5987,28 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 })
 
             filters = {
-                "safras": sorted(list(set([x["safra"] for x in result if x.get("safra")]))),
-                "ciclos": sorted(list(set([x["ciclo"] for x in result if x.get("ciclo")]))),
-                "fazendas": sorted(list(set([x["fazenda_grupo"] for x in result if x.get("fazenda_grupo")]))),
-                "projetos": sorted(list(set([x["projeto"] for x in result if x.get("projeto")]))),
-                "culturas": sorted(list(set([x["cultura"] for x in result if x.get("cultura")]))),
+                "safras": sorted(list(set([
+                    x["safra"] for x in filters_index if x.get("safra")
+                ]))),
+                "ciclos": sorted(list(set([
+                    str(x["ciclo"]) for x in filters_index if x.get("ciclo")
+                ])), key=lambda x: int(x) if str(x).isdigit() else 999),
+                "fazendas": sorted(list(set([
+                    x["fazenda_grupo"] for x in filters_index if x.get("fazenda_grupo")
+                ]))),
+                "projetos": sorted(list(set([
+                    x["projeto"] for x in filters_index if x.get("projeto")
+                ]))),
+                "culturas": sorted(list(set([
+                    x["cultura"] for x in filters_index if x.get("cultura")
+                ]))),
                 "variedades": list({
                     f'{x.get("cultura")}|{x.get("variedade")}': {
                         "cultura": x.get("cultura"),
                         "variedade": x.get("variedade"),
+                        "variedade_nome": x.get("variedade_nome"),
                     }
-                    for x in result
+                    for x in filters_index
                     if x.get("variedade")
                 }.values()),
                 "statuses": [
@@ -5927,6 +6026,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 "ciclo": ciclo_filter,
                 "total_return": len(result),
                 "filters": filters,
+                "filters_index": filters_index,
                 "totals": {
                     "total_parcelas": len(result),
                     "area_total": float(total_area),
