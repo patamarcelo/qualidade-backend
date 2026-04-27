@@ -5673,19 +5673,90 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 safra_filter = request.query_params.get("safra")
                 ciclo_filter = request.query_params.get("ciclo")
 
-            # Fallback usando CicloAtual, igual ao padrão que você já usa
-            if not safra_filter or not ciclo_filter:
-                try:
-                    current_filter = CicloAtual.objects.filter(nome="Colheita").first()
-                    if current_filter:
-                        safra_filter = current_filter.safra.safra
-                        ciclo_filter = str(current_filter.ciclo.ciclo)
-                except Exception as e:
-                    print("Erro ao buscar CicloAtual:", e)
+            safra_filter = str(safra_filter).strip() if safra_filter else None
+            ciclo_filter = str(ciclo_filter).strip() if ciclo_filter else None
 
+            # ------------------------------------------------------------
+            # 1. Ciclos operacionais válidos para a navegação
+            # ------------------------------------------------------------
+            # A navegação deve considerar SOMENTE:
+            # - CicloAtual(nome="Plantio")
+            # - CicloAtual(nome="Colheita")
+            #
+            # Isso impede o endpoint de trazer safras/ciclos antigos
+            # apenas porque ainda existem Plantio antigos no banco.
+            # ------------------------------------------------------------
+            navigation_current_filters = (
+                CicloAtual.objects
+                .select_related("safra", "ciclo")
+                .filter(nome__in=["Plantio", "Colheita"])
+            )
+
+            navigation_pairs = []
+
+            for current in navigation_current_filters:
+                if current.safra and current.ciclo:
+                    navigation_pairs.append({
+                        "nome": current.nome,
+                        "safra": str(current.safra.safra).strip(),
+                        "ciclo": str(current.ciclo.ciclo).strip(),
+                    })
+
+            # Fallback: prioriza Plantio, depois Colheita
+            default_filter = (
+                next((x for x in navigation_pairs if x["nome"] == "Plantio"), None)
+                or next((x for x in navigation_pairs if x["nome"] == "Colheita"), None)
+            )
+
+            if not safra_filter or not ciclo_filter:
+                if default_filter:
+                    safra_filter = default_filter["safra"]
+                    ciclo_filter = default_filter["ciclo"]
+
+            # Segurança final se CicloAtual estiver mal configurado
             safra_filter = safra_filter or "2025/2026"
-            ciclo_filter = ciclo_filter or "1"
-            
+            ciclo_filter = str(ciclo_filter or "1")
+
+            # Se o app mandar safra/ciclo fora dos CicloAtual permitidos,
+            # força para Plantio/Colheita configurado no banco.
+            if navigation_pairs:
+                requested_pair_is_valid = any(
+                    pair["safra"] == safra_filter and pair["ciclo"] == str(ciclo_filter)
+                    for pair in navigation_pairs
+                )
+
+                if not requested_pair_is_valid and default_filter:
+                    safra_filter = default_filter["safra"]
+                    ciclo_filter = default_filter["ciclo"]
+
+            # Q exato para evitar combinação cruzada.
+            # Exemplo:
+            # Plantio  = 2026/2027 ciclo 1
+            # Colheita = 2025/2026 ciclo 3
+            #
+            # Não queremos aceitar 2026/2027 ciclo 3 por engano.
+            navigation_q = Q()
+
+            for pair in navigation_pairs:
+                navigation_q |= Q(
+                    safra__safra=pair["safra"],
+                    ciclo__ciclo=pair["ciclo"],
+                )
+
+            # Se não houver CicloAtual configurado, evita retornar histórico inteiro.
+            if not navigation_pairs:
+                navigation_q = Q(
+                    safra__safra=safra_filter,
+                    ciclo__ciclo=ciclo_filter,
+                )
+
+            # ------------------------------------------------------------
+            # 2. Índice leve de filtros
+            # ------------------------------------------------------------
+            # Este bloco não traz geometria.
+            # Serve apenas para o app saber quais combinações existem
+            # dentro de Plantio/Colheita atuais.
+            # ------------------------------------------------------------
             qs_filters_index = (
                 Plantio.objects
                 .select_related(
@@ -5700,19 +5771,25 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 .values(
                     "safra__safra",
                     "ciclo__ciclo",
+
                     "talhao__fazenda__fazenda__nome",
                     "talhao__fazenda__nome",
                     "talhao__fazenda__id",
                     "talhao__fazenda__id_farmbox",
+
                     "variedade__nome_fantasia",
                     "variedade__variedade",
                     "variedade__cultura__cultura",
+
                     "finalizado_plantio",
                     "inicializado_plantio",
                     "finalizado_colheita",
                     "plantio_descontinuado",
                 )
-                .filter(plantio_descontinuado=False)
+                .filter(
+                    navigation_q,
+                    plantio_descontinuado=False,
+                )
                 .distinct()
                 .order_by(
                     "talhao__fazenda__fazenda__nome",
@@ -5723,7 +5800,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "variedade__nome_fantasia",
                 )
             )
-            
+
             filters_index_map = {}
 
             for item in qs_filters_index:
@@ -5774,7 +5851,11 @@ class PlantioViewSet(viewsets.ModelViewSet):
 
             filters_index = list(filters_index_map.values())
 
-            # Query base para mapa/navegação
+            # ------------------------------------------------------------
+            # 3. Query principal do mapa
+            # ------------------------------------------------------------
+            # Esta query traz os polígonos somente da safra/ciclo selecionados.
+            # ------------------------------------------------------------
             qs_plantio = (
                 Plantio.objects
                 .select_related(
@@ -5842,7 +5923,9 @@ class PlantioViewSet(viewsets.ModelViewSet):
 
             plantio_ids = [x["id"] for x in qs_plantio]
 
-            # Cargas / Colheita agregada por plantio
+            # ------------------------------------------------------------
+            # 4. Cargas / Colheita agregada por plantio
+            # ------------------------------------------------------------
             qs_colheita = (
                 Colheita.objects
                 .filter(plantio_id__in=plantio_ids)
@@ -5886,13 +5969,13 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     area_base_produtividade = area_parcial
 
                 produtividade = 0
+
                 if area_base_produtividade and peso_scs:
                     try:
                         produtividade = round(float(peso_scs) / float(area_base_produtividade), 2)
                     except Exception:
                         produtividade = 0
 
-                # Status geral para pintar/filtrar no app
                 if item["finalizado_colheita"]:
                     status_key = "colhido"
                     status_label = "Colhido"
@@ -5909,7 +5992,6 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     status_key = "sem_planejamento"
                     status_label = "Sem planejamento"
 
-                # Cor sugerida
                 fill_color = item["variedade__cultura__map_color"]
                 line_color = item["variedade__cultura__map_color_line"]
 
@@ -5986,6 +6068,9 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     },
                 })
 
+            # ------------------------------------------------------------
+            # 5. Filtros baseados apenas nos CicloAtual válidos
+            # ------------------------------------------------------------
             filters = {
                 "safras": sorted(list(set([
                     x["safra"] for x in filters_index if x.get("safra")
@@ -6018,6 +6103,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     {"key": "plantado", "label": "Plantado"},
                     {"key": "colhido", "label": "Colhido"},
                 ],
+                "operational_cycles": navigation_pairs,
             }
 
             response = {
@@ -6046,7 +6132,6 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 {"message": f"Ocorreu um Erro: {e}"},
                 status=status.HTTP_400_BAD_REQUEST
             )
-
 
 class DefensivoViewSet(viewsets.ModelViewSet):
     queryset = Defensivo.objects.all().order_by("produto")
