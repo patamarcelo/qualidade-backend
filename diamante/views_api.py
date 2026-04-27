@@ -247,7 +247,21 @@ import re
 logger = logging.getLogger(__name__)
 
 
+def add_days_to_date(value, days):
+    if not value or days in [None, ""]:
+        return None
 
+    try:
+        if isinstance(value, datetime.datetime):
+            base_date = value.date()
+        elif isinstance(value, datetime.date):
+            base_date = value
+        else:
+            base_date = datetime.datetime.strptime(str(value)[:10], "%Y-%m-%d").date()
+
+        return base_date + datetime.timedelta(days=int(days))
+    except Exception:
+        return None
 
 def resolve_farm_and_harvest_by_storage(storage_id, projetos_by_storage):
     if storage_id in [None, ""]:
@@ -6015,6 +6029,23 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 total_area_colhida += area_parcial if area_parcial else Decimal("0")
                 total_peso_kg += peso_kg
                 total_peso_scs += peso_scs
+                
+                
+                data_plantio = item["data_plantio"]
+                data_prevista_plantio = item["data_prevista_plantio"]
+                data_prevista_colheita_db = item["data_prevista_colheita"]
+                dias_ciclo = item["variedade__dias_ciclo"]
+
+                data_base_colheita = data_plantio or data_prevista_plantio
+
+                data_prevista_colheita_calc = add_days_to_date(
+                    data_base_colheita,
+                    dias_ciclo
+                )
+
+                data_prevista_colheita_final = (
+                    data_prevista_colheita_db or data_prevista_colheita_calc
+                )
 
                 result.append({
                     "id": plantio_id,
@@ -6051,7 +6082,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
 
                     "data_plantio": item["data_plantio"],
                     "data_prevista_plantio": item["data_prevista_plantio"],
-                    "data_prevista_colheita": item["data_prevista_colheita"],
+                    "data_prevista_colheita": data_prevista_colheita_final,
 
                     "peso_kg": float(peso_kg),
                     "peso_scs": float(peso_scs),
