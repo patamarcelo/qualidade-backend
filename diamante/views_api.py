@@ -3200,7 +3200,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 print('safra filter: ', safra_filter)
                 print('cicle filter: ',cicle_filter)
                 if device is None:
-                    safra_filter = ['2024/2025','2025/2026']    
+                    safra_filter = ['2025/2026','2026/2027']    
                     cicle_filter = ['1','2','3']
                 else:
                     safra_filter = ["2024/2025"] if safra_filter == None else [safra_filter]
