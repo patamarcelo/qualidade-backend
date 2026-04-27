@@ -502,6 +502,14 @@ class ManagerPersonalReminderAdmin(admin.ModelAdmin):
 
         return dt
 
+    def _candidate_already_dispatched(self, obj, candidate_dt):
+        if not obj.pk or not candidate_dt:
+            return False
+
+        return ManagerPersonalReminderDispatch.objects.filter(
+            reminder=obj,
+            scheduled_for=candidate_dt,
+        ).exists()
 
     def _next_business_day(self, date_value):
         while date_value.weekday() >= 5:
@@ -535,72 +543,111 @@ class ManagerPersonalReminderAdmin(admin.ModelAdmin):
             return None
 
         now = timezone.localtime()
-        today = now.date()
 
         if not obj.time_of_day:
             return None
 
-        base_date = today
+        last_scheduled_for = getattr(obj, "last_scheduled_for", None)
 
-        if obj.start_date and obj.start_date > base_date:
-            base_date = obj.start_date
+        if last_scheduled_for:
+            anchor_dt = timezone.localtime(last_scheduled_for)
+        else:
+            anchor_dt = now
 
-        if obj.end_date and base_date > obj.end_date:
+        anchor_date = anchor_dt.date()
+
+        if obj.start_date and obj.start_date > anchor_date:
+            anchor_date = obj.start_date
+            anchor_dt = self._make_aware_local(anchor_date, obj.time_of_day)
+
+        if obj.end_date and anchor_date > obj.end_date:
             return None
 
         if obj.schedule_type == obj.SCHEDULE_DAILY:
-            candidate_date = self._next_business_day(base_date)
-            candidate_dt = self._make_aware_local(candidate_date, obj.time_of_day)
+            if last_scheduled_for:
+                candidate_date = self._next_business_day(anchor_date + timedelta(days=1))
+            else:
+                candidate_date = self._next_business_day(anchor_date)
 
-            if candidate_dt <= now:
-                candidate_date = self._next_business_day(candidate_date + timedelta(days=1))
+            for _ in range(370):
                 candidate_dt = self._make_aware_local(candidate_date, obj.time_of_day)
 
-            if obj.end_date and candidate_date > obj.end_date:
-                return None
+                if candidate_dt <= now:
+                    candidate_date = self._next_business_day(candidate_date + timedelta(days=1))
+                    continue
 
-            return candidate_dt
+                if obj.end_date and candidate_date > obj.end_date:
+                    return None
+
+                if self._candidate_already_dispatched(obj, candidate_dt):
+                    candidate_date = self._next_business_day(candidate_date + timedelta(days=1))
+                    continue
+
+                return candidate_dt
+
+            return None
 
         if obj.schedule_type == obj.SCHEDULE_WEEKLY:
             if obj.weekday is None:
                 return None
 
-            days_ahead = (obj.weekday - base_date.weekday()) % 7
-            candidate_date = base_date + timedelta(days=days_ahead)
-            candidate_dt = self._make_aware_local(candidate_date, obj.time_of_day)
+            if last_scheduled_for:
+                candidate_date = anchor_date + timedelta(days=7)
+            else:
+                days_ahead = (obj.weekday - anchor_date.weekday()) % 7
+                candidate_date = anchor_date + timedelta(days=days_ahead)
 
-            if candidate_dt <= now:
-                candidate_date = candidate_date + timedelta(days=7)
+            for _ in range(80):
                 candidate_dt = self._make_aware_local(candidate_date, obj.time_of_day)
 
-            if obj.end_date and candidate_date > obj.end_date:
-                return None
+                if candidate_dt <= now:
+                    candidate_date = candidate_date + timedelta(days=7)
+                    continue
 
-            return candidate_dt
+                if obj.end_date and candidate_date > obj.end_date:
+                    return None
+
+                if self._candidate_already_dispatched(obj, candidate_dt):
+                    candidate_date = candidate_date + timedelta(days=7)
+                    continue
+
+                return candidate_dt
+
+            return None
 
         if obj.schedule_type == obj.SCHEDULE_MONTHLY:
             if not obj.day_of_month:
                 return None
 
-            year = base_date.year
-            month = base_date.month
+            if last_scheduled_for:
+                year, month = self._add_month(anchor_date.year, anchor_date.month)
+            else:
+                year = anchor_date.year
+                month = anchor_date.month
 
-            for _ in range(15):
+            for _ in range(36):
                 raw_date = self._safe_month_date(year, month, obj.day_of_month)
                 candidate_date = self._monthly_adjust_weekend_to_friday(raw_date)
                 candidate_dt = self._make_aware_local(candidate_date, obj.time_of_day)
 
-                if candidate_dt > now:
-                    if obj.start_date and candidate_date < obj.start_date:
-                        year, month = self._add_month(year, month)
-                        continue
+                if candidate_dt <= now:
+                    year, month = self._add_month(year, month)
+                    continue
 
-                    if obj.end_date and candidate_date > obj.end_date:
-                        return None
+                if obj.start_date and candidate_date < obj.start_date:
+                    year, month = self._add_month(year, month)
+                    continue
 
-                    return candidate_dt
+                if obj.end_date and candidate_date > obj.end_date:
+                    return None
 
-                year, month = self._add_month(year, month)
+                if self._candidate_already_dispatched(obj, candidate_dt):
+                    year, month = self._add_month(year, month)
+                    continue
+
+                return candidate_dt
+
+            return None
 
         return None
 
@@ -705,35 +752,46 @@ class ManagerPersonalReminderAdmin(admin.ModelAdmin):
 
         try:
             cl = response.context_data["cl"]
-            result_list = list(cl.result_list)
+
+            # Mantém exatamente a ordem original que o Django/Admin já montou
+            original_result_list = list(cl.result_list)
+
+            max_dt = timezone.datetime.max.replace(
+                tzinfo=timezone.get_current_timezone()
+            )
 
             enriched = []
 
-            for obj in result_list:
+            for obj in original_result_list:
                 next_dt = self.calculate_next_dispatch_for_admin(obj)
                 obj._next_dispatch_admin = next_dt
 
                 enriched.append((next_dt, obj))
 
-            enriched.sort(
+            # Esta ordenação serve APENAS para calcular o número do Next order.
+            # Ela NÃO será aplicada visualmente na tabela.
+            ranked = sorted(
+                enriched,
                 key=lambda item: (
                     item[0] is None,
-                    item[0] or timezone.datetime.max.replace(tzinfo=timezone.get_current_timezone()),
+                    item[0] or max_dt,
                     str(item[1].manager.name if item[1].manager else ""),
                     str(item[1].title or ""),
                 )
             )
 
-            for index, (_, obj) in enumerate(enriched, start=1):
+            for index, (_, obj) in enumerate(ranked, start=1):
                 obj._next_order_admin = index
 
-            cl.result_list = [obj for _, obj in enriched]
+            # Importante:
+            # mantém a listagem original, sem mudar a ordem visual.
+            cl.result_list = original_result_list
 
-        except Exception:
-            pass
+        except Exception as e:
+            print("[ManagerPersonalReminderAdmin] erro ao calcular next order:", e)
 
         return response
-
+    
     def get_ordering(self, request):
         return ()
 
@@ -767,6 +825,10 @@ class ManagerPersonalReminderAdmin(admin.ModelAdmin):
                 output_field=TimeField(),
             ),
 
+            last_scheduled_for=Subquery(
+                latest_dispatch.values("scheduled_for")[:1],
+                output_field=DateTimeField(),
+            ),
             last_sent_at=Subquery(
                 latest_dispatch.values("sent_at")[:1],
                 output_field=DateTimeField(),
@@ -782,7 +844,7 @@ class ManagerPersonalReminderAdmin(admin.ModelAdmin):
         )
 
         return qs
-
+    
     def delivery_mode_preview(self, obj):
         return "Template WhatsApp"
 
