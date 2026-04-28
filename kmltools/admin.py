@@ -4,7 +4,7 @@ from django.utils import timezone
 from django.contrib.auth import get_user_model
 from django.utils.html import format_html
 
-from .models import BillingProfile, WeeklyUsage, KMLMergeJob, MergeFeedback, UnlockFeedback
+from .models import BillingProfile, WeeklyUsage, KMLMergeJob, MergeFeedback, UnlockFeedback, EmailMagicLink
 
 from django.db.models import OuterRef, Subquery, IntegerField, Value, Case, When, F,  CharField, Count, Sum, TextField
 from django.db.models.functions import Coalesce, Trim, Cast
@@ -36,20 +36,21 @@ class BillingProfileAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "user_email",
+        "auth_method",  # ✅ nova coluna
         "plan",
-        "use_case",           # Novo campo na listagem
-        "usage_frequency",    # Novo campo na listagem
+        "use_case",
+        "usage_frequency",
         "is_unlimited_flag",
         "free_monthly_credits",
         "prepaid_credits",
         "credits_used_total",
+        "stripe_subscription_id",
         "remove_from_mail_list",
-        "onboarding_completed_at", # Útil para ver ativação
+        "onboarding_completed_at",
         "created_at",
         "stripe_customer_id",
-        "stripe_subscription_id",
         "current_period_end",
-        "country_name", 
+        "country_name",
     )
 
     list_filter = (
@@ -153,6 +154,28 @@ class BillingProfileAdmin(admin.ModelAdmin):
 
     user_email.short_description = "Email"
     user_email.admin_order_field = "user__email"
+
+    def auth_method(self, obj):
+        email = (getattr(obj.user, "email", "") or "").strip().lower()
+
+        if not email:
+            return "—"
+
+        used_link = EmailMagicLink.objects.filter(
+            email__iexact=email,
+            used_at__isnull=False,
+        ).exists()
+
+        if used_link:
+            return format_html(
+                '<span style="background:#e0f2fe;color:#075985;padding:3px 8px;border-radius:999px;font-weight:700;">Email link</span>'
+            )
+
+        return format_html(
+            '<span style="background:#f3f4f6;color:#374151;padding:3px 8px;border-radius:999px;font-weight:700;">Google / Other</span>'
+        )
+
+    auth_method.short_description = "Auth"
 
     def is_unlimited_flag(self, obj):
         # usa property do model

@@ -3136,6 +3136,18 @@ class UnlockFreeCreditView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
+        plan_now = (getattr(bp, "plan", "") or "free").lower().strip()
+
+        if plan_now != "free":
+            return Response(
+                {
+                    "detail": "Free unlock is only available for free accounts.",
+                    "code": "FREE_UNLOCK_ONLY_FOR_FREE_PLAN",
+                    "plan": plan_now,
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         anon_id = (request.headers.get("X-ANON-ID") or "").strip() or None
         ip_address = get_client_ip(request)
 
@@ -3218,6 +3230,19 @@ class UnlockFreeCreditView(APIView):
 
         with transaction.atomic():
             bp = BillingProfile.objects.select_for_update().get(pk=bp.pk)
+            
+            # ✅ recheck transacional: se virou prepaid/pro no meio do caminho, bloqueia
+            plan_now = (getattr(bp, "plan", "") or "free").lower().strip()
+
+            if plan_now != "free":
+                return Response(
+                    {
+                        "detail": "Free unlock is only available for free accounts.",
+                        "code": "FREE_UNLOCK_ONLY_FOR_FREE_PLAN",
+                        "plan": plan_now,
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                )
 
             # recheck por conta
             if bool(getattr(bp, "free_unlock_used", False)):
