@@ -5703,7 +5703,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             navigation_current_filters = (
                 CicloAtual.objects
                 .select_related("safra", "ciclo")
-                .filter(nome__in=["Plantio", "Colheita"])
+                .filter(nome__in=["Plantio", "Colheita", "Planejamento"])
             )
 
             navigation_pairs = []
@@ -5715,6 +5715,12 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         "safra": str(current.safra.safra).strip(),
                         "ciclo": str(current.ciclo.ciclo).strip(),
                     })
+                    
+            planning_pairs = {
+                (pair["safra"], str(pair["ciclo"]))
+                for pair in navigation_pairs
+                if pair["nome"] == "Planejamento"
+            }
 
             # Fallback: prioriza Plantio, depois Colheita
             default_filter = (
@@ -5818,7 +5824,15 @@ class PlantioViewSet(viewsets.ModelViewSet):
             filters_index_map = {}
 
             for item in qs_filters_index:
-                if item["finalizado_colheita"]:
+                item_pair = (
+                    str(item["safra__safra"]).strip(),
+                    str(item["ciclo__ciclo"]).strip(),
+                )
+
+                if item_pair in planning_pairs:
+                    status_key = "planejado"
+                    status_label = "Planejado"
+                elif item["finalizado_colheita"]:
                     status_key = "colhido"
                     status_label = "Colhido"
                 elif item["finalizado_plantio"]:
@@ -5991,7 +6005,15 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     except Exception:
                         produtividade = 0
 
-                if item["finalizado_colheita"]:
+                item_pair = (
+                    str(item["safra__safra"]).strip(),
+                    str(item["ciclo__ciclo"]).strip(),
+                )
+
+                if item_pair in planning_pairs:
+                    status_key = "planejado"
+                    status_label = "Planejado"
+                elif item["finalizado_colheita"]:
                     status_key = "colhido"
                     status_label = "Colhido"
                 elif item["finalizado_plantio"]:
