@@ -3563,8 +3563,271 @@ class TipoDefensivoFilter(SimpleListFilter):
 
 def _normalizar_nome_produto(nome):
     return " ".join((nome or "").strip().upper().split())
+
 @admin.register(Aplicacao)
 class AplicacaoAdmin(admin.ModelAdmin):
+    
+    @staticmethod
+    def processar_substituicao_cronograma_em_background(
+        task_id,
+        alteracoes,
+    ):
+        close_old_connections()
+        task = None
+
+        try:
+            task = BackgroundTaskStatus.objects.get(task_id=task_id)
+            task.status = "running"
+
+            if hasattr(task, "started_at"):
+                task.started_at = timezone.now()
+
+            task.save(
+                update_fields=["status"] + (["started_at"] if hasattr(task, "started_at") else [])
+            )
+
+            admin_instance = AplicacaoAdmin(Aplicacao, admin.site)
+
+            total_plantios_atualizados = 0
+
+            for item in alteracoes:
+                produto_origem = Defensivo.objects.filter(pk=item["produto_origem_id"]).first()
+                produto_destino = Defensivo.objects.filter(pk=item["produto_destino_id"]).first()
+
+                if not produto_origem or not produto_destino:
+                    continue
+
+                total_plantios_atualizados += admin_instance._sincronizar_produto_no_cronograma_nao_aplicado(
+                    aplicacao_id=item["aplicacao_id"],
+                    produto_origem=produto_origem,
+                    produto_destino=produto_destino,
+                    nova_dose=item.get("nova_dose"),
+                    alterar_dose=item.get("alterar_dose", False),
+                    zerar_custo=item.get("zerar_custo", False),
+                )
+
+            task.status = "done"
+
+            if hasattr(task, "result"):
+                task.result = {
+                    "ok": True,
+                    "plantios_cronograma_atualizados": total_plantios_atualizados,
+                    "alteracoes_processadas": len(alteracoes),
+                }
+
+        except Exception as e:
+            if task:
+                task.status = "failed"
+                if hasattr(task, "result"):
+                    task.result = {"error": str(e)}
+
+        finally:
+            if task:
+                update_fields = ["status"]
+
+                if hasattr(task, "result"):
+                    update_fields.append("result")
+
+                if hasattr(task, "ended_at"):
+                    task.ended_at = timezone.now()
+                    update_fields.append("ended_at")
+
+                task.save(update_fields=update_fields)
+
+            close_old_connections()
+    def _cronograma_item_ja_aplicado(self, item):
+        """
+        Detecta se uma etapa/produto do cronograma já foi aplicado.
+        Funciona tanto para boolean True quanto para strings comuns vindas do JSON.
+        """
+        if not isinstance(item, dict):
+            return False
+
+        possible_keys = [
+            "aplicado",
+            "aplicada",
+            "finalizado",
+            "finalizada",
+            "aplicacao_realizada",
+            "aplicação realizada",
+            "open_on_farm",
+            "opened_on_farm",
+            "enviado_farmbox",
+            "enviado farmbox",
+        ]
+
+        for key in possible_keys:
+            value = item.get(key)
+
+            if value is True:
+                return True
+
+            if isinstance(value, str) and value.strip().lower() in ["true", "sim", "yes", "1"]:
+                return True
+
+            if isinstance(value, int) and value == 1:
+                return True
+
+        return False
+    
+
+    def _normalizar_id_farmbox(self, value):
+        if value in [None, ""]:
+            return None
+        return str(value).strip()
+
+
+    def _sincronizar_produto_no_cronograma_nao_aplicado(
+        self,
+        aplicacao_id,
+        produto_origem,
+        produto_destino,
+        nova_dose=None,
+        alterar_dose=False,
+        zerar_custo=False,
+    ):
+        """
+        Atualiza o cronograma_programa salvo no Plantio,
+        mas SOMENTE:
+        - no programa da aplicação alterada;
+        - na etapa/estágio da operação alterada;
+        - no produto origem alterado;
+        - se a etapa/produto ainda não foi aplicado.
+        """
+        app = (
+            Aplicacao.objects
+            .filter(pk=aplicacao_id)
+            .select_related(
+                "operacao",
+                "operacao__programa",
+                "defensivo",
+            )
+            .first()
+        )
+
+        if not app or not app.operacao or not app.operacao.programa_id:
+            return 0
+
+        programa_id = app.operacao.programa_id
+        estagio_nome = str(app.operacao.estagio or "").strip()
+
+        if not estagio_nome:
+            return 0
+
+        origem_id_farmbox = self._normalizar_id_farmbox(
+            produto_origem.id_farmbox if produto_origem else None
+        )
+
+        origem_nome = _normalizar_nome_produto(
+            produto_origem.produto if produto_origem else ""
+        )
+
+        plantios = (
+            Plantio.objects
+            .filter(
+                programa_id=programa_id,
+                programa__ativo=True,
+                cronograma_programa__isnull=False,
+            )
+            .filter(
+                Q(inicializado_plantio=True) | Q(finalizado_plantio=True)
+            )
+            .select_related("programa")
+        )
+
+        plantios_atualizados = 0
+
+        for plantio in plantios:
+            cronograma = plantio.cronograma_programa or []
+
+            if not isinstance(cronograma, list):
+                continue
+
+            mudou_cronograma = False
+
+            for etapa in cronograma:
+                if not isinstance(etapa, dict):
+                    continue
+
+                # Se a etapa inteira já foi aplicada, não altera nada nela
+                if self._cronograma_item_ja_aplicado(etapa):
+                    continue
+
+                nome_etapa = str(
+                    etapa.get("estagio")
+                    or etapa.get("nome")
+                    or etapa.get("operacao")
+                    or etapa.get("operação")
+                    or ""
+                ).strip()
+
+                # REGRA DE SEGURANÇA:
+                # só altera a etapa explicitamente afetada pela operação da aplicação
+                if not nome_etapa or nome_etapa != estagio_nome:
+                    continue
+
+                produtos = etapa.get("produtos") or []
+
+                if not isinstance(produtos, list):
+                    continue
+
+                for produto_json in produtos:
+                    if not isinstance(produto_json, dict):
+                        continue
+
+                    # Produto já aplicado não pode ser alterado
+                    if self._cronograma_item_ja_aplicado(produto_json):
+                        continue
+
+                    produto_json_id = self._normalizar_id_farmbox(
+                        produto_json.get("id_farmbox")
+                    )
+
+                    produto_json_nome = _normalizar_nome_produto(
+                        produto_json.get("produto")
+                    )
+
+                    mesmo_produto = False
+
+                    if origem_id_farmbox and produto_json_id:
+                        mesmo_produto = origem_id_farmbox == produto_json_id
+                    elif origem_nome and produto_json_nome:
+                        mesmo_produto = origem_nome == produto_json_nome
+
+                    if not mesmo_produto:
+                        continue
+
+                    produto_json["produto"] = produto_destino.produto
+                    produto_json["tipo"] = produto_destino.tipo
+                    produto_json["id_farmbox"] = produto_destino.id_farmbox
+                    produto_json["formulacao"] = produto_destino.unidade_medida
+
+                    if alterar_dose:
+                        dose_final = nova_dose
+                        produto_json["dose"] = float(dose_final) if dose_final is not None else None
+
+                        try:
+                            area = float(plantio.area_colheita or 0)
+                            dose = float(dose_final or 0)
+                            produto_json["quantidade aplicar"] = round(area * dose, 3)
+                        except Exception:
+                            produto_json["quantidade aplicar"] = ""
+
+                    if zerar_custo:
+                        produto_json["preco"] = 0
+                        produto_json["valor_final"] = 0
+                        produto_json["valor_aplicacao"] = 0
+
+                    mudou_cronograma = True
+
+            if mudou_cronograma:
+                plantio.cronograma_programa = cronograma
+                plantio.save(update_fields=["cronograma_programa", "modificado"])
+                plantios_atualizados += 1
+
+        return plantios_atualizados
+
+
     actions = [export_programa, "substituir_produto_em_lote", "editar_precos_em_lote"]
 
     show_full_result_count = False
@@ -3753,7 +4016,7 @@ class AplicacaoAdmin(admin.ModelAdmin):
                 atualizados = 0
                 conflitos = 0
                 ignorados = 0
-                programas_afetados = set()
+                alteracoes_cronograma = []
 
                 with transaction.atomic():
                     for app in qs:
@@ -3771,6 +4034,8 @@ class AplicacaoAdmin(admin.ModelAdmin):
                             continue
 
                         mudou_algo = False
+
+                        produto_origem_app = app.defensivo
 
                         if app.defensivo_id != produto_destino.id:
                             app.defensivo = produto_destino
@@ -3790,48 +4055,80 @@ class AplicacaoAdmin(admin.ModelAdmin):
 
                         app.save()
                         atualizados += 1
-
-                        if app.operacao and app.operacao.programa_id:
-                            programas_afetados.add(app.operacao.programa_id)
-
-                tasks_disparadas = 0
-                tasks_ignoradas = 0
-
-                for programa_id in programas_afetados:
-                    programa = Programa.objects.filter(pk=programa_id).first()
-                    if not programa:
-                        continue
-
-                    task_name = programa.nome
-
-                    exists_running = BackgroundTaskStatus.objects.filter(
-                        task_name=task_name,
-                        status__in=["pending", "running"],
-                    ).exists()
-
-                    if exists_running:
-                        tasks_ignoradas += 1
-                        continue
-
+                        
+                        alteracoes_cronograma.append({
+                            "aplicacao_id": app.pk,
+                            "produto_origem_id": produto_origem_app.pk if produto_origem_app else None,
+                            "produto_destino_id": produto_destino.pk,
+                            "nova_dose": str(dose_final) if dose_final is not None else None,
+                            "alterar_dose": alterar_dose,
+                            "zerar_custo": zerar_custo,
+                        })
+                    
+                if alteracoes_cronograma:
                     task_id = str(uuid.uuid4())
+
                     BackgroundTaskStatus.objects.create(
                         task_id=task_id,
-                        task_name=task_name,
+                        task_name="Substituição em lote - cronograma programa",
                         status="pending",
                     )
 
                     Thread(
-                        target=processar_programa_em_background,
-                        args=(task_id, programa_id),
+                        target=self.processar_substituicao_cronograma_em_background,
+                        args=(task_id, alteracoes_cronograma),
                         daemon=True,
                     ).start()
 
-                    tasks_disparadas += 1
                     request.session["task_id"] = str(task_id)
                     request.session["executou_task"] = True
                     request.session.modified = True
 
-                if atualizados:
+
+                # tasks_disparadas = 0
+                # tasks_ignoradas = 0
+
+                # for programa_id in programas_afetados:
+                #     programa = Programa.objects.filter(pk=programa_id).first()
+                #     if not programa:
+                #         continue
+
+                #     task_name = programa.nome
+
+                #     exists_running = BackgroundTaskStatus.objects.filter(
+                #         task_name=task_name,
+                #         status__in=["pending", "running"],
+                #     ).exists()
+
+                #     if exists_running:
+                #         tasks_ignoradas += 1
+                #         continue
+
+                #     task_id = str(uuid.uuid4())
+                #     BackgroundTaskStatus.objects.create(
+                #         task_id=task_id,
+                #         task_name=task_name,
+                #         status="pending",
+                #     )
+
+                #     Thread(
+                #         target=processar_programa_em_background,
+                #         args=(task_id, programa_id),
+                #         daemon=True,
+                #     ).start()
+
+                #     tasks_disparadas += 1
+                #     request.session["task_id"] = str(task_id)
+                #     request.session["executou_task"] = True
+                #     request.session.modified = True
+
+                if atualizados and alteracoes_cronograma:
+                    self.message_user(
+                        request,
+                        f"{atualizados} aplicação(ões) atualizada(s). A atualização dos cronogramas foi enviada para processamento em background.",
+                        level=messages.SUCCESS,
+                    )
+                elif atualizados:
                     self.message_user(
                         request,
                         f"{atualizados} aplicação(ões) atualizada(s) com sucesso.",
@@ -3852,19 +4149,20 @@ class AplicacaoAdmin(admin.ModelAdmin):
                         level=messages.INFO,
                     )
 
-                if tasks_disparadas:
-                    self.message_user(
-                        request,
-                        f"{tasks_disparadas} tarefa(s) de reprocessamento de programa disparada(s).",
-                        level=messages.SUCCESS,
-                    )
+                # if tasks_disparadas:
+                #     self.message_user(
+                #         request,
+                #         f"{tasks_disparadas} tarefa(s) de reprocessamento de programa disparada(s).",
+                #         level=messages.SUCCESS,
+                #     )
 
-                if tasks_ignoradas:
-                    self.message_user(
-                        request,
-                        f"{tasks_ignoradas} programa(s) já tinham tarefa em andamento e foram ignorados.",
-                        level=messages.WARNING,
-                    )
+                # if tasks_ignoradas:
+                #     self.message_user(
+                #         request,
+                #         f"{tasks_ignoradas} programa(s) já tinham tarefa em andamento e foram ignorados.",
+                #         level=messages.WARNING,
+                #     )
+                
 
                 return HttpResponseRedirect(request.get_full_path())
 
@@ -4089,6 +4387,8 @@ class AplicacaoAdmin(admin.ModelAdmin):
             "admin/diamante/aplicacao/editar_precos_em_lote.html",
             context,
         )
+
+
 @admin.register(AplicacaoPlantio)
 class AplicacaoPlantioAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
