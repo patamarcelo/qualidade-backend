@@ -5924,8 +5924,9 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "map_geo_points",
                 )
                 .filter(
-                    safra__safra=safra_filter,
-                    ciclo__ciclo=ciclo_filter,
+                    # safra__safra=safra_filter,
+                    # ciclo__ciclo=ciclo_filter,
+                    navigation_q,
                     plantio_descontinuado=False,
                 )
                 .order_by(
