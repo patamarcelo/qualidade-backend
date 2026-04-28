@@ -2242,11 +2242,13 @@ class KMLDownloadView(APIView):
 
         bp = ensure_billing_profile(request.user, request=request)
         if not bp:
-            bp, created = BillingProfile.objects.get_or_create(
-                user=request.user,
-                defaults={"plan": "free"}
+            return Response(
+                {
+                    "detail": "BillingProfile ausente.",
+                    "code": "BILLING_PROFILE_MISSING",
+                },
+                status=status.HTTP_401_UNAUTHORIZED,
             )
-            print("⚠️ BillingProfile auto-created in download:", created)
 
         # ✅ agora é seguro: bp.pk existe
         plan = (bp.plan or "free").lower().strip()

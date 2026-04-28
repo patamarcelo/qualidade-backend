@@ -2,6 +2,7 @@ from django.urls import path
 from .views import ClaimJobsView,  KMLUnionView, MeView, UsageView, CreateCheckoutSessionView, StripeWebhookView, CreateBillingPortalSessionView, KMLHistoryDownloadView, KMLHistoryView, CreatePrepaidCheckoutSessionView, KMLDownloadView, ProfileOnboardingView, UnlockFreeCreditView
 from .views import SendTestReactivationEmailView, KMLJobStatusView
 from .views_feedback import MergeFeedbackView
+from .views_auth import RequestEmailMagicLinkView, VerifyEmailMagicLinkView
 
 urlpatterns = [
     path("kml-union/", KMLUnionView.as_view(), name="kml-union"),
@@ -40,6 +41,11 @@ urlpatterns += [
 
 urlpatterns += [
     path("billing/webhook/stripe/", StripeWebhookView.as_view(), name="stripe-webhook"),
+]
+
+urlpatterns += [
+    path("auth/email-link/request/", RequestEmailMagicLinkView.as_view(), name="auth-email-link-request"),
+    path("auth/email-link/verify/", VerifyEmailMagicLinkView.as_view(), name="auth-email-link-verify"),
 ]
 
 
