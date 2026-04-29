@@ -111,7 +111,7 @@
 
   .bulk-toolbar {
     display: grid;
-    grid-template-columns: 160px 160px auto;
+    grid-template-columns: 240px 160px 160px auto;
     gap: 12px;
     align-items: end;
   }
@@ -411,6 +411,85 @@
       width: 100%;
     }
   }
+
+  .row-remove-btn {
+    width: 34px;
+    height: 34px;
+    border: 1px solid #fecaca;
+    border-radius: 10px;
+    background: #fff1f2;
+    color: #be123c;
+    cursor: pointer;
+    font-size: 17px;
+    font-weight: 800;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: 0.18s ease;
+  }
+
+  .row-remove-btn:hover {
+    background: #ffe4e6;
+    border-color: #fb7185;
+    transform: translateY(-1px);
+  }
+
+  .removed-warning {
+    margin-top: 10px;
+    color: #9f1239;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .toast-stack {
+  position: fixed;
+  right: 22px;
+  bottom: 82px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.toast-item {
+  min-width: 280px;
+  max-width: 420px;
+  background: green;
+  color: #fff;
+  border-radius: 14px;
+  padding: 12px 14px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.22);
+  font-size: 13px;
+  line-height: 1.35;
+  opacity: 0;
+  transform: translateY(8px);
+  animation: toastIn 0.18s ease forwards;
+}
+
+.toast-title {
+  font-weight: 800;
+  margin-bottom: 3px;
+}
+
+.toast-desc {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+@keyframes toastIn {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes toastOut {
+  to {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
 </style>
 {% endblock %}
 
@@ -435,8 +514,13 @@
 
         <div class="stats-wrap">
           <div class="stat-box">
-            <div class="stat-label">Selecionados</div>
-            <div class="stat-value">{{ total_registros }}</div>
+            <div class="stat-label">Ativos para salvar</div>
+            <div class="stat-value" id="active-count">{{ total_registros }}</div>
+          </div>
+
+          <div class="stat-box">
+            <div class="stat-label">Removidos da edição</div>
+            <div class="stat-value" id="removed-count">0</div>
           </div>
         </div>
       </div>
@@ -445,12 +529,18 @@
         <div class="field-group">
           <label for="bulk_preco">Preço para todos</label>
           <input
-            type="number"
-            step="0.0001"
+            type="text"
+            inputmode="decimal"
             id="bulk_preco"
-            placeholder="Ex.: 125.5000"
+            placeholder="Ex.: 125,5000"
           >
         </div>
+        <div class="field-group">
+        <label for="product_filter">Produto para editar</label>
+        <select id="product_filter">
+          <option value="">Todos os produtos</option>
+        </select>
+      </div>
 
         <div class="field-group">
           <label for="bulk_moeda">Moeda para todos</label>
@@ -463,6 +553,13 @@
         </div>
 
         <div class="bulk-actions">
+          <button type="button" class="btn btn-light" id="keep-visible-only">
+            Manter só exibidos
+          </button>
+
+          <button type="button" class="btn btn-light" id="show-all-products">
+            Mostrar todos
+          </button>
           <button type="button" class="btn btn-secondary" id="apply-price-all">
             Aplicar preço em todos
           </button>
@@ -507,11 +604,15 @@
               <th>Nova moeda</th>
               <th>Valor final</th>
               <th>Valor aplicação</th>
+              <th>Ações</th>
             </tr>
           </thead>
           <tbody>
             {% for obj in queryset %}
-              <tr>
+              <tr
+                data-row-id="{{ obj.pk }}"
+                data-product="{{ obj.defensivo|escapejs }}"
+              >
                 <td class="sticky-col">
                   <span class="main-text">{{ obj.defensivo }}</span>
                 </td>
@@ -532,8 +633,8 @@
 
                 <td class="money-col">
                   <input
-                    type="number"
-                    step="0.0001"
+                    type="text"
+                    inputmode="decimal"
                     name="row_{{ obj.pk }}_preco"
                     value="{{ obj.preco|default_if_none:'' }}"
                     class="table-input js-preco-input"
@@ -556,6 +657,15 @@
 
                 <td><span class="readonly-money">{{ obj.valor_final|default_if_none:"-" }}</span></td>
                 <td><span class="readonly-money">{{ obj.valor_aplicacao|default_if_none:"-" }}</span></td>
+                <td>
+                  <button
+                    type="button"
+                    class="row-remove-btn js-remove-row"
+                    title="Remover esta aplicação da edição"
+                  >
+                    ✕
+                  </button>
+                </td>
               </tr>
             {% endfor %}
           </tbody>
@@ -565,7 +675,7 @@
 
     <section class="footer-actions">
       <div class="footer-left">
-        Revise os valores e clique em salvar para atualizar todas as linhas alteradas.
+        Revise os valores. Linhas removidas nesta tela não serão enviadas ao backend.
       </div>
 
       <div class="footer-right">
@@ -580,48 +690,217 @@
   </form>
 </div>
 
+<div class="toast-stack" id="toast-stack"></div>
+
+
 <script>
   (function () {
     const form = document.getElementById("bulk-price-form");
+
+    const idsInput = form.querySelector('input[name="ids"]');
 
     const bulkPreco = document.getElementById("bulk_preco");
     const bulkMoeda = document.getElementById("bulk_moeda");
     const bulkPrecoSubmit = document.getElementById("bulk_preco_submit");
     const bulkMoedaSubmit = document.getElementById("bulk_moeda_submit");
 
+    const productFilter = document.getElementById("product_filter");
+    const keepVisibleOnlyBtn = document.getElementById("keep-visible-only");
+    const showAllProductsBtn = document.getElementById("show-all-products");
+
     const applyPriceBtn = document.getElementById("apply-price-all");
     const applyCurrencyBtn = document.getElementById("apply-currency-all");
     const applyBothBtn = document.getElementById("apply-both-all");
     const clearBulkBtn = document.getElementById("clear-bulk-fields");
-
-    const precoInputs = document.querySelectorAll(".js-preco-input");
-    const moedaInputs = document.querySelectorAll(".js-moeda-input");
 
     const saveBtn = document.getElementById("save-btn");
     const cancelBtn = document.getElementById("cancel-btn");
     const saveSpinner = document.getElementById("save-spinner");
     const saveBtnText = document.getElementById("save-btn-text");
 
+    const activeCount = document.getElementById("active-count");
+    const removedCount = document.getElementById("removed-count");
+
+    const originalTotal = document.querySelectorAll("tbody tr[data-row-id]").length;
+
+    function getRows() {
+      return Array.from(document.querySelectorAll("tbody tr[data-row-id]"));
+    }
+
+    function getVisibleRows() {
+      return getRows().filter((row) => row.style.display !== "none");
+    }
+
+    function getPrecoInputs() {
+      return getVisibleRows().map((row) => row.querySelector(".js-preco-input")).filter(Boolean);
+    }
+
+    function getMoedaInputs() {
+      return getVisibleRows().map((row) => row.querySelector(".js-moeda-input")).filter(Boolean);
+    }
+
     function syncBulkHiddenFields() {
-      bulkPrecoSubmit.value = bulkPreco.value || "";
-      bulkMoedaSubmit.value = bulkMoeda.value || "";
+      // Importante:
+      // Não enviamos mais o valor em massa para o backend.
+      // O topo serve apenas para preencher os inputs das linhas exibidas.
+      // O backend deve salvar pelos campos row_ID_preco e row_ID_moeda.
+      bulkPrecoSubmit.value = "";
+      bulkMoedaSubmit.value = "";
+    }
+
+
+    function showToast(title, description) {
+      const stack = document.getElementById("toast-stack");
+      if (!stack) return;
+
+      const toast = document.createElement("div");
+      toast.className = "toast-item";
+
+      toast.innerHTML = `
+        <div class="toast-title">${title}</div>
+        <div class="toast-desc">${description}</div>
+      `;
+
+      stack.appendChild(toast);
+
+      window.setTimeout(() => {
+        toast.style.animation = "toastOut 0.18s ease forwards";
+        window.setTimeout(() => {
+          toast.remove();
+        }, 220);
+      }, 3800);
+    }
+
+    function injectSubmissionFields() {
+      document.querySelectorAll(".js-submit-shadow").forEach((el) => el.remove());
+
+      getRows().forEach((row) => {
+        const id = String(row.dataset.rowId || "").replace(/\D/g, "");
+        if (!id) return;
+
+        const precoInput = row.querySelector(".js-preco-input");
+        const moedaInput = row.querySelector(".js-moeda-input");
+
+        const precoValue = precoInput ? precoInput.value : "";
+        const moedaValue = moedaInput ? moedaInput.value : "";
+
+        const precoHidden = document.createElement("input");
+        precoHidden.type = "hidden";
+        precoHidden.name = `row_${id}_preco`;
+        precoHidden.value = precoValue;
+        precoHidden.className = "js-submit-shadow";
+
+        const moedaHidden = document.createElement("input");
+        moedaHidden.type = "hidden";
+        moedaHidden.name = `row_${id}_moeda`;
+        moedaHidden.value = moedaValue;
+        moedaHidden.className = "js-submit-shadow";
+
+        form.appendChild(precoHidden);
+        form.appendChild(moedaHidden);
+      });
+    }
+
+    function syncActiveIds() {
+      const activeIds = getRows()
+        .map((row) => String(row.dataset.rowId || ""))
+        .map((value) => value.replace(/\D/g, ""))
+        .filter(Boolean);
+
+      idsInput.value = activeIds.join(",");
+
+      if (activeCount) activeCount.textContent = activeIds.length;
+      if (removedCount) removedCount.textContent = Math.max(originalTotal - activeIds.length, 0);
+    }
+
+    function populateProductFilter() {
+      if (!productFilter) return;
+
+      const products = Array.from(
+        new Set(
+          getRows()
+            .map((row) => row.dataset.product || "")
+            .filter(Boolean)
+        )
+      ).sort((a, b) => a.localeCompare(b, "pt-BR"));
+
+      products.forEach((product) => {
+        const option = document.createElement("option");
+        option.value = product;
+        option.textContent = product;
+        productFilter.appendChild(option);
+      });
+    }
+
+    function applyProductFilter() {
+      const selectedProduct = productFilter ? productFilter.value : "";
+
+      getRows().forEach((row) => {
+        const rowProduct = row.dataset.product || "";
+        const shouldShow = !selectedProduct || rowProduct === selectedProduct;
+        row.style.display = shouldShow ? "" : "none";
+      });
+    }
+
+    function showAllProducts() {
+      if (productFilter) productFilter.value = "";
+
+      getRows().forEach((row) => {
+        row.style.display = "";
+      });
+    }
+
+    function keepVisibleOnly() {
+      const visibleRows = getVisibleRows();
+
+      if (!visibleRows.length) {
+        alert("Nenhuma linha exibida para manter.");
+        return;
+      }
+
+      const confirmed = window.confirm(
+        `Manter somente ${visibleRows.length} linha(s) exibida(s)?\n\nAs outras serão removidas desta edição e não serão enviadas ao backend.`
+      );
+
+      if (!confirmed) return;
+
+      getRows().forEach((row) => {
+        if (row.style.display === "none") {
+          row.remove();
+        }
+      });
+
+      showAllProducts();
+      rebuildProductFilter();
+      syncActiveIds();
+    }
+
+    function rebuildProductFilter() {
+      if (!productFilter) return;
+
+      productFilter.innerHTML = '<option value="">Todos os produtos</option>';
+      populateProductFilter();
     }
 
     function applyPriceToAll() {
       const value = bulkPreco.value;
       if (value === "") return;
-      precoInputs.forEach((input) => {
+
+      getPrecoInputs().forEach((input) => {
         input.value = value;
       });
+
       syncBulkHiddenFields();
     }
 
     function applyCurrencyToAll() {
       const value = bulkMoeda.value;
       if (value === "") return;
-      moedaInputs.forEach((select) => {
+
+      getMoedaInputs().forEach((select) => {
         select.value = value;
       });
+
       syncBulkHiddenFields();
     }
 
@@ -636,6 +915,41 @@
       syncBulkHiddenFields();
     }
 
+    function removeRow(row) {
+      if (!row) return;
+
+      const productName = row.querySelector(".sticky-col .main-text")?.textContent?.trim() || "este item";
+
+      row.remove();
+      rebuildProductFilter();
+      syncActiveIds();
+
+      showToast(
+        `${productName}`,
+        `Produto removido da edição, não será alterado o preço.`
+      );
+    }
+
+    document.addEventListener("click", function (event) {
+      const removeBtn = event.target.closest(".js-remove-row");
+      if (!removeBtn) return;
+
+      const row = removeBtn.closest("tr[data-row-id]");
+      removeRow(row);
+    });
+
+    if (productFilter) {
+      productFilter.addEventListener("change", applyProductFilter);
+    }
+
+    if (keepVisibleOnlyBtn) {
+      keepVisibleOnlyBtn.addEventListener("click", keepVisibleOnly);
+    }
+
+    if (showAllProductsBtn) {
+      showAllProductsBtn.addEventListener("click", showAllProducts);
+    }
+
     bulkPreco.addEventListener("input", syncBulkHiddenFields);
     bulkMoeda.addEventListener("change", syncBulkHiddenFields);
 
@@ -644,19 +958,52 @@
     applyBothBtn.addEventListener("click", applyBothToAll);
     clearBulkBtn.addEventListener("click", clearBulkFields);
 
-    form.addEventListener("submit", function () {
+    form.addEventListener("submit", function (event) {
+      if (bulkPreco.value !== "") {
+        applyPriceToAll();
+      }
+
+      if (bulkMoeda.value !== "") {
+        applyCurrencyToAll();
+      }
+
       syncBulkHiddenFields();
+      syncActiveIds();
+      injectSubmissionFields();
+
+      const activeIds = idsInput.value
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+      if (!activeIds.length) {
+        event.preventDefault();
+        alert("Nenhuma linha ativa para salvar. Mantenha pelo menos uma aplicação na tabela.");
+        return;
+      }
 
       saveBtn.disabled = true;
       applyPriceBtn.disabled = true;
       applyCurrencyBtn.disabled = true;
       applyBothBtn.disabled = true;
       clearBulkBtn.disabled = true;
+
+      if (keepVisibleOnlyBtn) keepVisibleOnlyBtn.disabled = true;
+      if (showAllProductsBtn) showAllProductsBtn.disabled = true;
+      if (productFilter) productFilter.disabled = true;
+
+      document.querySelectorAll(".js-remove-row").forEach((btn) => {
+        btn.disabled = true;
+      });
+
       if (cancelBtn) cancelBtn.style.pointerEvents = "none";
 
       saveSpinner.classList.remove("hidden");
       saveBtnText.textContent = "Salvando...";
     });
+
+    populateProductFilter();
+    syncActiveIds();
   })();
 </script>
 {% endblock %}

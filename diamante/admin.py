@@ -4202,7 +4202,7 @@ class AplicacaoAdmin(admin.ModelAdmin):
                 "operacao__programa__safra",
                 "operacao__programa__ciclo",
             )
-            .order_by("operacao__programa__nome", "operacao__estagio", "defensivo__produto", "id")
+            .order_by("defensivo__produto", "operacao__programa__nome", "operacao__estagio", "id")
         )
 
         ids = list(qs.values_list("id", flat=True))
@@ -4225,16 +4225,28 @@ class AplicacaoAdmin(admin.ModelAdmin):
 
 
     def editar_precos_em_lote_view(self, request):
-        ids_raw = request.POST.get("ids") or request.GET.get("ids", "")
+        print("\n\n🔥🔥🔥 ENTROU NA editar_precos_em_lote_view 🔥🔥🔥", flush=True)
+        print("METHOD:", request.method, flush=True)
+        print("PATH:", request.path, flush=True)
+        print("FULL PATH:", request.get_full_path(), flush=True)
+        post_ids_raw = request.POST.get("ids")
+        get_ids_raw = request.GET.get("ids", "")
+
+        ids_raw = post_ids_raw or get_ids_raw
         next_url = request.POST.get("next") or request.GET.get("next") or reverse("admin:diamante_aplicacao_changelist")
 
         ids = []
         for item in (ids_raw or "").split(","):
             item = (item or "").strip()
+
             if not item:
                 continue
+
+            # Corrige IDs formatados acidentalmente como "6.409" em vez de "6409".
+            normalized_item = item.replace(".", "")
+
             try:
-                ids.append(int(item))
+                ids.append(int(normalized_item))
             except (ValueError, TypeError):
                 continue
 
@@ -4247,7 +4259,7 @@ class AplicacaoAdmin(admin.ModelAdmin):
                 "operacao__programa__safra",
                 "operacao__programa__ciclo",
             )
-            .order_by("operacao__programa__nome", "operacao__estagio", "defensivo__produto", "id")
+            .order_by("defensivo__produto", "operacao__programa__nome", "operacao__estagio", "id")
         )
 
         total_registros = qs.count()
@@ -4304,6 +4316,16 @@ class AplicacaoAdmin(admin.ModelAdmin):
             with transaction.atomic():
                 for app in qs:
                     prefix = f"row_{app.pk}_"
+                    print("\n--- DEBUG LINHA ---")
+                    print("app.pk:", app.pk)
+                    print("defensivo:", app.defensivo)
+                    print("prefix:", prefix)
+                    print("POST preco raw:", repr(request.POST.get(f"{prefix}preco")))
+                    print("POST moeda raw:", repr(request.POST.get(f"{prefix}moeda")))
+                    print("has_bulk_preco:", has_bulk_preco, "bulk_preco:", repr(bulk_preco))
+                    print("has_bulk_moeda:", has_bulk_moeda, "bulk_moeda:", repr(bulk_moeda))
+                    print("preco atual app.preco:", repr(app.preco))
+                    print("moeda atual app.moeda:", repr(app.moeda))
 
                     # prioridade:
                     # 1) se vier preenchimento em massa, usa ele
@@ -4313,7 +4335,11 @@ class AplicacaoAdmin(admin.ModelAdmin):
                     else:
                         preco_raw = request.POST.get(f"{prefix}preco")
                         try:
-                            if preco_raw in [None, ""]:
+                            if preco_raw is None:
+                                ignorados += 1
+                                continue
+
+                            if preco_raw == "":
                                 preco_novo = None
                             else:
                                 preco_novo = Decimal(str(preco_raw).replace(",", "."))
@@ -4338,6 +4364,9 @@ class AplicacaoAdmin(admin.ModelAdmin):
                     if moeda_nova and moeda_antiga != moeda_nova:
                         app.moeda = moeda_nova
                         mudou_algo = True
+                        print("preco_novo:", repr(preco_novo))
+                        print("moeda_nova:", repr(moeda_nova))
+                        print("mudou_algo:", mudou_algo)
 
                     if not mudou_algo:
                         ignorados += 1
@@ -4368,6 +4397,14 @@ class AplicacaoAdmin(admin.ModelAdmin):
                     level=messages.WARNING,
                 )
 
+            print("\n================ RESULTADO EDITAR PREÇOS EM LOTE ================")
+            print("atualizados:", atualizados)
+            print("ignorados:", ignorados)
+            print("erros:", erros)
+            print("programas_afetados:", programas_afetados)
+            print("redirect:", next_url)
+            print("==================================================================\n")
+            
             return redirect(next_url)
 
         context = {
@@ -5683,19 +5720,37 @@ class BackgroundTaskStatusAdmin(admin.ModelAdmin):
 
 @admin.register(EmailAberturaST)
 class EmailAberturaSTAdmin(admin.ModelAdmin):
-    list_display = ["email", "get_projetos", 'get_tipos', 'ativo']
-    filter_horizontal = ["projetos", 'atividade']
+    list_display = ["email", "get_projetos", "get_tipos", "ativo"]
+    filter_horizontal = ["projetos", "atividade"]
+    list_filter = ["ativo", "projetos", "atividade"]
+    search_fields = ["email", "projetos__nome", "atividade__tipo"]
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.prefetch_related("projetos", "atividade")
 
     def get_projetos(self, obj):
-        return ", ".join([p.nome.replace('Projeto ', '').split()[0] for p in obj.projetos.all()])
+        projetos = []
+
+        for projeto in obj.projetos.all():
+            nome = (projeto.nome or "").replace("Projeto ", "").strip()
+            partes = nome.split()
+            projetos.append(partes[0] if partes else "-")
+
+        return ", ".join(projetos) if projetos else "-"
 
     get_projetos.short_description = "Projetos"
-    
-    def get_tipos(self, obj):
-        return ", ".join([p.tipo for p in obj.atividade.all()])
 
-    get_tipos.short_description = "Atividades"
-    
+    def get_tipos(self, obj):
+        tipos = sorted({
+            atividade.tipo
+            for atividade in obj.atividade.all()
+            if atividade.tipo
+        })
+
+        return ", ".join(tipos) if tipos else "-"
+
+    get_tipos.short_description = "Atividades"    
     
 @admin.register(TiposAtividadeEmails)
 class TiposAtividadesEmailsAdmin(admin.ModelAdmin):
