@@ -12,6 +12,13 @@ from django.db.models.expressions import Func
 from django.db.models import Count
 
 
+import json
+
+from django.urls import path, reverse
+from django.http import JsonResponse
+from django.core.files.storage import default_storage
+from django.utils.safestring import mark_safe
+
 
 
 
@@ -290,17 +297,19 @@ class WeeklyUsageAdmin(admin.ModelAdmin):
 # =========================
 @admin.register(KMLMergeJob)
 class KMLMergeJobAdmin(admin.ModelAdmin):
+    change_list_template = "admin/kmltools/kmlmergejob/change_list.html"
     show_full_result_count = False
     list_per_page = 100
     
     list_display = (
-        "created_at",
+        "created_at_br",
         "user_email",
-        "anon_id",
+        "anon_id_compact",
         "anon_id_total_jobs",
         "plan_badge",
         "status_badge",
         "download_state",
+        "merge_preview_button",
         "visitor_country_name",
         "visitor_ip",
         "visitor_ip_total_jobs",
@@ -513,6 +522,42 @@ class KMLMergeJobAdmin(admin.ModelAdmin):
     user_email.short_description = "Email"
     user_email.admin_order_field = "user__email"
     
+    def created_at_br(self, obj):
+        if not obj.created_at:
+            return "—"
+
+        dt = timezone.localtime(obj.created_at)
+
+        return dt.strftime("%d/%m/%y - %H:%M")
+
+    created_at_br.short_description = "Criado"
+    created_at_br.admin_order_field = "created_at"
+
+
+    def anon_id_compact(self, obj):
+        anon = (obj.anon_id or "").strip()
+
+        if not anon:
+            return "—"
+
+        if len(anon) <= 14:
+            label = anon
+        else:
+            label = f"{anon[:6]}...{anon[-6:]}"
+
+        return format_html(
+            '<button type="button" class="kml-copy-anon-btn" data-copy="{}" '
+            'title="Clique para copiar o anon_id completo" '
+            'style="border:0;background:#f1f5f9;color:#334155;padding:3px 8px;'
+            'border-radius:999px;font-weight:800;font-size:11px;cursor:pointer;'
+            'white-space:nowrap;">{}</button>',
+            anon,
+            label,
+        )
+
+    anon_id_compact.short_description = "Anon ID"
+    anon_id_compact.admin_order_field = "anon_id"
+    
     def plan_badge(self, obj):
         plan = (getattr(obj, "plan", "") or "unknown").strip()
 
@@ -671,6 +716,181 @@ class KMLMergeJobAdmin(admin.ModelAdmin):
     def visitor_ip_total_jobs(self, obj):
         return getattr(obj, "_visitor_ip_total_jobs", 0)
     visitor_ip_total_jobs.short_description = "Merges / IP"
+    
+    def get_urls(self):
+        urls = super().get_urls()
+
+        custom_urls = [
+            path(
+                "<path:object_id>/merge-preview-json/",
+                self.admin_site.admin_view(self.merge_preview_json_view),
+                name="kmltools_kmlmergejob_merge_preview_json",
+            ),
+        ]
+
+        return custom_urls + urls
+
+    def merge_preview_button(self, obj):
+        if not obj.pk:
+            return "—"
+
+        # Só mostra botão útil se tiver pelo menos metrics/meta/output/input.
+        has_preview = bool(
+            (obj.metrics or {}).get("preview_geojson")
+            or (obj.metrics or {}).get("input_preview_geojson")
+            or obj.meta_storage_path
+            or obj.storage_path
+            or obj.input_storage_paths
+        )
+
+        if not has_preview:
+            return format_html(
+                '<span style="background:#f3f4f6;color:#6b7280;padding:3px 8px;'
+                'border-radius:999px;font-weight:700;white-space:nowrap;">No preview</span>'
+            )
+
+        url = reverse(
+            "admin:kmltools_kmlmergejob_merge_preview_json",
+            args=[obj.pk],
+        )
+
+        return format_html(
+            '<button type="button" class="kml-preview-btn" data-preview-url="{}" '
+            'style="background:#111827;color:#fff;border:0;padding:4px 10px;'
+            'border-radius:999px;font-weight:800;cursor:pointer;white-space:nowrap;">'
+            'Preview</button>',
+            url,
+        )
+
+    merge_preview_button.short_description = "Antes / Depois"
+
+    def _read_meta_json_from_storage(self, obj):
+        if not obj.meta_storage_path:
+            return {}
+
+        try:
+            with default_storage.open(obj.meta_storage_path, "rb") as f:
+                raw = f.read()
+            return json.loads(raw.decode("utf-8", errors="ignore")) or {}
+        except Exception:
+            return {}
+
+    def _storage_url_or_none(self, path):
+        if not path:
+            return None
+
+        try:
+            return default_storage.url(path)
+        except Exception:
+            return None
+
+    def merge_preview_json_view(self, request, object_id):
+        obj = self.get_object(request, object_id)
+
+        if not obj:
+            return JsonResponse(
+                {"ok": False, "detail": "Job não encontrado."},
+                status=404,
+            )
+
+        metrics = obj.metrics or {}
+        meta = {}
+
+        input_preview_geojson = metrics.get("input_preview_geojson")
+        output_preview_geojson = metrics.get("preview_geojson")
+        files_report = metrics.get("files_report") or []
+
+        # Fallback: tenta ler meta.json salvo no storage.
+        if not input_preview_geojson or not output_preview_geojson or not files_report:
+            meta = self._read_meta_json_from_storage(obj)
+
+            input_preview_geojson = input_preview_geojson or meta.get("input_preview_geojson")
+            output_preview_geojson = output_preview_geojson or meta.get("preview_geojson")
+            files_report = files_report or meta.get("files_report") or []
+
+        input_preview_geojson = input_preview_geojson or {
+            "type": "FeatureCollection",
+            "features": [],
+        }
+
+        output_preview_geojson = output_preview_geojson or {
+            "type": "FeatureCollection",
+            "features": [],
+        }
+
+        input_filenames = obj.input_filenames or []
+        input_storage_paths = obj.input_storage_paths or []
+
+        input_files = []
+        for idx, name in enumerate(input_filenames):
+            path = input_storage_paths[idx] if idx < len(input_storage_paths) else None
+            input_files.append({
+                "name": name,
+                "path": path,
+                "url": self._storage_url_or_none(path),
+            })
+
+        output_url = self._storage_url_or_none(obj.storage_path)
+
+        total_polygons = int(obj.total_polygons or 0)
+        output_polygons = int(obj.output_polygons or 0) if obj.output_polygons is not None else None
+        merged_polygons = int(obj.merged_polygons or 0) if obj.merged_polygons is not None else None
+
+        reduction_pct = None
+        if total_polygons and output_polygons is not None:
+            try:
+                reduction_pct = round(((total_polygons - output_polygons) / total_polygons) * 100, 1)
+            except Exception:
+                reduction_pct = None
+
+        payload = {
+            "ok": True,
+            "job": {
+                "id": str(obj.id),
+                "request_id": obj.request_id,
+                "created_at": obj.created_at.isoformat() if obj.created_at else None,
+                "status": obj.status,
+                "plan": obj.plan,
+                "user_email": obj.user.email if obj.user else None,
+                "anon_id": obj.anon_id,
+                "visitor_ip": obj.visitor_ip,
+                "visitor_country_name": obj.visitor_country_name,
+                "tol_m": obj.tol_m,
+                "corridor_width_m": obj.corridor_width_m,
+            },
+            "download": {
+                "unlocked": bool(obj.download_unlocked),
+                "unlock_source": obj.download_unlock_source,
+                "credit_consumed": bool(obj.download_credit_consumed),
+                "count": int(obj.download_count or 0),
+                "first_downloaded_at": obj.first_downloaded_at.isoformat() if obj.first_downloaded_at else None,
+                "last_downloaded_at": obj.last_downloaded_at.isoformat() if obj.last_downloaded_at else None,
+            },
+            "metrics": {
+                "total_files": int(obj.total_files or 0),
+                "total_polygons": total_polygons,
+                "output_polygons": output_polygons,
+                "merged_polygons": merged_polygons,
+                "input_area_ha": obj.input_area_ha,
+                "output_area_ha": obj.output_area_ha,
+                "reduction_pct": reduction_pct,
+                "total_markers": int(metrics.get("total_markers") or meta.get("total_markers") or 0),
+                "merge_mode": metrics.get("merge_mode") or meta.get("merge_mode") or "",
+            },
+            "files": {
+                "input_files": input_files,
+                "files_report": files_report,
+                "output_storage_path": obj.storage_path,
+                "output_url": output_url,
+                "meta_storage_path": obj.meta_storage_path,
+            },
+            "geojson": {
+                "input": input_preview_geojson,
+                "output": output_preview_geojson,
+            },
+        }
+
+        return JsonResponse(payload, json_dumps_params={"ensure_ascii": False})
 
 @admin.register(MergeFeedback)
 class MergeFeedbackAdmin(admin.ModelAdmin):

@@ -1,0 +1,850 @@
+{% extends "admin/change_list.html" %}
+{% load static %}
+
+{% block extrahead %}
+{{ block.super }}
+
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+/>
+
+<style>
+  .kml-admin-drawer-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(15, 23, 42, 0.28);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 180ms ease;
+  }
+
+  .kml-admin-drawer-backdrop.is-open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .kml-admin-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    z-index: 10000;
+    width: min(58vw, 980px);
+    min-width: 720px;
+    height: 100vh;
+    background:
+      radial-gradient(circle at top left, rgba(255,255,255,0.95), rgba(248,250,252,0.98)),
+      #f8fafc;
+    color: #0f172a;
+    box-shadow: -28px 0 80px rgba(15, 23, 42, 0.28);
+    transform: translateX(104%);
+    transition: transform 220ms cubic-bezier(.2,.8,.2,1);
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid rgba(226, 232, 240, 0.9);
+  }
+
+  .kml-admin-drawer.is-open {
+    transform: translateX(0);
+  }
+
+  .kml-admin-drawer-header {
+    padding: 18px 20px 15px;
+    background: rgba(255, 255, 255, 0.82);
+    backdrop-filter: blur(18px);
+    border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: flex-start;
+  }
+
+  .kml-admin-drawer-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 7px;
+    padding: 4px 9px;
+    border-radius: 999px;
+    background: #eef2ff;
+    color: #3730a3;
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.02em;
+  }
+
+  .kml-admin-drawer-title {
+    margin: 0;
+    font-size: 19px;
+    font-weight: 950;
+    letter-spacing: -0.035em;
+    color: #020617;
+  }
+
+  .kml-admin-drawer-subtitle {
+    margin: 5px 0 0;
+    color: #64748b;
+    font-size: 12px;
+    line-height: 1.35;
+  }
+
+  .kml-admin-drawer-close {
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    color: #0f172a;
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    cursor: pointer;
+    font-size: 18px;
+    font-weight: 900;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  }
+
+  .kml-admin-drawer-body {
+    padding: 16px;
+    overflow: auto;
+    display: grid;
+    gap: 14px;
+  }
+
+  .kml-hero-value-card {
+    background: linear-gradient(135deg, #020617, #111827);
+    color: #fff;
+    border-radius: 22px;
+    padding: 16px;
+    box-shadow: 0 18px 44px rgba(15, 23, 42, 0.16);
+    display: grid;
+    grid-template-columns: 1.1fr 0.9fr;
+    gap: 14px;
+    align-items: stretch;
+  }
+
+  .kml-hero-value-title {
+    font-size: 18px;
+    font-weight: 950;
+    letter-spacing: -0.03em;
+    margin: 0;
+  }
+
+  .kml-hero-value-copy {
+    margin: 6px 0 0;
+    color: rgba(255,255,255,0.72);
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .kml-hero-value-number {
+    text-align: right;
+    font-size: 32px;
+    font-weight: 950;
+    letter-spacing: -0.05em;
+    line-height: 1;
+  }
+
+  .kml-hero-value-label {
+    margin-top: 5px;
+    text-align: right;
+    color: rgba(255,255,255,0.68);
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  .kml-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .kml-summary-card {
+    background: rgba(255,255,255,0.92);
+    border: 1px solid #e5e7eb;
+    border-radius: 18px;
+    padding: 12px;
+    min-height: 72px;
+    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.045);
+  }
+
+  .kml-summary-label {
+    font-size: 10px;
+    color: #64748b;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.055em;
+  }
+
+  .kml-summary-value {
+    margin-top: 5px;
+    font-size: 17px;
+    font-weight: 950;
+    color: #0f172a;
+    line-height: 1.15;
+  }
+
+  .kml-summary-help {
+    margin-top: 3px;
+    font-size: 11px;
+    color: #64748b;
+  }
+
+  .kml-map-stack {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .kml-map-card {
+    background: rgba(255,255,255,0.94);
+    border: 1px solid #e5e7eb;
+    border-radius: 22px;
+    overflow: hidden;
+    min-height: 340px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 12px 34px rgba(15, 23, 42, 0.055);
+  }
+
+  .kml-map-card-header {
+    padding: 12px 14px;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: center;
+    background: rgba(255,255,255,0.86);
+  }
+
+  .kml-map-card-title {
+    font-size: 13px;
+    font-weight: 950;
+    color: #111827;
+    letter-spacing: -0.02em;
+  }
+
+  .kml-map-card-meta {
+    font-size: 11px;
+    font-weight: 850;
+    color: #64748b;
+  }
+
+  .kml-map {
+    flex: 1;
+    min-height: 295px;
+    background:
+      linear-gradient(rgba(148, 163, 184, 0.11) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(148, 163, 184, 0.11) 1px, transparent 1px),
+      #f8fafc;
+    background-size: 26px 26px;
+  }
+
+  .kml-detail-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .kml-detail-card {
+    background: rgba(255,255,255,0.94);
+    border: 1px solid #e5e7eb;
+    border-radius: 20px;
+    padding: 14px;
+    box-shadow: 0 12px 34px rgba(15, 23, 42, 0.045);
+  }
+
+  .kml-detail-card h3 {
+    margin: 0 0 10px;
+    font-size: 14px;
+    font-weight: 950;
+    color: #111827;
+    letter-spacing: -0.02em;
+  }
+
+  .kml-file-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 7px;
+  }
+
+  .kml-file-item {
+    padding: 8px 10px;
+    border-radius: 13px;
+    background: #f8fafc;
+    border: 1px solid #eef2f7;
+    font-size: 12px;
+    color: #334155;
+    word-break: break-word;
+  }
+
+  .kml-json-box {
+    margin: 0;
+    max-height: 190px;
+    overflow: auto;
+    padding: 10px;
+    border-radius: 14px;
+    background: #020617;
+    color: #d1fae5;
+    font-size: 11px;
+    line-height: 1.45;
+  }
+
+  .kml-badge {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 4px 8px;
+    font-size: 11px;
+    font-weight: 900;
+    white-space: nowrap;
+  }
+
+  .kml-badge-success {
+    background: #dcfce7;
+    color: #166534;
+  }
+
+  .kml-badge-warn {
+    background: #fef3c7;
+    color: #92400e;
+  }
+
+  .kml-badge-danger {
+    background: #fee2e2;
+    color: #991b1b;
+  }
+
+  .kml-loading-state {
+  min-height: 320px;
+  padding: 44px 28px;
+  text-align: center;
+  color: #64748b;
+  font-weight: 850;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.kml-spinner-shell {
+  width: 64px;
+  height: 64px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.10);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 14px;
+}
+
+.kml-spinner {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 3px solid #e5e7eb;
+  border-top-color: #111827;
+  animation: kmlSpin 720ms linear infinite;
+}
+
+.kml-loading-title {
+  font-size: 14px;
+  font-weight: 950;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+}
+
+.kml-loading-copy {
+  margin-top: 5px;
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 700;
+}
+
+@keyframes kmlSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+  .kml-preview-btn {
+    transition: transform 140ms ease, box-shadow 140ms ease, opacity 140ms ease;
+  }
+
+  .kml-preview-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.18);
+  }
+
+  @media (max-width: 1000px) {
+    .kml-admin-drawer {
+      width: 94vw;
+      min-width: 0;
+    }
+
+    .kml-summary-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .kml-hero-value-card {
+      grid-template-columns: 1fr;
+    }
+
+    .kml-hero-value-number,
+    .kml-hero-value-label {
+      text-align: left;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+{{ block.super }}
+
+<div id="kmlAdminPreviewBackdrop" class="kml-admin-drawer-backdrop"></div>
+
+<aside id="kmlAdminPreviewDrawer" class="kml-admin-drawer" aria-hidden="true">
+  <div class="kml-admin-drawer-header">
+    <div>
+      <div class="kml-admin-drawer-kicker">KML Unifier · Auditoria visual</div>
+      <h2 id="kmlPreviewTitle" class="kml-admin-drawer-title">Preview do merge</h2>
+      <p id="kmlPreviewSubtitle" class="kml-admin-drawer-subtitle">Carregando dados...</p>
+    </div>
+
+    <button type="button" id="kmlPreviewClose" class="kml-admin-drawer-close">×</button>
+  </div>
+
+  <div id="kmlPreviewBody" class="kml-admin-drawer-body">
+    <div class="kml-loading-state">
+      <div class="kml-spinner-shell">
+        <div class="kml-spinner"></div>
+      </div>
+      <div class="kml-loading-title">Carregando preview do merge</div>
+      <div class="kml-loading-copy">Buscando arquivos, métricas e mapas antes/depois...</div>
+    </div>
+  </div>
+</aside>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+(function () {
+  let inputMap = null;
+  let outputMap = null;
+  let inputLayer = null;
+  let outputLayer = null;
+
+  const backdrop = document.getElementById("kmlAdminPreviewBackdrop");
+  const drawer = document.getElementById("kmlAdminPreviewDrawer");
+  const closeBtn = document.getElementById("kmlPreviewClose");
+  const titleEl = document.getElementById("kmlPreviewTitle");
+  const subtitleEl = document.getElementById("kmlPreviewSubtitle");
+  const bodyEl = document.getElementById("kmlPreviewBody");
+
+  function fmtNumber(value, digits = 2) {
+    if (value === null || value === undefined || value === "") return "—";
+    const n = Number(value);
+    if (!Number.isFinite(n)) return "—";
+    return n.toLocaleString("pt-BR", {
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+    });
+  }
+
+  function fmtInt(value) {
+    if (value === null || value === undefined || value === "") return "—";
+    const n = Number(value);
+    if (!Number.isFinite(n)) return "—";
+    return n.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
+  }
+
+  function safeText(value) {
+    if (value === null || value === undefined || value === "") return "—";
+    return String(value);
+  }
+
+  function escapeHtml(value) {
+    return safeText(value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function getFeatureCount(geojson) {
+    return ((geojson || {}).features || []).length;
+  }
+
+  function destroyMaps() {
+    if (inputMap) {
+      inputMap.remove();
+      inputMap = null;
+    }
+
+    if (outputMap) {
+      outputMap.remove();
+      outputMap = null;
+    }
+
+    inputLayer = null;
+    outputLayer = null;
+  }
+
+  function openDrawer() {
+    backdrop.classList.add("is-open");
+    drawer.classList.add("is-open");
+    drawer.setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+  }
+
+  function closeDrawer() {
+    backdrop.classList.remove("is-open");
+    drawer.classList.remove("is-open");
+    drawer.setAttribute("aria-hidden", "true");
+    document.body.style.overflow = "";
+    destroyMaps();
+  }
+
+  function badgeForStatus(status) {
+    const normalized = String(status || "").toLowerCase();
+
+    if (normalized === "success") {
+      return '<span class="kml-badge kml-badge-success">success</span>';
+    }
+
+    if (normalized === "queued" || normalized === "processing") {
+      return '<span class="kml-badge kml-badge-warn">' + escapeHtml(normalized) + '</span>';
+    }
+
+    if (normalized === "error") {
+      return '<span class="kml-badge kml-badge-danger">error</span>';
+    }
+
+    return '<span class="kml-badge kml-badge-warn">' + escapeHtml(status) + '</span>';
+  }
+
+  function renderSummaryCard(label, value, help) {
+    return `
+      <div class="kml-summary-card">
+        <div class="kml-summary-label">${escapeHtml(label)}</div>
+        <div class="kml-summary-value">${value}</div>
+        ${help ? `<div class="kml-summary-help">${escapeHtml(help)}</div>` : ""}
+      </div>
+    `;
+  }
+
+  function renderFiles(files) {
+    const items = files && files.length ? files : [];
+
+    if (!items.length) {
+      return '<li class="kml-file-item">Nenhum arquivo encontrado no job.</li>';
+    }
+
+    return items.map((file) => {
+      const name = escapeHtml(file.name);
+      const url = file.url;
+
+      if (url) {
+        return `<li class="kml-file-item"><a href="${url}" target="_blank" rel="noopener noreferrer">${name}</a></li>`;
+      }
+
+      return `<li class="kml-file-item">${name}</li>`;
+    }).join("");
+  }
+
+  function renderModal(data) {
+    const job = data.job || {};
+    const metrics = data.metrics || {};
+    const download = data.download || {};
+    const files = data.files || {};
+    const geojson = data.geojson || {};
+
+    const inputFeatures = getFeatureCount(geojson.input);
+    const outputFeatures = getFeatureCount(geojson.output);
+
+    const reduction = metrics.reduction_pct === null || metrics.reduction_pct === undefined
+      ? "—"
+      : `${fmtNumber(metrics.reduction_pct, 1)}%`;
+
+    const valueHelp = metrics.output_polygons !== null && metrics.output_polygons !== undefined
+      ? `${fmtInt(metrics.total_polygons)} → ${fmtInt(metrics.output_polygons)} polígonos`
+      : "Sem saída calculada";
+
+    const downloadLabel = download.unlocked
+      ? `Liberado · ${safeText(download.unlock_source || "unlocked")}`
+      : "Bloqueado";
+
+    titleEl.textContent = `Merge ${safeText(job.request_id)}`;
+    subtitleEl.textContent = `${safeText(job.user_email || "Anonymous")} · ${safeText(job.plan)} · ${safeText(job.created_at)}`;
+
+    bodyEl.innerHTML = `
+      <section class="kml-hero-value-card">
+        <div>
+          <h3 class="kml-hero-value-title">Valor entregue no merge</h3>
+          <p class="kml-hero-value-copy">
+            Comparação rápida entre o arquivo enviado pelo usuário e o arquivo final entregue pelo KML Unifier.
+          </p>
+        </div>
+        <div>
+          <div class="kml-hero-value-number">${reduction}</div>
+          <div class="kml-hero-value-label">${escapeHtml(valueHelp)}</div>
+        </div>
+      </section>
+
+      <div class="kml-summary-grid">
+        ${renderSummaryCard("Status", badgeForStatus(job.status), "Processamento")}
+        ${renderSummaryCard("Arquivos", fmtInt(metrics.total_files), "Total enviado")}
+        ${renderSummaryCard("Input", fmtInt(metrics.total_polygons), "Polígonos enviados")}
+        ${renderSummaryCard("Output", fmtInt(metrics.output_polygons), "Polígonos entregues")}
+        ${renderSummaryCard("Merge", fmtInt(metrics.merged_polygons), "Polígonos mesclados")}
+        ${renderSummaryCard("Download", escapeHtml(downloadLabel), `${fmtInt(download.count)} download(s)`)}
+        ${renderSummaryCard("Área input", `${fmtNumber(metrics.input_area_ha)} ha`, "Área original")}
+        ${renderSummaryCard("Área output", `${fmtNumber(metrics.output_area_ha)} ha`, "Área final")}
+        ${renderSummaryCard("Modo", escapeHtml(safeText(metrics.merge_mode || "union")), "Tipo de merge")}
+      </div>
+
+      <div class="kml-map-stack">
+        <div class="kml-map-card">
+          <div class="kml-map-card-header">
+            <div class="kml-map-card-title">Antes · arquivo enviado</div>
+            <div class="kml-map-card-meta">${fmtInt(inputFeatures)} feature(s)</div>
+          </div>
+          <div id="kmlInputMap" class="kml-map"></div>
+        </div>
+
+        <div class="kml-map-card">
+          <div class="kml-map-card-header">
+            <div class="kml-map-card-title">Depois · arquivo entregue</div>
+            <div class="kml-map-card-meta">${fmtInt(outputFeatures)} feature(s)</div>
+          </div>
+          <div id="kmlOutputMap" class="kml-map"></div>
+        </div>
+      </div>
+
+      <div class="kml-detail-grid">
+        <div class="kml-detail-card">
+          <h3>Arquivos enviados</h3>
+          <ul class="kml-file-list">
+            ${renderFiles(files.input_files || [])}
+          </ul>
+
+          ${
+            files.output_url
+              ? `<div style="margin-top:12px;">
+                  <a href="${files.output_url}" target="_blank" rel="noopener noreferrer" class="button">
+                    Abrir output entregue
+                  </a>
+                </div>`
+              : ""
+          }
+        </div>
+
+        <div class="kml-detail-card">
+          <h3>Relatório dos arquivos</h3>
+          <pre class="kml-json-box">${escapeHtml(JSON.stringify(files.files_report || [], null, 2))}</pre>
+        </div>
+      </div>
+    `;
+
+    setTimeout(() => {
+      initMaps(geojson.input, geojson.output);
+    }, 120);
+  }
+
+  function initOneMap(elementId, geojson, type) {
+
+    const map = L.map(elementId, {
+      scrollWheelZoom: true,
+      preferCanvas: true,
+      zoomControl: true,
+      attributionControl: false,
+    });
+
+    // Importante:
+    // Não usamos tileLayer externo aqui para evitar warning de referrer/CORS no admin.
+    // O fundo é CSS, e o Leaflet renderiza somente os vetores do GeoJSON.
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+      maxZoom: 20,
+      subdomains: "abcd",
+      attribution: "&copy; OpenStreetMap &copy; CARTO",
+      crossOrigin: true,
+      referrerPolicy: "no-referrer",
+    }).addTo(map);
+
+    const layer = L.geoJSON(geojson || { type: "FeatureCollection", features: [] }, {
+      style: function () {
+        if (type === "input") {
+          return {
+            color: "#2563eb",
+            weight: 2,
+            fillColor: "#2563eb",
+            fillOpacity: 0.14,
+          };
+        }
+
+        return {
+          color: "#16a34a",
+          weight: 2,
+          fillColor: "#16a34a",
+          fillOpacity: 0.18,
+        };
+      },
+      pointToLayer: function (feature, latlng) {
+        return L.circleMarker(latlng, {
+          radius: 5,
+          weight: 2,
+          color: type === "input" ? "#2563eb" : "#16a34a",
+          fillColor: type === "input" ? "#2563eb" : "#16a34a",
+          fillOpacity: 0.85,
+        });
+      },
+      onEachFeature: function (feature, layer) {
+        const props = feature.properties || {};
+        const name = props.name || props.kind || "Feature";
+        layer.bindPopup(escapeHtml(name));
+      },
+    }).addTo(map);
+
+    try {
+      const bounds = layer.getBounds();
+
+      if (bounds && bounds.isValid()) {
+        map.fitBounds(bounds, { padding: [28, 28] });
+      } else {
+        map.setView([-14.2350, -51.9253], 4);
+      }
+    } catch (err) {
+      map.setView([-14.2350, -51.9253], 4);
+    }
+
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 180);
+
+    return { map, layer };
+  }
+
+  function initMaps(inputGeojson, outputGeojson) {
+    destroyMaps();
+
+    const input = initOneMap("kmlInputMap", inputGeojson, "input");
+    const output = initOneMap("kmlOutputMap", outputGeojson, "output");
+
+    inputMap = input.map;
+    inputLayer = input.layer;
+
+    outputMap = output.map;
+    outputLayer = output.layer;
+  }
+
+  async function loadPreview(url) {
+    openDrawer();
+    destroyMaps();
+
+    titleEl.textContent = "Preview do merge";
+    subtitleEl.textContent = "Carregando dados do job...";
+
+    bodyEl.innerHTML = `
+      <div class="kml-loading-state">
+        <div class="kml-spinner-shell">
+          <div class="kml-spinner"></div>
+        </div>
+        <div class="kml-loading-title">Carregando preview do merge</div>
+        <div class="kml-loading-copy">Buscando arquivos, métricas e mapas antes/depois...</div>
+      </div>
+    `;
+
+    try {
+      const response = await fetch(url, {
+        method: "GET",
+        credentials: "same-origin",
+        headers: {
+          "Accept": "application/json",
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.ok) {
+        throw new Error(data.detail || "Não foi possível carregar o preview.");
+      }
+
+      renderModal(data);
+    } catch (err) {
+      bodyEl.innerHTML = `
+        <div class="kml-detail-card">
+          <h3>Erro ao carregar preview</h3>
+          <p>${escapeHtml(err.message || "Erro desconhecido.")}</p>
+        </div>
+      `;
+    }
+  }
+
+  document.addEventListener("click", function (event) {
+    const btn = event.target.closest(".kml-preview-btn");
+
+    if (!btn) return;
+
+    event.preventDefault();
+
+    const url = btn.getAttribute("data-preview-url");
+
+    if (!url) return;
+
+    loadPreview(url);
+  });
+
+  closeBtn.addEventListener("click", closeDrawer);
+
+  backdrop.addEventListener("click", closeDrawer);
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && drawer.classList.contains("is-open")) {
+      closeDrawer();
+    }
+  });
+
+  document.addEventListener("click", async function (event) {
+  const btn = event.target.closest(".kml-copy-anon-btn");
+
+  if (!btn) return;
+
+  event.preventDefault();
+  event.stopPropagation();
+
+  const value = btn.getAttribute("data-copy");
+
+  if (!value) return;
+
+  try {
+    await navigator.clipboard.writeText(value);
+
+    const original = btn.textContent;
+    btn.textContent = "Copiado";
+    btn.style.background = "#dcfce7";
+    btn.style.color = "#166534";
+
+    setTimeout(() => {
+      btn.textContent = original;
+      btn.style.background = "#f1f5f9";
+      btn.style.color = "#334155";
+    }, 900);
+  } catch (err) {
+    const original = btn.textContent;
+    btn.textContent = "Erro";
+    btn.style.background = "#fee2e2";
+    btn.style.color = "#991b1b";
+
+    setTimeout(() => {
+      btn.textContent = original;
+      btn.style.background = "#f1f5f9";
+      btn.style.color = "#334155";
+    }, 900);
+  }
+});
+})();
+</script>
+{% endblock %}
