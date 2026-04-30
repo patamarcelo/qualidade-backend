@@ -5675,6 +5675,47 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_401_UNAUTHORIZED
             )
 
+        def resolve_plantio_status(item, planning_pairs):
+            item_pair = (
+                str(item["safra__safra"]).strip(),
+                str(item["ciclo__ciclo"]).strip(),
+            )
+
+            area = item.get("area_colheita") or Decimal("0")
+            area_parcial = item.get("area_parcial") or Decimal("0")
+
+            try:
+                area = Decimal(str(area))
+            except Exception:
+                area = Decimal("0")
+
+            try:
+                area_parcial = Decimal(str(area_parcial))
+            except Exception:
+                area_parcial = Decimal("0")
+
+            colheita_finalizada_por_area = (
+                area > Decimal("0")
+                and area_parcial >= area
+            )
+
+            if item_pair in planning_pairs:
+                return "planejado", "Planejado"
+
+            if item.get("finalizado_colheita") or colheita_finalizada_por_area:
+                return "colhido", "Colhido"
+
+            if item.get("finalizado_plantio"):
+                return "plantado", "Plantado"
+
+            if item.get("inicializado_plantio"):
+                return "em_plantio", "Em plantio"
+
+            if item.get("variedade__cultura__cultura"):
+                return "planejado", "Planejado"
+
+            return "sem_planejamento", "Sem planejamento"
+
         try:
             safra_filter = None
             ciclo_filter = None
@@ -5693,13 +5734,6 @@ class PlantioViewSet(viewsets.ModelViewSet):
             # ------------------------------------------------------------
             # 1. Ciclos operacionais válidos para a navegação
             # ------------------------------------------------------------
-            # A navegação deve considerar SOMENTE:
-            # - CicloAtual(nome="Plantio")
-            # - CicloAtual(nome="Colheita")
-            #
-            # Isso impede o endpoint de trazer safras/ciclos antigos
-            # apenas porque ainda existem Plantio antigos no banco.
-            # ------------------------------------------------------------
             navigation_current_filters = (
                 CicloAtual.objects
                 .select_related("safra", "ciclo")
@@ -5715,7 +5749,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         "safra": str(current.safra.safra).strip(),
                         "ciclo": str(current.ciclo.ciclo).strip(),
                     })
-                    
+
             planning_pairs = {
                 (pair["safra"], str(pair["ciclo"]))
                 for pair in navigation_pairs
@@ -5750,11 +5784,6 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     ciclo_filter = default_filter["ciclo"]
 
             # Q exato para evitar combinação cruzada.
-            # Exemplo:
-            # Plantio  = 2026/2027 ciclo 1
-            # Colheita = 2025/2026 ciclo 3
-            #
-            # Não queremos aceitar 2026/2027 ciclo 3 por engano.
             navigation_q = Q()
 
             for pair in navigation_pairs:
@@ -5772,10 +5801,6 @@ class PlantioViewSet(viewsets.ModelViewSet):
 
             # ------------------------------------------------------------
             # 2. Índice leve de filtros
-            # ------------------------------------------------------------
-            # Este bloco não traz geometria.
-            # Serve apenas para o app saber quais combinações existem
-            # dentro de Plantio/Colheita atuais.
             # ------------------------------------------------------------
             qs_filters_index = (
                 Plantio.objects
@@ -5805,6 +5830,10 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "inicializado_plantio",
                     "finalizado_colheita",
                     "plantio_descontinuado",
+
+                    # Necessários para calcular status "colhido" por área também no filters_index
+                    "area_colheita",
+                    "area_parcial",
                 )
                 .filter(
                     navigation_q,
@@ -5824,29 +5853,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             filters_index_map = {}
 
             for item in qs_filters_index:
-                item_pair = (
-                    str(item["safra__safra"]).strip(),
-                    str(item["ciclo__ciclo"]).strip(),
-                )
-
-                if item_pair in planning_pairs:
-                    status_key = "planejado"
-                    status_label = "Planejado"
-                elif item["finalizado_colheita"]:
-                    status_key = "colhido"
-                    status_label = "Colhido"
-                elif item["finalizado_plantio"]:
-                    status_key = "plantado"
-                    status_label = "Plantado"
-                elif item["inicializado_plantio"]:
-                    status_key = "em_plantio"
-                    status_label = "Em plantio"
-                elif item["variedade__cultura__cultura"]:
-                    status_key = "planejado"
-                    status_label = "Planejado"
-                else:
-                    status_key = "sem_planejamento"
-                    status_label = "Sem planejamento"
+                status_key, status_label = resolve_plantio_status(item, planning_pairs)
 
                 row = {
                     "fazenda_grupo": item["talhao__fazenda__fazenda__nome"],
@@ -5881,8 +5888,6 @@ class PlantioViewSet(viewsets.ModelViewSet):
 
             # ------------------------------------------------------------
             # 3. Query principal do mapa
-            # ------------------------------------------------------------
-            # Esta query traz os polígonos somente da safra/ciclo selecionados.
             # ------------------------------------------------------------
             qs_plantio = (
                 Plantio.objects
@@ -5938,8 +5943,6 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "map_geo_points",
                 )
                 .filter(
-                    # safra__safra=safra_filter,
-                    # ciclo__ciclo=ciclo_filter,
                     navigation_q,
                     plantio_descontinuado=False,
                 )
@@ -5992,7 +5995,9 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 peso_scs = colheita.get("peso_scs") or Decimal("0")
                 total_romaneio = colheita.get("total_romaneio") or 0
 
-                if item["finalizado_colheita"]:
+                status_key, status_label = resolve_plantio_status(item, planning_pairs)
+
+                if status_key == "colhido":
                     area_base_produtividade = area
                 else:
                     area_base_produtividade = area_parcial
@@ -6004,30 +6009,6 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         produtividade = round(float(peso_scs) / float(area_base_produtividade), 2)
                     except Exception:
                         produtividade = 0
-
-                item_pair = (
-                    str(item["safra__safra"]).strip(),
-                    str(item["ciclo__ciclo"]).strip(),
-                )
-
-                if item_pair in planning_pairs:
-                    status_key = "planejado"
-                    status_label = "Planejado"
-                elif item["finalizado_colheita"]:
-                    status_key = "colhido"
-                    status_label = "Colhido"
-                elif item["finalizado_plantio"]:
-                    status_key = "plantado"
-                    status_label = "Plantado"
-                elif item["inicializado_plantio"]:
-                    status_key = "em_plantio"
-                    status_label = "Em plantio"
-                elif item["variedade__cultura__cultura"]:
-                    status_key = "planejado"
-                    status_label = "Planejado"
-                else:
-                    status_key = "sem_planejamento"
-                    status_label = "Sem planejamento"
 
                 fill_color = item["variedade__cultura__map_color"]
                 line_color = item["variedade__cultura__map_color_line"]
@@ -6049,11 +6030,13 @@ class PlantioViewSet(viewsets.ModelViewSet):
 
                 total_area += area
                 total_area_plantada += area if item["finalizado_plantio"] else Decimal("0")
+
+                # Mantive como estava: soma a área parcial computada.
                 total_area_colhida += area_parcial if area_parcial else Decimal("0")
+
                 total_peso_kg += peso_kg
                 total_peso_scs += peso_scs
-                
-                
+
                 data_plantio = item["data_plantio"]
                 data_prevista_plantio = item["data_prevista_plantio"]
                 data_prevista_colheita_db = item["data_prevista_colheita"]
