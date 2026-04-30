@@ -27,6 +27,7 @@ from opscheckin.cron import (
     run_opscheckin_director_agenda_summary,
     run_opscheckin_daily_manager_event_tick,
     run_opscheckin_manager_personal_reminder_tick,
+    run_opscheckin_personal_reminder_coordinator_daily_actions
 )
 
 from .scheduler_lock import acquire_scheduler_lock
@@ -97,6 +98,10 @@ def job_delete_old_job_executions():
 def job_run_opscheckin_manager_personal_reminder_tick():
     _prepare_db_for_job()
     return run_opscheckin_manager_personal_reminder_tick()
+
+def job_run_opscheckin_personal_reminder_coordinator_daily_actions():
+    _prepare_db_for_job()
+    return run_opscheckin_personal_reminder_coordinator_daily_actions()
 
 # =====================================================================
 # INICIALIZAÇÃO DO SCHEDULER
@@ -193,6 +198,18 @@ def start():
                 id="opscheckin_manager_personal_reminder_tick",
                 replace_existing=True,
                 misfire_grace_time=120,
+                coalesce=True,
+            )
+            
+            scheduler.add_job(
+                job_run_opscheckin_personal_reminder_coordinator_daily_actions,
+                "cron",
+                day_of_week="mon-fri",
+                hour="8",
+                minute="30",
+                id="opscheckin_personal_reminder_coordinator_daily_actions_0830",
+                replace_existing=True,
+                misfire_grace_time=600,
                 coalesce=True,
             )
 

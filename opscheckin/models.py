@@ -5,6 +5,7 @@ from django.utils import timezone
 from django.core.exceptions import ValidationError
 from diamante.models import Projeto
 
+from django.conf import settings
 
 def only_digits(v: str) -> str:
     return re.sub(r"\D+", "", str(v or ""))
@@ -128,6 +129,22 @@ class Manager(models.Model):
     projeto = models.ManyToManyField(Projeto, blank=True, default=None, related_name="projeto_manager")
     
     
+    personal_reminder_managers = models.ManyToManyField(
+        "self",
+        blank=True,
+        symmetrical=False,
+        related_name="personal_reminder_coordinators",
+        verbose_name="Managers sob coordenação",
+        help_text="Managers/funcionários cujos avisos pessoais serão acompanhados por este coordenador.",
+    )
+
+    is_personal_reminder_coordinator = models.BooleanField(
+        default=False,
+        verbose_name="Coordenador de avisos pessoais",
+        help_text="Recebe confirmações e resumo diário dos avisos pessoais dos managers relacionados.",
+    )
+    
+    
     
     
     
@@ -249,6 +266,10 @@ class OutboundMessage(models.Model):
             ("daily_meeting_reminder", "Lembrete reunião diária"),
             ("daily_meeting_reminder_changed", "Lembrete reunião diária alterada"),
             ("personal_reminder", "Aviso pessoal"),
+            ("personal_reminder_coordinator_notice", "Aviso ao coordenador"),
+            ("personal_reminder_coordinator_daily_action", "Botão resumo diário avisos"),
+            ("personal_reminder_coordinator_daily_summary", "Resumo diário avisos"),
+            ("manual_template", "Manual via template"),
         ],
         db_index=True,
     )
@@ -703,3 +724,35 @@ class ManagerPersonalReminderDispatch(models.Model):
 
     def __str__(self):
         return f"{self.manager.name} - {self.reminder.title} - {self.reference_date}"
+    
+class OpsBoardAccess(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="ops_board_access",
+        verbose_name="Usuário Django",
+    )
+
+    coordinator = models.ForeignKey(
+        "Manager",
+        on_delete=models.CASCADE,
+        related_name="board_accesses",
+        limit_choices_to={"is_personal_reminder_coordinator": True},
+        verbose_name="Coordenador",
+        help_text="Coordenador cujo grupo este usuário poderá visualizar no board.",
+    )
+
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name="Ativo",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Acesso ao Board OpsCheckin"
+        verbose_name_plural = "Acessos ao Board OpsCheckin"
+
+    def __str__(self):
+        return f"{self.user} → {self.coordinator}"

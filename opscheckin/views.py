@@ -26,6 +26,10 @@ from .models import (
 from opscheckin.services.whatsapp import send_buttons, send_text, send_list
 from opscheckin.services.personal_reminders import try_link_personal_reminder_response
 
+from opscheckin.services.personal_reminder_coordinators import (
+    handle_coordinator_personal_reminder_action,
+)
+
 logger = logging.getLogger("opscheckin.whatsapp")
 
 # mínimo “anti-vazio” p/ considerar que veio algo (a validação real é pelo parse)
@@ -1976,7 +1980,22 @@ def whatsapp_webhook(request):
                     if _handle_director_action(manager=manager, reply_id=reply_id, now=now):
                         _mark_inbound_processed(inbound, now)
                         continue
-
+                if reply_id.startswith("CR:"):
+                    logger.warning(
+                        "WEBHOOK_COORDINATOR_PERSONAL_REMINDER_ACTION manager=%s phone=%s reply_id=%s is_personal_reminder_coordinator=%s",
+                        getattr(manager, "name", ""),
+                        getattr(manager, "phone_e164", ""),
+                        reply_id,
+                        getattr(manager, "is_personal_reminder_coordinator", None),
+                    )
+                    if handle_coordinator_personal_reminder_action(
+                        manager=manager,
+                        reply_id=reply_id,
+                        now=now,
+                    ):
+                        _mark_inbound_processed(inbound, now)
+                        continue
+                
                 # Daqui em diante exige participação no check-in diário
                 if not is_checkin_user or not checkin:
                     logger.warning(

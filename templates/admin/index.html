@@ -4,7 +4,366 @@
 
 {% block extrastyle %}
 {{ block.super }}
-<!-- <link rel="stylesheet" type="text/css" href="{% static 'admin/css/dashboard.css' %}" /> -->
+<style>
+    .ops-hub-shell {
+        position: relative;
+        margin-bottom: 24px;
+        padding: 22px;
+        border-radius: 28px;
+        background:
+            radial-gradient(1200px 420px at 0% 0%, rgba(59, 130, 246, .07), transparent 45%),
+            radial-gradient(900px 360px at 100% 0%, rgba(16, 185, 129, .06), transparent 45%),
+            linear-gradient(180deg, rgba(255, 255, 255, .92), rgba(248, 250, 252, .96));
+        border: 1px solid rgba(15, 23, 42, .08);
+        box-shadow:
+            0 14px 34px rgba(15, 23, 42, .06),
+            inset 0 1px 0 rgba(255, 255, 255, .65);
+        backdrop-filter: blur(10px);
+    }
+
+    .ops-hub-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 20px;
+        margin-bottom: 20px;
+    }
+
+    .ops-hub-header-left {
+        min-width: 0;
+        flex: 1;
+    }
+
+    .ops-hub-header-right {
+        flex: 0 0 auto;
+        display: flex;
+        align-items: stretch;
+    }
+
+    .ops-hub-kicker {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 12px;
+        border-radius: 999px;
+        background: rgba(15, 23, 42, .045);
+        border: 1px solid rgba(15, 23, 42, .07);
+        color: #334155;
+        font-size: 11px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: .08em;
+        margin-bottom: 14px;
+    }
+
+    .ops-hub-kicker-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: linear-gradient(135deg, #22c55e, #16a34a);
+        box-shadow: 0 0 0 4px rgba(34, 197, 94, .12);
+    }
+
+    .ops-hub-title {
+        margin: 0;
+        color: #0f172a;
+        font-size: 30px;
+        line-height: 1.05;
+        font-weight: 900;
+        letter-spacing: -0.045em;
+    }
+
+    .ops-hub-description {
+        margin: 10px 0 0;
+        max-width: 760px;
+        color: #64748b;
+        font-size: 14px;
+        line-height: 1.6;
+        font-weight: 500;
+    }
+
+    .ops-hub-meta-card {
+        min-width: 210px;
+        padding: 16px 16px 14px;
+        border-radius: 20px;
+        background: rgba(255, 255, 255, .82);
+        border: 1px solid rgba(15, 23, 42, .08);
+        box-shadow:
+            0 10px 26px rgba(15, 23, 42, .05),
+            inset 0 1px 0 rgba(255, 255, 255, .72);
+    }
+
+    .ops-hub-meta-label {
+        font-size: 11px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: .08em;
+        color: #64748b;
+        margin-bottom: 8px;
+    }
+
+    .ops-hub-meta-value {
+        color: #0f172a;
+        font-size: 32px;
+        line-height: 1;
+        font-weight: 900;
+        letter-spacing: -0.05em;
+        margin-bottom: 6px;
+    }
+
+    .ops-hub-meta-subtle {
+        color: #64748b;
+        font-size: 12px;
+        line-height: 1.45;
+        font-weight: 500;
+    }
+
+    .ops-hub-grid {
+        margin-bottom: 0;
+    }
+
+    .ops-hub-card {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        min-height: 220px;
+        height: 100%;
+        padding: 18px;
+        margin-bottom: 16px;
+        border-radius: 24px;
+        text-decoration: none !important;
+        color: inherit !important;
+        overflow: hidden;
+        background:
+            linear-gradient(180deg, rgba(255, 255, 255, .96), rgba(248, 250, 252, .98));
+        border: 1px solid rgba(15, 23, 42, .08);
+        box-shadow:
+            0 14px 34px rgba(15, 23, 42, .07),
+            inset 0 1px 0 rgba(255, 255, 255, .78);
+        transition:
+            transform .18s ease,
+            box-shadow .18s ease,
+            border-color .18s ease;
+    }
+
+    .ops-hub-card:hover {
+        transform: translateY(-3px);
+        box-shadow:
+            0 18px 42px rgba(15, 23, 42, .10),
+            inset 0 1px 0 rgba(255, 255, 255, .85);
+        border-color: rgba(37, 99, 235, .18);
+    }
+
+    .ops-hub-card-accent {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, rgba(37, 99, 235, .95), rgba(59, 130, 246, .55));
+    }
+
+    .ops-hub-card-green .ops-hub-card-accent {
+        background: linear-gradient(90deg, rgba(22, 163, 74, .95), rgba(34, 197, 94, .55));
+    }
+
+    .ops-hub-card-blue .ops-hub-card-accent {
+        background: linear-gradient(90deg, rgba(37, 99, 235, .95), rgba(59, 130, 246, .55));
+    }
+
+    .ops-hub-card-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 18px;
+    }
+
+    .ops-hub-icon-wrap {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .ops-hub-icon {
+        width: 56px;
+        height: 56px;
+        border-radius: 18px;
+        display: grid;
+        place-items: center;
+        font-size: 24px;
+        background: rgba(37, 99, 235, .10);
+        color: #1d4ed8;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, .8);
+    }
+
+    .ops-hub-card-green .ops-hub-icon {
+        background: rgba(22, 163, 74, .12);
+        color: #15803d;
+    }
+
+    .ops-hub-card-blue .ops-hub-icon {
+        background: rgba(37, 99, 235, .10);
+        color: #1d4ed8;
+    }
+
+    .ops-hub-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 6px 11px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: .02em;
+        white-space: nowrap;
+        color: #1d4ed8;
+        background: rgba(37, 99, 235, .08);
+        border: 1px solid rgba(37, 99, 235, .10);
+    }
+
+    .ops-hub-card-green .ops-hub-badge {
+        color: #166534;
+        background: rgba(34, 197, 94, .10);
+        border-color: rgba(34, 197, 94, .12);
+    }
+
+    .ops-hub-card-body {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .ops-hub-card-title {
+        margin: 0;
+        color: #0f172a;
+        font-size: 18px;
+        line-height: 1.2;
+        font-weight: 900;
+        letter-spacing: -0.025em;
+    }
+
+    .ops-hub-card-description {
+        margin: 10px 0 0;
+        color: #64748b;
+        font-size: 13px;
+        line-height: 1.6;
+        font-weight: 500;
+    }
+
+    .ops-hub-card-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding-top: 16px;
+        margin-top: 18px;
+        border-top: 1px solid rgba(15, 23, 42, .06);
+    }
+
+    .ops-hub-card-action {
+        color: #0f172a;
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: .02em;
+    }
+
+    .ops-hub-card-arrow {
+        width: 34px;
+        height: 34px;
+        border-radius: 999px;
+        display: grid;
+        place-items: center;
+        background: rgba(15, 23, 42, .05);
+        color: #0f172a;
+        transition: transform .18s ease, background .18s ease;
+    }
+
+    .ops-hub-card:hover .ops-hub-card-arrow {
+        transform: translateX(2px);
+        background: rgba(37, 99, 235, .10);
+        color: #1d4ed8;
+    }
+
+    .ops-empty-state {
+        padding: 34px 28px;
+        border-radius: 24px;
+        text-align: center;
+        background: rgba(255, 255, 255, .88);
+        border: 1px dashed rgba(15, 23, 42, .18);
+        color: rgba(15, 23, 42, .72);
+        box-shadow: 0 8px 24px rgba(15, 23, 42, .04);
+    }
+
+    .ops-empty-icon {
+        width: 58px;
+        height: 58px;
+        display: grid;
+        place-items: center;
+        margin: 0 auto 12px;
+        border-radius: 18px;
+        background: rgba(15, 23, 42, .06);
+        color: rgba(15, 23, 42, .62);
+        font-size: 22px;
+    }
+
+    .ops-empty-state h3 {
+        margin: 0;
+        color: #0f172a;
+        font-size: 18px;
+        font-weight: 900;
+        letter-spacing: -0.02em;
+    }
+
+    .ops-empty-state p {
+        margin: 8px auto 0;
+        max-width: 520px;
+        font-size: 13px;
+        line-height: 1.6;
+    }
+
+    @media (max-width: 991.98px) {
+        .ops-hub-shell {
+            padding: 18px;
+            border-radius: 22px;
+        }
+
+        .ops-hub-header {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .ops-hub-header-right {
+            width: 100%;
+        }
+
+        .ops-hub-meta-card {
+            width: 100%;
+            min-width: 0;
+        }
+    }
+
+    @media (max-width: 767.98px) {
+        .ops-hub-title {
+            font-size: 24px;
+        }
+
+        .ops-hub-description {
+            font-size: 13px;
+        }
+
+        .ops-hub-card {
+            min-height: 200px;
+            border-radius: 20px;
+        }
+
+        .ops-hub-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 16px;
+            font-size: 22px;
+        }
+    }
+</style>
 {% endblock %}
 
 {% block coltype %}colMS{% endblock %}
@@ -12,19 +371,7 @@
 {% block bodyclass %}{{ block.super }} dashboard{% endblock %}
 {% if not is_popup %}
 {% block breadcrumbs %}
-<div class="row mb-2">
-    <div class="col-sm-4">
-        <h2>{{title}}</h2>
-    </div>
-    <div class="col-sm-8">
-        <ol class="breadcrumb float-sm-right">
-            <li class="breadcrumb-item"><a href="{% url 'admin:index' %}"><i class="fas fa-tachometer-alt"></i> {% trans 'Home' %}</a></li>
-            {% for app in app_list %}
-            <li class="breadcrumb-item active">{{ app.name }}</li>
-            {% endfor %}
-        </ol>
-    </div>
-</div>
+
 {% endblock %}
 {% endif %}
 
@@ -32,6 +379,73 @@
 {% block content %}
 <div id="content-main" class="container-fluid">
     <div class="row">
+        {% if ops_dashboard_cards %}
+        <div class="col-md-12">
+            <section class="ops-hub-shell">
+                <div class="ops-hub-header">
+                    <div class="ops-hub-header-left">
+                        <div class="ops-hub-kicker">
+                            <span class="ops-hub-kicker-dot"></span>
+                            Central Operacional
+                        </div>
+
+                        <h1 class="ops-hub-title">Seus painéis</h1>
+
+                        <p class="ops-hub-description">
+                            Acesse os dashboards liberados para o seu perfil e acompanhe os fluxos
+                            operacionais com mais rapidez e clareza.
+                        </p>
+                    </div>
+
+                    <div class="ops-hub-header-right">
+                        <div class="ops-hub-meta-card">
+                            <div class="ops-hub-meta-label">Painéis disponíveis</div>
+                            <div class="ops-hub-meta-value">{{ ops_dashboard_cards|length }}</div>
+                            <div class="ops-hub-meta-subtle">
+                                {% if user.is_superuser %}
+                                Visualização global habilitada
+                                {% else %}
+                                Escopo controlado por acesso
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row ops-hub-grid">
+                    {% for card in ops_dashboard_cards %}
+                    <div class="col-xl-4 col-lg-4 col-md-6 col-sm-12">
+                        <a class="ops-hub-card ops-hub-card-{{ card.theme }}" href="{{ card.url }}">
+                            <div class="ops-hub-card-accent"></div>
+
+                            <div class="ops-hub-card-top">
+                                <div class="ops-hub-icon-wrap">
+                                    <div class="ops-hub-icon">{{ card.icon }}</div>
+                                </div>
+
+                                <div class="ops-hub-badge">
+                                    {{ card.badge }}
+                                </div>
+                            </div>
+
+                            <div class="ops-hub-card-body">
+                                <h3 class="ops-hub-card-title">{{ card.title }}</h3>
+                                <p class="ops-hub-card-description">{{ card.subtitle }}</p>
+                            </div>
+
+                            <div class="ops-hub-card-footer">
+                                <span class="ops-hub-card-action">Abrir painel</span>
+                                <span class="ops-hub-card-arrow">
+                                    <i class="fas fa-arrow-right"></i>
+                                </span>
+                            </div>
+                        </a>
+                    </div>
+                    {% endfor %}
+                </div>
+            </section>
+        </div>
+        {% endif %}
         {% if app_list %}
         {% for app in app_list %}
 
@@ -55,11 +469,11 @@
                     <div class="col-md-4 col-sm-6 model-box">
 
                         <div class="info-box bg-secondary">
-                                
+
                             <span class="info-box-icon">
                                 <a href="{{ model.admin_url }}">{% autoescape off %}{% icon %}{% endautoescape %}</a>
                             </span>
-                        
+
                             <div class="info-box-content">
                                 <a href="{{ model.admin_url }}">
                                     <span class="info-box-text text-light">{{ model.name }}</span>
@@ -117,51 +531,59 @@
                 </div>{% endcomment %}
             </div>
         </div>
-                {% endfor %}
-            
-                {% else %}
-                <p>{% trans "You don't have permission to edit anything." %}</p>
-                {% endif %}
-                <!-- /.box-body -->
-           
+        {% endfor %}
+
+        {% else %}
+        {% if not ops_dashboard_cards %}
+        <div class="col-md-12">
+            <div class="ops-empty-state">
+                <div class="ops-empty-icon">
+                    <i class="fas fa-lock"></i>
+                </div>
+                <h3>Nenhum painel liberado</h3>
+                <p>
+                    Seu usuário ainda não possui permissões administrativas nem painéis
+                    operacionais vinculados.
+                </p>
+            </div>
+        </div>
+        {% endif %}
+        {% endif %}
+        <!-- /.box-body -->
+
 
 
         {% block sidebar %}
+        {% load log %}
+        {% get_admin_log 10 as admin_log for_user user %}
 
+        {% if admin_log %}
         <div class="card card-widget col-md-12">
             <div class="card-header ">
                 <h2 class="card-title">{% trans 'Recent actions' %} / </h2>
                 <h3 class="card-title"> {% trans 'My actions' %}</h3>
-                <h3 class="card-title"><a href="{{ app.app_url }}" class="nav-link"
-                        title="{% blocktrans with name=app.name %}Models in the {{ name }} application{% endblocktrans %}">{{ app.name }}</a>
-                </h3>
 
                 <div class="card-tools pull-right">
-                    <button type="button" class="btn btn-tool" data-card-widget="collapse"><i class="fa fa-minus"></i>
+                    <button type="button" class="btn btn-tool" data-card-widget="collapse">
+                        <i class="fa fa-minus"></i>
                     </button>
                 </div>
-                <!-- /.box-tools -->
             </div>
+
             <div class="card-body">
                 <div class="row">
                     <div class="col-md-12">
-                        {% load log %}
-                        {% get_admin_log 10 as admin_log for_user user %}
-                        {% if not admin_log %}
-                        <p>{% trans 'None available' %}</p>
-                        {% else %}
                         <div class="timeline">
                             {% for entry in admin_log %}
                             <div>
                                 <i
                                     class="fas fa-{% if entry.is_addition %}plus bg-blue{% endif %}{% if entry.is_change %}edit bg-green{% endif %}{% if entry.is_deletion %}minus bg-red{% endif %} "></i>
                                 <div class="timeline-item">
-                                    <span class="time"><i class="fas fa-clock"></i> {{entry.action_time}}</span>
+                                    <span class="time"><i class="fas fa-clock"></i> {{ entry.action_time }}</span>
 
                                     <div class="timeline-body">
-                                        <a href="#">{{entry.user}}</a>
-                                        {% if entry.is_addition %}added{% endif %}{% if entry.is_change %}edited
-                                        {% endif %}{% if entry.is_deletion %}deleted{% endif %}
+                                        <a href="#">{{ entry.user }}</a>
+                                        {% if entry.is_addition %}added{% endif %}{% if entry.is_change %}edited{% endif %}{% if entry.is_deletion %}deleted{% endif %}
                                         {% if entry.is_deletion or not entry.get_admin_url %}
                                         {{ entry.object_repr }}
                                         {% else %}
@@ -169,27 +591,23 @@
                                         {% endif %}
                                         <br />
                                         {% if entry.content_type %}
-                                        <span class="mini quiet">{% filter capfirst %}
-                                            {{ entry.content_type }}{% endfilter %}</span>
+                                        <span
+                                            class="mini quiet">{% filter capfirst %}{{ entry.content_type }}{% endfilter %}</span>
                                         {% else %}
                                         <span class="mini quiet">{% trans 'Unknown content' %}</span>
                                         {% endif %}
-
                                     </div>
                                 </div>
                             </div>
                             {% endfor %}
                         </div>
-                        {% endif %}
                     </div>
                 </div>
-
             </div>
-
         </div>
-
+        {% endif %}
         {% endblock %}
-
     </div>
+
 
     {% endblock %}

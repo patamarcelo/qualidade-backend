@@ -12,12 +12,18 @@ from .models import (
     Manager,
     OutboundMessage,
     OutboundQuestion,
+    OpsBoardAccess,
 )
+
+
 from .services.templates import render_message
-from .services.whatsapp import send_text
+from .services.whatsapp import send_text, send_template
 
 from django.http import JsonResponse
 from django.utils.dateparse import parse_datetime
+
+from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
 
 
 DEFAULT_MSG = (
@@ -58,10 +64,118 @@ def _build_message_payload(it):
         "ticks_class": it.get("ticks_class", "") or "",
     }
 
+BOARD_MANUAL_TEMPLATE_NAME = "ops_board_manual_message"
+BOARD_MANUAL_TEMPLATE_LANGUAGE = "pt_BR"
 
-@staff_member_required
+
+def _extract_provider_message_id(resp):
+    try:
+        return ((resp or {}).get("messages") or [{}])[0].get("id") or ""
+    except Exception:
+        return ""
+
+
+def _send_board_manual_template(manager, final_msg: str):
+    return send_template(
+        manager.phone_e164,
+        template_name=BOARD_MANUAL_TEMPLATE_NAME,
+        language_code=BOARD_MANUAL_TEMPLATE_LANGUAGE,
+        body_params=[
+            manager.name or "Gerente",
+            final_msg,
+        ],
+    )
+
+def _get_board_scope(request):
+    """
+    Segurança:
+    - Superuser pode ver global ou simular coordinator_id.
+    - Usuário normal só vê o coordenador definido em OpsBoardAccess.
+    - coordinator_id da URL é ignorado para usuário não-superuser.
+    """
+    base_qs = (
+        Manager.objects
+        .select_related("branch")
+        .prefetch_related("division", "projeto")
+        .order_by("name")
+    )
+
+    user = request.user
+
+    if user.is_superuser:
+        coordinator_id = (request.GET.get("coordinator_id") or "").strip()
+
+        if not coordinator_id:
+            return None, base_qs, False
+
+        coordinator = (
+            Manager.objects
+            .filter(
+                id=coordinator_id,
+                is_personal_reminder_coordinator=True,
+            )
+            .first()
+        )
+
+        if not coordinator:
+            return None, Manager.objects.none(), True
+
+        managers_qs = (
+            coordinator.personal_reminder_managers
+            .select_related("branch")
+            .prefetch_related("division", "projeto")
+            .order_by("name")
+        )
+
+        return coordinator, managers_qs, True
+
+    access = (
+        OpsBoardAccess.objects
+        .select_related("coordinator")
+        .filter(
+            user=user,
+            is_active=True,
+            coordinator__is_personal_reminder_coordinator=True,
+        )
+        .first()
+    )
+
+    if not access or not access.coordinator_id:
+        return None, Manager.objects.none(), True
+
+    coordinator = access.coordinator
+
+    managers_qs = (
+        coordinator.personal_reminder_managers
+        .select_related("branch")
+        .prefetch_related("division", "projeto")
+        .order_by("name")
+    )
+
+    return coordinator, managers_qs, True
+
+def _can_access_board(request):
+    user = request.user
+
+    if not user.is_authenticated:
+        return False
+
+    if user.is_superuser:
+        return True
+
+    return OpsBoardAccess.objects.filter(
+        user=user,
+        is_active=True,
+        coordinator__is_personal_reminder_coordinator=True,
+    ).exists()
+    
+    
+
+@login_required
 @require_http_methods(["GET"])
 def board_updates(request):
+    if not _can_access_board(request):
+        raise PermissionDenied
     day_str = request.GET.get("day") or ""
     since_str = request.GET.get("since") or ""
 
@@ -69,7 +183,8 @@ def board_updates(request):
     start_dt, end_dt = _day_bounds_local(day)
     since = _parse_since(since_str) or start_dt
 
-    managers = list(Manager.objects.all().order_by("name"))
+    coordinator, managers_qs, is_scoped = _get_board_scope(request)
+    managers = list(managers_qs)
     manager_ids = [m.id for m in managers]
 
     outbound_qs = (
@@ -350,14 +465,17 @@ def _build_sidebar_preview(timeline):
     }
 
 
-@staff_member_required
+@login_required
 @require_http_methods(["GET", "POST"])
 def board_view(request):
+    if not _can_access_board(request):
+        raise PermissionDenied
     date_str = request.GET.get("date") or ""
     day = _parse_date(date_str) or timezone.localdate()
     start_dt, end_dt = _day_bounds_local(day)
 
-    managers = Manager.objects.all().order_by("name")
+    coordinator, managers, is_scoped = _get_board_scope(request)
+    manager_ids = list(managers.values_list("id", flat=True))
 
     if request.method == "POST":
         now = timezone.now()
@@ -369,7 +487,7 @@ def board_view(request):
         if mode == "bulk":
             msg_tpl = msg_bulk or DEFAULT_MSG
             ids = request.POST.getlist("manager_ids")
-            qs = managers.filter(id__in=ids) if ids else managers
+            qs = managers.filter(id__in=ids) if ids else Manager.objects.none()
         else:
             msg_tpl = msg_single or ""
             mid = (request.POST.get("manager_id") or "").strip()
@@ -390,7 +508,7 @@ def board_view(request):
 
             resp = None
             try:
-                resp = send_text(m.phone_e164, final_msg)
+                resp = _send_board_manual_template(m, final_msg)
             except Exception as e:
                 OutboundMessage.objects.create(
                     manager=m,
@@ -398,7 +516,7 @@ def board_view(request):
                     related_question=q,
                     to_phone=m.phone_e164,
                     provider_message_id="",
-                    kind="manual",
+                    kind="manual_template",
                     text=final_msg,
                     sent_at=now,
                     raw_response={"error": str(e)},
@@ -406,11 +524,8 @@ def board_view(request):
                 )
                 continue
 
-            wamid = ""
-            try:
-                wamid = ((resp or {}).get("messages") or [{}])[0].get("id") or ""
-            except Exception:
-                wamid = ""
+            wamid = _extract_provider_message_id(resp)
+
 
             data = dict(
                 manager=m,
@@ -418,7 +533,7 @@ def board_view(request):
                 related_question=q,
                 to_phone=m.phone_e164,
                 provider_message_id=wamid,
-                kind="manual",
+                kind="manual_template",
                 text=final_msg,
                 sent_at=now,
                 raw_response=resp,
@@ -429,10 +544,17 @@ def board_view(request):
 
             OutboundMessage.objects.create(**data)
 
-        return redirect(f"{request.path}?date={day.isoformat()}")
+
+        redirect_url = f"{request.path}?date={day.isoformat()}"
+
+        if coordinator:
+            redirect_url += f"&coordinator_id={coordinator.id}"
+
+        return redirect(redirect_url)
+
 
     checkins = (
-        DailyCheckin.objects.filter(date=day)
+        DailyCheckin.objects.filter(date=day, manager_id__in=manager_ids)
         .select_related("manager")
         .prefetch_related("questions")
     )
@@ -442,7 +564,7 @@ def board_view(request):
         from .models import AgendaItem
 
         item_stats = (
-            AgendaItem.objects.filter(checkin__date=day)
+            AgendaItem.objects.filter(checkin__date=day, checkin__manager_id__in=manager_ids)
             .values("checkin_id")
             .annotate(
                 total=Count("id"),
@@ -525,5 +647,7 @@ def board_view(request):
             "default_msg": DEFAULT_MSG,
             "status_filter": request.GET.get("status") or "",
             "initial_sync": timezone.now().isoformat(),
+            "coordinator": coordinator,
+            "is_scoped": is_scoped,
         },
     )

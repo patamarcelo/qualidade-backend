@@ -29,7 +29,7 @@ from opscheckin.services.whatsapp import send_text, send_template
 from datetime import date, timedelta
 import calendar
 
-
+from opscheckin.services.personal_reminder_coordinators import notify_personal_reminder_coordinator
 logger = logging.getLogger(__name__)
 
 
@@ -91,6 +91,31 @@ def get_managers_subscribed_to_personal_reminders():
     )
 
 
+
+def _extract_inbound_reply_id(inbound: InboundMessage) -> str:
+    raw = inbound.raw_payload or {}
+
+    try:
+        msg_type = (raw.get("type") or inbound.msg_type or "").strip()
+
+        if msg_type == "button":
+            return ((raw.get("button") or {}).get("payload") or "").strip()
+
+        if msg_type == "interactive":
+            inter = raw.get("interactive") or {}
+            itype = (inter.get("type") or "").strip()
+
+            if itype == "button_reply":
+                return ((inter.get("button_reply") or {}).get("id") or "").strip()
+
+            if itype == "list_reply":
+                return ((inter.get("list_reply") or {}).get("id") or "").strip()
+
+    except Exception:
+        return ""
+
+    return ""
+    
 def reminder_matches_day(reminder: ManagerPersonalReminder, day) -> bool:
     if reminder.start_date and day < reminder.start_date:
         return False
@@ -449,6 +474,12 @@ def try_link_personal_reminder_response(inbound: InboundMessage) -> bool:
     if response_mode == "button":
         if msg_type not in {"button", "interactive"}:
             return False
+
+        reply_id = _extract_inbound_reply_id(inbound)
+
+        if reply_id != "PR:CONFIRM":
+            return False
+
         answer_source = "button"
 
     elif response_mode == "text":
@@ -473,6 +504,15 @@ def try_link_personal_reminder_response(inbound: InboundMessage) -> bool:
             "inbound_message",
         ]
     )
+    
+    try:
+        notify_personal_reminder_coordinator(dispatch)
+    except Exception:
+        logger.exception(
+            "[personal_reminder_response] coordinator_notify_failed manager=%s dispatch=%s",
+            manager.name,
+            dispatch.id,
+        )
 
     logger.info(
         "[personal_reminder_response] manager=%s dispatch=%s source=%s answered_at=%s",

@@ -37,3 +37,9 @@ def run_opscheckin_daily_manager_event_tick():
 def run_opscheckin_manager_personal_reminder_tick():
     connection.close()
     call_command("manager_personal_reminder_tick")
+    
+    
+def run_opscheckin_personal_reminder_coordinator_daily_actions():
+    connection.close()
+    call_command("send_personal_reminder_coordinator_daily_actions")
+

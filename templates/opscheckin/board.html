@@ -842,15 +842,144 @@
 .board {
   scroll-behavior: smooth;
 }
+  body.scopedCoordinator .app {
+  grid-template-columns: 340px minmax(0, 1fr);
+  height: calc(100vh - 58px);
+}
+
+body.scopedCoordinator .main {
+  min-width: 0;
+  background:
+    radial-gradient(900px 520px at 80% 0%, rgba(37, 99, 235, .08), transparent 55%),
+    rgba(241, 245, 249, .72);
+}
+
+body.scopedCoordinator .boardWrap {
+  padding: 0;
+  height: 100%;
+}
+
+body.scopedCoordinator .board {
+  height: 100%;
+  display: block;
+  overflow: hidden;
+  padding: 0;
+}
+
+body.scopedCoordinator .col {
+  display: none;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  border-radius: 0;
+  border: 0;
+  border-left: 1px solid var(--border);
+  box-shadow: none;
+  background: rgba(255, 255, 255, .96);
+}
+
+body.scopedCoordinator .col.active {
+  display: flex;
+}
+
+body.scopedCoordinator .colHeader {
+  padding: 14px 18px;
+  min-height: 74px;
+}
+
+body.scopedCoordinator .thread {
+  padding: 18px 8%;
+  background:
+    linear-gradient(180deg, rgba(248, 250, 252, .92), rgba(241, 245, 249, .92)),
+    radial-gradient(900px 520px at 20% 0%, rgba(34, 197, 94, .06), transparent 60%);
+}
+
+body.scopedCoordinator .bubble {
+  max-width: min(680px, 76%);
+  font-size: 13.5px;
+  line-height: 1.38;
+  padding: 9px 11px;
+  border-radius: 14px;
+}
+
+body.scopedCoordinator .composer {
+  padding: 12px 18px 14px;
+  background: rgba(255, 255, 255, .98);
+}
+
+body.scopedCoordinator .composerRow {
+  align-items: flex-end;
+}
+
+body.scopedCoordinator .composerText {
+  min-height: 44px;
+  max-height: 160px;
+  font-size: 14px;
+  line-height: 1.35;
+  border-radius: 14px;
+}
+
+body.scopedCoordinator .sendBtn {
+  width: 44px;
+  height: 44px;
+}
+
+body.scopedCoordinator .composerHint {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 7px;
+}
+
+body.scopedCoordinator .sidebar {
+  background: rgba(255, 255, 255, .96);
+}
+
+body.scopedCoordinator .conversationItem {
+  border-radius: 10px;
+}
+
+body.scopedCoordinator .conversationItem.active {
+  border: 1px solid rgba(37, 99, 235, .35);
+  box-shadow: inset 3px 0 0 #2563eb;
+}
+
+  body.scopedCoordinator .composer {
+    padding: 14px;
+  }
+
+  body.scopedCoordinator .composerText {
+    min-height: 44px;
+    font-size: 13.5px;
+  }
+
+  body.scopedCoordinator .sendBtn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .composerHint {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
   </style>
 </head>
 
-<body data-day="{{ day|date:'Y-m-d' }}" data-initial-sync="{{ initial_sync }}">
+<body   class="{% if is_scoped %}scopedCoordinator{% endif %}" data-day="{{ day|date:'Y-m-d' }}" data-initial-sync="{{ initial_sync }}" data-coordinator-id="{% if request.user.is_superuser and coordinator %}{{ coordinator.id }}{% endif %}">
   <div class="top">
     <div class="topRow">
       <div class="title">
-        <h1>OpsCheckin • Dashboard</h1>
-        <p class="sub">{{ day|date:"d/m/Y" }}</p>
+        <h1>
+          {% if coordinator %}
+            Painel WhatsApp • {{ coordinator.name }}
+          {% else %}
+            OpsCheckin • Dashboard
+          {% endif %}
+        </h1>
+        <p class="sub">
+          {{ day|date:"d/m/Y" }}
+          {% if coordinator %} · {{ cols|length }} manager(s) sob gestão{% endif %}
+        </p>
       </div>
 
       <div class="controls">
@@ -862,7 +991,14 @@
               <button class="btn" type="submit">Filtrar</button>
             </div>
           </div>
-          {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
+
+          {% if request.user.is_superuser and coordinator %}
+            <input type="hidden" name="coordinator_id" value="{{ coordinator.id }}">
+          {% endif %}
+
+          {% if status_filter %}
+            <input type="hidden" name="status" value="{{ status_filter }}">
+          {% endif %}
         </form>
 
         <div style="display:flex; flex-direction:column; gap:4px;">
@@ -890,7 +1026,7 @@
             </div>
 
             <div>
-              <label>Managers (Ctrl/Cmd p/ múltiplos). Vazio: envia p/ todos.</label>
+              <label>Selecione os managers que receberão a mensagem.</label>
               <select name="manager_ids" multiple>
                 <optgroup label="🟢 Ativos">
                   {% for m in managers %}
@@ -1043,9 +1179,19 @@
                 {% csrf_token %}
                 <input type="hidden" name="mode" value="single" />
                 <input type="hidden" name="manager_id" value="{{ col.manager.id }}" />
+
+                <div class="composerHint">
+                  Envio via template aprovado para {{ col.manager.name }}.
+                </div>
+
                 <div class="composerRow">
-                  <textarea class="composerText" name="message_single" rows="1"
-                    placeholder="Mensagem para {{ col.manager.name }}…" data-autogrow="1"></textarea>
+                  <textarea
+                    class="composerText"
+                    name="message_single"
+                    rows="1"
+                    placeholder="Digite a mensagem para {{ col.manager.name }}…"
+                    data-autogrow="1"></textarea>
+
                   <button class="sendBtn" type="submit" title="Enviar">
                     <span class="sendBtnText">➤</span>
                     <span class="sendBtnSpinner"></span>
@@ -1060,172 +1206,239 @@
     </main>
   </div>
 
+
   <script>
-    (function () {
-      const btnActive = document.getElementById("fActive");
-      const btnInactive = document.getElementById("fInactive");
-      const btnAll = document.getElementById("fAll");
-      const cols = Array.from(document.querySelectorAll(".col"));
-      const items = Array.from(document.querySelectorAll(".conversationItem"));
-      const searchInput = document.getElementById("managerSearch");
-      const board = document.getElementById("board");
+  (function () {
+    const btnActive = document.getElementById("fActive");
+    const btnInactive = document.getElementById("fInactive");
+    const btnAll = document.getElementById("fAll");
+    const cols = Array.from(document.querySelectorAll(".col"));
+    const items = Array.from(document.querySelectorAll(".conversationItem"));
+    const searchInput = document.getElementById("managerSearch");
+    const board = document.getElementById("board");
+    const isScopedCoordinator = document.body.classList.contains("scopedCoordinator");
 
-      let lockedTargetId = null;
-      let lockTimer = null;
+    let lockedTargetId = null;
+    let lockTimer = null;
 
-      function setActiveBtn(which) {
-        [btnActive, btnInactive, btnAll].forEach(b => b.classList.remove("active"));
-        if (which === "active") btnActive.classList.add("active");
-        if (which === "inactive") btnInactive.classList.add("active");
-        if (which === "all") btnAll.classList.add("active");
+    function setActiveBtn(which) {
+      [btnActive, btnInactive, btnAll].forEach(b => b.classList.remove("active"));
+      if (which === "active") btnActive.classList.add("active");
+      if (which === "inactive") btnInactive.classList.add("active");
+      if (which === "all") btnAll.classList.add("active");
+    }
+
+    function matchFilters(el, which, term) {
+      const isActive = el.getAttribute("data-active") === "1";
+      const name = (el.getAttribute("data-manager-name") || "").toLowerCase();
+
+      let okStatus = true;
+      if (which === "active") okStatus = isActive;
+      if (which === "inactive") okStatus = !isActive;
+
+      let okSearch = true;
+      if (term) okSearch = name.includes(term);
+
+      return okStatus && okSearch;
+    }
+
+    function getCurrentFilter() {
+      return document.querySelector(".pillBtn.active")?.dataset?.filter || "active";
+    }
+
+    function applyFilter(which) {
+      const term = (searchInput?.value || "").trim().toLowerCase();
+
+      cols.forEach(c => {
+        const visible = matchFilters(c, which, term);
+
+        if (isScopedCoordinator) {
+          c.dataset.filteredOut = visible ? "0" : "1";
+        } else {
+          c.style.display = visible ? "" : "none";
+        }
+      });
+
+      items.forEach(i => {
+        i.style.display = matchFilters(i, which, term) ? "" : "none";
+      });
+
+      if (isScopedCoordinator) {
+        const activeItem = items.find(i =>
+          i.classList.contains("active") &&
+          i.style.display !== "none"
+        );
+
+        if (activeItem) {
+          setSelectedConversation(activeItem.getAttribute("data-target"), { focus: false, lock: false });
+          return;
+        }
+
+        const firstVisibleItem = items.find(i => i.style.display !== "none");
+        if (firstVisibleItem) {
+          setSelectedConversation(firstVisibleItem.getAttribute("data-target"), { focus: false, lock: false });
+        } else {
+          cols.forEach(c => {
+            c.classList.remove("active");
+            c.style.display = "none";
+          });
+        }
+      }
+    }
+
+    function focusComposer(target) {
+      if (!target) return;
+      const textarea = target.querySelector(".composerText");
+      if (!textarea) return;
+
+      textarea.focus({ preventScroll: true });
+
+      const val = textarea.value || "";
+      textarea.setSelectionRange(val.length, val.length);
+    }
+
+    function setSelectedConversation(targetId, options = {}) {
+      const { focus = false, lock = false } = options;
+
+      items.forEach(i => {
+        i.classList.toggle("active", i.getAttribute("data-target") === targetId);
+      });
+
+      cols.forEach(c => {
+        const isActive = c.id === targetId;
+        c.classList.toggle("active", isActive);
+
+        if (isScopedCoordinator) {
+          const filteredOut = c.dataset.filteredOut === "1";
+          c.style.display = isActive && !filteredOut ? "flex" : "none";
+        }
+      });
+
+      if (lock) {
+        lockedTargetId = targetId;
+        if (lockTimer) clearTimeout(lockTimer);
+        lockTimer = setTimeout(() => {
+          lockedTargetId = null;
+        }, 900);
       }
 
-      function matchFilters(el, which, term) {
-        const isActive = el.getAttribute("data-active") === "1";
-        const name = (el.getAttribute("data-manager-name") || "").toLowerCase();
+      if (focus) {
+        const target = document.getElementById(targetId);
+        focusComposer(target);
+      }
+    }
 
-        let okStatus = true;
-        if (which === "active") okStatus = isActive;
-        if (which === "inactive") okStatus = !isActive;
+    function syncActiveConversation() {
+      if (isScopedCoordinator) {
+        const activeItem = items.find(i =>
+          i.classList.contains("active") &&
+          i.style.display !== "none"
+        );
 
-        let okSearch = true;
-        if (term) okSearch = name.includes(term);
+        if (activeItem) {
+          setSelectedConversation(activeItem.getAttribute("data-target"), { focus: false, lock: false });
+          return;
+        }
 
-        return okStatus && okSearch;
+        const firstVisibleItem = items.find(i => i.style.display !== "none");
+        if (firstVisibleItem) {
+          setSelectedConversation(firstVisibleItem.getAttribute("data-target"), { focus: false, lock: false });
+        }
+
+        return;
       }
 
-      function applyFilter(which) {
-        const term = (searchInput?.value || "").trim().toLowerCase();
-
-        cols.forEach(c => {
-          c.style.display = matchFilters(c, which, term) ? "" : "none";
-        });
-
-        items.forEach(i => {
-          i.style.display = matchFilters(i, which, term) ? "" : "none";
-        });
+      if (lockedTargetId) {
+        setSelectedConversation(lockedTargetId, { focus: false, lock: false });
+        return;
       }
 
-      function focusComposer(target) {
+      const visibleCols = cols.filter(c => c.style.display !== "none");
+      if (!visibleCols.length) return;
+
+      const boardRect = board.getBoundingClientRect();
+      let best = null;
+      let bestDist = Infinity;
+
+      visibleCols.forEach(col => {
+        const rect = col.getBoundingClientRect();
+        const dist = Math.abs(rect.left - boardRect.left - 8);
+        if (dist < bestDist) {
+          bestDist = dist;
+          best = col;
+        }
+      });
+
+      if (!best) return;
+      setSelectedConversation(best.id, { focus: false, lock: false });
+    }
+
+    btnActive.addEventListener("click", () => {
+      setActiveBtn("active");
+      applyFilter("active");
+      syncActiveConversation();
+    });
+
+    btnInactive.addEventListener("click", () => {
+      setActiveBtn("inactive");
+      applyFilter("inactive");
+      syncActiveConversation();
+    });
+
+    btnAll.addEventListener("click", () => {
+      setActiveBtn("all");
+      applyFilter("all");
+      syncActiveConversation();
+    });
+
+    if (searchInput) {
+      searchInput.addEventListener("input", () => {
+        const active = getCurrentFilter();
+        applyFilter(active);
+        syncActiveConversation();
+      });
+    }
+
+    items.forEach(item => {
+      item.addEventListener("click", () => {
+        const targetId = item.getAttribute("data-target");
+        const target = document.getElementById(targetId);
         if (!target) return;
-        const textarea = target.querySelector(".composerText");
-        if (!textarea) return;
 
-        textarea.focus({ preventScroll: true });
+        setSelectedConversation(targetId, { focus: true, lock: true });
 
-        const val = textarea.value || "";
-        textarea.setSelectionRange(val.length, val.length);
-      }
-
-      function setSelectedConversation(targetId, options = {}) {
-        const { focus = false, lock = false } = options;
-
-        items.forEach(i => {
-          i.classList.toggle("active", i.getAttribute("data-target") === targetId);
-        });
-
-        cols.forEach(c => {
-          c.classList.toggle("active", c.id === targetId);
-        });
-
-        if (lock) {
-          lockedTargetId = targetId;
-          if (lockTimer) clearTimeout(lockTimer);
-          lockTimer = setTimeout(() => {
-            lockedTargetId = null;
-          }, 900);
-        }
-
-        if (focus) {
-          const target = document.getElementById(targetId);
-          focusComposer(target);
-        }
-      }
-
-      btnActive.addEventListener("click", () => {
-        setActiveBtn("active");
-        applyFilter("active");
-        syncActiveConversation();
-      });
-
-      btnInactive.addEventListener("click", () => {
-        setActiveBtn("inactive");
-        applyFilter("inactive");
-        syncActiveConversation();
-      });
-
-      btnAll.addEventListener("click", () => {
-        setActiveBtn("all");
-        applyFilter("all");
-        syncActiveConversation();
-      });
-
-      if (searchInput) {
-        searchInput.addEventListener("input", () => {
-          const active = document.querySelector(".pillBtn.active")?.dataset?.filter || "active";
-          applyFilter(active);
-          syncActiveConversation();
-        });
-      }
-
-      items.forEach(item => {
-        item.addEventListener("click", () => {
-          const targetId = item.getAttribute("data-target");
-          const target = document.getElementById(targetId);
-          if (!target) return;
-
-          setSelectedConversation(targetId, { focus: true, lock: true });
-
+        if (!isScopedCoordinator) {
           target.scrollIntoView({
             behavior: "smooth",
             inline: "start",
             block: "nearest"
           });
-        });
-      });
 
-      function syncActiveConversation() {
-        if (lockedTargetId) {
-          setSelectedConversation(lockedTargetId, { focus: false, lock: false });
-          return;
+          window.setTimeout(() => {
+            setSelectedConversation(targetId, { focus: true, lock: true });
+          }, 350);
         }
+      });
+    });
 
-        const visibleCols = cols.filter(c => c.style.display !== "none");
-        if (!visibleCols.length) return;
-
-        const boardRect = board.getBoundingClientRect();
-        let best = null;
-        let bestDist = Infinity;
-
-        visibleCols.forEach(col => {
-          const rect = col.getBoundingClientRect();
-          const dist = Math.abs(rect.left - boardRect.left - 8);
-          if (dist < bestDist) {
-            bestDist = dist;
-            best = col;
-          }
-        });
-
-        if (!best) return;
-        setSelectedConversation(best.id, { focus: false, lock: false });
-      }
-
+    if (!isScopedCoordinator) {
       let syncRaf = null;
       board.addEventListener("scroll", () => {
         if (syncRaf) cancelAnimationFrame(syncRaf);
         syncRaf = window.requestAnimationFrame(syncActiveConversation);
       });
+    }
 
-      setActiveBtn("active");
-      applyFilter("active");
-      syncActiveConversation();
+    setActiveBtn("active");
+    applyFilter("active");
+    syncActiveConversation();
 
-      window.__opsBoard = window.__opsBoard || {};
-      window.__opsBoard.setSelectedConversation = setSelectedConversation;
-      window.__opsBoard.focusComposer = focusComposer;
-    })();
-  </script>
-
+    window.__opsBoard = window.__opsBoard || {};
+    window.__opsBoard.setSelectedConversation = setSelectedConversation;
+    window.__opsBoard.focusComposer = focusComposer;
+    window.__opsBoard.applyFilter = applyFilter;
+  })();
+</script>
   <script>
   (function () {
     function escapeHtml(str) {
@@ -1295,7 +1508,7 @@
           <div class="metaLine">
             <span class="time">${nowLabel()}</span>
             <span class="ticks ticksSent">✓</span>
-            <span class="tag">manual</span>
+            <span class="tag">template</span>
           </div>
         </div>
       `;
@@ -1576,7 +1789,12 @@
 
     async function fetchBoardUpdates() {
       try {
-        const url = `/opscheckin/board/updates/?day=${encodeURIComponent(day)}&since=${encodeURIComponent(lastSync)}`;
+        const coordinatorId = bodyEl.dataset.coordinatorId || "";
+        let url = `/opscheckin/board/updates/?day=${encodeURIComponent(day)}&since=${encodeURIComponent(lastSync)}`;
+
+        if (coordinatorId) {
+          url += `&coordinator_id=${encodeURIComponent(coordinatorId)}`;
+        }
         const resp = await fetch(url, {
           headers: { "X-Requested-With": "XMLHttpRequest" },
           credentials: "same-origin",

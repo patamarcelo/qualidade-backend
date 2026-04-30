@@ -21,7 +21,8 @@ from .models import (
     OutboundMessage,
     OutboundQuestion,
     ManagerPersonalReminder,
-    ManagerPersonalReminderDispatch
+    ManagerPersonalReminderDispatch,
+    OpsBoardAccess
 )
 
 
@@ -157,6 +158,8 @@ class ManagerAdminForm(forms.ModelForm):
             "is_active",
             "is_active_resume_agenda",
             "is_active_for_meetings",
+            "is_personal_reminder_coordinator",
+            "personal_reminder_managers",
             "id_responsavel_farmbox",
             "projeto",
         )
@@ -169,6 +172,21 @@ class ManagerAdminForm(forms.ModelForm):
             if s.startswith("55") and len(s) >= 4:
                 self.fields["ddd"].initial = s[2:4]
                 self.fields["number"].initial = s[4:]
+
+        self.fields["is_personal_reminder_coordinator"].help_text = (
+            "Marque quando este manager/coordenador deve receber confirmações e resumos dos avisos pessoais."
+        )
+        
+        self.fields["personal_reminder_managers"].help_text = (
+            "Selecione os managers/funcionários que ficam sob os cuidados deste coordenador."
+        )
+
+        if self.instance and self.instance.pk:
+            self.fields["personal_reminder_managers"].queryset = (
+                Manager.objects.exclude(pk=self.instance.pk).order_by("name")
+            )
+        else:
+            self.fields["personal_reminder_managers"].queryset = Manager.objects.all().order_by("name")
 
     def clean(self):
         cleaned = super().clean()
@@ -185,8 +203,17 @@ class ManagerAdminForm(forms.ModelForm):
             return cleaned
 
         self.instance.phone_e164 = f"55{ddd}{number}"
-        return cleaned
 
+        personal_reminder_managers = cleaned.get("personal_reminder_managers")
+
+        if self.instance and self.instance.pk and personal_reminder_managers:
+            if personal_reminder_managers.filter(pk=self.instance.pk).exists():
+                self.add_error(
+                    "personal_reminder_managers",
+                    "Um coordenador não pode coordenar ele mesmo.",
+                )
+
+        return cleaned
 
 class ManagerNotificationSubscriptionInline(admin.StackedInline):
     model = ManagerNotificationSubscription
@@ -232,9 +259,12 @@ class BranchAdmin(admin.ModelAdmin):
     managers_count.short_description = "Qtd. managers"
 
 
+
+
 @admin.register(Manager)
 class ManagerAdmin(admin.ModelAdmin):
     form = ManagerAdminForm
+
     list_display = (
         "id",
         "name",
@@ -243,23 +273,30 @@ class ManagerAdmin(admin.ModelAdmin):
         "branch_display",
         "divisions_badges",
         "projetos_badges",
+        "coordinator_role_badge",
+        "personal_reminder_managers_badge",
+        "personal_reminder_coordinators_badge",
         "is_active",
         "is_active_resume_agenda",
         "is_active_for_meetings",
+        "is_personal_reminder_coordinator",
         "notification_codes",
         "notifications_count",
         "last_checkin_link",
     )
+
     list_filter = (
         "is_active",
         "is_active_resume_agenda",
         "is_active_for_meetings",
+        "is_personal_reminder_coordinator",
         "branch",
         "division",
         "projeto",
         "notification_subscriptions__is_active",
         "notification_subscriptions__notification_type",
     )
+
     search_fields = (
         "name",
         "phone_e164",
@@ -268,32 +305,98 @@ class ManagerAdmin(admin.ModelAdmin):
         "division__name",
         "division__code",
         "projeto__nome",
+        "personal_reminder_managers__name",
+        "personal_reminder_managers__phone_e164",
+        "personal_reminder_coordinators__name",
+        "personal_reminder_coordinators__phone_e164",
         "notification_subscriptions__notification_type__code",
         "notification_subscriptions__notification_type__name",
     )
+
     ordering = ("name",)
-    inlines = [ ManagerNotificationSubscriptionInline, ManagerPersonalReminderInline ]
-    filter_horizontal = ("projeto", "division")
+
+    inlines = [
+        ManagerNotificationSubscriptionInline,
+        ManagerPersonalReminderInline,
+    ]
+
+    filter_horizontal = (
+        "projeto",
+        "division",
+        "personal_reminder_managers",
+    )
+
+
+    fieldsets = (
+        ("Identificação", {
+            "fields": (
+                "name",
+                ("country", "ddd", "number"),
+                "id_responsavel_farmbox",
+            )
+        }),
+        ("Estrutura operacional", {
+            "fields": (
+                "branch",
+                "division",
+                "projeto",
+            )
+        }),
+        ("Papéis nos fluxos", {
+            "fields": (
+                "is_active",
+                "is_active_resume_agenda",
+                "is_active_for_meetings",
+            )
+        }),
+        ("Coordenação de avisos pessoais", {
+            "fields": (
+                "is_personal_reminder_coordinator",
+                "personal_reminder_managers",
+            ),
+            "description": (
+                "Marque 'Coordenador de avisos pessoais' para usuários que recebem "
+                "confirmações e resumos. Depois selecione abaixo quais managers ficam "
+                "sob os cuidados deste coordenador."
+            ),
+        }),
+    )
 
     class Media:
         js = ("opscheckin/admin_phone_mask.js",)
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
-        qs = qs.select_related("branch").prefetch_related(
-            "division",
-            "projeto",
-            "notification_subscriptions__notification_type",
-            "checkins",
-        ).annotate(
-            notifications_total=Count(
-                "notification_subscriptions",
-                filter=Q(notification_subscriptions__is_active=True),
-                distinct=True,
+
+        qs = (
+            qs.select_related("branch")
+            .prefetch_related(
+                "division",
+                "projeto",
+                "personal_reminder_managers",
+                "personal_reminder_coordinators",
+                "notification_subscriptions__notification_type",
+                "checkins",
+            )
+            .annotate(
+                notifications_total=Count(
+                    "notification_subscriptions",
+                    filter=Q(notification_subscriptions__is_active=True),
+                    distinct=True,
+                ),
+                personal_reminder_managers_total=Count(
+                    "personal_reminder_managers",
+                    distinct=True,
+                ),
+                personal_reminder_coordinators_total=Count(
+                    "personal_reminder_coordinators",
+                    distinct=True,
+                ),
             )
         )
-        return qs
 
+        return qs
+    
     def phone_display(self, obj):
         return format_phone_br(obj.phone_e164)
 
@@ -305,6 +408,70 @@ class ManagerAdmin(admin.ModelAdmin):
 
     branch_display.short_description = "Filial"
     branch_display.admin_order_field = "branch__name"
+    
+    def coordinator_role_badge(self, obj):
+        if obj.is_personal_reminder_coordinator:
+            return format_html(
+                '<span style="display:inline-block;padding:4px 10px;'
+                'border-radius:999px;background:#dcfce7;color:#166534;'
+                'font-weight:800;font-size:11px;">Coordenador</span>'
+            )
+
+        total = getattr(obj, "personal_reminder_coordinators_total", 0)
+
+        if total > 0:
+            return format_html(
+                '<span style="display:inline-block;padding:4px 10px;'
+                'border-radius:999px;background:#eef2ff;color:#3730a3;'
+                'font-weight:800;font-size:11px;">Coordenado</span>'
+            )
+
+        return "-"
+
+    coordinator_role_badge.short_description = "Papel"
+
+
+    def personal_reminder_managers_badge(self, obj):
+        total = getattr(obj, "personal_reminder_managers_total", 0)
+
+        if not obj.is_personal_reminder_coordinator:
+            return "-"
+
+        if total <= 0:
+            return format_html(
+                '<span style="display:inline-block;padding:4px 10px;'
+                'border-radius:999px;background:#fee2e2;color:#991b1b;'
+                'font-weight:800;font-size:11px;">0 managers</span>'
+            )
+
+        return format_html(
+            '<span style="display:inline-block;padding:4px 10px;'
+            'border-radius:999px;background:#dbeafe;color:#1d4ed8;'
+            'font-weight:800;font-size:11px;">{} manager(s)</span>',
+            total,
+        )
+
+    personal_reminder_managers_badge.short_description = "Cuida de"
+
+
+    def personal_reminder_coordinators_badge(self, obj):
+        coordinators = obj.personal_reminder_coordinators.all().order_by("name")
+
+        if not coordinators:
+            return "-"
+
+        return format_html(
+            "".join(
+                pill_badge(
+                    c.name,
+                    bg="#F3E8FF",
+                    fg="#7E22CE",
+                )
+                for c in coordinators
+            )
+        )
+
+    personal_reminder_coordinators_badge.short_description = "Gestores"
 
     def divisions_badges(self, obj):
         divisions = obj.division.all().order_by("name")
@@ -1776,3 +1943,58 @@ class DailyManagerEventDispatchAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
         return False
+    
+
+
+@admin.register(OpsBoardAccess)
+class OpsBoardAccessAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "user",
+        "coordinator",
+        "coordinator_phone",
+        "coordinated_managers_count",
+        "is_active",
+        "created_at",
+        "updated_at",
+    )
+    list_filter = (
+        "is_active",
+        "coordinator",
+    )
+    search_fields = (
+        "user__username",
+        "user__email",
+        "user__first_name",
+        "user__last_name",
+        "coordinator__name",
+        "coordinator__phone_e164",
+    )
+    autocomplete_fields = (
+        "user",
+        "coordinator",
+    )
+    readonly_fields = (
+        "created_at",
+        "updated_at",
+    )
+
+    def get_queryset(self, request):
+        return (
+            super()
+            .get_queryset(request)
+            .select_related("user", "coordinator")
+            .prefetch_related("coordinator__personal_reminder_managers")
+        )
+
+    def coordinator_phone(self, obj):
+        return format_phone_br(obj.coordinator.phone_e164) if obj.coordinator else "-"
+
+    coordinator_phone.short_description = "Telefone coord."
+
+    def coordinated_managers_count(self, obj):
+        if not obj.coordinator_id:
+            return 0
+        return obj.coordinator.personal_reminder_managers.count()
+
+    coordinated_managers_count.short_description = "Managers sob gestão"
