@@ -26,10 +26,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 
 
-DEFAULT_MSG = (
-    "Bom dia {name},\n\n"
-    "Por favor poderia me mandar a sua agenda do dia?"
-)
+DEFAULT_MSG = "Por favor, poderia me mandar a sua agenda do dia?"
 
 def _iso(dt):
     if not dt:
@@ -495,7 +492,8 @@ def board_view(request):
 
         for m in qs:
             checkin, _ = DailyCheckin.objects.get_or_create(manager=m, date=day)
-            final_msg = render_message(msg_tpl, m)
+            display_msg = render_message(msg_tpl, m).strip()
+            template_variable_text = display_msg
 
             q = OutboundQuestion.objects.create(
                 checkin=checkin,
@@ -503,12 +501,12 @@ def board_view(request):
                 scheduled_for=now,
                 sent_at=now,
                 status="pending",
-                prompt_text=final_msg,
+                prompt_text=display_msg,
             )
 
             resp = None
             try:
-                resp = _send_board_manual_template(m, final_msg)
+                resp = _send_board_manual_template(m, template_variable_text)
             except Exception as e:
                 OutboundMessage.objects.create(
                     manager=m,
@@ -517,7 +515,7 @@ def board_view(request):
                     to_phone=m.phone_e164,
                     provider_message_id="",
                     kind="manual_template",
-                    text=final_msg,
+                    text=template_variable_text,
                     sent_at=now,
                     raw_response={"error": str(e)},
                     wa_status="failed",
@@ -534,7 +532,7 @@ def board_view(request):
                 to_phone=m.phone_e164,
                 provider_message_id=wamid,
                 kind="manual_template",
-                text=final_msg,
+                text=template_variable_text,
                 sent_at=now,
                 raw_response=resp,
             )
@@ -547,7 +545,7 @@ def board_view(request):
 
         redirect_url = f"{request.path}?date={day.isoformat()}"
 
-        if coordinator:
+        if request.user.is_superuser and coordinator:
             redirect_url += f"&coordinator_id={coordinator.id}"
 
         return redirect(redirect_url)

@@ -962,6 +962,11 @@ body.scopedCoordinator .conversationItem.active {
   color: var(--muted);
   margin-bottom: 8px;
 }
+.senderHint {
+  margin-top: 5px;
+  font-size: 11px;
+  color: var(--muted);
+}
   </style>
 </head>
 
@@ -1021,8 +1026,11 @@ body.scopedCoordinator .conversationItem.active {
             <input type="hidden" name="mode" value="bulk" />
 
             <div>
-              <label>Mensagem</label>
+              <label>Conteúdo da Mensagem</label>
               <textarea name="message_bulk">{{ default_msg }}</textarea>
+              <div class="senderHint">
+                A saudação do template será adicionada automaticamente no WhatsApp.
+              </div>
             </div>
 
             <div>
@@ -1181,7 +1189,7 @@ body.scopedCoordinator .conversationItem.active {
                 <input type="hidden" name="manager_id" value="{{ col.manager.id }}" />
 
                 <div class="composerHint">
-                  Envio via template aprovado para {{ col.manager.name }}.
+                  Digite somente o conteúdo da mensagem. O WhatsApp adicionará a saudação do template automaticamente.
                 </div>
 
                 <div class="composerRow">
@@ -1189,7 +1197,7 @@ body.scopedCoordinator .conversationItem.active {
                     class="composerText"
                     name="message_single"
                     rows="1"
-                    placeholder="Digite a mensagem para {{ col.manager.name }}…"
+                    placeholder="Digite o conteúdo da mensagem…"
                     data-autogrow="1"></textarea>
 
                   <button class="sendBtn" type="submit" title="Enviar">
