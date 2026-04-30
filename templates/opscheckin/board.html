@@ -626,6 +626,98 @@
       text-align: left;
     }
 
+    .dateDivider {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 10px 0 6px;
+      position: relative;
+    }
+
+    .dateDivider::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: rgba(15, 23, 42, .10);
+    }
+
+    .dateDivider span {
+      position: relative;
+      z-index: 1;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, .94);
+      border: 1px solid rgba(15, 23, 42, .10);
+      font-size: 10.5px;
+      font-weight: 900;
+      color: rgba(15, 23, 42, .58);
+    }
+
+    .replyContext {
+      max-width: 86%;
+      margin-bottom: 2px;
+      padding: 6px 8px;
+      border-left: 3px solid rgba(37, 99, 235, .45);
+      background: rgba(37, 99, 235, .07);
+      border-radius: 10px;
+      color: rgba(15, 23, 42, .72);
+    }
+
+    .msgRow.left .replyContext {
+      align-self: flex-start;
+    }
+
+    .msgRow.right .replyContext {
+      align-self: flex-end;
+    }
+
+    .replyContextLabel {
+      font-size: 10.5px;
+      font-weight: 900;
+      color: rgba(37, 99, 235, .95);
+    }
+
+    .replyContextText {
+      margin-top: 2px;
+      font-size: 11px;
+      line-height: 1.25;
+      color: rgba(15, 23, 42, .62);
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+
+    .loadOlderWrap {
+      display: flex;
+      justify-content: center;
+      padding: 4px 0 8px;
+    }
+
+    .loadOlderBtn {
+      border: 1px solid rgba(15, 23, 42, .12);
+      background: rgba(255, 255, 255, .82);
+      color: rgba(15, 23, 42, .72);
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 11px;
+      font-weight: 900;
+      cursor: pointer;
+    }
+
+    .loadOlderBtn:hover {
+      border-color: rgba(37, 99, 235, .28);
+      background: rgba(37, 99, 235, .07);
+      color: #2563eb;
+    }
+
+    .loadOlderBtn.loading {
+      opacity: .65;
+      cursor: wait;
+    }
+
     .metaLine {
       font-size: 10.5px;
       color: var(--muted);
@@ -967,6 +1059,41 @@ body.scopedCoordinator .conversationItem.active {
   font-size: 11px;
   color: var(--muted);
 }
+
+.confirmFlag {
+  max-width: 86%;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 2px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 900;
+  border: 1px solid rgba(15, 23, 42, .10);
+}
+
+.msgRow.right .confirmFlag {
+  align-self: flex-end;
+}
+
+.confirmFlag.pending {
+  background: rgba(245, 158, 11, .12);
+  color: #92400e;
+  border-color: rgba(245, 158, 11, .28);
+}
+
+.confirmFlag.ok {
+  background: rgba(22, 163, 74, .12);
+  color: #166534;
+  border-color: rgba(22, 163, 74, .26);
+}
+
+.confirmFlag.missed {
+  background: rgba(239, 68, 68, .10);
+  color: #7f1d1d;
+  border-color: rgba(239, 68, 68, .24);
+}
   </style>
 </head>
 
@@ -1156,29 +1283,86 @@ body.scopedCoordinator .conversationItem.active {
             </div>
 
             <div class="thread" data-thread="1" data-manager-id="{{ col.manager.id }}">
-              {% if col.timeline|length == 0 %}
-              <div class="empty">Sem conversa ainda.</div>
-              {% else %}
-              {% for it in col.timeline %}
-              <div class="msgRow {{ it.side }}">
-                <div class="bubble {% if it.side == 'right' %}outb{% else %}inb{% endif %}">
-                  {% if it.side == 'left' and it.meta == 'audio' %}🎤 {% endif %}{{ it.text }}
-                </div>
-                <div class="metaLine">
-                  <span class="time">{{ it.label }}</span>
-
-                  {% if it.is_outbound and it.ticks %}
-                  <span class="ticks {{ it.ticks_class }}">{{ it.ticks }}</span>
-                  {% endif %}
-
-                  {% if it.meta %}
-                    <span class="tag">
-                      {% if it.meta == 'audio' %}🎤 áudio{% else %}{{ it.meta }}{% endif %}
-                    </span>
-                  {% endif %}
-                </div>
+              <div class="loadOlderWrap">
+                <button
+                  type="button"
+                  class="loadOlderBtn"
+                  data-load-older="1"
+                  data-manager-id="{{ col.manager.id }}">
+                  Carregar mensagens anteriores
+                </button>
               </div>
-              {% endfor %}
+
+              {% if col.timeline|length == 0 %}
+                <div class="empty">Sem conversa ainda.</div>
+              {% else %}
+                {% for it in col.timeline %}
+                  {% ifchanged it.date_key %}
+                    <div class="dateDivider" data-date-divider="{{ it.date_key }}">
+                      <span>{{ it.date_label }}</span>
+                    </div>
+                  {% endifchanged %}
+
+                  <div class="msgRow {{ it.side }}"
+                    data-message-id="{{ it.message_id }}"
+                    data-provider-message-id="{{ it.provider_message_id }}"
+                    data-message-ts="{{ it.ts|date:'c' }}"
+                    data-date-key="{{ it.date_key }}"
+                    data-date-label="{{ it.date_label }}">
+                      
+                    {% if it.side == "left" %}
+                      {% if it.reminder_context %}
+                        <div class="replyContext">
+                          <div class="replyContextLabel">
+                            Resposta referente a aviso pessoal
+                            {% if it.reminder_context.scheduled_label %}
+                              · {{ it.reminder_context.scheduled_label }}
+                            {% endif %}
+                          </div>
+                          <div class="replyContextText">
+                            {{ it.reminder_context.title }}
+                          </div>
+                        </div>
+                      {% elif it.question_context %}
+                        <div class="replyContext">
+                          <div class="replyContextLabel">
+                            Resposta referente a {{ it.question_context.label }}
+                            {% if it.question_context.sent_label %}
+                              · {{ it.question_context.sent_label }}
+                            {% endif %}
+                          </div>
+                          {% if it.question_context.prompt %}
+                            <div class="replyContextText">{{ it.question_context.prompt }}</div>
+                          {% endif %}
+                        </div>
+                      {% endif %}
+                    {% endif %}
+
+                    <div class="bubble {% if it.side == 'right' %}outb{% else %}inb{% endif %}">
+                      {% if it.side == 'left' and it.meta == 'audio' %}🎤 {% endif %}{{ it.text }}
+                    </div>
+                    {% if it.confirm_flag %}
+                    <div class="confirmFlag {{ it.confirm_flag.class }}">
+                      {% if it.confirm_flag.class == "pending" %}⏳{% elif it.confirm_flag.class == "ok" %}✅{% else %}⚠️{% endif %}
+                      {{ it.confirm_flag.label }}
+                    </div>
+                  {% endif %}
+
+                    <div class="metaLine">
+                      <span class="time">{{ it.label }}</span>
+
+                      {% if it.is_outbound and it.ticks %}
+                        <span class="ticks {{ it.ticks_class }}">{{ it.ticks }}</span>
+                      {% endif %}
+
+                      {% if it.meta %}
+                        <span class="tag">
+                          {% if it.meta == 'audio' %}🎤 áudio{% else %}{{ it.meta }}{% endif %}
+                        </span>
+                      {% endif %}
+                    </div>
+                  </div>
+                {% endfor %}
               {% endif %}
             </div>
 
@@ -1659,14 +1843,97 @@ body.scopedCoordinator .conversationItem.active {
         : String(str || "").replace(/\s+/g, " ").trim();
     }
 
+    function contextHtml(msg) {
+      if (msg.side !== "left") return "";
+
+      const reminder = msg.reminder_context || null;
+      const question = msg.question_context || null;
+
+      if (reminder) {
+        return `
+          <div class="replyContext">
+            <div class="replyContextLabel">
+              Resposta referente a aviso pessoal${reminder.scheduled_label ? ` · ${escapeHtml(reminder.scheduled_label)}` : ""}
+            </div>
+            <div class="replyContextText">${escapeHtml(reminder.title || "")}</div>
+          </div>
+        `;
+      }
+
+      if (question) {
+        return `
+          <div class="replyContext">
+            <div class="replyContextLabel">
+              Resposta referente a ${escapeHtml(question.label || "mensagem")}${question.sent_label ? ` · ${escapeHtml(question.sent_label)}` : ""}
+            </div>
+            ${question.prompt ? `<div class="replyContextText">${escapeHtml(question.prompt)}</div>` : ""}
+          </div>
+        `;
+      }
+
+      return "";
+    }
+
+    function dateDividerHtml(msg) {
+      if (!msg.date_key) return "";
+
+      return `
+        <div class="dateDivider" data-date-divider="${escapeHtml(msg.date_key)}">
+          <span>${escapeHtml(msg.date_label || msg.date_key)}</span>
+        </div>
+      `;
+    }
+
+    function ensureDateDivider(thread, msg, prepend = false) {
+      if (!thread || !msg.date_key) return;
+
+      const safeKey = window.CSS && CSS.escape ? CSS.escape(msg.date_key) : msg.date_key;
+      const existing = thread.querySelector(`[data-date-divider="${safeKey}"]`);
+      if (existing) return;
+
+      const html = dateDividerHtml(msg);
+
+      const loadOlder = thread.querySelector(".loadOlderWrap");
+
+      if (prepend) {
+        if (loadOlder) {
+          loadOlder.insertAdjacentHTML("afterend", html);
+        } else {
+          thread.insertAdjacentHTML("afterbegin", html);
+        }
+      } else {
+        thread.insertAdjacentHTML("beforeend", html);
+      }
+    }
+
+    function confirmFlagHtml(msg) {
+      const flag = msg.confirm_flag || null;
+      if (!flag) return "";
+
+      let icon = "⏳";
+      if (flag.class === "ok") icon = "✅";
+      if (flag.class === "missed") icon = "⚠️";
+
+      return `
+        <div class="confirmFlag ${escapeHtml(flag.class || "")}">
+          ${icon} ${escapeHtml(flag.label || "")}
+        </div>
+      `;
+    }
+
     function messageHtml(msg) {
       return `
         <div class="msgRow ${msg.side}"
-             data-message-id="${escapeHtml(msg.message_id || "")}"
-             data-provider-message-id="${escapeHtml(msg.provider_message_id || "")}">
+          data-message-id="${escapeHtml(msg.message_id || "")}"
+          data-provider-message-id="${escapeHtml(msg.provider_message_id || "")}"
+          data-message-ts="${escapeHtml(msg.ts || "")}"
+          data-date-key="${escapeHtml(msg.date_key || "")}"
+          data-date-label="${escapeHtml(msg.date_label || "")}">
+          ${contextHtml(msg)}
           <div class="bubble ${msg.side === "right" ? "outb" : "inb"}">
             ${msg.side === "left" && msg.meta === "audio" ? "🎤 " : ""}${escapeHtml(msg.text)}
           </div>
+          ${confirmFlagHtml(msg)}
           <div class="metaLine">
             <span class="time">${escapeHtml(msg.label || "")}</span>
             ${msg.side === "right" && msg.ticks ? `<span class="ticks ${escapeHtml(msg.ticks_class || "")}">${escapeHtml(msg.ticks)}</span>` : ""}
@@ -1725,6 +1992,10 @@ body.scopedCoordinator .conversationItem.active {
       if (existsByContent) return;
 
       thread.insertAdjacentHTML("beforeend", messageHtml(msg));
+
+      if (window.__opsBoardThread?.rebuildThreadWithDividers) {
+        window.__opsBoardThread.rebuildThreadWithDividers(thread);
+      }
 
       if (shouldStick) {
         window.__opsBoardMessaging?.scrollThreadToBottom?.(thread, true);
@@ -1839,6 +2110,293 @@ body.scopedCoordinator .conversationItem.active {
     window.__opsBoardMessaging?.scrollAllThreadsToBottom?.(false);
 
     pollTimer = window.setInterval(fetchBoardUpdates, 5000);
+  })();
+</script>
+<script>
+  (function () {
+    function escapeHtml(str) {
+      return String(str || "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function contextHtml(msg) {
+      if (msg.side !== "left") return "";
+
+      const reminder = msg.reminder_context || null;
+      const question = msg.question_context || null;
+
+      if (reminder) {
+        return `
+          <div class="replyContext">
+            <div class="replyContextLabel">
+              Resposta referente a aviso pessoal${reminder.scheduled_label ? ` · ${escapeHtml(reminder.scheduled_label)}` : ""}
+            </div>
+            <div class="replyContextText">${escapeHtml(reminder.title || "")}</div>
+          </div>
+        `;
+      }
+
+      if (question) {
+        return `
+          <div class="replyContext">
+            <div class="replyContextLabel">
+              Resposta referente a ${escapeHtml(question.label || "mensagem")}${question.sent_label ? ` · ${escapeHtml(question.sent_label)}` : ""}
+            </div>
+            ${question.prompt ? `<div class="replyContextText">${escapeHtml(question.prompt)}</div>` : ""}
+          </div>
+        `;
+      }
+
+      return "";
+    }
+
+    function confirmFlagHtml(msg) {
+      const flag = msg.confirm_flag || null;
+      if (!flag) return "";
+
+      let icon = "⏳";
+      if (flag.class === "ok") icon = "✅";
+      if (flag.class === "missed") icon = "⚠️";
+
+      return `
+        <div class="confirmFlag ${escapeHtml(flag.class || "")}">
+          ${icon} ${escapeHtml(flag.label || "")}
+        </div>
+      `;
+    }
+
+    function messageHtml(msg) {
+      return `
+        <div class="msgRow ${msg.side}"
+            data-message-id="${escapeHtml(msg.message_id || "")}"
+            data-provider-message-id="${escapeHtml(msg.provider_message_id || "")}"
+            data-message-ts="${escapeHtml(msg.ts || "")}"
+            data-date-key="${escapeHtml(msg.date_key || "")}"
+            data-date-label="${escapeHtml(msg.date_label || "")}">
+          ${contextHtml(msg)}
+          <div class="bubble ${msg.side === "right" ? "outb" : "inb"}">
+            ${msg.side === "left" && msg.meta === "audio" ? "🎤 " : ""}${escapeHtml(msg.text)}
+          </div>
+          ${confirmFlagHtml(msg)}
+          <div class="metaLine">
+            <span class="time">${escapeHtml(msg.label || "")}</span>
+            ${msg.side === "right" && msg.ticks ? `<span class="ticks ${escapeHtml(msg.ticks_class || "")}">${escapeHtml(msg.ticks)}</span>` : ""}
+            ${msg.meta ? `<span class="tag">${msg.meta === "audio" ? "🎤 áudio" : escapeHtml(msg.meta)}</span>` : ""}
+          </div>
+        </div>
+      `;
+    }
+
+    function dateDividerHtml(msg) {
+      if (!msg.date_key) return "";
+
+      return `
+        <div class="dateDivider" data-date-divider="${escapeHtml(msg.date_key)}">
+          <span>${escapeHtml(msg.date_label || msg.date_key)}</span>
+        </div>
+      `;
+    }
+
+    function getOldestTs(thread) {
+      const rows = Array.from(thread.querySelectorAll(".msgRow[data-message-ts]"))
+        .filter(row => row.dataset.messageTs);
+
+      if (!rows.length) return "";
+
+      return rows
+        .map(row => row.dataset.messageTs)
+        .sort()[0];
+    }
+
+    function alreadyHasMessage(thread, msg) {
+      if (!thread || !msg.message_id) return false;
+      const safeId = window.CSS && CSS.escape ? CSS.escape(msg.message_id) : msg.message_id;
+      return Boolean(thread.querySelector(`[data-message-id="${safeId}"]`));
+    }
+
+    function rebuildThreadWithDividers(thread) {
+      if (!thread) return;
+
+      const loadOlder = thread.querySelector(".loadOlderWrap");
+      const empty = thread.querySelector(".empty");
+
+      const rows = Array.from(thread.querySelectorAll(".msgRow"))
+        .filter(row => row.dataset.messageTs);
+
+      thread.querySelectorAll(".dateDivider").forEach(el => el.remove());
+      rows.forEach(el => el.remove());
+
+      if (empty && rows.length > 0) {
+        empty.remove();
+      }
+
+      rows.sort((a, b) => {
+        const ta = a.dataset.messageTs || "";
+        const tb = b.dataset.messageTs || "";
+
+        if (ta !== tb) return ta.localeCompare(tb);
+
+        const ida = a.dataset.messageId || "";
+        const idb = b.dataset.messageId || "";
+        return ida.localeCompare(idb);
+      });
+
+      const frag = document.createDocumentFragment();
+      let lastDateKey = "";
+
+      rows.forEach(row => {
+        const dateKey = row.dataset.dateKey || "";
+        const dateLabel = row.dataset.dateLabel || dateKey;
+
+        if (dateKey && dateKey !== lastDateKey) {
+          const divider = document.createElement("div");
+          divider.className = "dateDivider";
+          divider.dataset.dateDivider = dateKey;
+          divider.innerHTML = `<span>${escapeHtml(dateLabel)}</span>`;
+          frag.appendChild(divider);
+          lastDateKey = dateKey;
+        }
+
+        frag.appendChild(row);
+      });
+
+      if (loadOlder) {
+        while (loadOlder.nextSibling) {
+          thread.removeChild(loadOlder.nextSibling);
+        }
+        thread.appendChild(frag);
+      } else {
+        thread.innerHTML = "";
+        thread.appendChild(frag);
+      }
+    }
+
+    window.__opsBoardThread = window.__opsBoardThread || {};
+    window.__opsBoardThread.rebuildThreadWithDividers = rebuildThreadWithDividers;
+
+    function prependMessages(thread, messages) {
+      if (!thread || !Array.isArray(messages) || !messages.length) return;
+
+      const oldScrollHeight = thread.scrollHeight;
+      const oldScrollTop = thread.scrollTop;
+
+      const loadOlder = thread.querySelector(".loadOlderWrap");
+
+      messages.forEach(msg => {
+        if (alreadyHasMessage(thread, msg)) return;
+
+        const wrapper = document.createElement("div");
+        wrapper.innerHTML = messageHtml(msg).trim();
+
+        const row = wrapper.firstElementChild;
+        if (!row) return;
+
+        row.dataset.dateLabel = msg.date_label || row.dataset.dateLabel || "";
+
+        if (loadOlder && loadOlder.nextSibling) {
+          thread.insertBefore(row, loadOlder.nextSibling);
+        } else if (loadOlder) {
+          loadOlder.insertAdjacentElement("afterend", row);
+        } else {
+          thread.insertAdjacentElement("afterbegin", row);
+        }
+      });
+
+      rebuildThreadWithDividers(thread);
+
+      requestAnimationFrame(() => {
+        const newScrollHeight = thread.scrollHeight;
+        thread.scrollTop = oldScrollTop + (newScrollHeight - oldScrollHeight);
+      });
+    }
+
+    async function loadOlderMessages(btn) {
+      if (!btn || btn.dataset.loading === "1") return;
+
+      const managerId = btn.dataset.managerId;
+      const thread = document.querySelector(`.thread[data-manager-id="${managerId}"]`);
+      if (!thread) return;
+
+      const before = getOldestTs(thread) || new Date().toISOString();
+
+      btn.dataset.loading = "1";
+      btn.classList.add("loading");
+      const oldText = btn.textContent;
+      btn.textContent = "Carregando…";
+
+      try {
+        let url = `/opscheckin/board/thread/messages/?manager_id=${encodeURIComponent(managerId)}&before=${encodeURIComponent(before)}&limit=20`;
+
+        const coordinatorId = document.body.dataset.coordinatorId || "";
+        if (coordinatorId) {
+          url += `&coordinator_id=${encodeURIComponent(coordinatorId)}`;
+        }
+
+        const resp = await fetch(url, {
+          headers: { "X-Requested-With": "XMLHttpRequest" },
+          credentials: "same-origin",
+        });
+
+        if (!resp.ok) {
+          throw new Error(`HTTP ${resp.status}`);
+        }
+
+        const data = await resp.json();
+
+        if (!data.ok) {
+          throw new Error("Resposta inválida");
+        }
+
+        prependMessages(thread, data.messages || []);
+
+        if (!data.has_more || !(data.messages || []).length) {
+          btn.textContent = "Sem mensagens anteriores";
+          btn.disabled = true;
+          return;
+        }
+
+        btn.textContent = oldText;
+      } catch (err) {
+        console.error("loadOlderMessages error", err);
+        btn.textContent = "Erro ao carregar";
+        window.setTimeout(() => {
+          btn.textContent = oldText;
+        }, 1600);
+      } finally {
+        btn.dataset.loading = "0";
+        btn.classList.remove("loading");
+      }
+    }
+
+    document.querySelectorAll(".loadOlderBtn[data-load-older='1']").forEach(btn => {
+      btn.addEventListener("click", () => loadOlderMessages(btn));
+    });
+
+    window.__opsBoardThread = window.__opsBoardThread || {};
+    window.__opsBoardThread.rebuildThreadWithDividers = rebuildThreadWithDividers;
+    
+    document.querySelectorAll(".thread[data-thread='1']").forEach(thread => {
+      let lock = false;
+
+      thread.addEventListener("scroll", () => {
+        if (lock) return;
+        if (thread.scrollTop > 24) return;
+
+        const btn = thread.querySelector(".loadOlderBtn[data-load-older='1']");
+        if (!btn || btn.disabled) return;
+
+        lock = true;
+        loadOlderMessages(btn).finally(() => {
+          window.setTimeout(() => {
+            lock = false;
+          }, 900);
+        });
+      });
+    });
   })();
 </script>
 </body>

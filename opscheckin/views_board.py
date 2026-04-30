@@ -1,4 +1,4 @@
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 
 from django.contrib.admin.views.decorators import staff_member_required
 from django.db.models import Count, Q
@@ -13,6 +13,7 @@ from .models import (
     OutboundMessage,
     OutboundQuestion,
     OpsBoardAccess,
+    ManagerPersonalReminderDispatch,
 )
 
 
@@ -44,21 +45,178 @@ def _parse_since(value):
         dt = timezone.make_aware(dt, timezone.get_current_timezone())
     return dt
 
+def _date_label(dt):
+    if not dt:
+        return ""
+
+    local_dt = timezone.localtime(dt)
+    d = local_dt.date()
+    today = timezone.localdate()
+
+    if d == today:
+        return "Hoje"
+
+    if d == today - timedelta(days=1):
+        return "Ontem"
+
+    return local_dt.strftime("%d/%m/%Y")
+
+
+def _question_context(q):
+    if not q:
+        return None
+
+    step = (q.step or "").strip()
+
+    label_by_step = {
+        "AGENDA": "Agenda do dia",
+        "AGENDA_CONFIRM": "Confirmação da agenda",
+        "MANUAL": "Mensagem manual",
+        "PERSONAL_REMINDER": "Aviso pessoal",
+        "DAILY_MEETING": "Reunião diária",
+        "MEETING_CONFIRM": "Confirmação de reunião",
+    }
+
+    return {
+        "question_id": q.id,
+        "step": step,
+        "label": label_by_step.get(step, step or "Mensagem"),
+        "prompt": _truncate(q.prompt_text or "", 110),
+        "sent_at": _iso(q.sent_at) if q.sent_at else "",
+        "sent_label": timezone.localtime(q.sent_at).strftime("%H:%M") if q.sent_at else "",
+        "status": q.status or "",
+        "answered_at": _iso(q.answered_at) if q.answered_at else "",
+        "answered_label": timezone.localtime(q.answered_at).strftime("%H:%M") if q.answered_at else "",
+    }
+
+
+def _needs_confirmation_flag(it):
+    qctx = it.get("question_context") or {}
+    reminder_ctx = it.get("reminder_context") or {}
+
+    step = (qctx.get("step") or "").strip()
+    status = (qctx.get("status") or "").strip()
+
+    if not qctx:
+        return None
+
+    # Começa mais limpo: só mostra nos fluxos que realmente exigem ação.
+    if step not in {"PERSONAL_REMINDER", "AGENDA_CONFIRM"}:
+        return None
+
+    is_personal_reminder = step == "PERSONAL_REMINDER" or bool(reminder_ctx)
+
+    if status == "pending":
+        if is_personal_reminder:
+            return {
+                "label": "Botão de confirmação pendente",
+                "class": "pending",
+            }
+
+        return {
+            "label": "Ação pendente",
+            "class": "pending",
+        }
+
+    if status == "answered":
+        if is_personal_reminder:
+            return {
+                "label": "Botão de confirmação pressionado",
+                "class": "ok",
+            }
+
+        return {
+            "label": "Ação respondida",
+            "class": "ok",
+        }
+
+    if status == "missed":
+        if is_personal_reminder:
+            return {
+                "label": "Botão não pressionado",
+                "class": "missed",
+            }
+
+        return {
+            "label": "Sem resposta",
+            "class": "missed",
+        }
+
+    return None
+
+
+def _personal_reminder_context_from_outbound(outbound_message):
+    if not outbound_message:
+        return None
+
+    dispatch = (
+        ManagerPersonalReminderDispatch.objects
+        .select_related("reminder")
+        .filter(outbound_message=outbound_message)
+        .order_by("-id")
+        .first()
+    )
+
+    if not dispatch or not dispatch.reminder:
+        return None
+
+    return {
+        "dispatch_id": dispatch.id,
+        "reminder_id": dispatch.reminder_id,
+        "title": dispatch.reminder.title or "",
+        "description": dispatch.reminder.description or "",
+        "reference_date": dispatch.reference_date.isoformat() if dispatch.reference_date else "",
+        "scheduled_label": timezone.localtime(dispatch.scheduled_for).strftime("%d/%m %H:%M") if dispatch.scheduled_for else "",
+        "status": dispatch.status or "",
+    }
+
+
+def _personal_reminder_context_from_inbound(inbound_message):
+    if not inbound_message:
+        return None
+
+    dispatch = (
+        ManagerPersonalReminderDispatch.objects
+        .select_related("reminder")
+        .filter(inbound_message=inbound_message)
+        .order_by("-id")
+        .first()
+    )
+
+    if not dispatch or not dispatch.reminder:
+        return None
+
+    return {
+        "dispatch_id": dispatch.id,
+        "reminder_id": dispatch.reminder_id,
+        "title": dispatch.reminder.title or "",
+        "description": dispatch.reminder.description or "",
+        "reference_date": dispatch.reference_date.isoformat() if dispatch.reference_date else "",
+        "scheduled_label": timezone.localtime(dispatch.scheduled_for).strftime("%d/%m %H:%M") if dispatch.scheduled_for else "",
+        "status": dispatch.status or "",
+    }
 
 def _build_message_payload(it):
+    ts = it.get("ts")
+
     return {
         "message_id": it.get("message_id", ""),
         "provider_message_id": it.get("provider_message_id", ""),
         "manager_id": it["manager_id"],
         "column_id": f"manager-{it['manager_id']}",
         "kind": it["kind"],
-        "ts": _iso(it["ts"]),
-        "label": timezone.localtime(it["ts"]).strftime("%H:%M") if it.get("ts") else "",
+        "ts": _iso(ts),
+        "label": timezone.localtime(ts).strftime("%H:%M") if ts else "",
+        "date_key": timezone.localtime(ts).date().isoformat() if ts else "",
+        "date_label": _date_label(ts) if ts else "",
         "side": it["side"],
         "text": it["text"] or "",
         "meta": it.get("meta", "") or "",
         "ticks": it.get("ticks", "") or "",
         "ticks_class": it.get("ticks_class", "") or "",
+        "question_context": it.get("question_context"),
+        "reminder_context": it.get("reminder_context"),
+        "confirm_flag": it.get("confirm_flag"),
     }
 
 BOARD_MANUAL_TEMPLATE_NAME = "ops_board_manual_message"
@@ -192,7 +350,7 @@ def board_updates(request):
             sent_at__lte=end_dt,
             sent_at__gt=since,
         )
-        .select_related("manager")
+        .select_related("manager", "related_question")
         .order_by("sent_at", "id")
     )
 
@@ -204,7 +362,7 @@ def board_updates(request):
             received_at__lte=end_dt,
             received_at__gt=since,
         )
-        .select_related("manager")
+        .select_related("manager", "linked_question")
         .order_by("received_at", "id")
     )
 
@@ -212,7 +370,10 @@ def board_updates(request):
 
     for om in outbound_qs:
         glyph, cls = _ticks_from_wa_status(getattr(om, "wa_status", ""))
-        messages.append(_build_message_payload({
+        qctx = _question_context(getattr(om, "related_question", None))
+        rctx = _personal_reminder_context_from_outbound(om)
+
+        item = {
             "message_id": f"out-{om.id}",
             "provider_message_id": om.provider_message_id or "",
             "manager_id": om.manager_id,
@@ -223,7 +384,13 @@ def board_updates(request):
             "meta": om.kind or "",
             "ticks": glyph,
             "ticks_class": cls,
-        }))
+            "question_context": qctx,
+            "reminder_context": rctx,
+        }
+
+        item["confirm_flag"] = _needs_confirmation_flag(item)
+
+        messages.append(_build_message_payload(item))
 
     for im in inbound_qs:
         messages.append(_build_message_payload({
@@ -235,6 +402,8 @@ def board_updates(request):
             "side": "left",
             "text": im.text,
             "meta": im.msg_type or "",
+            "question_context": _question_context(getattr(im, "linked_question", None)),
+            "reminder_context": _personal_reminder_context_from_inbound(im),
         }))
 
     messages.sort(key=lambda x: x["ts"] or "")
@@ -378,6 +547,7 @@ def _build_manager_timeline(manager, start_dt, end_dt):
             sent_at__gte=start_dt,
             sent_at__lte=end_dt,
         )
+        .select_related("related_question")
         .order_by("sent_at", "id")
     )
 
@@ -388,27 +558,43 @@ def _build_manager_timeline(manager, start_dt, end_dt):
             received_at__gte=start_dt,
             received_at__lte=end_dt,
         )
+        .select_related("linked_question")
         .order_by("received_at", "id")
     )
 
     for om in outbound_qs:
         glyph, cls = _ticks_from_wa_status(getattr(om, "wa_status", ""))
 
-        items.append(
-            {
-                "ts": om.sent_at,
-                "side": "right",
-                "text": om.text,
-                "is_outbound": True,
-                "meta": (om.kind or ""),
-                "ticks": glyph,
-                "ticks_class": cls,
-            }
-        )
+        qctx = _question_context(getattr(om, "related_question", None))
+        rctx = _personal_reminder_context_from_outbound(om)
+
+        item = {
+            "message_id": f"out-{om.id}",
+            "provider_message_id": om.provider_message_id or "",
+            "manager_id": om.manager_id,
+            "kind": "outbound",
+            "ts": om.sent_at,
+            "side": "right",
+            "text": om.text,
+            "is_outbound": True,
+            "meta": (om.kind or ""),
+            "ticks": glyph,
+            "ticks_class": cls,
+            "question_context": qctx,
+            "reminder_context": rctx,
+        }
+
+        item["confirm_flag"] = _needs_confirmation_flag(item)
+
+        items.append(item)
 
     for im in inbound_qs:
         items.append(
             {
+                "message_id": f"in-{im.id}",
+                "provider_message_id": "",
+                "manager_id": im.manager_id,
+                "kind": "inbound",
                 "ts": im.received_at,
                 "side": "left",
                 "text": im.text,
@@ -416,6 +602,8 @@ def _build_manager_timeline(manager, start_dt, end_dt):
                 "meta": (im.msg_type or ""),
                 "ticks": "",
                 "ticks_class": "",
+                "question_context": _question_context(getattr(im, "linked_question", None)),
+                "reminder_context": _personal_reminder_context_from_inbound(im),
             }
         )
 
@@ -425,10 +613,10 @@ def _build_manager_timeline(manager, start_dt, end_dt):
         ts = it["ts"] or timezone.now()
         it["label"] = timezone.localtime(ts).strftime("%H:%M")
         it["day_label"] = timezone.localtime(ts).strftime("%d/%m %H:%M")
+        it["date_key"] = timezone.localtime(ts).date().isoformat()
+        it["date_label"] = _date_label(ts)
 
     return items
-
-
 def _badge_for_q(q):
     if not q:
         return ("—", "badge")
@@ -649,3 +837,101 @@ def board_view(request):
             "is_scoped": is_scoped,
         },
     )
+
+@login_required
+@require_http_methods(["GET"])
+def board_thread_messages(request):
+    if not _can_access_board(request):
+        raise PermissionDenied
+
+    manager_id = (request.GET.get("manager_id") or "").strip()
+    before_str = request.GET.get("before") or ""
+    limit_raw = request.GET.get("limit") or "20"
+
+    try:
+        limit = int(limit_raw)
+    except Exception:
+        limit = 20
+
+    limit = max(5, min(limit, 50))
+
+    coordinator, managers_qs, is_scoped = _get_board_scope(request)
+
+    manager = managers_qs.filter(id=manager_id).first()
+    if not manager:
+        raise PermissionDenied
+
+    before = _parse_since(before_str) or timezone.now()
+
+    outbound_qs = (
+        OutboundMessage.objects
+        .filter(
+            manager=manager,
+            sent_at__lt=before,
+        )
+        .select_related("related_question")
+        .order_by("-sent_at", "-id")[:limit]
+    )
+
+    inbound_qs = (
+        InboundMessage.objects
+        .filter(
+            manager=manager,
+            received_at__lt=before,
+        )
+        .select_related("linked_question")
+        .order_by("-received_at", "-id")[:limit]
+    )
+
+    raw = []
+
+    for om in outbound_qs:
+        glyph, cls = _ticks_from_wa_status(getattr(om, "wa_status", ""))
+
+        qctx = _question_context(getattr(om, "related_question", None))
+        rctx = _personal_reminder_context_from_outbound(om)
+
+        item = {
+            "message_id": f"out-{om.id}",
+            "provider_message_id": om.provider_message_id or "",
+            "manager_id": om.manager_id,
+            "kind": "outbound",
+            "ts": om.sent_at,
+            "side": "right",
+            "text": om.text,
+            "meta": om.kind or "",
+            "ticks": glyph,
+            "ticks_class": cls,
+            "question_context": qctx,
+            "reminder_context": rctx,
+        }
+
+        item["confirm_flag"] = _needs_confirmation_flag(item)
+
+        raw.append(item)
+
+    for im in inbound_qs:
+        raw.append({
+            "message_id": f"in-{im.id}",
+            "provider_message_id": "",
+            "manager_id": im.manager_id,
+            "kind": "inbound",
+            "ts": im.received_at,
+            "side": "left",
+            "text": im.text,
+            "meta": im.msg_type or "",
+            "question_context": _question_context(getattr(im, "linked_question", None)),
+            "reminder_context": _personal_reminder_context_from_inbound(im),
+        })
+
+    raw.sort(key=lambda x: x["ts"] or timezone.now())
+
+    messages = [_build_message_payload(x) for x in raw]
+
+    return JsonResponse({
+        "ok": True,
+        "manager_id": manager.id,
+        "messages": messages,
+        "oldest_ts": messages[0]["ts"] if messages else "",
+        "has_more": len(messages) >= limit,
+    })

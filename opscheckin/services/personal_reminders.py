@@ -9,11 +9,13 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from opscheckin.models import (
+    DailyCheckin,
     InboundMessage,
     Manager,
     ManagerNotificationSubscription,
     NotificationType,
     OutboundMessage,
+    OutboundQuestion,
 )
 
 # AJUSTE ESTES IMPORTS para os models novos que você criou.
@@ -174,7 +176,13 @@ def get_pending_dispatch_for_inbound(
     min_dt = now_local - timedelta(hours=lookback_hours)
 
     return (
-        ManagerPersonalReminderDispatch.objects.select_related("reminder", "manager")
+        ManagerPersonalReminderDispatch.objects.select_related(
+            "reminder",
+            "manager",
+            "outbound_message",
+            "outbound_message__related_question",
+            "outbound_message__checkin",
+        )
         .filter(
             manager=manager,
             status="pending",
@@ -354,8 +362,26 @@ def send_manager_personal_reminder(
             raw_response = (send_result or {}).get("raw_response")
             wa_status = (send_result or {}).get("wa_status", "") or "sent"
 
+            checkin, _ = DailyCheckin.objects.get_or_create(
+                manager=manager,
+                date=reference_date,
+            )
+
+            question = None
+            if response_mode in ("text", "button"):
+                question = OutboundQuestion.objects.create(
+                    checkin=checkin,
+                    step="PERSONAL_REMINDER",
+                    scheduled_for=scheduled_for,
+                    sent_at=now_local,
+                    status="pending",
+                    prompt_text=text_to_send or reminder.title or "",
+                )
+
             outbound_message = OutboundMessage.objects.create(
                 manager=manager,
+                checkin=checkin,
+                related_question=question,
                 to_phone=manager.phone_e164,
                 provider_message_id=provider_message_id,
                 kind=OUTBOUND_KIND_PERSONAL_REMINDER,
@@ -490,6 +516,26 @@ def try_link_personal_reminder_response(inbound: InboundMessage) -> bool:
     else:
         return False
 
+    linked_question = None
+    checkin = None
+
+    if dispatch.outbound_message_id:
+        outbound = (
+            OutboundMessage.objects
+            .select_related("related_question", "checkin")
+            .filter(id=dispatch.outbound_message_id)
+            .first()
+        )
+
+        if outbound:
+            linked_question = outbound.related_question
+            checkin = outbound.checkin
+
+    if linked_question or checkin:
+        inbound.linked_question = linked_question
+        inbound.checkin = checkin
+        inbound.save(update_fields=["linked_question", "checkin"])
+
     dispatch.status = "answered"
     dispatch.answered_at = inbound.received_at or timezone.now()
     dispatch.answer_text = inbound_text
@@ -504,6 +550,16 @@ def try_link_personal_reminder_response(inbound: InboundMessage) -> bool:
             "inbound_message",
         ]
     )
+
+    if linked_question and linked_question.status == "pending":
+        linked_question.status = "answered"
+        linked_question.answered_at = dispatch.answered_at
+        linked_question.answer_text = inbound_text
+        linked_question.save(update_fields=[
+            "status",
+            "answered_at",
+            "answer_text",
+        ])
     
     try:
         notify_personal_reminder_coordinator(dispatch)
