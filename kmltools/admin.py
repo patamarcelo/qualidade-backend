@@ -298,8 +298,8 @@ class KMLMergeJobAdmin(admin.ModelAdmin):
         "user_email",
         "anon_id",
         "anon_id_total_jobs",
-        "plan",
-        "status",
+        "plan_badge",
+        "status_badge",
         "download_state",
         "visitor_country_name",
         "visitor_ip",
@@ -512,6 +512,120 @@ class KMLMergeJobAdmin(admin.ModelAdmin):
         return obj.user.email if obj.user else "—"
     user_email.short_description = "Email"
     user_email.admin_order_field = "user__email"
+    
+    def plan_badge(self, obj):
+        plan = (getattr(obj, "plan", "") or "unknown").strip()
+
+        plan_styles = {
+            "free": {
+                "bg": "#f3f4f6",
+                "color": "#374151",
+                "label": "Free",
+            },
+            "anonymous": {
+                "bg": "#fef3c7",
+                "color": "#92400e",
+                "label": "Anonymous",
+            },
+            "prepaid": {
+                "bg": "#dbeafe",
+                "color": "#1d4ed8",
+                "label": "Prepaid",
+            },
+            "pro": {
+                "bg": "#dcfce7",
+                "color": "#166534",
+                "label": "Pro",
+            },
+            "pro_monthly": {
+                "bg": "#dcfce7",
+                "color": "#166534",
+                "label": "Pro Monthly",
+            },
+            "pro_yearly": {
+                "bg": "#ccfbf1",
+                "color": "#0f766e",
+                "label": "Pro Yearly",
+            },
+        }
+
+        style = plan_styles.get(plan, {
+            "bg": "#f3f4f6",
+            "color": "#374151",
+            "label": plan or "—",
+        })
+
+        return format_html(
+            '<span style="background:{};color:{};padding:3px 8px;border-radius:999px;font-weight:700;white-space:nowrap;">{}</span>',
+            style["bg"],
+            style["color"],
+            style["label"],
+        )
+
+    plan_badge.short_description = "Plan"
+    plan_badge.admin_order_field = "plan"
+
+    def status_badge(self, obj):
+        status = (getattr(obj, "status", "") or "unknown").strip()
+
+        status_styles = {
+            "pending": {
+                "bg": "#fef3c7",
+                "color": "#92400e",
+                "label": "Pending",
+            },
+            "processing": {
+                "bg": "#dbeafe",
+                "color": "#1d4ed8",
+                "label": "Processing",
+            },
+            "done": {
+                "bg": "#dcfce7",
+                "color": "#166534",
+                "label": "Done",
+            },
+            "completed": {
+                "bg": "#dcfce7",
+                "color": "#166534",
+                "label": "Completed",
+            },
+            "success": {
+                "bg": "#dcfce7",
+                "color": "#166534",
+                "label": "Success",
+            },
+            "failed": {
+                "bg": "#fee2e2",
+                "color": "#991b1b",
+                "label": "Failed",
+            },
+            "error": {
+                "bg": "#fee2e2",
+                "color": "#991b1b",
+                "label": "Error",
+            },
+            "cancelled": {
+                "bg": "#f3f4f6",
+                "color": "#374151",
+                "label": "Cancelled",
+            },
+        }
+
+        style = status_styles.get(status, {
+            "bg": "#f3f4f6",
+            "color": "#374151",
+            "label": status or "—",
+        })
+
+        return format_html(
+            '<span style="background:{};color:{};padding:3px 8px;border-radius:999px;font-weight:700;white-space:nowrap;">{}</span>',
+            style["bg"],
+            style["color"],
+            style["label"],
+        )
+
+    status_badge.short_description = "Status"
+    status_badge.admin_order_field = "status"
     
     def download_state(self, obj):
         if getattr(obj, "download_unlocked", False):
