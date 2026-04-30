@@ -258,6 +258,23 @@ class KMLMergeJob(models.Model):
 
     # Auditoria (opcional, mas recomendo)
     download_email_sent_at = models.DateTimeField(blank=True, null=True)
+
+    # Controle real de liberação/download
+    download_unlocked = models.BooleanField(default=False, db_index=True)
+    download_unlocked_at = models.DateTimeField(blank=True, null=True)
+
+    download_unlock_source = models.CharField(
+        max_length=32,
+        blank=True,
+        default="",
+        db_index=True,
+    )
+
+    download_credit_consumed = models.BooleanField(default=False)
+
+    download_count = models.PositiveIntegerField(default=0)
+    first_downloaded_at = models.DateTimeField(blank=True, null=True)
+    last_downloaded_at = models.DateTimeField(blank=True, null=True)
     
     
     visitor_ip = models.GenericIPAddressField(null=True, blank=True, db_index=True)

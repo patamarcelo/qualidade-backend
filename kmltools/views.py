@@ -2250,36 +2250,71 @@ class KMLDownloadView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
-        # ✅ agora é seguro: bp.pk existe
-        plan = (bp.plan or "free").lower().strip()
-        is_unlimited = bool(getattr(bp, "is_unlimited", False)) or plan in ("pro_monthly", "pro_yearly")
-
 
         consumed = False
         prepaid_after = None
+        should_queue_download_email = False
+        now = timezone.now()
 
-        # ✅ Pro/unlimited: sempre ok (não consome)
-        if not is_unlimited:
-            # ✅ Prepaid: consome 1 crédito agora (atomic)
-            with transaction.atomic():
-                bp = BillingProfile.objects.select_for_update().get(pk=bp.pk)
+        with transaction.atomic():
+            job = KMLMergeJob.objects.select_for_update().get(pk=job.pk)
+            bp = BillingProfile.objects.select_for_update().get(pk=bp.pk)
 
-                prepaid_left = int(getattr(bp, "prepaid_credits", 0) or 0)
-                if prepaid_left <= 0:
-                    return Response(
-                        {
-                            "detail": "No credits left. Please buy prepaid credits or go Pro.",
-                            "code": "NO_CREDITS_LEFT",
-                        },
-                        status=status.HTTP_403_FORBIDDEN,
-                    )
+            # Recalcula dentro da transação, usando o bp travado
+            plan = (bp.plan or "free").lower().strip()
+            is_unlimited = bool(getattr(bp, "is_unlimited", False)) or plan in ("pro_monthly", "pro_yearly")
 
-                bp.prepaid_credits = prepaid_left - 1
-                bp.credits_used_total = int(getattr(bp, "credits_used_total", 0) or 0) + 1
-                bp.save(update_fields=["prepaid_credits", "credits_used_total", "updated_at"])
+            # Se o job ainda não foi liberado para download, libera agora
+            if not bool(getattr(job, "download_unlocked", False)):
 
-                consumed = True
-                prepaid_after = int(bp.prepaid_credits or 0)
+                # Plano recorrente/pro: libera sem consumir crédito
+                if is_unlimited:
+                    job.download_unlocked = True
+                    job.download_unlocked_at = now
+                    job.download_unlock_source = plan or "pro"
+
+                # Free/prepaid: precisa consumir 1 crédito prepaid
+                else:
+                    prepaid_left = int(getattr(bp, "prepaid_credits", 0) or 0)
+
+                    if prepaid_left <= 0:
+                        return Response(
+                            {
+                                "detail": "No credits left. Please buy prepaid credits or go Pro.",
+                                "code": "NO_CREDITS_LEFT",
+                            },
+                            status=status.HTTP_403_FORBIDDEN,
+                        )
+
+                    bp.prepaid_credits = prepaid_left - 1
+                    bp.credits_used_total = int(getattr(bp, "credits_used_total", 0) or 0) + 1
+                    bp.save(update_fields=["prepaid_credits", "credits_used_total", "updated_at"])
+
+                    job.download_unlocked = True
+                    job.download_unlocked_at = now
+                    job.download_unlock_source = "prepaid_credit"
+                    job.download_credit_consumed = True
+
+                    consumed = True
+                    prepaid_after = int(bp.prepaid_credits or 0)
+
+            # Registra uso do download/re-download
+            if not job.first_downloaded_at:
+                job.first_downloaded_at = now
+                should_queue_download_email = True
+
+            job.last_downloaded_at = now
+            job.download_count = int(job.download_count or 0) + 1
+
+            job.save(update_fields=[
+                "download_unlocked",
+                "download_unlocked_at",
+                "download_unlock_source",
+                "download_credit_consumed",
+                "download_count",
+                "first_downloaded_at",
+                "last_downloaded_at",
+            ])
 
         # ✅ Mantém comportamento: retorna URL
         try:
@@ -2302,7 +2337,7 @@ class KMLDownloadView(APIView):
         has_meta = bool(getattr(job, "meta_storage_path", None))
         has_output = bool(getattr(job, "storage_path", None))
 
-        if to_email and has_inputs and has_meta and has_output:
+        if should_queue_download_email and to_email and has_inputs and has_meta and has_output:
             queue_job_zip_email(job_id=str(job.id), to_email=to_email, plan=plan)
             email_queued = True
 

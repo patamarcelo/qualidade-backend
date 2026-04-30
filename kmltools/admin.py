@@ -300,6 +300,7 @@ class KMLMergeJobAdmin(admin.ModelAdmin):
         "anon_id_total_jobs",
         "plan",
         "status",
+        "download_state",
         "visitor_country_name",
         "visitor_ip",
         "visitor_ip_total_jobs",
@@ -316,6 +317,9 @@ class KMLMergeJobAdmin(admin.ModelAdmin):
     list_filter = (
         "status",
         "plan",
+        "download_unlocked",
+        "download_unlock_source",
+        "download_credit_consumed",
         "visitor_country",
         "created_at",
     )
@@ -345,6 +349,14 @@ class KMLMergeJobAdmin(admin.ModelAdmin):
         "visitor_country",
         "visitor_country_name",
         "download_email_sent_at",
+
+        "download_unlocked",
+        "download_unlocked_at",
+        "download_unlock_source",
+        "download_credit_consumed",
+        "download_count",
+        "first_downloaded_at",
+        "last_downloaded_at",
     )
 
     ordering = ("-created_at",)
@@ -415,6 +427,14 @@ class KMLMergeJobAdmin(admin.ModelAdmin):
                     "storage_path",
                     "meta_storage_path",
                     "download_email_sent_at",
+
+                    "download_unlocked",
+                    "download_unlocked_at",
+                    "download_unlock_source",
+                    "download_credit_consumed",
+                    "download_count",
+                    "first_downloaded_at",
+                    "last_downloaded_at",
                 ),
             },
         ),
@@ -492,6 +512,43 @@ class KMLMergeJobAdmin(admin.ModelAdmin):
         return obj.user.email if obj.user else "—"
     user_email.short_description = "Email"
     user_email.admin_order_field = "user__email"
+    
+    def download_state(self, obj):
+        if getattr(obj, "download_unlocked", False):
+            source = (getattr(obj, "download_unlock_source", "") or "unlocked").strip()
+            count = int(getattr(obj, "download_count", 0) or 0)
+
+            if source in ("pro_monthly", "pro_yearly", "pro"):
+                bg = "#dcfce7"
+                color = "#166534"
+                label = f"Unlocked · {source}"
+            elif source == "prepaid_credit":
+                bg = "#dbeafe"
+                color = "#1d4ed8"
+                label = "Unlocked · credit"
+            elif source == "manual":
+                bg = "#fef3c7"
+                color = "#92400e"
+                label = "Unlocked · manual"
+            else:
+                bg = "#f3f4f6"
+                color = "#374151"
+                label = f"Unlocked · {source}"
+
+            return format_html(
+                '<span style="background:{};color:{};padding:3px 8px;border-radius:999px;font-weight:700;white-space:nowrap;">{} · {}x</span>',
+                bg,
+                color,
+                label,
+                count,
+            )
+
+        return format_html(
+            '<span style="background:#fee2e2;color:#991b1b;padding:3px 8px;border-radius:999px;font-weight:700;white-space:nowrap;">Locked</span>'
+        )
+
+    download_state.short_description = "Download"
+    download_state.admin_order_field = "download_unlocked"
 
     def anon_id_total_jobs(self, obj):
         return getattr(obj, "_anon_id_total_jobs", 0)
