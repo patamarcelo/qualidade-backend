@@ -5790,6 +5790,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 navigation_q |= Q(
                     safra__safra=pair["safra"],
                     ciclo__ciclo=pair["ciclo"],
+                    ativo=True
                 )
 
             # Se não houver CicloAtual configurado, evita retornar histórico inteiro.
@@ -5797,6 +5798,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 navigation_q = Q(
                     safra__safra=safra_filter,
                     ciclo__ciclo=ciclo_filter,
+                    ativo=True
                 )
 
             # ------------------------------------------------------------
@@ -5838,7 +5840,6 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 .filter(
                     navigation_q,
                     plantio_descontinuado=False,
-                    ativo=True,
                 )
                 .distinct()
                 .order_by(
