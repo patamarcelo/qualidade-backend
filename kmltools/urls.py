@@ -3,6 +3,7 @@ from .views import ClaimJobsView,  KMLUnionView, MeView, UsageView, CreateChecko
 from .views import SendTestReactivationEmailView, KMLJobStatusView,  KMLAccountSummaryView, KMLAccountJobsView, KMLAccountJobDetailView
 from .views_feedback import MergeFeedbackView
 from .views_auth import RequestEmailMagicLinkView, VerifyEmailMagicLinkView
+from .views import PublicKMLStatsView
 
 urlpatterns = [
     path("kml-union/", KMLUnionView.as_view(), name="kml-union"),
@@ -52,5 +53,6 @@ urlpatterns += [
     path("account/summary/", KMLAccountSummaryView.as_view(), name="kml-account-summary"),
     path("account/jobs/", KMLAccountJobsView.as_view(), name="kml-account-jobs"),
     path("account/jobs/<uuid:job_id>/", KMLAccountJobDetailView.as_view(), name="kml-account-job-detail"),
+    path("public-stats/", PublicKMLStatsView.as_view(), name="public-kml-stats"),
 ]
 

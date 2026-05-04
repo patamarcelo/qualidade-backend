@@ -3746,3 +3746,84 @@ class KMLJobStatusView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+    
+    
+from decimal import Decimal
+
+from django.core.cache import cache
+from django.db.models import Sum
+from rest_framework.views import APIView
+from rest_framework.response import Response
+
+from .models import KMLMergeJob
+
+
+class PublicKMLStatsView(APIView):
+    """
+    Public social-proof stats for KML Unifier landing.
+
+    Returns only aggregated, non-sensitive metrics.
+    No emails, anon IDs, IPs, job IDs or user data.
+    """
+
+    authentication_classes = []
+    permission_classes = []
+
+    CACHE_KEY = "kmltools:public_kml_stats:v2"
+    CACHE_TIMEOUT = 60 * 30  # 30 minutes
+
+    def _number(self, value):
+        if value is None:
+            return 0
+
+        if isinstance(value, Decimal):
+            return float(value)
+
+        return value
+
+    def get(self, request, *args, **kwargs):
+        cached = cache.get(self.CACHE_KEY)
+        if cached:
+            return Response(cached)
+
+        successful_jobs = KMLMergeJob.objects.filter(
+            status=KMLMergeJob.STATUS_SUCCESS
+        )
+
+        agg = successful_jobs.aggregate(
+            total_polygons_processed=Sum("total_polygons"),
+            total_files_processed=Sum("total_files"),
+            total_input_area_ha=Sum("input_area_ha"),
+            total_output_area_ha=Sum("output_area_ha"),
+        )
+
+        total_polygons_processed = int(self._number(agg.get("total_polygons_processed")) or 0)
+        total_files_processed = int(self._number(agg.get("total_files_processed")) or 0)
+
+        # Preferência:
+        # 1. input_area_ha = área real recebida/processada
+        # 2. output_area_ha = fallback se input_area_ha estiver zerado
+        input_area_ha = float(self._number(agg.get("total_input_area_ha")) or 0)
+        output_area_ha = float(self._number(agg.get("total_output_area_ha")) or 0)
+
+        total_area_ha = input_area_ha if input_area_ha > 0 else output_area_ha
+
+        total_countries = (
+            successful_jobs
+            .exclude(visitor_country__isnull=True)
+            .exclude(visitor_country="")
+            .values("visitor_country")
+            .distinct()
+            .count()
+        )
+
+        data = {
+            "total_polygons_processed": total_polygons_processed,
+            "total_files_processed": total_files_processed,
+            "total_countries": total_countries,
+            "total_area_ha": int(total_area_ha),
+        }
+        print('data ', data)
+        cache.set(self.CACHE_KEY, data, self.CACHE_TIMEOUT)
+
+        return Response(data)
