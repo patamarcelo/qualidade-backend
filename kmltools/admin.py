@@ -734,21 +734,6 @@ class KMLMergeJobAdmin(admin.ModelAdmin):
         if not obj.pk:
             return "—"
 
-        # Só mostra botão útil se tiver pelo menos metrics/meta/output/input.
-        has_preview = bool(
-            (obj.metrics or {}).get("preview_geojson")
-            or (obj.metrics or {}).get("input_preview_geojson")
-            or obj.meta_storage_path
-            or obj.storage_path
-            or obj.input_storage_paths
-        )
-
-        if not has_preview:
-            return format_html(
-                '<span style="background:#f3f4f6;color:#6b7280;padding:3px 8px;'
-                'border-radius:999px;font-weight:700;white-space:nowrap;">No preview</span>'
-            )
-
         url = reverse(
             "admin:kmltools_kmlmergejob_merge_preview_json",
             args=[obj.pk],
