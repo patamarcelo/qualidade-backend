@@ -5838,6 +5838,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 .filter(
                     navigation_q,
                     plantio_descontinuado=False,
+                    ativo=True,
                 )
                 .distinct()
                 .order_by(
