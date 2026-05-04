@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import ClaimJobsView,  KMLUnionView, MeView, UsageView, CreateCheckoutSessionView, StripeWebhookView, CreateBillingPortalSessionView, KMLHistoryDownloadView, KMLHistoryView, CreatePrepaidCheckoutSessionView, KMLDownloadView, ProfileOnboardingView, UnlockFreeCreditView
-from .views import SendTestReactivationEmailView, KMLJobStatusView
+from .views import SendTestReactivationEmailView, KMLJobStatusView,  KMLAccountSummaryView, KMLAccountJobsView, KMLAccountJobDetailView
 from .views_feedback import MergeFeedbackView
 from .views_auth import RequestEmailMagicLinkView, VerifyEmailMagicLinkView
 
@@ -48,4 +48,9 @@ urlpatterns += [
     path("auth/email-link/verify/", VerifyEmailMagicLinkView.as_view(), name="auth-email-link-verify"),
 ]
 
+urlpatterns += [
+    path("account/summary/", KMLAccountSummaryView.as_view(), name="kml-account-summary"),
+    path("account/jobs/", KMLAccountJobsView.as_view(), name="kml-account-jobs"),
+    path("account/jobs/<uuid:job_id>/", KMLAccountJobDetailView.as_view(), name="kml-account-job-detail"),
+]
 

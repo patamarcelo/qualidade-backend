@@ -44,7 +44,7 @@ import requests
 from django.core.cache import cache
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
-from django.db.models import Q
+from django.db.models import Q, Count , Sum
 from rest_framework.exceptions import NotFound
 
 import ipaddress
@@ -3084,6 +3084,343 @@ class KMLHistoryDownloadView(APIView):
             "download_url": url,
         }, status=status.HTTP_200_OK)
 
+
+class KMLAccountPagination(PageNumberPagination):
+    page_size = 50
+    page_size_query_param = "page_size"
+    max_page_size = 100
+
+
+def _account_plan_flags(bp):
+    plan = (getattr(bp, "plan", None) or "free").lower().strip()
+    prepaid_credits = int(getattr(bp, "prepaid_credits", 0) or 0)
+
+    is_unlimited = bool(getattr(bp, "is_unlimited", False)) or plan in (
+        "pro_monthly",
+        "pro_yearly",
+    )
+
+    # Prepaid é cliente pagante e deve acessar histórico/mapas,
+    # mesmo se no momento estiver com 0 créditos.
+    is_prepaid_customer = plan == "prepaid" or prepaid_credits > 0
+
+    has_full_history_access = bool(is_unlimited or is_prepaid_customer)
+
+    return {
+        "plan": plan,
+        "is_unlimited": is_unlimited,
+        "is_prepaid_customer": is_prepaid_customer,
+        "has_full_history_access": has_full_history_access,
+        "prepaid_credits": prepaid_credits,
+    }
+
+
+def _plan_label(plan):
+    labels = {
+        "free": "Free",
+        "prepaid": "Prepaid",
+        "pro_monthly": "Pro Monthly",
+        "pro_yearly": "Pro Yearly",
+        "pro": "Pro",
+        "anonymous": "Anonymous",
+    }
+    return labels.get((plan or "").lower().strip(), plan or "Free")
+
+
+def _merge_mode_from_job(job):
+    metrics = job.metrics or {}
+    mode = (metrics.get("merge_mode") or "").strip()
+    if mode:
+        return mode
+    return "union"
+
+
+def _job_can_open_detail(job, flags):
+    if bool(getattr(job, "download_unlocked", False)):
+        return True
+    return bool(flags["has_full_history_access"])
+
+
+def _job_can_download(job, flags):
+    if job.status != getattr(KMLMergeJob, "STATUS_SUCCESS", "success"):
+        return False
+
+    if bool(getattr(job, "download_unlocked", False)):
+        return True
+
+    if bool(flags["is_unlimited"]):
+        return True
+
+    # Se tem crédito, pode tentar baixar; a rota segura vai consumir e liberar.
+    if int(flags["prepaid_credits"] or 0) > 0:
+        return True
+
+    return False
+
+
+def _serialize_account_job_list_item(job, flags):
+    can_open_detail = _job_can_open_detail(job, flags)
+    can_download = _job_can_download(job, flags)
+
+    input_filenames = job.input_filenames or []
+    if not isinstance(input_filenames, list):
+        input_filenames = []
+
+    return {
+        "id": str(job.id),
+        "job_id": str(job.id),
+        "request_id": job.request_id,
+        "status": job.status,
+        "plan": job.plan,
+        "created_at": job.created_at.isoformat() if job.created_at else None,
+
+        "total_files": job.total_files,
+        "total_polygons": job.total_polygons,
+        "tol_m": job.tol_m,
+        "corridor_width_m": job.corridor_width_m,
+
+        "output_polygons": job.output_polygons,
+        "merged_polygons": job.merged_polygons,
+        "input_area_m2": job.input_area_m2,
+        "input_area_ha": job.input_area_ha,
+        "output_area_m2": job.output_area_m2,
+        "output_area_ha": job.output_area_ha,
+
+        "input_filenames": input_filenames[:8],
+        "input_filenames_count": len(input_filenames),
+
+        "merge_mode": _merge_mode_from_job(job),
+
+        "download_unlocked": bool(getattr(job, "download_unlocked", False)),
+        "download_unlock_source": getattr(job, "download_unlock_source", "") or "",
+        "download_credit_consumed": bool(getattr(job, "download_credit_consumed", False)),
+        "download_count": int(getattr(job, "download_count", 0) or 0),
+        "first_downloaded_at": job.first_downloaded_at.isoformat() if getattr(job, "first_downloaded_at", None) else None,
+        "last_downloaded_at": job.last_downloaded_at.isoformat() if getattr(job, "last_downloaded_at", None) else None,
+
+        "can_open_detail": can_open_detail,
+        "can_download": can_download,
+        "locked_reason": None if can_open_detail else "upgrade_required",
+
+        "total_markers": (job.metrics or {}).get("total_markers", 0),
+        "error_message": getattr(job, "error_message", None) or (job.metrics or {}).get("error_message"),
+    }
+
+
+class KMLAccountSummaryView(APIView):
+    authentication_classes = (FirebaseAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        bp = ensure_billing_profile(request.user, request=request)
+
+        if not bp:
+            return Response(
+                {
+                    "email": request.user.email,
+                    "plan": "free",
+                    "plan_label": "Free",
+                    "access_level": "limited",
+                    "history_locked": True,
+                    "can_access_history": False,
+                    "can_access_maps": False,
+                    "can_download_from_history": False,
+
+                    "prepaid_credits": 0,
+                    "free_monthly_credits": 0,
+                    "credits_used_total": 0,
+                    "current_period_end": None,
+                    "cancel_at_period_end": False,
+
+                    "total_jobs": 0,
+                    "success_jobs": 0,
+                    "error_jobs": 0,
+                    "processing_jobs": 0,
+                    "queued_jobs": 0,
+                    "unlocked_jobs": 0,
+                    "total_files": 0,
+                    "total_input_area_ha": 0,
+                    "total_output_area_ha": 0,
+                    "last_merge_at": None,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        flags = _account_plan_flags(bp)
+
+        base_qs = KMLMergeJob.objects.filter(user=request.user)
+
+        total_jobs = base_qs.count()
+        success_jobs = base_qs.filter(status=KMLMergeJob.STATUS_SUCCESS).count()
+        error_jobs = base_qs.filter(status=KMLMergeJob.STATUS_ERROR).count()
+        processing_jobs = base_qs.filter(status=KMLMergeJob.STATUS_PROCESSING).count()
+        queued_jobs = base_qs.filter(status=KMLMergeJob.STATUS_QUEUED).count()
+        unlocked_jobs = base_qs.filter(download_unlocked=True).count()
+
+        agg = base_qs.aggregate(
+            total_files_sum=Sum("total_files"),
+            total_input_area_ha_sum=Sum("input_area_ha"),
+            total_output_area_ha_sum=Sum("output_area_ha"),
+        )
+
+        last_merge = base_qs.order_by("-created_at").first()
+
+        history_locked = not flags["has_full_history_access"]
+
+        return Response(
+            {
+                "email": request.user.email,
+                "plan": flags["plan"],
+                "plan_label": _plan_label(flags["plan"]),
+                "access_level": "full" if flags["has_full_history_access"] else "limited",
+                "history_locked": history_locked,
+                "can_access_history": flags["has_full_history_access"],
+                "can_access_maps": flags["has_full_history_access"],
+                "can_download_from_history": bool(flags["is_unlimited"] or flags["prepaid_credits"] > 0),
+
+                "prepaid_credits": int(bp.prepaid_credits or 0),
+                "free_monthly_credits": int(bp.free_monthly_credits or 0),
+                "credits_used_total": int(bp.credits_used_total or 0),
+                "current_period_end": bp.current_period_end.isoformat() if bp.current_period_end else None,
+                "cancel_at_period_end": bool(bp.cancel_at_period_end),
+
+                "total_jobs": total_jobs,
+                "success_jobs": success_jobs,
+                "error_jobs": error_jobs,
+                "processing_jobs": processing_jobs,
+                "queued_jobs": queued_jobs,
+                "unlocked_jobs": unlocked_jobs,
+                "total_files": int(agg.get("total_files_sum") or 0),
+                "total_input_area_ha": float(agg.get("total_input_area_ha_sum") or 0),
+                "total_output_area_ha": float(agg.get("total_output_area_ha_sum") or 0),
+                "last_merge_at": last_merge.created_at.isoformat() if last_merge else None,
+
+                "upgrade_cta": (
+                    "Upgrade to access previous maps, details, and downloads whenever you need them."
+                    if history_locked
+                    else ""
+                ),
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class KMLAccountJobsView(APIView):
+    authentication_classes = (FirebaseAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        bp = ensure_billing_profile(request.user, request=request)
+        flags = _account_plan_flags(bp) if bp else {
+            "plan": "free",
+            "is_unlimited": False,
+            "is_prepaid_customer": False,
+            "has_full_history_access": False,
+            "prepaid_credits": 0,
+        }
+
+        qs = (
+            KMLMergeJob.objects
+            .filter(user=request.user)
+            .only(
+                "id",
+                "request_id",
+                "status",
+                "plan",
+                "created_at",
+                "total_files",
+                "total_polygons",
+                "tol_m",
+                "corridor_width_m",
+                "output_polygons",
+                "merged_polygons",
+                "input_area_m2",
+                "input_area_ha",
+                "output_area_m2",
+                "output_area_ha",
+                "input_filenames",
+                "metrics",
+                "download_unlocked",
+                "download_unlocked_at",
+                "download_unlock_source",
+                "download_credit_consumed",
+                "download_count",
+                "first_downloaded_at",
+                "last_downloaded_at",
+            )
+            .order_by("-created_at")
+        )
+
+        status_ = (request.query_params.get("status") or "").strip().lower()
+        if status_ in ("queued", "processing", "success", "error"):
+            qs = qs.filter(status=status_)
+
+        unlocked = (request.query_params.get("unlocked") or "").strip().lower()
+        if unlocked in ("1", "true", "yes"):
+            qs = qs.filter(download_unlocked=True)
+        elif unlocked in ("0", "false", "no"):
+            qs = qs.filter(download_unlocked=False)
+
+        paginator = KMLAccountPagination()
+        page = paginator.paginate_queryset(qs, request)
+
+        items = [_serialize_account_job_list_item(job, flags) for job in page]
+
+        response = paginator.get_paginated_response(items)
+        response.data["plan"] = flags["plan"]
+        response.data["access_level"] = "full" if flags["has_full_history_access"] else "limited"
+        response.data["history_locked"] = not flags["has_full_history_access"]
+        response.data["prepaid_credits"] = flags["prepaid_credits"]
+        return response
+
+
+class KMLAccountJobDetailView(APIView):
+    authentication_classes = (FirebaseAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request, job_id):
+        bp = ensure_billing_profile(request.user, request=request)
+        flags = _account_plan_flags(bp) if bp else {
+            "plan": "free",
+            "is_unlimited": False,
+            "is_prepaid_customer": False,
+            "has_full_history_access": False,
+            "prepaid_credits": 0,
+        }
+
+        job = get_object_or_404(KMLMergeJob, id=job_id, user=request.user)
+
+        can_open_detail = _job_can_open_detail(job, flags)
+
+        if not can_open_detail:
+            return Response(
+                {
+                    "detail": "Upgrade required to access merge details.",
+                    "code": "HISTORY_DETAIL_LOCKED",
+                    "job_id": str(job.id),
+                    "download_unlocked": bool(job.download_unlocked),
+                    "can_open_detail": False,
+                    "can_download": _job_can_download(job, flags),
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        item = _serialize_account_job_list_item(job, flags)
+
+        metrics = job.metrics or {}
+
+        item.update({
+            "preview_geojson": metrics.get("preview_geojson"),
+            "input_preview_geojson": metrics.get("input_preview_geojson"),
+            "files_report": metrics.get("files_report", []),
+            "metrics": {
+                k: v
+                for k, v in metrics.items()
+                if k not in ("preview_geojson", "input_preview_geojson", "files_report")
+            },
+        })
+
+        return Response(item, status=status.HTTP_200_OK)
 
 
 class ProfileOnboardingView(APIView):
