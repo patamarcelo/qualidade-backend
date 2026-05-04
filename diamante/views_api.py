@@ -3506,6 +3506,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     # .filter(safra=s_dict[safra_filter], ciclo=c_dict[cicle_filter])
                     .filter(safra=s_dict[safra_filter])
                     .filter(plantio_descontinuado=False)
+                    .filter(ativo=True)
                     # .filter(variedade__cultura__isnull=False)
                 )
                 
@@ -3638,6 +3639,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 ).filter(
                     safra=s_dict[safra_filter],
                     plantio_descontinuado=False,
+                    ativo=True
                 )
                 
                 
@@ -4437,6 +4439,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 # finalizado_plantio=True,
                 # programa__isnull=False,
                 talhao__fazenda__id_farmbox__in=projeto_filter,
+                ativo=True
             ).order_by('data_prevista_plantio')
             
             if parcelas_filter:
