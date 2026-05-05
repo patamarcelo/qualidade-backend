@@ -2882,6 +2882,115 @@ class StripeWebhookView(APIView):
         return HttpResponse(status=200)
 
 
+class CheckoutSessionView(APIView):
+    authentication_classes = (FirebaseAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+
+        session_id = (request.query_params.get("session_id") or "").strip()
+
+        if not session_id:
+            return Response(
+                {
+                    "detail": "session_id ausente.",
+                    "code": "SESSION_ID_MISSING",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            session = stripe.checkout.Session.retrieve(session_id)
+        except stripe.error.StripeError as e:
+            msg = getattr(e, "user_message", None) or str(e)
+            return Response(
+                {
+                    "detail": msg,
+                    "code": "STRIPE_SESSION_RETRIEVE_ERROR",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        bp = getattr(request.user, "billing", None)
+        customer_id = session.get("customer")
+
+        # Segurança: se o BillingProfile já tem customer_id,
+        # garante que a sessão pertence ao usuário autenticado.
+        if bp and bp.stripe_customer_id and customer_id:
+            if bp.stripe_customer_id != customer_id:
+                return Response(
+                    {
+                        "detail": "Sessão não pertence ao usuário autenticado.",
+                        "code": "SESSION_CUSTOMER_MISMATCH",
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+        payment_status = (session.get("payment_status") or "").lower().strip()
+        stripe_status = (session.get("status") or "").lower().strip()
+        mode = (session.get("mode") or "").lower().strip()
+
+        metadata = session.get("metadata") or {}
+
+        amount_total = session.get("amount_total") or 0
+        currency = (session.get("currency") or "usd").upper()
+        value = float(amount_total or 0) / 100
+
+        kind = (metadata.get("kind") or "").lower().strip()
+        pack = (metadata.get("pack") or "").lower().strip()
+        credits_raw = metadata.get("credits")
+
+        is_paid = payment_status == "paid" or stripe_status == "complete"
+
+        if not is_paid:
+            return Response(
+                {
+                    "detail": "Pagamento ainda não confirmado.",
+                    "code": "PAYMENT_NOT_CONFIRMED",
+                    "session_id": session_id,
+                    "stripe_status": stripe_status,
+                    "payment_status": payment_status,
+                    "mode": mode,
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        if kind.startswith("prepaid_"):
+            plan_type = kind
+        elif mode == "subscription":
+            plan_type = "subscription"
+        else:
+            plan_type = mode or "stripe_checkout"
+
+        try:
+            credits = int(credits_raw) if credits_raw is not None else None
+        except (TypeError, ValueError):
+            credits = None
+
+        return Response(
+            {
+                "message": "Pagamento confirmado. Seu plano foi atualizado.",
+                "session_id": session_id,
+                "transaction_id": session_id,
+
+                "payment_status": payment_status,
+                "stripe_status": stripe_status,
+                "mode": mode,
+
+                # Dados para GA4 / Google Ads
+                "value": value,
+                "currency": currency,
+                "plan_type": plan_type,
+
+                # Extras úteis para debug
+                "kind": kind,
+                "pack": pack,
+                "credits": credits,
+            },
+            status=status.HTTP_200_OK,
+        )
+
 class CreateBillingPortalSessionView(APIView):
     authentication_classes = (FirebaseAuthentication,)
     permission_classes = (IsAuthenticated,)

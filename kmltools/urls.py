@@ -3,7 +3,7 @@ from .views import ClaimJobsView,  KMLUnionView, MeView, UsageView, CreateChecko
 from .views import SendTestReactivationEmailView, KMLJobStatusView,  KMLAccountSummaryView, KMLAccountJobsView, KMLAccountJobDetailView
 from .views_feedback import MergeFeedbackView
 from .views_auth import RequestEmailMagicLinkView, VerifyEmailMagicLinkView
-from .views import PublicKMLStatsView
+from .views import PublicKMLStatsView, CheckoutSessionView
 
 urlpatterns = [
     path("kml-union/", KMLUnionView.as_view(), name="kml-union"),
@@ -14,6 +14,7 @@ urlpatterns = [
 
 urlpatterns += [
     path("billing/checkout/", CreateCheckoutSessionView.as_view(), name="billing-checkout"),
+    path("billing/checkout-session/", CheckoutSessionView.as_view(), name="billing-checkout-session"),
     path("billing/portal/", CreateBillingPortalSessionView.as_view(), name="billing-portal"),  # NEW
     path("billing/checkout-prepaid/", CreatePrepaidCheckoutSessionView.as_view(), name="billing-checkout-prepaid"),
     path("kml-download/<uuid:job_id>/", KMLDownloadView.as_view()),
