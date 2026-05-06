@@ -3594,7 +3594,7 @@ class AplicacaoAdmin(admin.ModelAdmin):
                 produto_origem = Defensivo.objects.filter(pk=item["produto_origem_id"]).first()
                 produto_destino = Defensivo.objects.filter(pk=item["produto_destino_id"]).first()
 
-                if not produto_origem or not produto_destino:
+                if not produto_destino:
                     continue
 
                 total_plantios_atualizados += admin_instance._sincronizar_produto_no_cronograma_nao_aplicado(
@@ -3604,6 +3604,13 @@ class AplicacaoAdmin(admin.ModelAdmin):
                     nova_dose=item.get("nova_dose"),
                     alterar_dose=item.get("alterar_dose", False),
                     zerar_custo=item.get("zerar_custo", False),
+
+                    produto_origem_nome=item.get("produto_origem_nome"),
+                    produto_origem_id_farmbox=item.get("produto_origem_id_farmbox"),
+                    produto_destino_nome=item.get("produto_destino_nome"),
+                    produto_destino_tipo=item.get("produto_destino_tipo"),
+                    produto_destino_id_farmbox=item.get("produto_destino_id_farmbox"),
+                    produto_destino_formulacao=item.get("produto_destino_formulacao"),
                 )
 
             task.status = "done"
@@ -3685,6 +3692,12 @@ class AplicacaoAdmin(admin.ModelAdmin):
         nova_dose=None,
         alterar_dose=False,
         zerar_custo=False,
+        produto_origem_nome=None,
+        produto_origem_id_farmbox=None,
+        produto_destino_nome=None,
+        produto_destino_tipo=None,
+        produto_destino_id_farmbox=None,
+        produto_destino_formulacao=None,
     ):
         """
         Atualiza o cronograma_programa salvo no Plantio,
@@ -3692,7 +3705,7 @@ class AplicacaoAdmin(admin.ModelAdmin):
         - no programa da aplicação alterada;
         - na etapa/estágio da operação alterada;
         - no produto origem alterado;
-        - se a etapa/produto ainda não foi aplicado.
+        - se a etapa/produto ainda não foi aplicado/enviado.
         """
         app = (
             Aplicacao.objects
@@ -3709,17 +3722,20 @@ class AplicacaoAdmin(admin.ModelAdmin):
             return 0
 
         programa_id = app.operacao.programa_id
+        estagio_id = app.operacao_id
         estagio_nome = str(app.operacao.estagio or "").strip()
 
-        if not estagio_nome:
+        if not estagio_id and not estagio_nome:
             return 0
 
         origem_id_farmbox = self._normalizar_id_farmbox(
-            produto_origem.id_farmbox if produto_origem else None
+            produto_origem_id_farmbox
+            or (produto_origem.id_farmbox if produto_origem else None)
         )
 
         origem_nome = _normalizar_nome_produto(
-            produto_origem.produto if produto_origem else ""
+            produto_origem_nome
+            or (produto_origem.produto if produto_origem else "")
         )
 
         plantios = (
@@ -3749,21 +3765,26 @@ class AplicacaoAdmin(admin.ModelAdmin):
                 if not isinstance(etapa, dict):
                     continue
 
-                # Se a etapa inteira já foi aplicada, não altera nada nela
+                # Se a etapa inteira já foi aplicada/enviada, não altera nada nela.
                 if self._cronograma_item_ja_aplicado(etapa):
                     continue
 
                 nome_etapa = str(
                     etapa.get("estagio")
-                    or etapa.get("nome")
-                    or etapa.get("operacao")
-                    or etapa.get("operação")
+                    or etapa.get("Estagio")
                     or ""
                 ).strip()
 
-                # REGRA DE SEGURANÇA:
-                # só altera a etapa explicitamente afetada pela operação da aplicação
-                if not nome_etapa or nome_etapa != estagio_nome:
+                etapa_id = etapa.get("estagio_id")
+
+                mesma_etapa = False
+
+                try:
+                    mesma_etapa = int(etapa_id) == int(estagio_id)
+                except (TypeError, ValueError):
+                    mesma_etapa = bool(nome_etapa and nome_etapa == estagio_nome)
+
+                if not mesma_etapa:
                     continue
 
                 produtos = etapa.get("produtos") or []
@@ -3775,7 +3796,7 @@ class AplicacaoAdmin(admin.ModelAdmin):
                     if not isinstance(produto_json, dict):
                         continue
 
-                    # Produto já aplicado não pode ser alterado
+                    # Segurança extra caso no futuro o produto individual ganhe flag de aplicado.
                     if self._cronograma_item_ja_aplicado(produto_json):
                         continue
 
@@ -3797,19 +3818,24 @@ class AplicacaoAdmin(admin.ModelAdmin):
                     if not mesmo_produto:
                         continue
 
-                    produto_json["produto"] = produto_destino.produto
-                    produto_json["tipo"] = produto_destino.tipo
-                    produto_json["id_farmbox"] = produto_destino.id_farmbox
-                    produto_json["formulacao"] = produto_destino.unidade_medida
+                    produto_json["produto"] = produto_destino_nome or produto_destino.produto
+                    produto_json["tipo"] = produto_destino_tipo or produto_destino.tipo
+                    produto_json["id_farmbox"] = (
+                        produto_destino_id_farmbox
+                        if produto_destino_id_farmbox not in [None, ""]
+                        else produto_destino.id_farmbox
+                    )
+                    produto_json["formulacao"] = produto_destino_formulacao or produto_destino.unidade_medida
 
                     if alterar_dose:
                         dose_final = nova_dose
-                        produto_json["dose"] = float(dose_final) if dose_final is not None else None
+                        produto_json["dose"] = str(dose_final) if dose_final is not None else None
 
                         try:
-                            area = float(plantio.area_colheita or 0)
-                            dose = float(dose_final or 0)
-                            produto_json["quantidade aplicar"] = round(area * dose, 3)
+                            area = Decimal(str(plantio.area_colheita or 0))
+                            dose = Decimal(str(dose_final or 0))
+                            quantidade = round(area * dose, 3)
+                            produto_json["quantidade aplicar"] = str(quantidade)
                         except Exception:
                             produto_json["quantidade aplicar"] = ""
 
@@ -4058,8 +4084,17 @@ class AplicacaoAdmin(admin.ModelAdmin):
                         
                         alteracoes_cronograma.append({
                             "aplicacao_id": app.pk,
+
                             "produto_origem_id": produto_origem_app.pk if produto_origem_app else None,
+                            "produto_origem_nome": produto_origem_app.produto if produto_origem_app else "",
+                            "produto_origem_id_farmbox": produto_origem_app.id_farmbox if produto_origem_app else None,
+
                             "produto_destino_id": produto_destino.pk,
+                            "produto_destino_nome": produto_destino.produto,
+                            "produto_destino_tipo": produto_destino.tipo,
+                            "produto_destino_id_farmbox": produto_destino.id_farmbox,
+                            "produto_destino_formulacao": produto_destino.unidade_medida,
+
                             "nova_dose": str(dose_final) if dose_final is not None else None,
                             "alterar_dose": alterar_dose,
                             "zerar_custo": zerar_custo,
