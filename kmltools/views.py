@@ -29,7 +29,9 @@ from kmltools.services import merge_no_flood, merge_no_flood_not_union
 from kmltools.newservices.credits import reserve_one_credit, refund_one_credit, NoCreditsLeft
 
 
-from shapely.geometry import LineString
+from shapely.geometry import LineString, MultiLineString
+from shapely.ops import linemerge, unary_union
+import math
 
 from django.utils.text import slugify
 from .newservices.email_async import queue_job_zip_email
@@ -188,6 +190,366 @@ def build_concat_only_kml(file_entries):
         total_markers,
     )
     
+def _haversine_m(a, b):
+    lon1, lat1 = a
+    lon2, lat2 = b
+
+    radius = 6371000.0
+
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+
+    x = (
+        math.sin(dlat / 2) ** 2
+        + math.cos(math.radians(lat1))
+        * math.cos(math.radians(lat2))
+        * math.sin(dlon / 2) ** 2
+    )
+
+    return 2 * radius * math.asin(math.sqrt(x))
+
+
+def _line_length_m(line):
+    coords = list(line.coords)
+    total = 0.0
+
+    for idx in range(1, len(coords)):
+        total += _haversine_m(coords[idx - 1], coords[idx])
+
+    return total
+
+
+def _dedupe_consecutive_coords(coords):
+    cleaned = []
+
+    for pt in coords or []:
+        if not cleaned or cleaned[-1] != pt:
+            cleaned.append(pt)
+
+    return cleaned
+
+
+def _orient_coords_to_connect(base_end, candidate_coords):
+    """
+    Retorna candidate_coords na orientação que conecta melhor com base_end.
+    """
+    if not candidate_coords:
+        return candidate_coords, None
+
+    start = candidate_coords[0]
+    end = candidate_coords[-1]
+
+    dist_to_start = _haversine_m(base_end, start)
+    dist_to_end = _haversine_m(base_end, end)
+
+    if dist_to_start <= dist_to_end:
+        return candidate_coords, dist_to_start
+
+    return list(reversed(candidate_coords)), dist_to_end
+
+
+def _build_line_components(lines, gap_m):
+    """
+    Monta componentes de linhas por proximidade de endpoints.
+    Não usa unary_union, para evitar quebrar uma linha em dezenas/centenas de segmentos.
+    """
+
+    remaining = []
+
+    for idx, item in enumerate(lines):
+        coords = list(item["geom"].coords)
+        if len(coords) < 2:
+            continue
+
+        remaining.append({
+            "idx": idx,
+            "name": item.get("name") or f"Line {idx + 1}",
+            "coords": coords,
+        })
+
+    components = []
+    bridge_reports = []
+    bridges_created = 0
+
+    gap_m = float(gap_m or 0)
+
+    while remaining:
+        current = remaining.pop(0)
+        chain = list(current["coords"])
+        chain_source_indexes = [current["idx"]]
+
+        changed = True
+
+        while changed and remaining:
+            changed = False
+
+            best = None
+
+            chain_start = chain[0]
+            chain_end = chain[-1]
+
+            for pos, candidate in enumerate(remaining):
+                cand_coords = candidate["coords"]
+                cand_start = cand_coords[0]
+                cand_end = cand_coords[-1]
+
+                options = [
+                    {
+                        "pos": pos,
+                        "attach": "end_to_start",
+                        "distance_m": _haversine_m(chain_end, cand_start),
+                        "coords": cand_coords,
+                        "bridge_from": chain_end,
+                        "bridge_to": cand_start,
+                    },
+                    {
+                        "pos": pos,
+                        "attach": "end_to_end",
+                        "distance_m": _haversine_m(chain_end, cand_end),
+                        "coords": list(reversed(cand_coords)),
+                        "bridge_from": chain_end,
+                        "bridge_to": cand_end,
+                    },
+                    {
+                        "pos": pos,
+                        "attach": "start_to_end",
+                        "distance_m": _haversine_m(chain_start, cand_end),
+                        "coords": cand_coords,
+                        "bridge_from": cand_end,
+                        "bridge_to": chain_start,
+                    },
+                    {
+                        "pos": pos,
+                        "attach": "start_to_start",
+                        "distance_m": _haversine_m(chain_start, cand_start),
+                        "coords": list(reversed(cand_coords)),
+                        "bridge_from": cand_start,
+                        "bridge_to": chain_start,
+                    },
+                ]
+
+                for option in options:
+                    if option["distance_m"] <= gap_m:
+                        if best is None or option["distance_m"] < best["distance_m"]:
+                            best = {
+                                **option,
+                                "candidate": candidate,
+                            }
+
+            if best is None:
+                break
+
+            candidate = best["candidate"]
+            candidate_coords = best["coords"]
+            dist_m = float(best["distance_m"])
+
+            if best["attach"] in ("end_to_start", "end_to_end"):
+                if dist_m > 0:
+                    chain.append(best["bridge_to"])
+                    bridges_created += 1
+
+                    bridge_reports.append({
+                        "from_line_index": chain_source_indexes[-1],
+                        "to_line_index": candidate["idx"],
+                        "attach": best["attach"],
+                        "distance_m": round(dist_m, 2),
+                    })
+
+                chain.extend(candidate_coords)
+
+            else:
+                if dist_m > 0:
+                    chain.insert(0, best["bridge_from"])
+                    bridges_created += 1
+
+                    bridge_reports.append({
+                        "from_line_index": candidate["idx"],
+                        "to_line_index": chain_source_indexes[0],
+                        "attach": best["attach"],
+                        "distance_m": round(dist_m, 2),
+                    })
+
+                chain = candidate_coords + chain
+
+            chain = _dedupe_consecutive_coords(chain)
+            chain_source_indexes.append(candidate["idx"])
+
+            remaining.pop(best["pos"])
+            changed = True
+
+        chain = _dedupe_consecutive_coords(chain)
+
+        if len(chain) >= 2:
+            components.append({
+                "coords": chain,
+                "source_indexes": chain_source_indexes,
+            })
+
+    return components, bridges_created, bridge_reports
+
+
+def build_line_merge_kml(parcelas, gap_m=20.0):
+    """
+    Usado somente quando os arquivos não têm Polygon e possuem LineString/LinearRing.
+
+    Reaproveita o tol_m atual como gap_m:
+    - conecta endpoints de linhas diferentes quando a distância entre eles <= gap_m
+    - não cria área
+    - não usa corridor_width_m
+    - não usa unary_union, para não fragmentar a linha final
+    """
+
+    lines = []
+    input_features = []
+
+    for p in parcelas or []:
+        talhao = p.get("talhao") or "Line"
+        geoms = p.get("geoms") or []
+
+        for geom in geoms:
+            try:
+                coords = list(geom.coords)
+            except Exception:
+                coords = []
+
+            if len(coords) < 2:
+                continue
+
+            line = LineString(coords)
+
+            lines.append({
+                "name": talhao,
+                "geom": line,
+            })
+
+            input_features.append({
+                "type": "Feature",
+                "properties": {
+                    "name": talhao,
+                    "kind": "input_line",
+                },
+                "geometry": {
+                    "type": "LineString",
+                    "coordinates": [[float(x), float(y)] for x, y in coords],
+                },
+            })
+
+    if not lines:
+        raise ValueError("Nenhuma linha válida encontrada nos arquivos KML.")
+
+    components, bridges_created, bridge_reports = _build_line_components(
+        lines,
+        gap_m=gap_m,
+    )
+
+    output_features = []
+    output_lines = []
+
+    for idx, component in enumerate(components, start=1):
+        coords = component["coords"]
+
+        if len(coords) < 2:
+            continue
+
+        line = LineString(coords)
+        output_lines.append(line)
+
+        output_features.append({
+            "type": "Feature",
+            "properties": {
+                "name": f"Merged line {idx}",
+                "kind": "merged_line",
+                "idx": idx,
+                "source_lines": component.get("source_indexes") or [],
+            },
+            "geometry": {
+                "type": "LineString",
+                "coordinates": [[float(x), float(y)] for x, y in coords],
+            },
+        })
+
+    if not output_lines:
+        raise ValueError("Não foi possível gerar linhas finais a partir dos arquivos KML.")
+
+    kml_parts = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<kml xmlns="http://www.opengis.net/kml/2.2">',
+        '<Document>',
+        '<name>KML Unifier — merged lines</name>',
+        """
+        <Style id="mergedLineStyle">
+            <LineStyle>
+                <color>ff00aaff</color>
+                <width>4</width>
+            </LineStyle>
+        </Style>
+        """,
+    ]
+
+    for idx, line in enumerate(output_lines, start=1):
+        coord_text = " ".join(
+            f"{float(x)},{float(y)},0"
+            for x, y in line.coords
+        )
+
+        kml_parts.append(f"""
+        <Placemark>
+            <name>Merged line {idx}</name>
+            <styleUrl>#mergedLineStyle</styleUrl>
+            <LineString>
+                <tessellate>1</tessellate>
+                <coordinates>{coord_text}</coordinates>
+            </LineString>
+        </Placemark>
+        """)
+
+    kml_parts.extend([
+        '</Document>',
+        '</kml>',
+    ])
+
+    input_length_m = sum(_line_length_m(item["geom"]) for item in lines)
+    output_length_m = sum(_line_length_m(line) for line in output_lines)
+
+    preview_geojson = {
+        "type": "FeatureCollection",
+        "features": output_features,
+    }
+
+    input_preview_geojson = {
+        "type": "FeatureCollection",
+        "features": input_features,
+    }
+
+    metrics = {
+        "geometry_type": "lines",
+        "merge_mode": "line_merge",
+        "gap_m": float(gap_m or 0),
+        "input_lines": len(lines),
+        "output_lines": len(output_lines),
+        "bridges_created": bridges_created,
+        "bridge_reports": bridge_reports,
+        "input_length_m": round(float(input_length_m), 2),
+        "input_length_km": round(float(input_length_m) / 1000, 3),
+        "output_length_m": round(float(output_length_m), 2),
+        "output_length_km": round(float(output_length_m) / 1000, 3),
+
+        # compatibilidade com o restante do sistema
+        "output_polygons": 0,
+        "merged_polygons": 0,
+        "input_area_m2": 0,
+        "input_area_ha": 0,
+        "output_area_m2": 0,
+        "output_area_ha": 0,
+    }
+
+    return (
+        "\n".join(kml_parts),
+        metrics,
+        preview_geojson,
+        input_preview_geojson,
+    )
+
     
 def run_kml_merge_job(job_id):
     close_old_connections()
@@ -213,6 +575,7 @@ def run_kml_merge_job(job_id):
         total_polygons = 0
         file_reports = []
         markers = []
+        total_cad_lines = 0
 
         input_storage_paths = list(job.input_storage_paths or [])
         input_filenames = list(job.input_filenames or [])
@@ -328,6 +691,7 @@ def run_kml_merge_job(job_id):
 
                         if line_geoms:
                             parcelas.append({"talhao": talhao_name_base, "geoms": line_geoms})
+                total_cad_lines += cad_lines_file
 
                 file_reports.append({
                     "filename": input_filenames[idx - 1] if idx - 1 < len(input_filenames) else safe_name,
@@ -353,11 +717,11 @@ def run_kml_merge_job(job_id):
 
         if not parcelas and markers:
             kml_str = """<?xml version="1.0" encoding="UTF-8"?>
-<kml xmlns="http://www.opengis.net/kml/2.2">
-  <Document>
-    <name>KML Unifier — markers</name>
-  </Document>
-</kml>"""
+        <kml xmlns="http://www.opengis.net/kml/2.2">
+        <Document>
+            <name>KML Unifier — markers</name>
+        </Document>
+        </kml>"""
             preview_geojson = {"type": "FeatureCollection", "features": markers}
             input_preview_geojson = {"type": "FeatureCollection", "features": markers}
             metrics = {
@@ -368,10 +732,11 @@ def run_kml_merge_job(job_id):
                 "output_area_m2": 0,
                 "output_area_ha": 0,
             }
+
         elif not parcelas and not markers:
-            raise ValueError("Nenhum polígono ou marcador válido encontrado nos arquivos KML.")
+            raise ValueError("Nenhum polígono, linha ou marcador válido encontrado nos arquivos KML.")
+
         else:
-            
             job_metrics = job.metrics or {}
             merge_mode = (job_metrics.get("merge_mode") or "union").lower().strip()
 
@@ -391,6 +756,23 @@ def run_kml_merge_job(job_id):
                 total_polygons = total_polygons_concat
                 debug_geojson = None
 
+            elif total_polygons == 0 and total_cad_lines > 0:
+                (
+                    kml_str,
+                    metrics,
+                    preview_geojson,
+                    input_preview_geojson,
+                ) = build_line_merge_kml(
+                    parcelas,
+                    gap_m=tol_m,
+                )
+
+                debug_geojson = None
+
+                if markers:
+                    preview_geojson["features"] = (preview_geojson.get("features") or []) + markers
+                    input_preview_geojson["features"] = (input_preview_geojson.get("features") or []) + markers
+
             elif merge_mode == "no_union":
                 kml_str, metrics, debug_geojson = merge_no_flood_not_union(
                     parcelas,
@@ -400,14 +782,17 @@ def run_kml_merge_job(job_id):
                 )
 
                 preview_geojson = view._kml_str_to_geojson(kml_str)
+
                 if markers:
                     preview_geojson["features"] = (preview_geojson.get("features") or []) + markers
+
                 if debug_geojson:
                     extra_feats = (debug_geojson.get("features") or [])
                     if extra_feats:
                         preview_geojson["features"] = (preview_geojson.get("features") or []) + extra_feats
 
                 input_preview_geojson = view._parcelas_to_geojson(parcelas)
+
                 if markers:
                     input_preview_geojson["features"] = (input_preview_geojson.get("features") or []) + markers
 
@@ -418,16 +803,18 @@ def run_kml_merge_job(job_id):
                     corridor_width_m=corridor_width_m,
                     return_metrics=True,
                 )
+
                 debug_geojson = None
 
                 preview_geojson = view._kml_str_to_geojson(kml_str)
+
                 if markers:
                     preview_geojson["features"] = (preview_geojson.get("features") or []) + markers
 
                 input_preview_geojson = view._parcelas_to_geojson(parcelas)
+
                 if markers:
                     input_preview_geojson["features"] = (input_preview_geojson.get("features") or []) + markers
-                    
 
         kml_str = view._append_marker_placemarks_to_kml(kml_str, markers)
 
@@ -469,6 +856,7 @@ def run_kml_merge_job(job_id):
             "total_markers": len([f for f in markers if (f.get("geometry") or {}).get("type") == "Point"]),
             "preview_geojson": preview_geojson,
             "input_preview_geojson": input_preview_geojson,
+            "total_cad_lines": total_cad_lines,
         }
 
         meta_path = f"kml_unions/{request_id}/meta/meta.json"
@@ -494,6 +882,7 @@ def run_kml_merge_job(job_id):
             "preview_geojson": preview_geojson,
             "input_preview_geojson": input_preview_geojson,
             "total_markers": len([f for f in markers if (f.get("geometry") or {}).get("type") == "Point"]),
+            "total_cad_lines": total_cad_lines,
             "weekly_used": weekly_used,
         }
         job.save()
@@ -3842,6 +4231,18 @@ class KMLJobStatusView(APIView):
                 "input_area_ha": job.input_area_ha,
                 "output_area_m2": job.output_area_m2,
                 "output_area_ha": job.output_area_ha,
+
+                "geometry_type": (job.metrics or {}).get("geometry_type"),
+                "line_merge_mode": (job.metrics or {}).get("merge_mode"),
+                "input_lines": (job.metrics or {}).get("input_lines"),
+                "output_lines": (job.metrics or {}).get("output_lines"),
+                "bridges_created": (job.metrics or {}).get("bridges_created"),
+                "input_length_m": (job.metrics or {}).get("input_length_m"),
+                "input_length_km": (job.metrics or {}).get("input_length_km"),
+                "output_length_m": (job.metrics or {}).get("output_length_m"),
+                "output_length_km": (job.metrics or {}).get("output_length_km"),
+                "total_cad_lines": (job.metrics or {}).get("total_cad_lines", 0),
+                "bridge_reports": (job.metrics or {}).get("bridge_reports", []),
 
                 "download_url": url,
                 "download_available": bool(url),
