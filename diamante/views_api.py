@@ -5709,7 +5709,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
             )
 
             plantio_finalizado_por_area = (
-                area_planejamento > Decimal("0")
+                item.get("inicializado_plantio")
+                and area_planejamento > Decimal("0")
                 and area_colheita >= area_planejamento
             )
 
@@ -5729,7 +5730,6 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 return "planejado", "Planejado"
 
             return "sem_planejamento", "Sem planejamento"
-        
     
         try:
             safra_filter = None
@@ -5850,6 +5850,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
 
                     # Necessários para calcular status "colhido" por área também no filters_index
                     "area_colheita",
+                    "area_planejamento_plantio",
                     "area_parcial",
                 )
                 .filter(
