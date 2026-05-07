@@ -100,6 +100,10 @@ class Command(BaseCommand):
         body_text = f"As agendas de {day_br} estão disponíveis para consulta."
 
         if dry_run:
+            self.stdout.write("===== DESTINATÁRIOS =====")
+            for director in directors:
+                self.stdout.write(f"{director.id} | {director.name} | {director.phone_e164}")
+
             self.stdout.write("===== TEMPLATE director_agenda_global_summary_action =====")
             self.stdout.write(f"body param resumo: {body_text}")
             self.stdout.write("quick_reply_payload: DIR:REFRESH")

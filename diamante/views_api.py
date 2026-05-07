@@ -5684,13 +5684,19 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 str(item["ciclo__ciclo"]).strip(),
             )
 
-            area = item.get("area_colheita") or Decimal("0")
+            area_colheita = item.get("area_colheita") or Decimal("0")
+            area_planejamento = item.get("area_planejamento_plantio") or Decimal("0")
             area_parcial = item.get("area_parcial") or Decimal("0")
 
             try:
-                area = Decimal(str(area))
+                area_colheita = Decimal(str(area_colheita))
             except Exception:
-                area = Decimal("0")
+                area_colheita = Decimal("0")
+
+            try:
+                area_planejamento = Decimal(str(area_planejamento))
+            except Exception:
+                area_planejamento = Decimal("0")
 
             try:
                 area_parcial = Decimal(str(area_parcial))
@@ -5698,8 +5704,13 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 area_parcial = Decimal("0")
 
             colheita_finalizada_por_area = (
-                area > Decimal("0")
-                and area_parcial >= area
+                area_colheita > Decimal("0")
+                and area_parcial >= area_colheita
+            )
+
+            plantio_finalizado_por_area = (
+                area_planejamento > Decimal("0")
+                and area_colheita >= area_planejamento
             )
 
             if item_pair in planning_pairs:
@@ -5708,7 +5719,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             if item.get("finalizado_colheita") or colheita_finalizada_por_area:
                 return "colhido", "Colhido"
 
-            if item.get("finalizado_plantio"):
+            if item.get("finalizado_plantio") or plantio_finalizado_por_area:
                 return "plantado", "Plantado"
 
             if item.get("inicializado_plantio"):
@@ -5718,7 +5729,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 return "planejado", "Planejado"
 
             return "sem_planejamento", "Sem planejamento"
-
+        
+    
         try:
             safra_filter = None
             ciclo_filter = None
@@ -6034,7 +6046,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     line_color = "#334155"
 
                 total_area += area
-                total_area_plantada += area if item["finalizado_plantio"] else Decimal("0")
+                total_area_plantada += area if status_key in ["plantado", "colhido"] else Decimal("0")
 
                 # Mantive como estava: soma a área parcial computada.
                 total_area_colhida += area_parcial if area_parcial else Decimal("0")
