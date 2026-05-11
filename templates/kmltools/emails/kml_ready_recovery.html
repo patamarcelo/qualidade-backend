@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+  <body style="margin:0;background:#f3f0ea;padding:0;font-family:Arial,Helvetica,sans-serif;color:#1f241f;">
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">
+      Your merged KML/KMZ result is ready. Open the map preview and unlock the final KML download.
+    </div>
+
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f3f0ea;padding:34px 14px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:660px;background:#ffffff;border-radius:28px;overflow:hidden;border:1px solid #e2ddd4;box-shadow:0 24px 70px rgba(42,36,28,0.13);">
+
+            {% if is_test %}
+            <tr>
+              <td style="background:#fff7d6;color:#8a5a00;padding:12px 26px;font-size:13px;font-weight:800;">
+                TEST EMAIL — sent only to the admin. This job was not marked as sent.
+              </td>
+            </tr>
+            {% endif %}
+
+            <tr>
+              <td style="padding:0;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:linear-gradient(135deg,#162019 0%,#294833 54%,#5b7f5f 100%);">
+                  <tr>
+                    <td style="padding:34px 30px 30px;">
+                      <div style="display:inline-block;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.20);color:#ffffff;border-radius:999px;padding:7px 12px;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;">
+                        KML Unifier
+                      </div>
+
+                      <h1 style="margin:18px 0 0;font-size:36px;line-height:1.02;letter-spacing:-0.055em;color:#ffffff;font-weight:900;">
+                        Your merged KML file is ready
+                      </h1>
+
+                      <p style="margin:14px 0 0;color:rgba(255,255,255,0.82);font-size:16px;line-height:1.58;max-width:540px;">
+                        We finished processing your KML/KMZ files. Open your result page to inspect the merged map preview and unlock the final KML download.
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:26px 30px 8px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f8f7f3;border:1px solid #ebe6dc;border-radius:22px;">
+                  <tr>
+                    <td style="padding:20px;">
+                      <div style="font-size:12px;color:#747064;font-weight:900;letter-spacing:.08em;text-transform:uppercase;margin-bottom:14px;">
+                        Result summary
+                      </div>
+
+                      <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                        <tr>
+                          <td style="padding:0 0 12px;">
+                            <span style="display:inline-block;background:#e9f5ec;color:#245b38;border:1px solid #d4eadb;border-radius:999px;padding:8px 12px;font-size:13px;font-weight:900;margin:0 6px 8px 0;">
+                              {{ total_files }} file{% if total_files != 1 %}s{% endif %} processed
+                            </span>
+
+                            {% if total_polygons %}
+                            <span style="display:inline-block;background:#eef1f4;color:#36414d;border:1px solid #dde3e8;border-radius:999px;padding:8px 12px;font-size:13px;font-weight:900;margin:0 6px 8px 0;">
+                              {{ total_polygons }} input polygon{% if total_polygons != 1 %}s{% endif %}
+                            </span>
+                            {% endif %}
+
+                            {% if output_polygons %}
+                            <span style="display:inline-block;background:#edf7f5;color:#235b55;border:1px solid #d8eeea;border-radius:999px;padding:8px 12px;font-size:13px;font-weight:900;margin:0 6px 8px 0;">
+                              {{ output_polygons }} output polygon{% if output_polygons != 1 %}s{% endif %}
+                            </span>
+                            {% endif %}
+                          </td>
+                        </tr>
+
+                        {% if input_filenames %}
+                        <tr>
+                          <td style="padding-top:12px;border-top:1px solid #ebe6dc;">
+                            <div style="font-size:13px;color:#747064;font-weight:800;margin-bottom:8px;">
+                              Uploaded files
+                            </div>
+
+                            {% for filename in input_filenames %}
+                            <div style="font-size:13px;color:#4d4a43;line-height:1.5;margin:3px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                              • {{ filename }}
+                            </div>
+                            {% endfor %}
+                          </td>
+                        </tr>
+                        {% endif %}
+                      </table>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:22px 30px 10px;">
+                <p style="margin:0;color:#3d4039;font-size:16px;line-height:1.65;">
+                  Your map preview is available now. The exact metrics and final KML export are protected until you unlock the result.
+                </p>
+
+                <div style="margin:26px 0 18px;">
+                  <a href="{{ result_url }}"
+                     style="display:inline-block;background:#213f2b;color:#ffffff;text-decoration:none;border-radius:16px;padding:15px 22px;font-size:15px;font-weight:900;box-shadow:0 14px 30px rgba(33,63,43,0.24);">
+                    Open result preview
+                  </a>
+                </div>
+
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top:18px;background:#f8f7f3;border:1px solid #ebe6dc;border-radius:18px;">
+                  <tr>
+                    <td style="padding:15px 16px;">
+                      <div style="font-size:14px;color:#242821;font-weight:900;margin-bottom:4px;">
+                        Need help finishing the download?
+                      </div>
+                      <div style="font-size:13px;color:#6f6b61;line-height:1.55;">
+                        Reply to this email and I’ll help you complete the unlock or check your result.
+                      </div>
+                    </td>
+                  </tr>
+                </table>
+
+                <p style="margin:18px 0 0;color:#8b8579;font-size:12px;line-height:1.5;">
+                  Button not working? Copy and paste this link:<br>
+                  <span style="color:#3f7a52;word-break:break-all;">{{ result_url }}</span>
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:18px 30px 24px;">
+                <div style="height:1px;background:#ebe6dc;margin-bottom:16px;"></div>
+                <div style="font-size:12px;color:#9a9488;line-height:1.5;">
+                  You are receiving this because you uploaded files to KML Unifier and your merge result was processed.
+                </div>
+              </td>
+            </tr>
+
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

@@ -398,6 +398,39 @@
     }
   }
 </style>
+<style>
+  .kml-admin-action-loading {
+    pointer-events: none !important;
+    opacity: .72 !important;
+    position: relative;
+    padding-left: 28px !important;
+  }
+
+  .kml-admin-action-loading::before {
+    content: "";
+    position: absolute;
+    left: 9px;
+    top: 50%;
+    width: 12px;
+    height: 12px;
+    margin-top: -6px;
+    border-radius: 999px;
+    border: 2px solid rgba(255,255,255,.45);
+    border-top-color: #fff;
+    animation: kmlAdminSpin .7s linear infinite;
+  }
+
+  .kml-admin-action-loading.kml-admin-action-light::before {
+    border-color: rgba(17,24,39,.22);
+    border-top-color: #111827;
+  }
+
+  @keyframes kmlAdminSpin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -846,5 +879,29 @@
   }
 });
 })();
+</script>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll('a[href*="send-ready-email"]').forEach(function (link) {
+      link.addEventListener("click", function () {
+        if (link.dataset.loading === "1") {
+          return false;
+        }
+
+        link.dataset.loading = "1";
+
+        const isTest = link.href.includes("send-ready-email-test");
+        link.dataset.originalText = link.textContent;
+
+        link.textContent = isTest ? "Sending test..." : "Sending...";
+
+        link.classList.add("kml-admin-action-loading");
+
+        if (isTest) {
+          link.classList.add("kml-admin-action-light");
+        }
+      });
+    });
+  });
 </script>
 {% endblock %}

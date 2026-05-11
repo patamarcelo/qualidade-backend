@@ -405,3 +405,9 @@ WHATSAPP_TEMPLATE_DIRECTOR_AGENDA_GLOBAL_SUMMARY_ACTION_ENABLED = True
 
 OPENAI_API_KEY = env("OPENAI_API_KEY", default="")
 WHATSAPP_GRAPH_VERSION = env("WHATSAPP_GRAPH_VERSION", default="v23.0")
+
+
+DEFAULT_FROM_EMAIL = "KML Unifier <team@kmlunifier.com>"
+KML_SUPPORT_EMAIL = "team@kmlunifier.com"
+KML_RESULT_URL_TEMPLATE = "https://kmlunifier.com/result/{job_id}?recover=1"
+APP_URL = "https://kmlunifier.com"

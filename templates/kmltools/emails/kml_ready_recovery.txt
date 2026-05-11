@@ -1,0 +1,20 @@
+{% if is_test %}[TEST EMAIL - not sent to the real user]
+
+{% endif %}Your merged KML file is ready
+
+We finished processing your KML/KMZ files.
+
+Open your result page to inspect the merged map preview and unlock the final KML download.
+
+Open result preview:
+{{ result_url }}
+
+{% if total_files %}Files processed: {{ total_files }}
+{% endif %}{% if total_polygons %}Input polygons: {{ total_polygons }}
+{% endif %}{% if output_polygons %}Output polygons: {{ output_polygons }}
+{% endif %}
+
+Need help finishing the download?
+Reply to this email and I’ll help you complete the unlock or check your result.
+
+KML Unifier

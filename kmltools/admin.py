@@ -21,6 +21,15 @@ from django.utils.safestring import mark_safe
 
 
 
+from django.contrib import messages
+from django.shortcuts import redirect
+from django.utils.http import url_has_allowed_host_and_scheme
+
+from .newservices.recovery_email import (
+    get_kml_recovery_block_reason,
+    send_kml_ready_recovery_email,
+)
+
 
 
 
@@ -309,6 +318,7 @@ class KMLMergeJobAdmin(admin.ModelAdmin):
         "plan_badge",
         "status_badge",
         "download_state",
+        "recovery_email_action",
         "merge_preview_button",
         "visitor_country_name",
         "visitor_ip",
@@ -366,6 +376,10 @@ class KMLMergeJobAdmin(admin.ModelAdmin):
         "download_count",
         "first_downloaded_at",
         "last_downloaded_at",
+        
+        "recovery_email_sent_at",
+        "recovery_email_sent_to",
+        "recovery_email_last_error",
     )
 
     ordering = ("-created_at",)
@@ -436,6 +450,10 @@ class KMLMergeJobAdmin(admin.ModelAdmin):
                     "storage_path",
                     "meta_storage_path",
                     "download_email_sent_at",
+                    
+                    "recovery_email_sent_at",
+                    "recovery_email_sent_to",
+                    "recovery_email_last_error",
 
                     "download_unlocked",
                     "download_unlocked_at",
@@ -726,9 +744,152 @@ class KMLMergeJobAdmin(admin.ModelAdmin):
                 self.admin_site.admin_view(self.merge_preview_json_view),
                 name="kmltools_kmlmergejob_merge_preview_json",
             ),
+            path(
+                "<path:object_id>/send-ready-email/",
+                self.admin_site.admin_view(self.send_ready_email_view),
+                name="kmltools_kmlmergejob_send_ready_email",
+            ),
+            path(
+                "<path:object_id>/send-ready-email-test/",
+                self.admin_site.admin_view(self.send_ready_email_test_view),
+                name="kmltools_kmlmergejob_send_ready_email_test",
+            ),
         ]
 
         return custom_urls + urls
+    
+
+    def recovery_email_action(self, obj):
+        if not obj.pk:
+            return "—"
+
+        if obj.status != getattr(KMLMergeJob, "STATUS_SUCCESS", "success"):
+            return format_html(
+                '<span style="background:#f3f4f6;color:#6b7280;padding:3px 8px;'
+                'border-radius:999px;font-weight:700;white-space:nowrap;">Not ready</span>'
+            )
+
+        test_url = reverse(
+            "admin:kmltools_kmlmergejob_send_ready_email_test",
+            args=[obj.pk],
+        )
+
+        if obj.recovery_email_sent_at:
+            sent_at = timezone.localtime(obj.recovery_email_sent_at).strftime("%d/%m/%y - %H:%M")
+
+            return format_html(
+                '<div style="display:flex;gap:6px;align-items:center;white-space:nowrap;">'
+                '<span style="background:#dcfce7;color:#166534;padding:3px 8px;'
+                'border-radius:999px;font-weight:800;">Sent {}</span>'
+                '<a href="{}" style="background:#f3f4f6;color:#111827;padding:4px 9px;'
+                'border-radius:999px;text-decoration:none;font-weight:800;">Test</a>'
+                '</div>',
+                sent_at,
+                test_url,
+            )
+
+        block_reason = get_kml_recovery_block_reason(obj)
+
+        if block_reason:
+            return format_html(
+                '<div style="display:flex;gap:6px;align-items:center;white-space:nowrap;">'
+                '<span title="{}" style="background:#fef3c7;color:#92400e;padding:3px 8px;'
+                'border-radius:999px;font-weight:800;">Blocked</span>'
+                '<a href="{}" style="background:#f3f4f6;color:#111827;padding:4px 9px;'
+                'border-radius:999px;text-decoration:none;font-weight:800;">Test</a>'
+                '</div>',
+                block_reason,
+                test_url,
+            )
+
+        send_url = reverse(
+            "admin:kmltools_kmlmergejob_send_ready_email",
+            args=[obj.pk],
+        )
+
+        return format_html(
+            '<div style="display:flex;gap:6px;align-items:center;white-space:nowrap;">'
+            '<a href="{}" style="background:#111827;color:#fff;padding:4px 10px;'
+            'border-radius:999px;text-decoration:none;font-weight:900;">Send ready</a>'
+            '<a href="{}" style="background:#f3f4f6;color:#111827;padding:4px 9px;'
+            'border-radius:999px;text-decoration:none;font-weight:800;">Test</a>'
+            '</div>',
+            send_url,
+            test_url,
+        )
+
+    recovery_email_action.short_description = "Ready email"
+
+    def _safe_admin_redirect(self, request):
+        fallback = reverse("admin:kmltools_kmlmergejob_changelist")
+        next_url = request.GET.get("next") or request.META.get("HTTP_REFERER") or fallback
+
+        if url_has_allowed_host_and_scheme(
+            next_url,
+            allowed_hosts={request.get_host()},
+            require_https=request.is_secure(),
+        ):
+            return redirect(next_url)
+
+        return redirect(fallback)
+
+    def send_ready_email_view(self, request, object_id):
+        obj = self.get_object(request, object_id)
+
+        if not obj:
+            messages.error(request, "Job não encontrado.")
+            return self._safe_admin_redirect(request)
+
+        result = send_kml_ready_recovery_email(
+            obj,
+            sent_by=request.user,
+        )
+
+        if result.get("ok"):
+            messages.success(
+                request,
+                f"Recovery email enviado para {result.get('to')}."
+            )
+        else:
+            messages.error(
+                request,
+                f"Recovery email não enviado: {result.get('reason') or 'erro desconhecido'}"
+            )
+
+        return self._safe_admin_redirect(request)
+
+    def send_ready_email_test_view(self, request, object_id):
+        obj = self.get_object(request, object_id)
+
+        if not obj:
+            messages.error(request, "Job não encontrado.")
+            return self._safe_admin_redirect(request)
+
+        test_to = (getattr(request.user, "email", "") or "").strip()
+
+        if not test_to:
+            messages.error(request, "Seu usuário admin não tem e-mail para teste.")
+            return self._safe_admin_redirect(request)
+
+        result = send_kml_ready_recovery_email(
+            obj,
+            sent_by=request.user,
+            test_to_email=test_to,
+            mark_as_sent=False,
+        )
+
+        if result.get("ok"):
+            messages.success(
+                request,
+                f"Teste enviado para {test_to}. O job não foi marcado como enviado."
+            )
+        else:
+            messages.error(
+                request,
+                f"Teste não enviado: {result.get('reason') or 'erro desconhecido'}"
+            )
+
+        return self._safe_admin_redirect(request)
 
     def merge_preview_button(self, obj):
         if not obj.pk:

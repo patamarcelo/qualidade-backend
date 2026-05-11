@@ -258,6 +258,11 @@ class KMLMergeJob(models.Model):
 
     # Auditoria (opcional, mas recomendo)
     download_email_sent_at = models.DateTimeField(blank=True, null=True)
+    
+    # Recuperação manual: merge pronto, mas usuário não finalizou download
+    recovery_email_sent_at = models.DateTimeField(blank=True, null=True)
+    recovery_email_sent_to = models.EmailField(blank=True, default="")
+    recovery_email_last_error = models.TextField(blank=True, default="")
 
     # Controle real de liberação/download
     download_unlocked = models.BooleanField(default=False, db_index=True)

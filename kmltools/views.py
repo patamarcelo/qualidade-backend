@@ -4193,23 +4193,76 @@ class KMLJobStatusView(APIView):
         anon_id = (request.headers.get("X-ANON-ID") or "").strip() or None
         user = request.user if getattr(request.user, "is_authenticated", False) else None
 
-        qs = KMLMergeJob.objects.filter(id=job_id)
+        is_recovery = (request.query_params.get("recover") or "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+        )
 
-        if user:
-            qs = qs.filter(Q(user=user) | (Q(anon_id=anon_id) if anon_id else Q(pk=None)))
-        else:
-            if not anon_id:
-                raise NotFound("Not found.")
-            qs = qs.filter(anon_id=anon_id)
+        job = KMLMergeJob.objects.filter(id=job_id).first()
 
-        job = qs.first()
         if not job:
             raise NotFound("Not found.")
+
+        # ------------------------------------------------------------
+        # ACCESS RULES
+        # ------------------------------------------------------------
+        #
+        # Fluxo normal:
+        # - usuário logado acessa se job.user == request.user
+        # - ou se o anon_id do navegador é o mesmo do job
+        #
+        # Fluxo recovery:
+        # - se deslogado e job tem user vinculado, retorna 401 claro
+        #   para o front abrir login e tentar de novo depois.
+        #
+        # Importante:
+        # - Não abrimos preview público só por UUID.
+        # - Não quebramos o fluxo antigo, porque anon_id continua funcionando.
+        # ------------------------------------------------------------
+
+        if user:
+            can_access = False
+
+            if job.user_id and job.user_id == user.id:
+                can_access = True
+
+            if anon_id and job.anon_id and job.anon_id == anon_id:
+                can_access = True
+
+            # Se o job foi criado anônimo e o mesmo navegador agora está logado,
+            # vincula ao usuário automaticamente.
+            if can_access and job.user_id is None:
+                job.user = user
+                job.save(update_fields=["user"])
+
+            if not can_access:
+                raise NotFound("Not found.")
+
+        else:
+            # Recovery por e-mail: se o job já pertence a um usuário,
+            # peça login em vez de responder 404 genérico.
+            if is_recovery and job.user_id:
+                return Response(
+                    {
+                        "detail": "Sign in to open this result.",
+                        "code": "AUTH_REQUIRED_FOR_RECOVERY",
+                        "job_id": str(job.id),
+                        "status": job.status,
+                    },
+                    status=status.HTTP_401_UNAUTHORIZED,
+                )
+
+            # Fluxo anônimo antigo: mantém exatamente a regra por anon_id.
+            if not anon_id or not job.anon_id or job.anon_id != anon_id:
+                raise NotFound("Not found.")
 
         try:
             url = default_storage.url(job.storage_path) if job.storage_path else None
         except Exception:
             url = None
+
+        metrics = job.metrics or {}
 
         return Response(
             {
@@ -4218,7 +4271,7 @@ class KMLJobStatusView(APIView):
                 "request_id": job.request_id,
                 "status": job.status,
                 "plan": job.plan,
-                "created_at": job.created_at.isoformat(),
+                "created_at": job.created_at.isoformat() if job.created_at else None,
 
                 "total_files": job.total_files,
                 "total_polygons": job.total_polygons,
@@ -4232,31 +4285,54 @@ class KMLJobStatusView(APIView):
                 "output_area_m2": job.output_area_m2,
                 "output_area_ha": job.output_area_ha,
 
-                "geometry_type": (job.metrics or {}).get("geometry_type"),
-                "line_merge_mode": (job.metrics or {}).get("merge_mode"),
-                "input_lines": (job.metrics or {}).get("input_lines"),
-                "output_lines": (job.metrics or {}).get("output_lines"),
-                "bridges_created": (job.metrics or {}).get("bridges_created"),
-                "input_length_m": (job.metrics or {}).get("input_length_m"),
-                "input_length_km": (job.metrics or {}).get("input_length_km"),
-                "output_length_m": (job.metrics or {}).get("output_length_m"),
-                "output_length_km": (job.metrics or {}).get("output_length_km"),
-                "total_cad_lines": (job.metrics or {}).get("total_cad_lines", 0),
-                "bridge_reports": (job.metrics or {}).get("bridge_reports", []),
+                # Linhas / CAD
+                "geometry_type": metrics.get("geometry_type"),
+                "line_merge_mode": metrics.get("merge_mode"),
+                "input_lines": metrics.get("input_lines"),
+                "output_lines": metrics.get("output_lines"),
+                "bridges_created": metrics.get("bridges_created"),
+                "input_length_m": metrics.get("input_length_m"),
+                "input_length_km": metrics.get("input_length_km"),
+                "output_length_m": metrics.get("output_length_m"),
+                "output_length_km": metrics.get("output_length_km"),
+                "total_cad_lines": metrics.get("total_cad_lines", 0),
+                "bridge_reports": metrics.get("bridge_reports", []),
 
+                # Download
                 "download_url": url,
                 "download_available": bool(url),
+
+                # Arquivos
                 "input_filenames": job.input_filenames,
 
-                "preview_geojson": (job.metrics or {}).get("preview_geojson"),
-                "input_preview_geojson": (job.metrics or {}).get("input_preview_geojson"),
-                "files_report": (job.metrics or {}).get("files_report", []),
-                "total_markers": (job.metrics or {}).get("total_markers", 0),
-                "error_message": getattr(job, "error_message", None) or (job.metrics or {}).get("error_message"),
+                # Preview do mapa
+                "preview_geojson": metrics.get("preview_geojson"),
+                "input_preview_geojson": metrics.get("input_preview_geojson"),
+
+                # Debug/relatórios
+                "files_report": metrics.get("files_report", []),
+                "total_markers": metrics.get("total_markers", 0),
+                "error_message": getattr(job, "error_message", None) or metrics.get("error_message"),
+
+                # Estado de liberação/download
+                "download_unlocked": bool(getattr(job, "download_unlocked", False)),
+                "download_unlock_source": getattr(job, "download_unlock_source", "") or "",
+                "download_credit_consumed": bool(getattr(job, "download_credit_consumed", False)),
+                "download_count": int(getattr(job, "download_count", 0) or 0),
+                "first_downloaded_at": (
+                    job.first_downloaded_at.isoformat()
+                    if getattr(job, "first_downloaded_at", None)
+                    else None
+                ),
+                "last_downloaded_at": (
+                    job.last_downloaded_at.isoformat()
+                    if getattr(job, "last_downloaded_at", None)
+                    else None
+                ),
             },
             status=status.HTTP_200_OK,
         )
-    
+        
     
 from decimal import Decimal
 
