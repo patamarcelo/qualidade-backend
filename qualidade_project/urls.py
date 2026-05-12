@@ -37,6 +37,7 @@ urlpatterns = [
     path("aviacao/", include("aviacao.urls")),
     path("kmltools/", include("kmltools.urls")),
     path("opscheckin/", include("opscheckin.urls")),
+    path("maquinario/", include("maquinario.urls")),
 ]
 
 urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

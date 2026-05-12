@@ -1,0 +1,395 @@
+from decimal import Decimal
+
+from django.db import models
+from django.utils import timezone
+
+
+class Machine(models.Model):
+    class MachineType(models.TextChoices):
+        TRACTOR = "tractor", "Trator"
+        SPRAYER = "sprayer", "Pulverizador"
+        HARVESTER = "harvester", "Colheitadeira"
+        OTHER = "other", "Outro"
+
+    class Status(models.TextChoices):
+        OPERATION = "operation", "Em operação"
+        MAINTENANCE = "maintenance", "Manutenção"
+        REVISION = "revision", "Revisão"
+        INACTIVE = "inactive", "Inativo"
+
+    fazenda = models.ForeignKey(
+        "diamante.Fazenda",
+        on_delete=models.PROTECT,
+        related_name="machines",
+    )
+
+    identifier = models.CharField(
+        "Identificador",
+        max_length=80,
+        help_text="Código interno da máquina. Ex: TR23, 11-0038.",
+    )
+
+    chassis = models.CharField(
+        "Chassi",
+        max_length=120,
+        blank=True,
+        null=True,
+    )
+
+    description = models.CharField(
+        "Descrição",
+        max_length=180,
+    )
+
+    machine_type = models.CharField(
+        "Tipo",
+        max_length=30,
+        choices=MachineType.choices,
+        default=MachineType.TRACTOR,
+    )
+
+    brand = models.CharField(
+        "Marca",
+        max_length=80,
+        blank=True,
+        null=True,
+    )
+
+    model_name = models.CharField(
+        "Modelo",
+        max_length=80,
+        blank=True,
+        null=True,
+    )
+
+    status = models.CharField(
+        "Status",
+        max_length=30,
+        choices=Status.choices,
+        default=Status.OPERATION,
+    )
+
+    current_hourmeter = models.DecimalField(
+        "Horímetro atual",
+        max_digits=10,
+        decimal_places=1,
+        default=Decimal("0.0"),
+    )
+
+    last_hourmeter_at = models.DateTimeField(
+        "Última leitura do horímetro",
+        blank=True,
+        null=True,
+    )
+
+    last_revision_hourmeter = models.DecimalField(
+        "Horímetro da última revisão",
+        max_digits=10,
+        decimal_places=1,
+        blank=True,
+        null=True,
+    )
+
+    next_revision_hourmeter = models.DecimalField(
+        "Horímetro da próxima revisão",
+        max_digits=10,
+        decimal_places=1,
+        blank=True,
+        null=True,
+    )
+
+    revision_interval_hours = models.DecimalField(
+        "Intervalo padrão entre revisões",
+        max_digits=8,
+        decimal_places=1,
+        default=Decimal("250.0"),
+        help_text="Ex: revisão a cada 250 horas.",
+    )
+
+    average_hours_per_day = models.DecimalField(
+        "Média de horas por dia",
+        max_digits=8,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        help_text="Usado para estimar quantos dias faltam até a próxima revisão.",
+    )
+
+    location_text = models.CharField(
+        "Localidade original",
+        max_length=180,
+        blank=True,
+        null=True,
+    )
+
+    is_active = models.BooleanField(
+        "Ativa",
+        default=True,
+    )
+
+    created_at = models.DateTimeField(
+        "Criado em",
+        auto_now_add=True,
+    )
+
+    updated_at = models.DateTimeField(
+        "Atualizado em",
+        auto_now=True,
+    )
+
+    class Meta:
+        verbose_name = "Máquina"
+        verbose_name_plural = "Máquinas"
+        ordering = ["identifier"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["fazenda", "identifier"],
+                name="unique_machine_identifier_per_farm",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.identifier} - {self.description}"
+
+    @property
+    def hours_to_next_revision(self):
+        if self.next_revision_hourmeter is None:
+            return None
+
+        remaining = self.next_revision_hourmeter - self.current_hourmeter
+        return max(remaining, Decimal("0.0"))
+
+    @property
+    def estimated_days_to_next_revision(self):
+        if self.hours_to_next_revision is None:
+            return None
+
+        if not self.average_hours_per_day or self.average_hours_per_day <= 0:
+            return None
+
+        return int((self.hours_to_next_revision / self.average_hours_per_day).to_integral_value(rounding="ROUND_CEILING"))
+
+    @property
+    def revision_progress_percent(self):
+        if self.last_revision_hourmeter is None or self.next_revision_hourmeter is None:
+            return None
+
+        total_range = self.next_revision_hourmeter - self.last_revision_hourmeter
+        if total_range <= 0:
+            return None
+
+        used = self.current_hourmeter - self.last_revision_hourmeter
+        percent = (used / total_range) * Decimal("100")
+
+        if percent < 0:
+            return 0
+
+        if percent > 100:
+            return 100
+
+        return int(percent)
+
+
+class HourmeterReading(models.Model):
+    class Source(models.TextChoices):
+        MANUAL = "manual", "Manual"
+        API = "api", "API"
+        IMPORT = "import", "Importação"
+        APP = "app", "Aplicativo"
+
+    machine = models.ForeignKey(
+        Machine,
+        on_delete=models.CASCADE,
+        related_name="hourmeter_readings",
+    )
+
+    value = models.DecimalField(
+        "Horímetro",
+        max_digits=10,
+        decimal_places=1,
+    )
+
+    measured_at = models.DateTimeField(
+        "Data da leitura",
+        default=timezone.now,
+    )
+
+    source = models.CharField(
+        "Origem",
+        max_length=30,
+        choices=Source.choices,
+        default=Source.MANUAL,
+    )
+
+    notes = models.TextField(
+        "Observações",
+        blank=True,
+        null=True,
+    )
+
+    created_at = models.DateTimeField(
+        "Criado em",
+        auto_now_add=True,
+    )
+
+    class Meta:
+        verbose_name = "Leitura de horímetro"
+        verbose_name_plural = "Leituras de horímetro"
+        ordering = ["-measured_at", "-id"]
+        indexes = [
+            models.Index(fields=["machine", "-measured_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.machine.identifier} - {self.value}h"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+
+        machine = self.machine
+
+        should_update_machine = (
+            machine.last_hourmeter_at is None
+            or self.measured_at >= machine.last_hourmeter_at
+        )
+
+        if should_update_machine:
+            machine.current_hourmeter = self.value
+            machine.last_hourmeter_at = self.measured_at
+            machine.save(
+                update_fields=[
+                    "current_hourmeter",
+                    "last_hourmeter_at",
+                    "updated_at",
+                ]
+            )
+
+
+class MaintenanceRecord(models.Model):
+    class MaintenanceType(models.TextChoices):
+        REVISION = "revision", "Revisão"
+        CORRECTIVE = "corrective", "Corretiva"
+        PREVENTIVE = "preventive", "Preventiva"
+        OTHER = "other", "Outra"
+
+    machine = models.ForeignKey(
+        Machine,
+        on_delete=models.CASCADE,
+        related_name="maintenance_records",
+    )
+
+    maintenance_type = models.CharField(
+        "Tipo",
+        max_length=30,
+        choices=MaintenanceType.choices,
+        default=MaintenanceType.REVISION,
+    )
+
+    performed_at = models.DateTimeField(
+        "Realizada em",
+        default=timezone.now,
+    )
+
+    hourmeter = models.DecimalField(
+        "Horímetro da revisão",
+        max_digits=10,
+        decimal_places=1,
+    )
+
+    description = models.TextField(
+        "Descrição",
+        blank=True,
+        null=True,
+    )
+
+    next_revision_hourmeter = models.DecimalField(
+        "Próxima revisão no horímetro",
+        max_digits=10,
+        decimal_places=1,
+        blank=True,
+        null=True,
+    )
+
+    created_at = models.DateTimeField(
+        "Criado em",
+        auto_now_add=True,
+    )
+
+    class Meta:
+        verbose_name = "Manutenção/Revisão"
+        verbose_name_plural = "Manutenções/Revisões"
+        ordering = ["-performed_at", "-id"]
+
+    def __str__(self):
+        return f"{self.machine.identifier} - {self.get_maintenance_type_display()}"
+
+    def save(self, *args, **kwargs):
+        if self.next_revision_hourmeter is None:
+            self.next_revision_hourmeter = self.hourmeter + self.machine.revision_interval_hours
+
+        super().save(*args, **kwargs)
+
+        machine = self.machine
+        machine.last_revision_hourmeter = self.hourmeter
+        machine.next_revision_hourmeter = self.next_revision_hourmeter
+        machine.status = Machine.Status.OPERATION
+        machine.save(
+            update_fields=[
+                "last_revision_hourmeter",
+                "next_revision_hourmeter",
+                "status",
+                "updated_at",
+            ]
+        )
+
+
+class MachineAlertRule(models.Model):
+    machine = models.ForeignKey(
+        Machine,
+        on_delete=models.CASCADE,
+        related_name="alert_rules",
+    )
+
+    managers = models.ManyToManyField(
+        "opscheckin.Manager",
+        blank=True,
+        related_name="machine_alert_rules",
+    )
+
+    enabled = models.BooleanField(
+        "Ativa",
+        default=True,
+    )
+
+    hours_before = models.DecimalField(
+        "Alertar faltando quantas horas",
+        max_digits=8,
+        decimal_places=1,
+        default=Decimal("30.0"),
+    )
+
+    days_before = models.PositiveIntegerField(
+        "Alertar faltando quantos dias",
+        default=7,
+    )
+
+    notify_when_overdue = models.BooleanField(
+        "Avisar quando vencida",
+        default=True,
+    )
+
+    created_at = models.DateTimeField(
+        "Criado em",
+        auto_now_add=True,
+    )
+
+    updated_at = models.DateTimeField(
+        "Atualizado em",
+        auto_now=True,
+    )
+
+    class Meta:
+        verbose_name = "Regra de alerta"
+        verbose_name_plural = "Regras de alerta"
+
+    def __str__(self):
+        return f"Alerta - {self.machine.identifier}"

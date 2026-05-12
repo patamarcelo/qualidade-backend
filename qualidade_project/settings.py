@@ -89,7 +89,8 @@ INSTALLED_APPS = [
     "aviacao",
     "anymail",
     "kmltools",
-    "opscheckin"
+    "opscheckin",
+    "maquinario"
 ]
 
 MIDDLEWARE = [
