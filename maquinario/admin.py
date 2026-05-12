@@ -37,7 +37,19 @@ def export_machines_excel(modeladmin, request, queryset):
     ws = wb.active
     ws.title = "Máquinas"
 
-    headers = [
+    machines = queryset.select_related("fazenda").prefetch_related(
+        "maintenance_records",
+        "maintenance_records__maintenance_plan",
+    )
+
+    plans = (
+        MaintenancePlan.objects
+        .filter(is_active=True)
+        .prefetch_related("farms")
+        .order_by("interval_hours", "name")
+    )
+
+    base_headers = [
         "ID",
         "Fazenda",
         "Identificador",
@@ -47,18 +59,48 @@ def export_machines_excel(modeladmin, request, queryset):
         "Status",
         "Horímetro atual",
         "Última leitura",
-        "Última revisão",
-        "Próxima revisão",
-        "Horas restantes",
-        "Dias estimados",
-        "Progresso revisão (%)",
+        "Plano mais próximo",
+        "Próxima revisão geral",
+        "Horas restantes geral",
+        "Dias estimados geral",
         "Ativa",
     ]
 
-    ws.append(headers)
+    plan_headers = []
 
-    for machine in queryset.select_related("fazenda"):
-        ws.append([
+    for plan in plans:
+        label = f"{plan.name} ({plan.interval_hours}h)"
+        plan_headers.extend([
+            f"Última - {label}",
+            f"Data última - {label}",
+            f"Próxima - {label}",
+            f"Faltam h - {label}",
+            f"Vencida - {label}",
+        ])
+
+    ws.append(base_headers + plan_headers)
+
+    for machine in machines:
+        next_due = machine.get_next_due_maintenance_item()
+
+        if next_due:
+            next_due_plan_name = next_due.get("plan_name") or ""
+            next_due_hourmeter = next_due.get("next_revision_hourmeter")
+            next_due_hours = next_due.get("hours_to_next_revision")
+        else:
+            next_due_plan_name = ""
+            next_due_hourmeter = None
+            next_due_hours = None
+
+        days_to_next = ""
+
+        if next_due_hours is not None and machine.average_hours_per_day and machine.average_hours_per_day > 0:
+            days_to_next = int(
+                (next_due_hours / machine.average_hours_per_day)
+                .to_integral_value(rounding="ROUND_CEILING")
+            )
+
+        row = [
             machine.id,
             str(machine.fazenda),
             machine.identifier,
@@ -68,13 +110,41 @@ def export_machines_excel(modeladmin, request, queryset):
             machine.get_status_display(),
             float(machine.current_hourmeter or 0),
             machine.last_hourmeter_at.strftime("%d/%m/%Y %H:%M") if machine.last_hourmeter_at else "",
-            float(machine.last_revision_hourmeter or 0) if machine.last_revision_hourmeter is not None else "",
-            float(machine.next_revision_hourmeter or 0) if machine.next_revision_hourmeter is not None else "",
-            float(machine.hours_to_next_revision or 0) if machine.hours_to_next_revision is not None else "",
-            machine.estimated_days_to_next_revision or "",
-            machine.revision_progress_percent or "",
+            next_due_plan_name,
+            float(next_due_hourmeter) if next_due_hourmeter is not None else "",
+            float(next_due_hours) if next_due_hours is not None else "",
+            days_to_next,
             "Sim" if machine.is_active else "Não",
-        ])
+        ]
+
+        summary = machine.get_maintenance_summary()
+        summary_by_plan_id = {
+            item["plan_id"]: item
+            for item in summary
+        }
+
+        for plan in plans:
+            item = summary_by_plan_id.get(plan.id)
+
+            if not item:
+                row.extend(["", "", "", "", ""])
+                continue
+
+            last_revision_hourmeter = item.get("last_revision_hourmeter")
+            last_revision_at = item.get("last_revision_at")
+            next_revision_hourmeter = item.get("next_revision_hourmeter")
+            hours_to_next_revision = item.get("hours_to_next_revision")
+            is_due = item.get("is_due")
+
+            row.extend([
+                float(last_revision_hourmeter) if last_revision_hourmeter is not None else "",
+                last_revision_at.strftime("%d/%m/%Y %H:%M") if last_revision_at else "",
+                float(next_revision_hourmeter) if next_revision_hourmeter is not None else "",
+                float(hours_to_next_revision) if hours_to_next_revision is not None else "",
+                "Sim" if is_due else "Não",
+            ])
+
+        ws.append(row)
 
     for column_cells in ws.columns:
         max_length = 0
@@ -96,7 +166,6 @@ def export_machines_excel(modeladmin, request, queryset):
     return response
 
 
-
 class HourmeterReadingInline(admin.TabularInline):
     model = HourmeterReading
     extra = 0
@@ -113,11 +182,18 @@ class MaintenanceRecordInline(admin.TabularInline):
     model = MaintenanceRecord
     extra = 0
     fields = [
+        "maintenance_plan",
         "maintenance_type",
         "performed_at",
         "hourmeter",
         "next_revision_hourmeter",
         "description",
+    ]
+    readonly_fields = [
+        "next_revision_hourmeter",
+    ]
+    autocomplete_fields = [
+        "maintenance_plan",
     ]
 
 
@@ -131,7 +207,7 @@ class MachineAdmin(admin.ModelAdmin):
         "machine_type",
         "status",
         "current_hourmeter",
-        "next_revision_hourmeter",
+        "next_due_plan_display",
         "hours_to_next_revision_display",
         "estimated_days_to_next_revision_display",
         "is_active",
@@ -155,6 +231,7 @@ class MachineAdmin(admin.ModelAdmin):
     readonly_fields = [
         "created_at",
         "updated_at",
+        "next_due_plan_display",
         "hours_to_next_revision_display",
         "estimated_days_to_next_revision_display",
         "revision_progress_percent_display",
@@ -187,6 +264,7 @@ class MachineAdmin(admin.ModelAdmin):
                 "next_revision_hourmeter",
                 "revision_interval_hours",
                 "average_hours_per_day",
+                "next_due_plan_display",
                 "hours_to_next_revision_display",
                 "estimated_days_to_next_revision_display",
                 "revision_progress_percent_display",
@@ -206,6 +284,11 @@ class MachineAdmin(admin.ModelAdmin):
     ]
 
     def hours_to_next_revision_display(self, obj):
+        next_due = obj.get_next_due_maintenance_item()
+
+        if next_due and next_due.get("hours_to_next_revision") is not None:
+            return f'{next_due["hours_to_next_revision"]} h'
+
         value = obj.hours_to_next_revision
         if value is None:
             return "-"
@@ -214,7 +297,20 @@ class MachineAdmin(admin.ModelAdmin):
 
     hours_to_next_revision_display.short_description = "Horas até próxima revisão"
 
+
     def estimated_days_to_next_revision_display(self, obj):
+        next_due = obj.get_next_due_maintenance_item()
+
+        if next_due and next_due.get("hours_to_next_revision") is not None:
+            hours_to_next = next_due["hours_to_next_revision"]
+
+            if obj.average_hours_per_day and obj.average_hours_per_day > 0:
+                days = int(
+                    (hours_to_next / obj.average_hours_per_day)
+                    .to_integral_value(rounding="ROUND_CEILING")
+                )
+                return f"{days} dias"
+
         value = obj.estimated_days_to_next_revision
         if value is None:
             return "-"
@@ -222,6 +318,7 @@ class MachineAdmin(admin.ModelAdmin):
         return f"{value} dias"
 
     estimated_days_to_next_revision_display.short_description = "Dias estimados até revisão"
+
 
     def revision_progress_percent_display(self, obj):
         value = obj.revision_progress_percent
@@ -231,6 +328,24 @@ class MachineAdmin(admin.ModelAdmin):
         return f"{value}%"
 
     revision_progress_percent_display.short_description = "Progresso da revisão"
+    
+    
+    def next_due_plan_display(self, obj):
+        next_due = obj.get_next_due_maintenance_item()
+
+        if not next_due:
+            return "-"
+
+        plan_name = next_due.get("plan_name") or "-"
+        next_hourmeter = next_due.get("next_revision_hourmeter")
+        hours_to_next = next_due.get("hours_to_next_revision")
+
+        if next_hourmeter is None:
+            return plan_name
+
+        return f"{plan_name} em {next_hourmeter}h | faltam {hours_to_next}h"
+
+    next_due_plan_display.short_description = "Próxima manutenção"
 
 
 @admin.register(HourmeterReading)
@@ -273,6 +388,7 @@ class MaintenanceRecordAdmin(admin.ModelAdmin):
 
     list_filter = [
         "maintenance_type",
+        "maintenance_plan",
         "machine__fazenda",
         "performed_at",
     ]
@@ -280,13 +396,14 @@ class MaintenanceRecordAdmin(admin.ModelAdmin):
     search_fields = [
         "machine__identifier",
         "machine__description",
+        "maintenance_plan__name",
         "description",
     ]
 
     autocomplete_fields = [
         "machine",
+        "maintenance_plan",
     ]
-
 
 @admin.register(MachineAlertRule)
 class MachineAlertRuleAdmin(admin.ModelAdmin):

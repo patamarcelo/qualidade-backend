@@ -158,24 +158,36 @@ class MachineViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        if hourmeter_decimal < 0:
+            return Response(
+                {"error": "Horímetro não pode ser negativo."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         maintenance_plan = None
 
         if maintenance_plan_id:
-            maintenance_plan = MaintenancePlan.objects.filter(
-            id=maintenance_plan_id,
-            farms=machine.fazenda,
-            is_active=True,
-        ).first()
-
-        if maintenance_plan and machine.machine_type not in (maintenance_plan.machine_types or []):
-            return Response(
-                {"error": "Plano de manutenção não se aplica ao tipo dessa máquina."},
-                status=status.HTTP_400_BAD_REQUEST,
+            maintenance_plan = (
+                MaintenancePlan.objects
+                .filter(
+                    id=maintenance_plan_id,
+                    farms=machine.fazenda,
+                    is_active=True,
+                )
+                .first()
             )
 
             if not maintenance_plan:
                 return Response(
                     {"error": "Plano de manutenção não encontrado para essa fazenda."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            selected_machine_types = maintenance_plan.machine_types or []
+
+            if selected_machine_types and machine.machine_type not in selected_machine_types:
+                return Response(
+                    {"error": "Plano de manutenção não se aplica ao tipo dessa máquina."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
@@ -201,7 +213,7 @@ class MachineViewSet(viewsets.ModelViewSet):
             },
         })
         
-        
+            
     @action(detail=False, methods=["post"])
     def export_excel(self, request):
         fazenda_id = request.data.get("fazenda_id")
@@ -229,38 +241,125 @@ class MachineViewSet(viewsets.ModelViewSet):
                 | Q(model_name__icontains=search)
             )
 
+        machines = queryset.order_by("identifier").prefetch_related(
+            "maintenance_records",
+            "maintenance_records__maintenance_plan",
+        )
+
+        plans = (
+            MaintenancePlan.objects
+            .filter(is_active=True)
+            .prefetch_related("farms")
+            .order_by("interval_hours", "name")
+        )
+
+        if fazenda_id:
+            plans = plans.filter(farms__id=fazenda_id).distinct()
+
         wb = Workbook()
         ws = wb.active
         ws.title = "Máquinas"
 
-        ws.append([
+        base_headers = [
             "Identificador",
             "Descrição",
             "Chassi",
             "Tipo",
             "Status",
             "Horímetro atual",
-            "Última revisão",
-            "Próxima revisão",
-            "Horas restantes",
-            "Dias estimados",
-            "Progresso revisão (%)",
-        ])
+            "Última leitura",
+            "Plano mais próximo",
+            "Próxima revisão geral",
+            "Horas restantes geral",
+            "Dias estimados geral",
+        ]
 
-        for machine in queryset.order_by("identifier"):
-            ws.append([
+        plan_headers = []
+
+        for plan in plans:
+            label = f"{plan.name} ({plan.interval_hours}h)"
+            plan_headers.extend([
+                f"Última - {label}",
+                f"Data última - {label}",
+                f"Próxima - {label}",
+                f"Faltam h - {label}",
+                f"Vencida - {label}",
+            ])
+
+        ws.append(base_headers + plan_headers)
+
+        for machine in machines:
+            next_due = machine.get_next_due_maintenance_item()
+
+            if next_due:
+                next_due_plan_name = next_due.get("plan_name") or ""
+                next_due_hourmeter = next_due.get("next_revision_hourmeter")
+                next_due_hours = next_due.get("hours_to_next_revision")
+            else:
+                next_due_plan_name = ""
+                next_due_hourmeter = None
+                next_due_hours = None
+
+            days_to_next = ""
+
+            if next_due_hours is not None and machine.average_hours_per_day and machine.average_hours_per_day > 0:
+                days_to_next = int(
+                    (next_due_hours / machine.average_hours_per_day)
+                    .to_integral_value(rounding="ROUND_CEILING")
+                )
+
+            row = [
                 machine.identifier,
                 machine.description,
                 machine.chassis or "",
                 machine.get_machine_type_display(),
                 machine.get_status_display(),
                 float(machine.current_hourmeter or 0),
-                float(machine.last_revision_hourmeter or 0) if machine.last_revision_hourmeter is not None else "",
-                float(machine.next_revision_hourmeter or 0) if machine.next_revision_hourmeter is not None else "",
-                float(machine.hours_to_next_revision or 0) if machine.hours_to_next_revision is not None else "",
-                machine.estimated_days_to_next_revision or "",
-                machine.revision_progress_percent or "",
-            ])
+                machine.last_hourmeter_at.strftime("%d/%m/%Y %H:%M") if machine.last_hourmeter_at else "",
+                next_due_plan_name,
+                float(next_due_hourmeter) if next_due_hourmeter is not None else "",
+                float(next_due_hours) if next_due_hours is not None else "",
+                days_to_next,
+            ]
+
+            summary = machine.get_maintenance_summary()
+            summary_by_plan_id = {
+                item["plan_id"]: item
+                for item in summary
+            }
+
+            for plan in plans:
+                item = summary_by_plan_id.get(plan.id)
+
+                if not item:
+                    row.extend(["", "", "", "", ""])
+                    continue
+
+                last_revision_hourmeter = item.get("last_revision_hourmeter")
+                last_revision_at = item.get("last_revision_at")
+                next_revision_hourmeter = item.get("next_revision_hourmeter")
+                hours_to_next_revision = item.get("hours_to_next_revision")
+                is_due = item.get("is_due")
+
+                row.extend([
+                    float(last_revision_hourmeter) if last_revision_hourmeter is not None else "",
+                    last_revision_at.strftime("%d/%m/%Y %H:%M") if last_revision_at else "",
+                    float(next_revision_hourmeter) if next_revision_hourmeter is not None else "",
+                    float(hours_to_next_revision) if hours_to_next_revision is not None else "",
+                    "Sim" if is_due else "Não",
+                ])
+
+            ws.append(row)
+
+        for column_cells in ws.columns:
+            max_length = 0
+            column_letter = column_cells[0].column_letter
+
+            for cell in column_cells:
+                value = str(cell.value or "")
+                max_length = max(max_length, len(value))
+
+            ws.column_dimensions[column_letter].width = min(max_length + 2, 42)
 
         response = HttpResponse(
             content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -378,6 +477,49 @@ class MachineViewSet(viewsets.ModelViewSet):
 
         serializer = MaintenanceRecordSerializer(records, many=True)
         return Response(serializer.data)
+    
+    @action(detail=True, methods=["get"])
+    def maintenance_summary(self, request, pk=None):
+        machine = self.get_object()
+
+        summary = machine.get_maintenance_summary()
+
+        data = []
+
+        for item in summary:
+            data.append({
+                "plan_id": item["plan_id"],
+                "plan_name": item["plan_name"],
+                "interval_hours": float(item["interval_hours"]),
+                "last_record_id": item["last_record_id"],
+                "last_revision_hourmeter": (
+                    float(item["last_revision_hourmeter"])
+                    if item["last_revision_hourmeter"] is not None
+                    else None
+                ),
+                "last_revision_at": item["last_revision_at"],
+                "next_revision_hourmeter": (
+                    float(item["next_revision_hourmeter"])
+                    if item["next_revision_hourmeter"] is not None
+                    else None
+                ),
+                "hours_to_next_revision": (
+                    float(item["hours_to_next_revision"])
+                    if item["hours_to_next_revision"] is not None
+                    else None
+                ),
+                "is_due": item["is_due"],
+            })
+
+        return Response({
+            "machine": {
+                "id": machine.id,
+                "identifier": machine.identifier,
+                "description": machine.description,
+                "current_hourmeter": float(machine.current_hourmeter or 0),
+            },
+            "summary": data,
+        })
 
 
 class HourmeterReadingViewSet(viewsets.ModelViewSet):
@@ -464,13 +606,20 @@ class MaintenancePlanViewSet(viewsets.ModelViewSet):
         if fazenda_id:
             queryset = queryset.filter(farms__id=fazenda_id)
 
-        if machine_type:
-            queryset = queryset.filter(
-                Q(machine_types__contains=[machine_type]) |
-                Q(machine_types=[])
-            )
-
         if active in ["true", "1", "yes"]:
             queryset = queryset.filter(is_active=True)
 
-        return queryset.distinct().order_by("interval_hours", "name")
+        queryset = queryset.distinct().order_by("interval_hours", "name")
+
+        if machine_type:
+            matching_ids = []
+
+            for plan in queryset:
+                selected_machine_types = plan.machine_types or []
+
+                if not selected_machine_types or machine_type in selected_machine_types:
+                    matching_ids.append(plan.id)
+
+            queryset = MaintenancePlan.objects.filter(id__in=matching_ids).prefetch_related("farms")
+
+        return queryset

@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from django.db import models
 from django.utils import timezone
-
+from django.core.exceptions import ValidationError
 
 class Machine(models.Model):
     class MachineType(models.TextChoices):
@@ -149,6 +149,86 @@ class Machine(models.Model):
 
     def __str__(self):
         return f"{self.identifier} - {self.description}"
+    
+    def get_applicable_maintenance_plans(self):
+        plans = (
+            MaintenancePlan.objects
+            .filter(
+                is_active=True,
+                farms=self.fazenda,
+            )
+            .distinct()
+            .order_by("interval_hours", "name")
+        )
+
+        applicable = []
+
+        for plan in plans:
+            if plan.applies_to_machine(self):
+                applicable.append(plan)
+
+        return applicable
+
+    def get_maintenance_summary(self):
+        summary = []
+
+        plans = self.get_applicable_maintenance_plans()
+
+        for plan in plans:
+            last_record = (
+                self.maintenance_records
+                .filter(maintenance_plan=plan)
+                .order_by("-hourmeter", "-performed_at", "-id")
+                .first()
+            )
+
+            if last_record:
+                last_hourmeter = last_record.hourmeter
+                next_hourmeter = last_record.next_revision_hourmeter or (
+                    last_record.hourmeter + plan.interval_hours
+                )
+                last_performed_at = last_record.performed_at
+                record_id = last_record.id
+            else:
+                last_hourmeter = None
+                next_hourmeter = plan.interval_hours
+                last_performed_at = None
+                record_id = None
+
+            hours_to_next = None
+
+            if next_hourmeter is not None:
+                hours_to_next = max(next_hourmeter - self.current_hourmeter, Decimal("0.0"))
+
+            summary.append({
+                "plan_id": plan.id,
+                "plan_name": plan.name,
+                "interval_hours": plan.interval_hours,
+                "last_record_id": record_id,
+                "last_revision_hourmeter": last_hourmeter,
+                "last_revision_at": last_performed_at,
+                "next_revision_hourmeter": next_hourmeter,
+                "hours_to_next_revision": hours_to_next,
+                "is_due": hours_to_next is not None and hours_to_next <= 0,
+            })
+
+        return summary
+
+    def get_next_due_maintenance_item(self):
+        summary = self.get_maintenance_summary()
+
+        valid_items = [
+            item for item in summary
+            if item.get("next_revision_hourmeter") is not None
+        ]
+
+        if not valid_items:
+            return None
+
+        return sorted(
+            valid_items,
+            key=lambda item: item["next_revision_hourmeter"]
+        )[0]
 
     @property
     def hours_to_next_revision(self):
@@ -414,7 +494,7 @@ class MaintenanceRecord(models.Model):
 
     def save(self, *args, **kwargs):
         if self.maintenance_plan and not self.maintenance_plan.applies_to_machine(self.machine):
-            raise ValueError("Este plano de manutenção não se aplica a essa máquina.")
+            raise ValidationError("Este plano de manutenção não se aplica a essa máquina.")
 
         interval_hours = self.machine.revision_interval_hours
 
@@ -430,8 +510,14 @@ class MaintenanceRecord(models.Model):
         super().save(*args, **kwargs)
 
         machine = self.machine
+        next_due = machine.get_next_due_maintenance_item()
+
         machine.last_revision_hourmeter = self.hourmeter
-        machine.next_revision_hourmeter = self.next_revision_hourmeter
+
+        if next_due:
+            machine.next_revision_hourmeter = next_due["next_revision_hourmeter"]
+        else:
+            machine.next_revision_hourmeter = self.next_revision_hourmeter
         machine.status = Machine.Status.OPERATION
 
         if machine.current_hourmeter < self.hourmeter:

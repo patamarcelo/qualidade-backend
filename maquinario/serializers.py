@@ -10,11 +10,15 @@ from .models import (
 
 
 class MachineListSerializer(serializers.ModelSerializer):
+    last_revision_hourmeter = serializers.SerializerMethodField()
+    next_revision_hourmeter = serializers.SerializerMethodField()
     hours_to_next_revision = serializers.SerializerMethodField()
     estimated_days_to_next_revision = serializers.SerializerMethodField()
     revision_progress_percent = serializers.SerializerMethodField()
     status_label = serializers.CharField(source="get_status_display", read_only=True)
     machine_type_label = serializers.CharField(source="get_machine_type_display", read_only=True)
+    maintenance_summary = serializers.SerializerMethodField()
+    next_due_maintenance = serializers.SerializerMethodField()
 
     class Meta:
         model = Machine
@@ -38,19 +42,113 @@ class MachineListSerializer(serializers.ModelSerializer):
             "hours_to_next_revision",
             "estimated_days_to_next_revision",
             "revision_progress_percent",
+            "maintenance_summary",
+            "next_due_maintenance",
         ]
 
+    def get_last_revision_hourmeter(self, obj):
+        next_due = obj.get_next_due_maintenance_item()
+
+        if next_due and next_due.get("last_revision_hourmeter") is not None:
+            return float(next_due["last_revision_hourmeter"])
+
+        value = obj.last_revision_hourmeter
+        return None if value is None else float(value)
+
+
+    def get_next_revision_hourmeter(self, obj):
+        next_due = obj.get_next_due_maintenance_item()
+
+        if next_due and next_due.get("next_revision_hourmeter") is not None:
+            return float(next_due["next_revision_hourmeter"])
+
+        value = obj.next_revision_hourmeter
+        return None if value is None else float(value)
+    
     def get_hours_to_next_revision(self, obj):
+        next_due = obj.get_next_due_maintenance_item()
+
+        if next_due and next_due.get("hours_to_next_revision") is not None:
+            return float(next_due["hours_to_next_revision"])
+
         value = obj.hours_to_next_revision
         return None if value is None else float(value)
 
     def get_estimated_days_to_next_revision(self, obj):
+        next_due = obj.get_next_due_maintenance_item()
+
+        if next_due and next_due.get("hours_to_next_revision") is not None:
+            hours_to_next = next_due["hours_to_next_revision"]
+
+            if obj.average_hours_per_day and obj.average_hours_per_day > 0:
+                return int(
+                    (hours_to_next / obj.average_hours_per_day)
+                    .to_integral_value(rounding="ROUND_CEILING")
+                )
+
         return obj.estimated_days_to_next_revision
 
     def get_revision_progress_percent(self, obj):
         return obj.revision_progress_percent
 
+    def get_maintenance_summary(self, obj):
+        summary = obj.get_maintenance_summary()
 
+        return [
+            {
+                "plan_id": item["plan_id"],
+                "plan_name": item["plan_name"],
+                "interval_hours": float(item["interval_hours"]),
+                "last_record_id": item["last_record_id"],
+                "last_revision_hourmeter": (
+                    float(item["last_revision_hourmeter"])
+                    if item["last_revision_hourmeter"] is not None
+                    else None
+                ),
+                "last_revision_at": item["last_revision_at"],
+                "next_revision_hourmeter": (
+                    float(item["next_revision_hourmeter"])
+                    if item["next_revision_hourmeter"] is not None
+                    else None
+                ),
+                "hours_to_next_revision": (
+                    float(item["hours_to_next_revision"])
+                    if item["hours_to_next_revision"] is not None
+                    else None
+                ),
+                "is_due": item["is_due"],
+            }
+            for item in summary
+        ]
+
+    def get_next_due_maintenance(self, obj):
+        item = obj.get_next_due_maintenance_item()
+
+        if not item:
+            return None
+
+        return {
+            "plan_id": item["plan_id"],
+            "plan_name": item["plan_name"],
+            "interval_hours": float(item["interval_hours"]),
+            "last_revision_hourmeter": (
+                float(item["last_revision_hourmeter"])
+                if item["last_revision_hourmeter"] is not None
+                else None
+            ),
+            "next_revision_hourmeter": (
+                float(item["next_revision_hourmeter"])
+                if item["next_revision_hourmeter"] is not None
+                else None
+            ),
+            "hours_to_next_revision": (
+                float(item["hours_to_next_revision"])
+                if item["hours_to_next_revision"] is not None
+                else None
+            ),
+            "is_due": item["is_due"],
+        }
+    
 class MachineDetailSerializer(MachineListSerializer):
     class Meta(MachineListSerializer.Meta):
         fields = MachineListSerializer.Meta.fields + [
@@ -156,9 +254,12 @@ class MaintenancePlanSerializer(serializers.ModelSerializer):
         return [str(farm) for farm in obj.farms.all()]
 
     def get_machine_types_labels(self, obj):
+        if not obj.machine_types:
+            return ["Todos"]
+
         labels = dict(MaintenancePlan.MachineType.choices)
 
         return [
             labels.get(machine_type, machine_type)
-            for machine_type in (obj.machine_types or [])
+            for machine_type in obj.machine_types
         ]
