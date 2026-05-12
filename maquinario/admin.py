@@ -5,7 +5,96 @@ from .models import (
     HourmeterReading,
     MaintenanceRecord,
     MachineAlertRule,
+    MaintenancePlan,
 )
+
+from django.http import HttpResponse
+from openpyxl import Workbook
+
+from django import forms
+
+
+class MaintenancePlanAdminForm(forms.ModelForm):
+    machine_types = forms.MultipleChoiceField(
+        label="Tipos de máquina",
+        choices=MaintenancePlan.MachineType.choices,
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+        help_text="Se não marcar nenhum tipo, o plano será aplicado para todos os tipos de máquina.",
+    )
+
+    class Meta:
+        model = MaintenancePlan
+        fields = "__all__"
+
+    def clean_machine_types(self):
+        return self.cleaned_data.get("machine_types") or []
+
+
+@admin.action(description="Exportar relatório de máquinas em Excel")
+def export_machines_excel(modeladmin, request, queryset):
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Máquinas"
+
+    headers = [
+        "ID",
+        "Fazenda",
+        "Identificador",
+        "Descrição",
+        "Chassi",
+        "Tipo",
+        "Status",
+        "Horímetro atual",
+        "Última leitura",
+        "Última revisão",
+        "Próxima revisão",
+        "Horas restantes",
+        "Dias estimados",
+        "Progresso revisão (%)",
+        "Ativa",
+    ]
+
+    ws.append(headers)
+
+    for machine in queryset.select_related("fazenda"):
+        ws.append([
+            machine.id,
+            str(machine.fazenda),
+            machine.identifier,
+            machine.description,
+            machine.chassis or "",
+            machine.get_machine_type_display(),
+            machine.get_status_display(),
+            float(machine.current_hourmeter or 0),
+            machine.last_hourmeter_at.strftime("%d/%m/%Y %H:%M") if machine.last_hourmeter_at else "",
+            float(machine.last_revision_hourmeter or 0) if machine.last_revision_hourmeter is not None else "",
+            float(machine.next_revision_hourmeter or 0) if machine.next_revision_hourmeter is not None else "",
+            float(machine.hours_to_next_revision or 0) if machine.hours_to_next_revision is not None else "",
+            machine.estimated_days_to_next_revision or "",
+            machine.revision_progress_percent or "",
+            "Sim" if machine.is_active else "Não",
+        ])
+
+    for column_cells in ws.columns:
+        max_length = 0
+        column_letter = column_cells[0].column_letter
+
+        for cell in column_cells:
+            value = str(cell.value or "")
+            max_length = max(max_length, len(value))
+
+        ws.column_dimensions[column_letter].width = min(max_length + 2, 42)
+
+    response = HttpResponse(
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response["Content-Disposition"] = 'attachment; filename="relatorio_maquinas.xlsx"'
+
+    wb.save(response)
+
+    return response
+
 
 
 class HourmeterReadingInline(admin.TabularInline):
@@ -34,6 +123,7 @@ class MaintenanceRecordInline(admin.TabularInline):
 
 @admin.register(Machine)
 class MachineAdmin(admin.ModelAdmin):
+    actions = [export_machines_excel]
     list_display = [
         "identifier",
         "description",
@@ -174,6 +264,7 @@ class HourmeterReadingAdmin(admin.ModelAdmin):
 class MaintenanceRecordAdmin(admin.ModelAdmin):
     list_display = [
         "machine",
+        "maintenance_plan",
         "maintenance_type",
         "performed_at",
         "hourmeter",
@@ -222,3 +313,53 @@ class MachineAlertRuleAdmin(admin.ModelAdmin):
         "machine",
         "managers",
     ]
+    
+
+@admin.register(MaintenancePlan)
+class MaintenancePlanAdmin(admin.ModelAdmin):
+    form = MaintenancePlanAdminForm
+
+    list_display = [
+        "name",
+        "interval_hours",
+        "machine_types_display",
+        "farms_display",
+        "is_active",
+    ]
+
+    list_filter = [
+        "is_active",
+        "farms",
+    ]
+
+    search_fields = [
+        "name",
+        "description",
+    ]
+
+    filter_horizontal = [
+        "farms",
+    ]
+
+    ordering = [
+        "interval_hours",
+        "name",
+    ]
+
+    def farms_display(self, obj):
+        return ", ".join(str(farm) for farm in obj.farms.all())
+
+    farms_display.short_description = "Fazendas"
+
+    def machine_types_display(self, obj):
+        if not obj.machine_types:
+            return "Todos"
+
+        labels = dict(MaintenancePlan.MachineType.choices)
+
+        return ", ".join(
+            labels.get(machine_type, machine_type)
+            for machine_type in obj.machine_types
+        )
+
+    machine_types_display.short_description = "Tipos de máquina"

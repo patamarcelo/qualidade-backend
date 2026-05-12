@@ -195,6 +195,7 @@ class HourmeterReading(models.Model):
         API = "api", "API"
         IMPORT = "import", "Importação"
         APP = "app", "Aplicativo"
+        WHATSAPP = "whatsapp", "WhatsApp"
 
     machine = models.ForeignKey(
         Machine,
@@ -264,6 +265,86 @@ class HourmeterReading(models.Model):
             )
 
 
+
+
+class MaintenancePlan(models.Model):
+    class MachineType(models.TextChoices):
+        TRACTOR = "tractor", "Trator"
+        SPRAYER = "sprayer", "Pulverizador"
+        HARVESTER = "harvester", "Colheitadeira"
+        OTHER = "other", "Outro"
+
+    name = models.CharField(
+        "Nome da revisão",
+        max_length=120,
+        help_text="Ex: Revisão de 300h, Revisão de 600h.",
+    )
+
+    farms = models.ManyToManyField(
+        "diamante.Fazenda",
+        related_name="maintenance_plans",
+        blank=True,
+        verbose_name="Fazendas",
+        help_text="Fazendas onde essa regra de manutenção pode ser aplicada.",
+    )
+
+    machine_types = models.JSONField(
+        "Tipos de máquina",
+        default=list,
+        blank=True,
+        help_text="Lista de tipos: tractor, sprayer, harvester, other.",
+    )
+
+    interval_hours = models.DecimalField(
+        "Intervalo em horas",
+        max_digits=8,
+        decimal_places=1,
+        help_text="Ex: 300, 600.",
+    )
+
+    description = models.TextField(
+        "Descrição padrão",
+        blank=True,
+        null=True,
+        help_text="O que deve ser verificado/trocado nessa revisão.",
+    )
+
+    is_active = models.BooleanField(
+        "Ativo",
+        default=True,
+    )
+
+    created_at = models.DateTimeField(
+        "Criado em",
+        auto_now_add=True,
+    )
+
+    updated_at = models.DateTimeField(
+        "Atualizado em",
+        auto_now=True,
+    )
+
+    class Meta:
+        verbose_name = "Plano de manutenção"
+        verbose_name_plural = "Planos de manutenção"
+        ordering = ["interval_hours", "name"]
+
+    def __str__(self):
+        return f"{self.name} - {self.interval_hours}h"
+
+    def applies_to_machine(self, machine):
+        if not self.is_active:
+            return False
+
+        has_farm = self.farms.filter(id=machine.fazenda_id).exists()
+
+        # Se não selecionar nenhum tipo, aplica para todos
+        selected_machine_types = self.machine_types or []
+        has_type = not selected_machine_types or machine.machine_type in selected_machine_types
+
+        return has_farm and has_type
+
+
 class MaintenanceRecord(models.Model):
     class MaintenanceType(models.TextChoices):
         REVISION = "revision", "Revisão"
@@ -275,6 +356,15 @@ class MaintenanceRecord(models.Model):
         Machine,
         on_delete=models.CASCADE,
         related_name="maintenance_records",
+    )
+
+    maintenance_plan = models.ForeignKey(
+        MaintenancePlan,
+        on_delete=models.SET_NULL,
+        related_name="maintenance_records",
+        blank=True,
+        null=True,
+        verbose_name="Plano de manutenção",
     )
 
     maintenance_type = models.CharField(
@@ -323,8 +413,19 @@ class MaintenanceRecord(models.Model):
         return f"{self.machine.identifier} - {self.get_maintenance_type_display()}"
 
     def save(self, *args, **kwargs):
+        if self.maintenance_plan and not self.maintenance_plan.applies_to_machine(self.machine):
+            raise ValueError("Este plano de manutenção não se aplica a essa máquina.")
+
+        interval_hours = self.machine.revision_interval_hours
+
+        if self.maintenance_plan and self.maintenance_plan.interval_hours:
+            interval_hours = self.maintenance_plan.interval_hours
+
         if self.next_revision_hourmeter is None:
-            self.next_revision_hourmeter = self.hourmeter + self.machine.revision_interval_hours
+            self.next_revision_hourmeter = self.hourmeter + interval_hours
+
+        if not self.description and self.maintenance_plan:
+            self.description = self.maintenance_plan.description
 
         super().save(*args, **kwargs)
 
@@ -332,16 +433,22 @@ class MaintenanceRecord(models.Model):
         machine.last_revision_hourmeter = self.hourmeter
         machine.next_revision_hourmeter = self.next_revision_hourmeter
         machine.status = Machine.Status.OPERATION
+
+        if machine.current_hourmeter < self.hourmeter:
+            machine.current_hourmeter = self.hourmeter
+            machine.last_hourmeter_at = self.performed_at
+
         machine.save(
             update_fields=[
                 "last_revision_hourmeter",
                 "next_revision_hourmeter",
+                "current_hourmeter",
+                "last_hourmeter_at",
                 "status",
                 "updated_at",
             ]
         )
-
-
+    
 class MachineAlertRule(models.Model):
     machine = models.ForeignKey(
         Machine,
@@ -393,3 +500,4 @@ class MachineAlertRule(models.Model):
 
     def __str__(self):
         return f"Alerta - {self.machine.identifier}"
+    

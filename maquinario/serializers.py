@@ -5,6 +5,7 @@ from .models import (
     HourmeterReading,
     MaintenanceRecord,
     MachineAlertRule,
+    MaintenancePlan,
 )
 
 
@@ -92,12 +93,18 @@ class MaintenanceRecordSerializer(serializers.ModelSerializer):
         source="get_maintenance_type_display",
         read_only=True,
     )
+    maintenance_plan_name = serializers.CharField(
+        source="maintenance_plan.name",
+        read_only=True,
+    )
 
     class Meta:
         model = MaintenanceRecord
         fields = [
             "id",
             "machine",
+            "maintenance_plan",
+            "maintenance_plan_name",
             "maintenance_type",
             "maintenance_type_label",
             "performed_at",
@@ -106,8 +113,7 @@ class MaintenanceRecordSerializer(serializers.ModelSerializer):
             "next_revision_hourmeter",
             "created_at",
         ]
-        read_only_fields = ["created_at"]
-
+        read_only_fields = ["created_at", "next_revision_hourmeter"]
 
 class MachineAlertRuleSerializer(serializers.ModelSerializer):
     class Meta:
@@ -124,3 +130,35 @@ class MachineAlertRuleSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["created_at", "updated_at"]
+
+class MaintenancePlanSerializer(serializers.ModelSerializer):
+    farms_names = serializers.SerializerMethodField()
+    machine_types_labels = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MaintenancePlan
+        fields = [
+            "id",
+            "name",
+            "farms",
+            "farms_names",
+            "machine_types",
+            "machine_types_labels",
+            "interval_hours",
+            "description",
+            "is_active",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["created_at", "updated_at"]
+
+    def get_farms_names(self, obj):
+        return [str(farm) for farm in obj.farms.all()]
+
+    def get_machine_types_labels(self, obj):
+        labels = dict(MaintenancePlan.MachineType.choices)
+
+        return [
+            labels.get(machine_type, machine_type)
+            for machine_type in (obj.machine_types or [])
+        ]
