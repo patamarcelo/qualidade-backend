@@ -18,6 +18,10 @@ from .serializers import (
 )
 
 
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from django.db.models import Q
+
 class MachineViewSet(viewsets.ModelViewSet):
     queryset = (
         Machine.objects
@@ -56,6 +60,77 @@ class MachineViewSet(viewsets.ModelViewSet):
 
         return queryset.order_by("identifier")
 
+
+    @action(detail=False, methods=["post"])
+    def list_app(self, request):
+        fazenda_id = request.data.get("fazenda_id")
+        status_values = request.data.get("status") or []
+        machine_types = request.data.get("machine_type") or []
+        manager_id = request.data.get("manager_id")
+        search = request.data.get("search") or ""
+        user_data = request.data.get("user") or {}
+
+        queryset = (
+            Machine.objects
+            .select_related("fazenda")
+            .filter(is_active=True)
+        )
+
+        if fazenda_id:
+            queryset = queryset.filter(fazenda_id=fazenda_id)
+
+        if status_values:
+            queryset = queryset.filter(status__in=status_values)
+
+        if machine_types:
+            queryset = queryset.filter(machine_type__in=machine_types)
+
+        if search:
+            queryset = queryset.filter(
+                Q(identifier__icontains=search)
+                | Q(description__icontains=search)
+                | Q(chassis__icontains=search)
+                | Q(brand__icontains=search)
+                | Q(model_name__icontains=search)
+            )
+
+        # Futuro:
+        # aqui entra filtro por responsabilidade/manager.
+        # Exemplo quando existir vínculo Machine <-> Manager:
+        #
+        # if manager_id:
+        #     queryset = queryset.filter(responsible_managers__id=manager_id)
+        #
+        # ou usando o e-mail/uid enviado:
+        #
+        # user_email = user_data.get("email")
+        # user_uid = user_data.get("uid")
+
+        machines = queryset.order_by("identifier")
+
+        serializer = MachineListSerializer(machines, many=True)
+
+        return Response({
+            "data": serializer.data,
+            "totals": {
+                "total": machines.count(),
+                "operation": machines.filter(status=Machine.Status.OPERATION).count(),
+                "revision": machines.filter(status=Machine.Status.REVISION).count(),
+                "maintenance": machines.filter(status=Machine.Status.MAINTENANCE).count(),
+            },
+            "filters": {
+                "fazenda_id": fazenda_id,
+                "status": status_values,
+                "machine_type": machine_types,
+                "manager_id": manager_id,
+                "search": search,
+            },
+            "user": {
+                "email": user_data.get("email"),
+                "uid": user_data.get("uid"),
+            },
+        })
+        
     @action(detail=True, methods=["get"])
     def readings(self, request, pk=None):
         machine = self.get_object()
