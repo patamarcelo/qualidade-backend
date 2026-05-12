@@ -110,8 +110,8 @@ class Machine(models.Model):
         "Média de horas por dia",
         max_digits=8,
         decimal_places=2,
-        default=Decimal("0.00"),
-        help_text="Usado para estimar quantos dias faltam até a próxima revisão.",
+        default=Decimal("10.00"),
+        help_text="Média estimada de trabalho por dia. Usado para calcular dias até a próxima revisão.",
     )
 
     location_text = models.CharField(

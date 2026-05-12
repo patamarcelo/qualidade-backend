@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from decimal import Decimal
 
 from .models import (
     Machine,
@@ -19,11 +20,14 @@ class MachineListSerializer(serializers.ModelSerializer):
     machine_type_label = serializers.CharField(source="get_machine_type_display", read_only=True)
     maintenance_summary = serializers.SerializerMethodField()
     next_due_maintenance = serializers.SerializerMethodField()
+    fazenda_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Machine
         fields = [
             "id",
+            "fazenda",
+            "fazenda_name",
             "identifier",
             "chassis",
             "description",
@@ -45,6 +49,10 @@ class MachineListSerializer(serializers.ModelSerializer):
             "maintenance_summary",
             "next_due_maintenance",
         ]
+
+    
+    def get_fazenda_name(self, obj):
+        return str(obj.fazenda) if obj.fazenda else None
 
     def get_last_revision_hourmeter(self, obj):
         next_due = obj.get_next_due_maintenance_item()
@@ -77,16 +85,28 @@ class MachineListSerializer(serializers.ModelSerializer):
     def get_estimated_days_to_next_revision(self, obj):
         next_due = obj.get_next_due_maintenance_item()
 
+        hours_to_next = None
+
         if next_due and next_due.get("hours_to_next_revision") is not None:
             hours_to_next = next_due["hours_to_next_revision"]
+        elif obj.hours_to_next_revision is not None:
+            hours_to_next = obj.hours_to_next_revision
 
-            if obj.average_hours_per_day and obj.average_hours_per_day > 0:
-                return int(
-                    (hours_to_next / obj.average_hours_per_day)
-                    .to_integral_value(rounding="ROUND_CEILING")
-                )
+        if hours_to_next is None:
+            return None
 
-        return obj.estimated_days_to_next_revision
+        average_hours_per_day = obj.average_hours_per_day or 0
+
+        if average_hours_per_day <= 0:
+            average_hours_per_day = Decimal("10.00")
+
+        if obj.status != Machine.Status.OPERATION:
+            return None
+
+        return int(
+            (hours_to_next / average_hours_per_day)
+            .to_integral_value(rounding="ROUND_CEILING")
+        )
 
     def get_revision_progress_percent(self, obj):
         return obj.revision_progress_percent
@@ -152,7 +172,6 @@ class MachineListSerializer(serializers.ModelSerializer):
 class MachineDetailSerializer(MachineListSerializer):
     class Meta(MachineListSerializer.Meta):
         fields = MachineListSerializer.Meta.fields + [
-            "fazenda",
             "location_text",
             "is_active",
             "created_at",

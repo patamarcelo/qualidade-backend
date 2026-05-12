@@ -378,6 +378,10 @@ class MachineViewSet(viewsets.ModelViewSet):
         manager_id = request.data.get("manager_id")
         search = request.data.get("search") or ""
         user_data = request.data.get("user") or {}
+        
+        print("MAQUINARIO list_app user_data:", user_data)
+        print("MAQUINARIO list_app customClaims:", user_data.get("customClaims"))
+        print("MAQUINARIO list_app payload:", request.data)
 
         queryset = (
             Machine.objects
