@@ -8,7 +8,8 @@ from .models import (
     MaintenanceRecord,
     MachineAlertRule,
     MaintenancePlan,
-    MachineFarmTransfer
+    MachineFarmTransfer,
+    MachineStatusChange
 )
 from .serializers import (
     MachineListSerializer,
@@ -18,7 +19,7 @@ from .serializers import (
     MaintenanceRecordSerializer,
     MachineAlertRuleSerializer,
     MaintenancePlanSerializer,
-    MachineFarmTransferSerializer
+    MachineFarmTransferSerializer,
 )
 
 
