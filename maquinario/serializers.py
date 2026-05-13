@@ -190,9 +190,17 @@ class HourmeterReadingSerializer(serializers.ModelSerializer):
             "measured_at",
             "source",
             "notes",
+            "user_uid",
+            "user_email",
+            "user_display_name",
             "created_at",
         ]
-        read_only_fields = ["created_at"]
+        read_only_fields = [
+            "created_at",
+            "user_uid",
+            "user_email",
+            "user_display_name",
+        ]
 
 
 class CreateHourmeterReadingSerializer(serializers.ModelSerializer):
@@ -229,9 +237,18 @@ class MaintenanceRecordSerializer(serializers.ModelSerializer):
             "hourmeter",
             "description",
             "next_revision_hourmeter",
+            "user_uid",
+            "user_email",
+            "user_display_name",
             "created_at",
         ]
-        read_only_fields = ["created_at", "next_revision_hourmeter"]
+        read_only_fields = [
+            "created_at",
+            "next_revision_hourmeter",
+            "user_uid",
+            "user_email",
+            "user_display_name",
+        ]
 
 class MachineAlertRuleSerializer(serializers.ModelSerializer):
     class Meta:

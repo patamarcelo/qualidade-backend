@@ -119,6 +119,9 @@ class MachineViewSet(viewsets.ModelViewSet):
             measured_at=measured_at or timezone.now(),
             source=source,
             notes=notes,
+            user_uid=user_data.get("uid") or "",
+            user_email=user_data.get("email") or "",
+            user_display_name=user_data.get("displayName") or "",
         )
 
         machine.refresh_from_db()
@@ -202,6 +205,9 @@ class MachineViewSet(viewsets.ModelViewSet):
             performed_at=performed_at or timezone.now(),
             hourmeter=hourmeter_decimal,
             description=description,
+            user_uid=user_data.get("uid") or "",
+            user_email=user_data.get("email") or "",
+            user_display_name=user_data.get("displayName") or "",
         )
 
         machine.refresh_from_db()

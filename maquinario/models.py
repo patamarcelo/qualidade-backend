@@ -275,6 +275,7 @@ class HourmeterReading(models.Model):
         API = "api", "API"
         IMPORT = "import", "Importação"
         APP = "app", "Aplicativo"
+        APP_OFFLINE = "app_offline", "Aplicativo offline"
         WHATSAPP = "whatsapp", "WhatsApp"
 
     machine = models.ForeignKey(
@@ -305,6 +306,23 @@ class HourmeterReading(models.Model):
         "Observações",
         blank=True,
         null=True,
+    )
+    
+    user_uid = models.CharField(
+        "UID do usuário",
+        max_length=180,
+        blank=True,
+    )
+
+    user_email = models.EmailField(
+        "E-mail do usuário",
+        blank=True,
+    )
+
+    user_display_name = models.CharField(
+        "Nome do usuário",
+        max_length=180,
+        blank=True,
     )
 
     created_at = models.DateTimeField(
@@ -477,6 +495,23 @@ class MaintenanceRecord(models.Model):
         decimal_places=1,
         blank=True,
         null=True,
+    )
+    
+    user_uid = models.CharField(
+        "UID do usuário",
+        max_length=180,
+        blank=True,
+    )
+
+    user_email = models.EmailField(
+        "E-mail do usuário",
+        blank=True,
+    )
+
+    user_display_name = models.CharField(
+        "Nome do usuário",
+        max_length=180,
+        blank=True,
     )
 
     created_at = models.DateTimeField(
