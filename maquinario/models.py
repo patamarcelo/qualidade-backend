@@ -587,3 +587,54 @@ class MachineAlertRule(models.Model):
     def __str__(self):
         return f"Alerta - {self.machine.identifier}"
     
+
+
+
+class MachineFarmTransfer(models.Model):
+    class Source(models.TextChoices):
+        APP = "app", "Aplicativo"
+        ADMIN = "admin", "Admin"
+        AGENT = "agent", "Agente"
+        SYSTEM = "system", "Sistema"
+
+    machine = models.ForeignKey(
+        Machine,
+        on_delete=models.CASCADE,
+        related_name="farm_transfers",
+    )
+
+    from_fazenda = models.ForeignKey(
+        "diamante.Fazenda",
+        on_delete=models.PROTECT,
+        related_name="machine_transfers_from",
+        null=True,
+        blank=True,
+    )
+
+    to_fazenda = models.ForeignKey(
+        "diamante.Fazenda",
+        on_delete=models.PROTECT,
+        related_name="machine_transfers_to",
+    )
+
+    source = models.CharField(
+        max_length=20,
+        choices=Source.choices,
+        default=Source.APP,
+    )
+
+    notes = models.TextField(blank=True)
+
+    user_uid = models.CharField(max_length=180, blank=True)
+    user_email = models.EmailField(blank=True)
+    user_display_name = models.CharField(max_length=180, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Transferência de Fazenda"
+        verbose_name_plural = "Transferências de Fazenda"
+
+    def __str__(self):
+        return f"{self.machine} → {self.to_fazenda}"

@@ -7,6 +7,7 @@ from .models import (
     MaintenanceRecord,
     MachineAlertRule,
     MaintenancePlan,
+    MachineFarmTransfer
 )
 
 
@@ -282,3 +283,33 @@ class MaintenancePlanSerializer(serializers.ModelSerializer):
             labels.get(machine_type, machine_type)
             for machine_type in obj.machine_types
         ]
+        
+        
+
+
+class MachineFarmTransferSerializer(serializers.ModelSerializer):
+    from_fazenda_name = serializers.SerializerMethodField()
+    to_fazenda_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MachineFarmTransfer
+        fields = [
+            "id",
+            "machine",
+            "from_fazenda",
+            "from_fazenda_name",
+            "to_fazenda",
+            "to_fazenda_name",
+            "source",
+            "notes",
+            "user_uid",
+            "user_email",
+            "user_display_name",
+            "created_at",
+        ]
+
+    def get_from_fazenda_name(self, obj):
+        return str(obj.from_fazenda) if obj.from_fazenda else None
+
+    def get_to_fazenda_name(self, obj):
+        return str(obj.to_fazenda) if obj.to_fazenda else None

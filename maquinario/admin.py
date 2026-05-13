@@ -6,6 +6,7 @@ from .models import (
     MaintenanceRecord,
     MachineAlertRule,
     MaintenancePlan,
+    MachineFarmTransfer
 )
 
 from django.http import HttpResponse
@@ -480,3 +481,138 @@ class MaintenancePlanAdmin(admin.ModelAdmin):
         )
 
     machine_types_display.short_description = "Tipos de máquina"
+    
+
+
+@admin.register(MachineFarmTransfer)
+class MachineFarmTransferAdmin(admin.ModelAdmin):
+    list_display = [
+        "id",
+        "machine_display",
+        "from_fazenda",
+        "to_fazenda",
+        "source_badge",
+        "user_display",
+        "created_at",
+    ]
+
+    list_filter = [
+        "source",
+        "from_fazenda",
+        "to_fazenda",
+        "created_at",
+    ]
+
+    search_fields = [
+        "machine__identifier",
+        "machine__description",
+        "machine__chassis",
+        "from_fazenda__nome",
+        "to_fazenda__nome",
+        "user_email",
+        "user_display_name",
+        "user_uid",
+        "notes",
+    ]
+
+    readonly_fields = [
+        "machine",
+        "from_fazenda",
+        "to_fazenda",
+        "source",
+        "notes",
+        "user_uid",
+        "user_email",
+        "user_display_name",
+        "created_at",
+    ]
+
+    date_hierarchy = "created_at"
+
+    ordering = ["-created_at"]
+
+    list_select_related = [
+        "machine",
+        "from_fazenda",
+        "to_fazenda",
+    ]
+
+    fieldsets = (
+        (
+            "Transferência",
+            {
+                "fields": (
+                    "machine",
+                    "from_fazenda",
+                    "to_fazenda",
+                    "source",
+                    "notes",
+                )
+            },
+        ),
+        (
+            "Usuário",
+            {
+                "fields": (
+                    "user_display_name",
+                    "user_email",
+                    "user_uid",
+                )
+            },
+        ),
+        (
+            "Controle",
+            {
+                "fields": (
+                    "created_at",
+                )
+            },
+        ),
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def machine_display(self, obj):
+        identifier = getattr(obj.machine, "identifier", None) or "Sem código"
+        description = getattr(obj.machine, "description", None) or ""
+
+        if description:
+            return f"{identifier} - {description}"
+
+        return identifier
+
+    machine_display.short_description = "Máquina"
+    machine_display.admin_order_field = "machine__identifier"
+
+    def user_display(self, obj):
+        if obj.user_display_name and obj.user_email:
+            return f"{obj.user_display_name} ({obj.user_email})"
+
+        if obj.user_display_name:
+            return obj.user_display_name
+
+        if obj.user_email:
+            return obj.user_email
+
+        if obj.user_uid:
+            return obj.user_uid
+
+        return "-"
+
+    user_display.short_description = "Usuário"
+
+    def source_badge(self, obj):
+        labels = {
+            "app": "Aplicativo",
+            "admin": "Admin",
+            "agent": "Agente",
+            "system": "Sistema",
+        }
+
+        return labels.get(obj.source, obj.source or "-")
+
+    source_badge.short_description = "Origem"

@@ -7,7 +7,8 @@ from .models import (
     HourmeterReading,
     MaintenanceRecord,
     MachineAlertRule,
-    MaintenancePlan
+    MaintenancePlan,
+    MachineFarmTransfer
 )
 from .serializers import (
     MachineListSerializer,
@@ -16,7 +17,8 @@ from .serializers import (
     CreateHourmeterReadingSerializer,
     MaintenanceRecordSerializer,
     MachineAlertRuleSerializer,
-    MaintenancePlanSerializer
+    MaintenancePlanSerializer,
+    MachineFarmTransferSerializer
 )
 
 
@@ -30,6 +32,8 @@ from django.utils import timezone
 
 from django.http import HttpResponse
 from openpyxl import Workbook
+
+from django.db import transaction
 
 
 class MachineViewSet(viewsets.ModelViewSet):
@@ -525,7 +529,102 @@ class MachineViewSet(viewsets.ModelViewSet):
             "summary": data,
         })
 
+    @action(detail=True, methods=["post"])
+    def transfer_farm(self, request, pk=None):
+        machine = self.get_object()
 
+        to_fazenda_id = request.data.get("to_fazenda")
+        notes = request.data.get("notes") or ""
+        source = request.data.get("source") or MachineFarmTransfer.Source.APP
+        user_data = request.data.get("user") or {}
+
+        if not to_fazenda_id:
+            return Response(
+                {"error": "Informe a fazenda de destino."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            to_fazenda_id = int(to_fazenda_id)
+        except (TypeError, ValueError):
+            return Response(
+                {"error": "Fazenda de destino inválida."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Ajuste este queryset para o model real da sua fazenda, se necessário.
+        to_fazenda = machine._meta.get_field("fazenda").remote_field.model.objects.filter(
+            id=to_fazenda_id
+        ).first()
+
+        if not to_fazenda:
+            return Response(
+                {"error": "Fazenda de destino não encontrada."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if machine.fazenda_id == to_fazenda.id:
+            return Response(
+                {"error": "A máquina já está nessa fazenda."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        with transaction.atomic():
+            from_fazenda = machine.fazenda
+
+            transfer = MachineFarmTransfer.objects.create(
+                machine=machine,
+                from_fazenda=from_fazenda,
+                to_fazenda=to_fazenda,
+                source=source,
+                notes=notes,
+                user_uid=user_data.get("uid") or "",
+                user_email=user_data.get("email") or "",
+                user_display_name=user_data.get("displayName") or "",
+            )
+
+            machine.fazenda = to_fazenda
+            machine.save(update_fields=["fazenda", "updated_at"])
+
+            machine.refresh_from_db()
+
+        return Response({
+            "message": "Máquina transferida com sucesso.",
+            "transfer": MachineFarmTransferSerializer(transfer).data,
+            "machine": MachineDetailSerializer(machine).data,
+            "user": {
+                "email": user_data.get("email"),
+                "uid": user_data.get("uid"),
+                "displayName": user_data.get("displayName"),
+            },
+        })
+        
+        
+        
+    @action(detail=False, methods=["post"])
+    def farms_options(self, request):
+        user_data = request.data.get("user") or {}
+
+        FazendaModel = Machine._meta.get_field("fazenda").remote_field.model
+
+        farms = FazendaModel.objects.all().order_by("nome")
+
+        data = [
+            {
+                "id": farm.id,
+                "name": str(farm),
+            }
+            for farm in farms
+        ]
+
+        return Response({
+            "data": data,
+            "user": {
+                "email": user_data.get("email"),
+                "uid": user_data.get("uid"),
+            },
+        })
+        
 class HourmeterReadingViewSet(viewsets.ModelViewSet):
     queryset = (
         HourmeterReading.objects
