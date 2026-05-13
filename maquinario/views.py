@@ -631,6 +631,71 @@ class MachineViewSet(viewsets.ModelViewSet):
             },
         })
         
+    
+    @action(detail=True, methods=["post"])
+    def update_status(self, request, pk=None):
+        machine = self.get_object()
+
+        new_status = request.data.get("status")
+        notes = request.data.get("notes") or ""
+        user_data = request.data.get("user") or {}
+
+        allowed_statuses = dict(Machine.Status.choices)
+
+        if not new_status:
+            return Response(
+                {"error": "Informe o novo status da máquina."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if new_status not in allowed_statuses:
+            return Response(
+                {"error": "Status inválido."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if machine.status == new_status:
+            return Response(
+                {"error": "A máquina já está com esse status."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        old_status = machine.status
+
+        with transaction.atomic():
+            machine.status = new_status
+            machine.save(update_fields=["status", "updated_at"])
+
+            # Opcional, mas recomendado: criar histórico/auditoria
+            MachineStatusChange.objects.create(
+                machine=machine,
+                from_status=old_status,
+                to_status=new_status,
+                notes=notes,
+                source=MachineStatusChange.Source.APP,
+                user_uid=user_data.get("uid") or "",
+                user_email=user_data.get("email") or "",
+                user_display_name=user_data.get("displayName") or "",
+            )
+
+            machine.refresh_from_db()
+
+        return Response({
+            "message": "Status da máquina atualizado com sucesso.",
+            "machine": MachineDetailSerializer(machine).data,
+            "status_change": {
+                "from_status": old_status,
+                "to_status": new_status,
+                "notes": notes,
+                "user": {
+                    "uid": user_data.get("uid"),
+                    "email": user_data.get("email"),
+                    "displayName": user_data.get("displayName"),
+                },
+            },
+        })
+    
+        
 class HourmeterReadingViewSet(viewsets.ModelViewSet):
     queryset = (
         HourmeterReading.objects

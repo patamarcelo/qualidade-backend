@@ -6,7 +6,8 @@ from .models import (
     MaintenanceRecord,
     MachineAlertRule,
     MaintenancePlan,
-    MachineFarmTransfer
+    MachineFarmTransfer,
+    MachineStatusChange
 )
 
 from django.http import HttpResponse
@@ -616,3 +617,115 @@ class MachineFarmTransferAdmin(admin.ModelAdmin):
         return labels.get(obj.source, obj.source or "-")
 
     source_badge.short_description = "Origem"
+
+
+
+
+@admin.register(MachineStatusChange)
+class MachineStatusChangeAdmin(admin.ModelAdmin):
+    list_display = [
+        "id",
+        "machine_display",
+        "from_status",
+        "to_status",
+        "source",
+        "user_display",
+        "created_at",
+    ]
+
+    list_filter = [
+        "from_status",
+        "to_status",
+        "source",
+        "created_at",
+    ]
+
+    search_fields = [
+        "machine__identifier",
+        "machine__description",
+        "user_email",
+        "user_display_name",
+        "user_uid",
+        "notes",
+    ]
+
+    readonly_fields = [
+        "machine",
+        "from_status",
+        "to_status",
+        "source",
+        "notes",
+        "user_uid",
+        "user_email",
+        "user_display_name",
+        "created_at",
+    ]
+
+    ordering = ["-created_at"]
+    date_hierarchy = "created_at"
+    list_select_related = ["machine"]
+
+    fieldsets = (
+        (
+            "Alteração",
+            {
+                "fields": (
+                    "machine",
+                    "from_status",
+                    "to_status",
+                    "source",
+                    "notes",
+                )
+            },
+        ),
+        (
+            "Usuário",
+            {
+                "fields": (
+                    "user_display_name",
+                    "user_email",
+                    "user_uid",
+                )
+            },
+        ),
+        (
+            "Controle",
+            {
+                "fields": ("created_at",)
+            },
+        ),
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def machine_display(self, obj):
+        identifier = getattr(obj.machine, "identifier", None) or "Sem código"
+        description = getattr(obj.machine, "description", None) or ""
+
+        if description:
+            return f"{identifier} - {description}"
+
+        return identifier
+
+    machine_display.short_description = "Máquina"
+
+    def user_display(self, obj):
+        if obj.user_display_name and obj.user_email:
+            return f"{obj.user_display_name} ({obj.user_email})"
+
+        if obj.user_display_name:
+            return obj.user_display_name
+
+        if obj.user_email:
+            return obj.user_email
+
+        if obj.user_uid:
+            return obj.user_uid
+
+        return "-"
+
+    user_display.short_description = "Usuário"

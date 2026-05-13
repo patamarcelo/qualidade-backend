@@ -673,3 +673,57 @@ class MachineFarmTransfer(models.Model):
 
     def __str__(self):
         return f"{self.machine} → {self.to_fazenda}"
+    
+
+
+class MachineStatusChange(models.Model):
+    class Source(models.TextChoices):
+        APP = "app", "Aplicativo"
+        ADMIN = "admin", "Admin"
+        AGENT = "agent", "Agente"
+        SYSTEM = "system", "Sistema"
+
+    machine = models.ForeignKey(
+        Machine,
+        on_delete=models.CASCADE,
+        related_name="status_changes",
+    )
+
+    from_status = models.CharField(
+        "Status anterior",
+        max_length=30,
+        choices=Machine.Status.choices,
+        blank=True,
+    )
+
+    to_status = models.CharField(
+        "Novo status",
+        max_length=30,
+        choices=Machine.Status.choices,
+    )
+
+    source = models.CharField(
+        "Origem",
+        max_length=20,
+        choices=Source.choices,
+        default=Source.APP,
+    )
+
+    notes = models.TextField(
+        "Observações",
+        blank=True,
+    )
+
+    user_uid = models.CharField(max_length=180, blank=True)
+    user_email = models.EmailField(blank=True)
+    user_display_name = models.CharField(max_length=180, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Alteração de status da máquina"
+        verbose_name_plural = "Alterações de status das máquinas"
+
+    def __str__(self):
+        return f"{self.machine} | {self.from_status} → {self.to_status}"

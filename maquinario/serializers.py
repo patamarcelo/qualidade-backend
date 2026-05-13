@@ -7,7 +7,8 @@ from .models import (
     MaintenanceRecord,
     MachineAlertRule,
     MaintenancePlan,
-    MachineFarmTransfer
+    MachineFarmTransfer,
+    MachineStatusChange
 )
 
 
@@ -330,3 +331,32 @@ class MachineFarmTransferSerializer(serializers.ModelSerializer):
 
     def get_to_fazenda_name(self, obj):
         return str(obj.to_fazenda) if obj.to_fazenda else None
+    
+
+
+class MachineStatusChangeSerializer(serializers.ModelSerializer):
+    from_status_label = serializers.SerializerMethodField()
+    to_status_label = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MachineStatusChange
+        fields = [
+            "id",
+            "machine",
+            "from_status",
+            "from_status_label",
+            "to_status",
+            "to_status_label",
+            "source",
+            "notes",
+            "user_uid",
+            "user_email",
+            "user_display_name",
+            "created_at",
+        ]
+
+    def get_from_status_label(self, obj):
+        return dict(Machine.Status.choices).get(obj.from_status, obj.from_status)
+
+    def get_to_status_label(self, obj):
+        return dict(Machine.Status.choices).get(obj.to_status, obj.to_status)
