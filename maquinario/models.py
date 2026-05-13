@@ -727,3 +727,147 @@ class MachineStatusChange(models.Model):
 
     def __str__(self):
         return f"{self.machine} | {self.from_status} → {self.to_status}"
+    
+
+class MachineWhatsappCommand(models.Model):
+    class Action(models.TextChoices):
+        UPDATE_HOURMETER = "update_hourmeter", "Atualizar horímetro"
+        REGISTER_REVISION = "register_revision", "Registrar revisão"
+
+    class Status(models.TextChoices):
+        PENDING_CONFIRMATION = "pending_confirmation", "Aguardando confirmação"
+        APPLIED = "applied", "Aplicado"
+        CANCELLED = "cancelled", "Cancelado"
+        FAILED = "failed", "Falhou"
+
+    manager = models.ForeignKey(
+        "opscheckin.Manager",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="machine_whatsapp_commands",
+    )
+
+    inbound_message = models.ForeignKey(
+        "opscheckin.InboundMessage",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="machine_commands",
+    )
+
+    machine = models.ForeignKey(
+        "Machine",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="whatsapp_commands",
+    )
+
+    action = models.CharField(
+        max_length=40,
+        choices=Action.choices,
+        db_index=True,
+    )
+
+    status = models.CharField(
+        max_length=40,
+        choices=Status.choices,
+        default=Status.PENDING_CONFIRMATION,
+        db_index=True,
+    )
+
+    original_text = models.TextField(blank=True, default="")
+    parsed_payload = models.JSONField(default=dict, blank=True)
+
+    error_message = models.TextField(blank=True, default="")
+
+    applied_hourmeter_reading = models.ForeignKey(
+        "HourmeterReading",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="whatsapp_commands",
+    )
+
+    applied_maintenance_record = models.ForeignKey(
+        "MaintenanceRecord",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="whatsapp_commands",
+    )
+
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+    applied_at = models.DateTimeField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Comando WhatsApp de máquina"
+        verbose_name_plural = "Comandos WhatsApp de máquinas"
+        indexes = [
+            models.Index(fields=["manager", "status", "created_at"]),
+            models.Index(fields=["machine", "created_at"]),
+            models.Index(fields=["action", "status"]),
+        ]
+
+    def __str__(self):
+        manager_name = self.manager.name if self.manager else "Sem manager"
+        machine_name = self.machine.identifier if self.machine else "Sem máquina"
+        return f"{manager_name} - {machine_name} - {self.action} - {self.status}"
+
+
+class MachineMaintenanceAlertDispatch(models.Model):
+    manager = models.ForeignKey(
+        "opscheckin.Manager",
+        on_delete=models.CASCADE,
+        related_name="machine_alert_dispatches",
+    )
+
+    machine = models.ForeignKey(
+        "Machine",
+        on_delete=models.CASCADE,
+        related_name="maintenance_alert_dispatches",
+    )
+
+    maintenance_plan = models.ForeignKey(
+        "MaintenancePlan",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="alert_dispatches",
+    )
+
+    reference_date = models.DateField(db_index=True)
+
+    hours_to_next_revision = models.DecimalField(
+        max_digits=10,
+        decimal_places=1,
+        null=True,
+        blank=True,
+    )
+
+    sent_at = models.DateTimeField(null=True, blank=True)
+    provider_message_id = models.CharField(max_length=128, blank=True, default="")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-reference_date", "machine__identifier"]
+        verbose_name = "Disparo de alerta de revisão"
+        verbose_name_plural = "Disparos de alertas de revisão"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["manager", "machine", "maintenance_plan", "reference_date"],
+                name="uniq_machine_alert_dispatch_day",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["manager", "reference_date"]),
+            models.Index(fields=["machine", "reference_date"]),
+        ]
+
+    def __str__(self):
+        return f"{self.manager} - {self.machine} - {self.reference_date}"

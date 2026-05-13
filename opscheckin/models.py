@@ -270,6 +270,11 @@ class OutboundMessage(models.Model):
             ("personal_reminder_coordinator_daily_action", "Botão resumo diário avisos"),
             ("personal_reminder_coordinator_daily_summary", "Resumo diário avisos"),
             ("manual_template", "Manual via template"),
+            ("machine_update_confirmation", "Confirmação atualização de máquina"),
+            ("machine_revision_confirmation", "Confirmação revisão de máquina"),
+            ("machine_update_applied", "Atualização de máquina aplicada"),
+            ("machine_update_field_manager_notice", "Aviso atualização maquinário"),
+            ("machine_revision_alert", "Alerta revisão de máquina"),
         ],
         db_index=True,
     )

@@ -30,6 +30,8 @@ from opscheckin.services.personal_reminder_coordinators import (
     handle_coordinator_personal_reminder_action,
 )
 
+from maquinario.services.whatsapp_machinery import handle_machinery_whatsapp_message
+
 logger = logging.getLogger("opscheckin.whatsapp")
 
 # mínimo “anti-vazio” p/ considerar que veio algo (a validação real é pelo parse)
@@ -1964,6 +1966,36 @@ def whatsapp_webhook(request):
                             from_phone,
                             msg_id,
                         )
+                # ==========
+                # maquinário: horímetro/revisão por WhatsApp
+                # ==========
+                try:
+                    if msg_type == "text":
+                        if handle_machinery_whatsapp_message(
+                            manager=manager,
+                            inbound=inbound,
+                            text=text,
+                        ):
+                            _mark_inbound_processed(inbound, now)
+                            continue
+                except Exception:
+                    logger.exception(
+                        "MACHINERY_WHATSAPP_FLOW_FAILED manager=%s phone=%s msg_id=%s",
+                        getattr(manager, "name", ""),
+                        from_phone,
+                        msg_id,
+                    )
+                    try:
+                        send_text(
+                            manager.phone_e164,
+                            "Recebi sua mensagem, mas não consegui processar o dado de maquinário agora. Confira o formato e tente novamente.",
+                        )
+                    except Exception:
+                        logger.exception("MACHINERY_WHATSAPP_FLOW_REPLY_FAILED")
+
+                    _mark_inbound_processed(inbound, now)
+                    continue
+
 
                 # ==========
                 # 1) actions via reply_id (ordem importa)

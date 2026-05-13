@@ -7,7 +7,9 @@ from .models import (
     MachineAlertRule,
     MaintenancePlan,
     MachineFarmTransfer,
-    MachineStatusChange
+    MachineStatusChange,
+    MachineWhatsappCommand,
+    MachineMaintenanceAlertDispatch,
 )
 
 from django.http import HttpResponse
@@ -729,3 +731,69 @@ class MachineStatusChangeAdmin(admin.ModelAdmin):
         return "-"
 
     user_display.short_description = "Usuário"
+    
+    
+@admin.register(MachineWhatsappCommand)
+class MachineWhatsappCommandAdmin(admin.ModelAdmin):
+    list_display = [
+        "id",
+        "manager",
+        "machine",
+        "action",
+        "status",
+        "created_at",
+        "applied_at",
+    ]
+    list_filter = ["action", "status", "created_at"]
+    search_fields = [
+        "manager__name",
+        "manager__phone_e164",
+        "machine__identifier",
+        "machine__description",
+        "original_text",
+    ]
+    readonly_fields = [
+        "manager",
+        "inbound_message",
+        "machine",
+        "action",
+        "status",
+        "original_text",
+        "parsed_payload",
+        "error_message",
+        "applied_hourmeter_reading",
+        "applied_maintenance_record",
+        "confirmed_at",
+        "applied_at",
+        "created_at",
+    ]
+
+
+@admin.register(MachineMaintenanceAlertDispatch)
+class MachineMaintenanceAlertDispatchAdmin(admin.ModelAdmin):
+    list_display = [
+        "id",
+        "reference_date",
+        "manager",
+        "machine",
+        "maintenance_plan",
+        "hours_to_next_revision",
+        "sent_at",
+    ]
+    list_filter = ["reference_date", "sent_at"]
+    search_fields = [
+        "manager__name",
+        "manager__phone_e164",
+        "machine__identifier",
+        "machine__description",
+    ]
+    readonly_fields = [
+        "manager",
+        "machine",
+        "maintenance_plan",
+        "reference_date",
+        "hours_to_next_revision",
+        "sent_at",
+        "provider_message_id",
+        "created_at",
+    ]
