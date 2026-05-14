@@ -5710,47 +5710,179 @@ class SeedConfigAdmin(admin.ModelAdmin):
         return cultura
     cultura_description.short_description = "Cultura"
     
-
-from datetime import timedelta
-
 @admin.register(BackgroundTaskStatus)
 class BackgroundTaskStatusAdmin(admin.ModelAdmin):
     list_display = [
-        'task_id',
+        'short_task_id',
         'formated_created',
         'task_name',
-        'status',
+        'status_badge',
         'formatted_started_at',
         'formatted_ended_at',
-        'task_duration'
+        'task_duration',
     ]
+
+    list_filter = [
+        'status',
+        'task_name',
+        'criados',
+        'started_at',
+        'ended_at',
+    ]
+
+    search_fields = [
+        'task_id',
+        'task_name',
+        'status',
+    ]
+
+    ordering = ['-criados']
+
+    readonly_fields = [
+        'task_id',
+        'task_name',
+        'status',
+        'started_at',
+        'ended_at',
+        'result',
+        'formated_created',
+        'formatted_started_at',
+        'formatted_ended_at',
+        'task_duration',
+    ]
+
+    fieldsets = (
+        ('Identificação', {
+            'fields': (
+                'task_id',
+                'task_name',
+                'status',
+            )
+        }),
+        ('Datas', {
+            'fields': (
+                'formated_created',
+                'formatted_started_at',
+                'formatted_ended_at',
+                'task_duration',
+            )
+        }),
+        ('Resultado', {
+            'fields': (
+                'result',
+            )
+        }),
+    )
+
+    list_per_page = 50
+    date_hierarchy = 'criados'
+
+    def short_task_id(self, obj):
+        if not obj.task_id:
+            return '-'
+
+        task_id = str(obj.task_id)
+
+        if len(task_id) <= 18:
+            return task_id
+
+        return f'{task_id[:8]}...{task_id[-6:]}'
+
+    short_task_id.short_description = 'Task ID'
+    short_task_id.admin_order_field = 'task_id'
+
+    def status_badge(self, obj):
+        status = obj.status or '-'
+
+        colors = {
+            'pending': {
+                'bg': '#FEF3C7',
+                'color': '#92400E',
+                'label': 'Pendente',
+            },
+            'running': {
+                'bg': '#DBEAFE',
+                'color': '#1E40AF',
+                'label': 'Rodando',
+            },
+            'done': {
+                'bg': '#DCFCE7',
+                'color': '#166534',
+                'label': 'Finalizado',
+            },
+            'failed': {
+                'bg': '#FEE2E2',
+                'color': '#991B1B',
+                'label': 'Falhou',
+            },
+        }
+
+        config = colors.get(status, {
+            'bg': '#E5E7EB',
+            'color': '#374151',
+            'label': status,
+        })
+
+        return format_html(
+            """
+            <span style="
+                display: inline-flex;
+                align-items: center;
+                padding: 3px 10px;
+                border-radius: 999px;
+                background: {};
+                color: {};
+                font-size: 12px;
+                font-weight: 700;
+                line-height: 1.4;
+                white-space: nowrap;
+            ">
+                {}
+            </span>
+            """,
+            config['bg'],
+            config['color'],
+            config['label'],
+        )
+
+    status_badge.short_description = 'Status'
+    status_badge.admin_order_field = 'status'
 
     def formatted_started_at(self, obj):
         if obj.started_at:
             return obj.started_at.strftime('%d/%m/%Y %H:%M:%S')
         return "-"
+
     formatted_started_at.short_description = "Início"
+    formatted_started_at.admin_order_field = 'started_at'
 
     def formatted_ended_at(self, obj):
         if obj.ended_at:
             return obj.ended_at.strftime('%d/%m/%Y %H:%M:%S')
         return "-"
+
     formatted_ended_at.short_description = "Fim"
+    formatted_ended_at.admin_order_field = 'ended_at'
 
     def task_duration(self, obj):
         if obj.started_at and obj.ended_at:
             duration = obj.ended_at - obj.started_at
-            # Formata como H:MM:SS
             return str(timedelta(seconds=int(duration.total_seconds())))
+
+        if obj.started_at and not obj.ended_at and obj.status == 'running':
+            return "Em execução"
+
         return "-"
+
     task_duration.short_description = "Duração"
-    
+
     def formated_created(self, obj):
         if obj.criados:
             return obj.criados.strftime('%d/%m/%Y %H:%M:%S')
         return "-"
+
     formated_created.short_description = "Data"
-    
+    formated_created.admin_order_field = 'criados'    
     
 
 @admin.register(EmailAberturaST)

@@ -10,6 +10,7 @@ from .models import (
     MachineStatusChange,
     MachineWhatsappCommand,
     MachineMaintenanceAlertDispatch,
+    MachineHourmeterStaleAlertDispatch
 )
 
 from django.http import HttpResponse
@@ -797,3 +798,67 @@ class MachineMaintenanceAlertDispatchAdmin(admin.ModelAdmin):
         "provider_message_id",
         "created_at",
     ]
+    
+
+
+@admin.register(MachineHourmeterStaleAlertDispatch)
+class MachineHourmeterStaleAlertDispatchAdmin(admin.ModelAdmin):
+    list_display = [
+        "id",
+        "reference_date",
+        "manager",
+        "machine",
+        "audience",
+        "current_hourmeter",
+        "last_hourmeter_at",
+        "sent_at",
+        "created_at",
+    ]
+
+    list_filter = [
+        "audience",
+        "reference_date",
+        "sent_at",
+        "created_at",
+    ]
+
+    search_fields = [
+        "manager__name",
+        "manager__phone_e164",
+        "machine__identifier",
+        "machine__description",
+        "machine__fazenda__nome",
+    ]
+
+    readonly_fields = [
+        "manager",
+        "machine",
+        "audience",
+        "reference_date",
+        "last_hourmeter_at",
+        "current_hourmeter",
+        "sent_at",
+        "provider_message_id",
+        "created_at",
+    ]
+
+    autocomplete_fields = [
+        "manager",
+        "machine",
+    ]
+
+    date_hierarchy = "reference_date"
+
+    ordering = [
+        "-reference_date",
+        "machine__identifier",
+        "audience",
+    ]
+
+    list_per_page = 50
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False

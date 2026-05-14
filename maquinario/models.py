@@ -871,3 +871,62 @@ class MachineMaintenanceAlertDispatch(models.Model):
 
     def __str__(self):
         return f"{self.manager} - {self.machine} - {self.reference_date}"
+
+
+
+class MachineHourmeterStaleAlertDispatch(models.Model):
+    class Audience(models.TextChoices):
+        UPDATE_MANAGER = "update_manager", "Responsável por atualização"
+        FIELD_MANAGER = "field_manager", "Gerente de Campo"
+
+    manager = models.ForeignKey(
+        "opscheckin.Manager",
+        on_delete=models.CASCADE,
+        related_name="machine_hourmeter_stale_dispatches",
+    )
+
+    machine = models.ForeignKey(
+        "Machine",
+        on_delete=models.CASCADE,
+        related_name="hourmeter_stale_dispatches",
+    )
+
+    audience = models.CharField(
+        max_length=30,
+        choices=Audience.choices,
+        db_index=True,
+    )
+
+    reference_date = models.DateField(db_index=True)
+
+    last_hourmeter_at = models.DateTimeField(null=True, blank=True)
+    current_hourmeter = models.DecimalField(
+        max_digits=10,
+        decimal_places=1,
+        null=True,
+        blank=True,
+    )
+
+    sent_at = models.DateTimeField(null=True, blank=True)
+    provider_message_id = models.CharField(max_length=128, blank=True, default="")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-reference_date", "machine__identifier"]
+        verbose_name = "Disparo de alerta de horímetro desatualizado"
+        verbose_name_plural = "Disparos de alertas de horímetro desatualizado"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["manager", "machine", "audience", "reference_date"],
+                name="uniq_machine_hourmeter_stale_alert_day",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["manager", "reference_date"]),
+            models.Index(fields=["machine", "reference_date"]),
+            models.Index(fields=["audience", "reference_date"]),
+        ]
+
+    def __str__(self):
+        return f"{self.manager} - {self.machine} - {self.audience} - {self.reference_date}"

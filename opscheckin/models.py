@@ -275,6 +275,8 @@ class OutboundMessage(models.Model):
             ("machine_update_applied", "Atualização de máquina aplicada"),
             ("machine_update_field_manager_notice", "Aviso atualização maquinário"),
             ("machine_revision_alert", "Alerta revisão de máquina"),
+            ("machine_hourmeter_stale_update_request", "Solicitação horímetro desatualizado"),
+            ("machine_hourmeter_stale_field_manager_notice", "Aviso horímetro desatualizado ao gerente de campo"),
         ],
         db_index=True,
     )
