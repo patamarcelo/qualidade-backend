@@ -15,6 +15,9 @@ from maquinario.models import (
 from opscheckin.models import Manager, OutboundMessage
 from opscheckin.services.whatsapp import send_text, send_template
 
+import logging
+logger = logging.getLogger("opscheckin.whatsapp")
+
 
 UPDATE_MACHINE_CODE = "update_machine"
 FIELD_MANAGER_DIVISION_NAME = "Gerente de Campo"
@@ -33,6 +36,8 @@ def normalize_decimal(value):
 def normalize_text(text):
     return re.sub(r"\s+", " ", (text or "").strip())
 
+def compact_machine_code(value):
+    return re.sub(r"[\s._/-]+", "", (value or "").strip()).upper()
 
 def format_decimal_br(value):
     if value is None:
@@ -141,6 +146,87 @@ def parse_machinery_message(text):
     }
 
 
+def parse_hourmeter_bulk_message(text):
+    """
+    Interpreta mensagens no padrão:
+
+    HORIMETRO
+
+    TR 23 - 1540
+    TR 41 - 2201
+    PV 08 - 873
+    """
+
+    raw_text = (text or "").strip()
+
+    if not raw_text:
+        return None
+
+    lines = [
+        (line or "").strip()
+        for line in raw_text.splitlines()
+        if (line or "").strip()
+    ]
+
+    if not lines:
+        return None
+
+    header = lines[0].strip().lower()
+
+    if header not in {"horimetro", "horímetro"}:
+        return None
+
+    items = []
+    invalid_lines = []
+    empty_lines = []
+
+    for line in lines[1:]:
+        clean = line.strip()
+
+        if not clean:
+            continue
+
+        m = re.match(
+            r"^\s*(.+?)\s*[-–—:]\s*(\d+(?:[,.]\d+)?)?\s*$",
+            clean,
+            re.I,
+        )
+
+        if not m:
+            invalid_lines.append(clean)
+            continue
+
+        machine_query = normalize_text(m.group(1)).upper()
+        hourmeter_raw = (m.group(2) or "").strip()
+
+        if not machine_query:
+            invalid_lines.append(clean)
+            continue
+
+        if not hourmeter_raw:
+            empty_lines.append(machine_query)
+            continue
+
+        hourmeter = normalize_decimal(hourmeter_raw)
+
+        if hourmeter is None:
+            invalid_lines.append(clean)
+            continue
+
+        items.append({
+            "machine_query": machine_query,
+            "hourmeter": hourmeter,
+            "raw_line": clean,
+        })
+
+    return {
+        "items": items,
+        "invalid_lines": invalid_lines,
+        "empty_lines": empty_lines,
+    }
+    
+
+
 def find_machine_for_manager(manager, machine_query):
     query = (machine_query or "").strip()
 
@@ -166,7 +252,40 @@ def find_machine_for_manager(manager, machine_query):
     if len(partial) == 1:
         return partial[0], partial
 
+    query_compact = compact_machine_code(query)
+
+    if query_compact:
+        candidates = list(
+            base_qs
+            .order_by("identifier")[:500]
+        )
+
+        compact_matches = [
+            machine
+            for machine in candidates
+            if compact_machine_code(machine.identifier) == query_compact
+        ]
+
+        if len(compact_matches) == 1:
+            return compact_matches[0], compact_matches
+
+        if len(compact_matches) > 1:
+            return None, compact_matches[:5]
+
+        compact_partial_matches = [
+            machine
+            for machine in candidates
+            if query_compact in compact_machine_code(machine.identifier)
+        ]
+
+        if len(compact_partial_matches) == 1:
+            return compact_partial_matches[0], compact_partial_matches
+
+        if len(compact_partial_matches) > 1:
+            return None, compact_partial_matches[:5]
+
     return None, partial
+
 
 
 def get_pending_command(manager):
@@ -505,9 +624,209 @@ def apply_command(command):
     return False, "Tipo de comando não reconhecido."
 
 
+
+
+
+def apply_bulk_hourmeter_update(*, manager, inbound, parsed_bulk):
+    items = parsed_bulk.get("items") or []
+    invalid_lines = parsed_bulk.get("invalid_lines") or []
+    empty_lines = parsed_bulk.get("empty_lines") or []
+
+    if not manager_can_update_machine(manager):
+        send_text(
+            manager.phone_e164,
+            "Seu número está cadastrado, mas não está habilitado para atualizar máquinas pelo WhatsApp.",
+        )
+        return True
+
+    if not items:
+        message_lines = [
+            "Não encontrei nenhum horímetro preenchido para salvar.",
+            "",
+            "Use o padrão:",
+            "HORIMETRO",
+            "",
+            "TR 23 - 1540",
+            "TR 41 - 2201",
+        ]
+
+        if empty_lines:
+            message_lines.extend([
+                "",
+                f"Linhas sem valor: {len(empty_lines)}",
+            ])
+
+        if invalid_lines:
+            message_lines.extend([
+                "",
+                "Linhas inválidas:",
+                *invalid_lines[:10],
+            ])
+
+        send_text(manager.phone_e164, "\n".join(message_lines).strip())
+        return True
+
+    updated = []
+    failed = []
+    ambiguous = []
+
+    for item in items:
+        machine_query = item.get("machine_query")
+        hourmeter = item.get("hourmeter")
+
+        try:
+            machine, matches = find_machine_for_manager(manager, machine_query)
+
+            if not machine:
+                if matches:
+                    ambiguous.append(
+                        f"{machine_query}: mais de uma máquina encontrada"
+                    )
+                else:
+                    failed.append(
+                        f"{machine_query}: máquina não encontrada nas fazendas liberadas"
+                    )
+                continue
+
+            if hourmeter is None:
+                failed.append(
+                    f"{machine_query}: horímetro inválido"
+                )
+                continue
+
+            if hourmeter < 0:
+                failed.append(
+                    f"{machine.identifier}: horímetro negativo"
+                )
+                continue
+
+            if machine.current_hourmeter and hourmeter < machine.current_hourmeter:
+                failed.append(
+                    (
+                        f"{machine.identifier}: informado {format_decimal_br(hourmeter)}h, "
+                        f"atual {format_decimal_br(machine.current_hourmeter)}h"
+                    )
+                )
+                continue
+
+            with transaction.atomic():
+                machine_locked = (
+                    Machine.objects
+                    .select_for_update()
+                    .get(id=machine.id)
+                )
+
+                if machine_locked.current_hourmeter and hourmeter < machine_locked.current_hourmeter:
+                    failed.append(
+                        (
+                            f"{machine_locked.identifier}: informado {format_decimal_br(hourmeter)}h, "
+                            f"atual {format_decimal_br(machine_locked.current_hourmeter)}h"
+                        )
+                    )
+                    continue
+
+                now = timezone.now()
+
+                reading = HourmeterReading.objects.create(
+                    machine=machine_locked,
+                    value=hourmeter,
+                    measured_at=now,
+                    source=HourmeterReading.Source.WHATSAPP,
+                    notes=f"Atualizado via WhatsApp em lote por {manager.name}",
+                    user_uid="",
+                    user_email="",
+                    user_display_name=manager.name,
+                )
+
+                command = MachineWhatsappCommand.objects.create(
+                    manager=manager,
+                    inbound_message=inbound,
+                    machine=machine_locked,
+                    action=MachineWhatsappCommand.Action.UPDATE_HOURMETER,
+                    status=MachineWhatsappCommand.Status.APPLIED,
+                    original_text=item.get("raw_line") or "",
+                    parsed_payload={
+                        "machine_query": machine_query,
+                        "hourmeter": str(hourmeter),
+                        "plan_hours": None,
+                        "plan_name": "",
+                        "bulk": True,
+                    },
+                    confirmed_at=now,
+                    applied_at=now,
+                    applied_hourmeter_reading=reading,
+                )
+
+                updated.append(
+                    f"✅ {machine_locked.identifier}: {format_decimal_br(hourmeter)}h"
+                )
+
+                action_label = f"Horímetro atualizado para {format_decimal_br(hourmeter)}h"
+
+                transaction.on_commit(
+                    lambda command_id=command.id, action_label=action_label: notify_field_managers(
+                        MachineWhatsappCommand.objects
+                        .select_related("machine", "manager")
+                        .get(id=command_id),
+                        action_label,
+                    )
+                )
+
+        except Exception:
+            logger.exception(
+                "MACHINE_BULK_HOURMETER_ITEM_FAILED manager_id=%s machine_query=%s inbound_id=%s",
+                getattr(manager, "id", None),
+                machine_query,
+                getattr(inbound, "id", None),
+            )
+            failed.append(
+                f"{machine_query}: erro interno ao processar"
+            )
+
+    response_lines = []
+
+    if updated:
+        response_lines.append(f"Horímetros atualizados: {len(updated)}")
+        response_lines.extend(updated)
+
+    if failed:
+        response_lines.append("")
+        response_lines.append(f"Não salvos: {len(failed)}")
+        response_lines.extend([f"⚠️ {line}" for line in failed[:15]])
+
+    if ambiguous:
+        response_lines.append("")
+        response_lines.append(f"Ambíguos: {len(ambiguous)}")
+        response_lines.extend([f"⚠️ {line}" for line in ambiguous[:15]])
+
+    if invalid_lines:
+        response_lines.append("")
+        response_lines.append(f"Linhas inválidas: {len(invalid_lines)}")
+        response_lines.extend([f"⚠️ {line}" for line in invalid_lines[:10]])
+
+    if empty_lines:
+        response_lines.append("")
+        response_lines.append(f"Linhas ignoradas sem horímetro: {len(empty_lines)}")
+
+    if not response_lines:
+        response_lines.append("Nenhum horímetro foi atualizado.")
+
+    send_text(manager.phone_e164, "\n".join(response_lines).strip())
+
+    return True
+
 def handle_machinery_whatsapp_message(*, manager, inbound, text):
     raw = normalize_text(text)
     low = raw.lower()
+
+    parsed_bulk = parse_hourmeter_bulk_message(text)
+
+    if parsed_bulk is not None:
+        return apply_bulk_hourmeter_update(
+            manager=manager,
+            inbound=inbound,
+            parsed_bulk=parsed_bulk,
+        )
 
     pending = get_pending_command(manager)
 
