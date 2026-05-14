@@ -36,6 +36,8 @@ from openpyxl import Workbook
 
 from django.db import transaction
 
+from diamante.models import Projeto
+
 
 class MachineViewSet(viewsets.ModelViewSet):
     queryset = (
@@ -43,6 +45,139 @@ class MachineViewSet(viewsets.ModelViewSet):
         .select_related("fazenda")
         .all()
     )
+    
+    def _get_user_custom_claims(self, user_data):
+        if not isinstance(user_data, dict):
+            return {}
+
+        return user_data.get("customClaims") or {}
+
+
+    def _get_allowed_projects_from_user(self, user_data):
+        custom_claims = self._get_user_custom_claims(user_data)
+
+        projetos_liberados = custom_claims.get("projetosLiberados") or []
+
+        if isinstance(projetos_liberados, str):
+            projetos_liberados = [projetos_liberados]
+
+        return [
+            str(nome).strip()
+            for nome in projetos_liberados
+            if str(nome or "").strip()
+        ]
+
+
+    def _get_allowed_farm_ids_from_user(self, user_data):
+        projetos_liberados = self._get_allowed_projects_from_user(user_data)
+
+        if not projetos_liberados:
+            return []
+
+        return list(
+            Projeto.objects
+            .filter(
+                ativo=True,
+                nome__in=projetos_liberados,
+            )
+            .values_list("fazenda_id", flat=True)
+            .distinct()
+        )
+        
+    
+    def _empty_permission_response(self, user_data, filters=None):
+        filters = filters or {}
+
+        return Response({
+            "data": [],
+            "totals": {
+                "total": 0,
+                "operation": 0,
+                "revision": 0,
+                "maintenance": 0,
+            },
+            "filters": filters,
+            "available_filters": {
+                "farms": [],
+                "status": [],
+                "machine_type": [],
+            },
+            "permission": {
+                "allowed": False,
+                "reason": "missing_projects_claim",
+                "requires_token_refresh": True,
+                "message": (
+                    "Nenhum projeto liberado foi encontrado para este usuário. "
+                    "Saia e entre novamente no app para atualizar suas permissões."
+                ),
+            },
+            "user": {
+                "email": user_data.get("email") if isinstance(user_data, dict) else None,
+                "uid": user_data.get("uid") if isinstance(user_data, dict) else None,
+            },
+        })
+        
+    
+    def _build_farms_filter(self, allowed_farm_ids):
+        FazendaModel = Machine._meta.get_field("fazenda").remote_field.model
+
+        farms = (
+            FazendaModel.objects
+            .filter(id__in=allowed_farm_ids)
+            .order_by("nome")
+        )
+
+        return [
+            {
+                "id": farm.id,
+                "name": str(farm),
+            }
+            for farm in farms
+        ]
+
+
+    def _build_status_filter(self, allowed_farm_ids):
+        available_statuses = (
+            Machine.objects
+            .filter(
+                is_active=True,
+                fazenda_id__in=allowed_farm_ids,
+            )
+            .values_list("status", flat=True)
+            .distinct()
+        )
+
+        labels = dict(Machine.Status.choices)
+
+        return [
+            {
+                "value": status_value,
+                "label": labels.get(status_value, status_value),
+            }
+            for status_value in available_statuses
+        ]
+
+
+    def _build_machine_type_filter(self, allowed_farm_ids):
+        available_types = (
+            Machine.objects
+            .filter(
+                is_active=True,
+                fazenda_id__in=allowed_farm_ids,
+            )
+            .values_list("machine_type", flat=True)
+            .distinct()
+        )
+
+        labels = dict(Machine.MachineType.choices)
+
+        return [
+            {
+                "value": machine_type,
+                "label": labels.get(machine_type, machine_type),
+            }
+            for machine_type in available_types
+        ]
 
     def get_serializer_class(self):
         if self.action == "list":
@@ -389,19 +524,114 @@ class MachineViewSet(viewsets.ModelViewSet):
         manager_id = request.data.get("manager_id")
         search = request.data.get("search") or ""
         user_data = request.data.get("user") or {}
-        
+
+        filters_payload = {
+            "fazenda_id": fazenda_id,
+            "status": status_values,
+            "machine_type": machine_types,
+            "manager_id": manager_id,
+            "search": search,
+        }
+
         print("MAQUINARIO list_app user_data:", user_data)
-        print("MAQUINARIO list_app customClaims:", user_data.get("customClaims"))
+        print("MAQUINARIO list_app customClaims:", user_data.get("customClaims") if isinstance(user_data, dict) else None)
         print("MAQUINARIO list_app payload:", request.data)
+
+        projetos_liberados = self._get_allowed_projects_from_user(user_data)
+        allowed_farm_ids = self._get_allowed_farm_ids_from_user(user_data)
+
+        print("MAQUINARIO projetos_liberados:", projetos_liberados)
+        print("MAQUINARIO allowed_farm_ids:", allowed_farm_ids)
+
+        if not projetos_liberados:
+            return self._empty_permission_response(
+                user_data=user_data,
+                filters=filters_payload,
+            )
+
+        if not allowed_farm_ids:
+            return Response({
+                "data": [],
+                "totals": {
+                    "total": 0,
+                    "operation": 0,
+                    "revision": 0,
+                    "maintenance": 0,
+                },
+                "filters": filters_payload,
+                "available_filters": {
+                    "farms": [],
+                    "status": [],
+                    "machine_type": [],
+                },
+                "permission": {
+                    "allowed": False,
+                    "reason": "projects_without_farms",
+                    "requires_token_refresh": False,
+                    "message": (
+                        "Os projetos liberados para este usuário não possuem fazendas vinculadas "
+                        "ou não foram encontrados no cadastro."
+                    ),
+                    "projetos_liberados": projetos_liberados,
+                },
+                "user": {
+                    "email": user_data.get("email"),
+                    "uid": user_data.get("uid"),
+                },
+            })
 
         queryset = (
             Machine.objects
             .select_related("fazenda")
-            .filter(is_active=True)
+            .filter(
+                is_active=True,
+                fazenda_id__in=allowed_farm_ids,
+            )
         )
 
         if fazenda_id:
-            queryset = queryset.filter(fazenda_id=fazenda_id)
+            try:
+                fazenda_id_int = int(fazenda_id)
+            except (TypeError, ValueError):
+                return Response(
+                    {
+                        "data": [],
+                        "error": "fazenda_id inválido.",
+                        "filters": filters_payload,
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            if fazenda_id_int not in allowed_farm_ids:
+                return Response({
+                    "data": [],
+                    "totals": {
+                        "total": 0,
+                        "operation": 0,
+                        "revision": 0,
+                        "maintenance": 0,
+                    },
+                    "filters": filters_payload,
+                    "available_filters": {
+                        "farms": self._build_farms_filter(allowed_farm_ids),
+                        "status": self._build_status_filter(allowed_farm_ids),
+                        "machine_type": self._build_machine_type_filter(allowed_farm_ids),
+                    },
+                    "permission": {
+                        "allowed": False,
+                        "reason": "farm_not_allowed",
+                        "requires_token_refresh": False,
+                        "message": "Esta fazenda não está liberada para o usuário atual.",
+                        "allowed_farm_ids": allowed_farm_ids,
+                        "requested_fazenda_id": fazenda_id_int,
+                    },
+                    "user": {
+                        "email": user_data.get("email"),
+                        "uid": user_data.get("uid"),
+                    },
+                })
+
+            queryset = queryset.filter(fazenda_id=fazenda_id_int)
 
         if status_values:
             queryset = queryset.filter(status__in=status_values)
@@ -418,18 +648,6 @@ class MachineViewSet(viewsets.ModelViewSet):
                 | Q(model_name__icontains=search)
             )
 
-        # Futuro:
-        # aqui entra filtro por responsabilidade/manager.
-        # Exemplo quando existir vínculo Machine <-> Manager:
-        #
-        # if manager_id:
-        #     queryset = queryset.filter(responsible_managers__id=manager_id)
-        #
-        # ou usando o e-mail/uid enviado:
-        #
-        # user_email = user_data.get("email")
-        # user_uid = user_data.get("uid")
-
         machines = queryset.order_by("identifier")
 
         serializer = MachineListSerializer(machines, many=True)
@@ -442,12 +660,18 @@ class MachineViewSet(viewsets.ModelViewSet):
                 "revision": machines.filter(status=Machine.Status.REVISION).count(),
                 "maintenance": machines.filter(status=Machine.Status.MAINTENANCE).count(),
             },
-            "filters": {
-                "fazenda_id": fazenda_id,
-                "status": status_values,
-                "machine_type": machine_types,
-                "manager_id": manager_id,
-                "search": search,
+            "filters": filters_payload,
+            "available_filters": {
+                "farms": self._build_farms_filter(allowed_farm_ids),
+                "status": self._build_status_filter(allowed_farm_ids),
+                "machine_type": self._build_machine_type_filter(allowed_farm_ids),
+            },
+            "permission": {
+                "allowed": True,
+                "reason": "ok",
+                "requires_token_refresh": False,
+                "allowed_farm_ids": allowed_farm_ids,
+                "projetos_liberados_count": len(projetos_liberados),
             },
             "user": {
                 "email": user_data.get("email"),
@@ -455,6 +679,8 @@ class MachineViewSet(viewsets.ModelViewSet):
             },
         })
         
+        
+
     @action(detail=True, methods=["get"])
     def readings(self, request, pk=None):
         machine = self.get_object()
