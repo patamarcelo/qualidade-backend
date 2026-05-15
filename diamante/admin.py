@@ -1616,7 +1616,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         t = Thread(
             target=self._safe_update_farmbox_data,
             args=(id_farmbox, data_str, variedade_id, cultura_id),
-            daemon=True
+            daemon=False,
         )
         t.start()
 
@@ -3348,7 +3348,7 @@ class OperacaoAdmin(admin.ModelAdmin):
     @staticmethod
     def processar_operacao_em_background(
         task_id,
-        query,
+        programa_id,
         current_op,
         produtos,
         changed_dap,
@@ -3356,16 +3356,33 @@ class OperacaoAdmin(admin.ModelAdmin):
         nome_estagio_alterado,
         estagio_alterado,
     ):
-        close_old_connections()  # fundamental em thread
+        print("🔥 ENTROU NA TASK DE OPERAÇÃO/ESTÁGIO", task_id, flush=True)
+        print("programa_id:", programa_id, flush=True)
+        print("current_op:", current_op, flush=True)
+        print("changed_dap:", changed_dap, "newDap:", newDap, flush=True)
+        print("nome_estagio_alterado:", nome_estagio_alterado, "estagio_alterado:", estagio_alterado, flush=True)
+
+        close_old_connections()
         task = None
         started_at = timezone.now()
 
         try:
             task = BackgroundTaskStatus.objects.get(task_id=task_id)
             task.status = "running"
+
             if hasattr(task, "started_at"):
                 task.started_at = started_at
-            task.save(update_fields=["status"] + (["started_at"] if hasattr(task, "started_at") else []))
+
+            task.save(
+                update_fields=["status"] + (["started_at"] if hasattr(task, "started_at") else [])
+            )
+
+            query = Plantio.objects.filter(
+                programa_id=programa_id,
+                inicializado_plantio=True,
+            )
+
+            print("plantios encontrados para atualizar:", query.count(), flush=True)
 
             admin_form_alter_programa_and_save(
                 query,
@@ -3378,22 +3395,48 @@ class OperacaoAdmin(admin.ModelAdmin):
             )
 
             task.status = "done"
+
             if hasattr(task, "result"):
-                task.result = {"ok": True}
+                task.result = {
+                    "ok": True,
+                    "programa_id": programa_id,
+                    "plantios_processados": query.count(),
+                    "current_op": current_op,
+                    "changed_dap": changed_dap,
+                    "newDap": newDap,
+                    "nome_estagio_alterado": nome_estagio_alterado,
+                    "estagio_alterado": estagio_alterado,
+                }
+
         except Exception as e:
+            print("❌ ERRO NA TASK DE OPERAÇÃO/ESTÁGIO:", str(e), flush=True)
+
             if task:
                 task.status = "failed"
+
                 if hasattr(task, "result"):
-                    task.result = {"error": str(e)}
+                    task.result = {
+                        "ok": False,
+                        "error": str(e),
+                        "programa_id": programa_id,
+                    }
+
         finally:
             if task:
+                update_fields = ["status"]
+
+                if hasattr(task, "result"):
+                    update_fields.append("result")
+
                 if hasattr(task, "ended_at"):
                     task.ended_at = timezone.now()
-                    task.save(update_fields=["status"] + (["result"] if hasattr(task, "result") else []) + (["ended_at"] if hasattr(task, "ended_at") else []))
-                else:
-                    task.save(update_fields=["status"] + (["result"] if hasattr(task, "result") else []))
-            close_old_connections()
+                    update_fields.append("ended_at")
 
+                task.save(update_fields=update_fields)
+
+            close_old_connections()
+            
+            
     def changelist_view(self, request, extra_context=None):
         extra_context = extra_context or {}
         if request.session.get("executou_task") and "task_id" in request.session:
@@ -3464,32 +3507,34 @@ class OperacaoAdmin(admin.ModelAdmin):
             ]
 
             current_program = form.instance.programa
-            current_query = Plantio.objects.filter(
-                programa=current_program,
-                inicializado_plantio=True,
-            )
+
+            programa_id = current_program.pk
 
             task_id = str(uuid.uuid4())
+
             BackgroundTaskStatus.objects.create(
                 task_id=task_id,
                 task_name=programa_nome,
                 status="pending",
             )
 
-            Thread(
-                target=self.processar_operacao_em_background,
-                args=(
-                    task_id,
-                    current_query,
-                    current_op,
-                    produtos,
-                    changed_dap,
-                    newDap,
-                    nome_estagio_alterado,
-                    estagio_alterado,
-                ),
-                daemon=True,
-            ).start()
+            def iniciar_task_operacao():
+                Thread(
+                    target=self.processar_operacao_em_background,
+                    args=(
+                        task_id,
+                        programa_id,
+                        current_op,
+                        produtos,
+                        changed_dap,
+                        newDap,
+                        nome_estagio_alterado,
+                        estagio_alterado,
+                    ),
+                    daemon=False,
+                ).start()
+
+            transaction.on_commit(iniciar_task_operacao)
 
             request.session["task_id"] = str(task_id)
             request.session["executou_task"] = True
