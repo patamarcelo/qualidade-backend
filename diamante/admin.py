@@ -3572,6 +3572,8 @@ class AplicacaoAdmin(admin.ModelAdmin):
         task_id,
         alteracoes,
     ):
+        print("🔥 ENTROU NA TASK DE SUBSTITUIÇÃO DO CRONOGRAMA", task_id, flush=True)
+        print("Total de alterações recebidas:", len(alteracoes or []), flush=True)
         close_old_connections()
         task = None
 
@@ -4109,11 +4111,14 @@ class AplicacaoAdmin(admin.ModelAdmin):
                         status="pending",
                     )
 
-                    Thread(
-                        target=self.processar_substituicao_cronograma_em_background,
-                        args=(task_id, alteracoes_cronograma),
-                        daemon=True,
-                    ).start()
+                    def iniciar_task_cronograma():
+                        Thread(
+                            target=self.processar_substituicao_cronograma_em_background,
+                            args=(task_id, alteracoes_cronograma),
+                            daemon=False,
+                        ).start()
+
+                    transaction.on_commit(iniciar_task_cronograma)
 
                     request.session["task_id"] = str(task_id)
                     request.session["executou_task"] = True

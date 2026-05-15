@@ -1803,7 +1803,7 @@ class BackgroundTaskStatus(Base):
     task_id    = models.CharField(max_length=100, unique=True)
     task_name  = models.CharField(max_length=100)
     status     = models.CharField(max_length=50, default='pending')  # pending, running, done, failed
-    started_at = models.DateTimeField(auto_now_add=True)
+    started_at = models.DateTimeField(null=True, blank=True)
     ended_at   = models.DateTimeField(null=True, blank=True)
     result     = models.JSONField(null=True, blank=True)
     
