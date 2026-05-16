@@ -26,6 +26,15 @@ CONFIRM_WORDS = {"confirmar", "confirma", "sim", "ok", "certo"}
 CANCEL_WORDS = {"cancelar", "cancela", "nao", "não"}
 
 
+
+MACHINE_UPDATE_CONFIRMATION_TEMPLATE = "machine_update_confirmation_v2"
+MACHINE_REVISION_CONFIRMATION_TEMPLATE = "machine_revision_confirmation_v2"
+
+MACHINE_BUTTON_PREFIX = "MC:"
+MACHINE_BUTTON_CONFIRM = "CONFIRM"
+MACHINE_BUTTON_CANCEL = "CANCEL"
+
+
 def normalize_decimal(value):
     try:
         return Decimal(str(value).replace(",", "."))
@@ -305,6 +314,9 @@ def extract_provider_message_id(resp):
         return ((resp or {}).get("messages") or [{}])[0].get("id") or ""
     except Exception:
         return ""
+    
+def build_machine_button_payload(action, command_id):
+    return f"{MACHINE_BUTTON_PREFIX}{action}:{command_id}"
 
 
 def log_outbound_template(manager, machine, template_name, body_text, resp, kind):
@@ -333,13 +345,17 @@ def send_command_confirmation(command):
 
         resp = send_template(
             machine_command_phone(command),
-            template_name="machine_update_confirmation",
+            template_name=MACHINE_UPDATE_CONFIRMATION_TEMPLATE,
             body_params=[
                 f"{machine.identifier} - {machine.description}",
                 str(machine.fazenda),
                 "Horímetro",
                 current_hourmeter,
                 new_hourmeter,
+            ],
+            quick_reply_payloads=[
+                build_machine_button_payload(MACHINE_BUTTON_CONFIRM, command.id),
+                build_machine_button_payload(MACHINE_BUTTON_CANCEL, command.id),
             ],
         )
 
@@ -351,7 +367,7 @@ def send_command_confirmation(command):
         log_outbound_template(
             manager=command.manager,
             machine=machine,
-            template_name="machine_update_confirmation",
+            template_name=MACHINE_UPDATE_CONFIRMATION_TEMPLATE,
             body_text=body_text,
             resp=resp,
             kind="machine_update_confirmation",
@@ -359,18 +375,23 @@ def send_command_confirmation(command):
 
         return resp
 
+    
     if command.action == MachineWhatsappCommand.Action.REGISTER_REVISION:
         hourmeter = format_decimal_br(payload.get("hourmeter"))
         plan_label = payload.get("plan_name") or f"Revisão de {payload.get('plan_hours')}h"
 
         resp = send_template(
             machine_command_phone(command),
-            template_name="machine_revision_confirmation",
+            template_name=MACHINE_REVISION_CONFIRMATION_TEMPLATE,
             body_params=[
                 f"{machine.identifier} - {machine.description}",
                 str(machine.fazenda),
                 plan_label,
                 hourmeter,
+            ],
+            quick_reply_payloads=[
+                build_machine_button_payload(MACHINE_BUTTON_CONFIRM, command.id),
+                build_machine_button_payload(MACHINE_BUTTON_CANCEL, command.id),
             ],
         )
 
@@ -382,7 +403,7 @@ def send_command_confirmation(command):
         log_outbound_template(
             manager=command.manager,
             machine=machine,
-            template_name="machine_revision_confirmation",
+            template_name=MACHINE_REVISION_CONFIRMATION_TEMPLATE,
             body_text=body_text,
             resp=resp,
             kind="machine_revision_confirmation",
@@ -815,9 +836,85 @@ def apply_bulk_hourmeter_update(*, manager, inbound, parsed_bulk):
 
     return True
 
-def handle_machinery_whatsapp_message(*, manager, inbound, text):
+
+def handle_machinery_button_reply(*, manager, reply_id):
+    raw = (reply_id or "").strip()
+
+    if not raw.startswith(MACHINE_BUTTON_PREFIX):
+        return False
+
+    # Formato esperado:
+    # MC:CONFIRM:<command_id>
+    # MC:CANCEL:<command_id>
+    parts = raw.split(":")
+
+    if len(parts) != 3:
+        send_text(
+            manager.phone_e164,
+            "Não consegui interpretar essa resposta. Envie CONFIRMAR para salvar ou CANCELAR para ignorar.",
+        )
+        return True
+
+    _, action, command_id_raw = parts
+
+    try:
+        command_id = int(command_id_raw)
+    except Exception:
+        send_text(
+            manager.phone_e164,
+            "Não consegui identificar a operação. Envie CONFIRMAR para salvar ou CANCELAR para ignorar.",
+        )
+        return True
+
+    command = (
+        MachineWhatsappCommand.objects
+        .select_related("machine", "manager")
+        .filter(
+            id=command_id,
+            manager=manager,
+            status=MachineWhatsappCommand.Status.PENDING_CONFIRMATION,
+        )
+        .first()
+    )
+
+    if not command:
+        send_text(
+            manager.phone_e164,
+            "Essa operação não está mais pendente. Ela pode já ter sido confirmada, cancelada ou substituída.",
+        )
+        return True
+
+    action = (action or "").strip().upper()
+
+    if action == MACHINE_BUTTON_CONFIRM:
+        ok, message = apply_command(command)
+        send_text(manager.phone_e164, message)
+        return True
+
+    if action == MACHINE_BUTTON_CANCEL:
+        command.status = MachineWhatsappCommand.Status.CANCELLED
+        command.save(update_fields=["status"])
+        send_text(manager.phone_e164, "Operação cancelada. Nada foi salvo.")
+        return True
+
+    send_text(
+        manager.phone_e164,
+        "Não consegui interpretar essa opção. Envie CONFIRMAR para salvar ou CANCELAR para ignorar.",
+    )
+    return True
+
+
+def handle_machinery_whatsapp_message(*, manager, inbound, text, reply_id=""):
     raw = normalize_text(text)
     low = raw.lower()
+
+    
+    if reply_id:
+        if handle_machinery_button_reply(
+            manager=manager,
+            reply_id=reply_id,
+        ):
+            return True
 
     parsed_bulk = parse_hourmeter_bulk_message(text)
 

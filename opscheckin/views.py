@@ -1970,11 +1970,12 @@ def whatsapp_webhook(request):
                 # maquinário: horímetro/revisão por WhatsApp
                 # ==========
                 try:
-                    if msg_type == "text":
+                    if msg_type == "text" or reply_id.startswith("MC:"):
                         if handle_machinery_whatsapp_message(
                             manager=manager,
                             inbound=inbound,
                             text=text,
+                            reply_id=reply_id,
                         ):
                             _mark_inbound_processed(inbound, now)
                             continue

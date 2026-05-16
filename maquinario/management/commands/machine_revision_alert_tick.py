@@ -9,13 +9,20 @@ from maquinario.models import (
     MachineMaintenanceAlertDispatch,
 )
 from opscheckin.models import Manager, OutboundMessage
-from opscheckin.services.whatsapp import send_text
+from opscheckin.services.whatsapp import send_template
 
 
 DEFAULT_HOURS_THRESHOLD = Decimal("50.0")
 UPDATE_MACHINE_CODE = "update_machine"
+MACHINE_REVISION_ALERT_TEMPLATE = "machine_revision_alert"
 
-
+def extract_provider_message_id(resp):
+    try:
+        return ((resp or {}).get("messages") or [{}])[0].get("id") or ""
+    except Exception:
+        return ""
+    
+    
 def format_decimal_br(value):
     if value is None:
         return "-"
@@ -86,36 +93,6 @@ class Command(BaseCommand):
             )
 
             for manager in managers:
-                lines = [
-                    f"⚠️ Revisão próxima - {machine.identifier}",
-                    "",
-                    f"Fazenda: {machine.fazenda}",
-                    f"Máquina: {machine.description}",
-                    f"Horímetro atual: {format_decimal_br(machine.current_hourmeter)}h",
-                    "",
-                    "Revisões próximas:",
-                ]
-
-                for item in due_items:
-                    hours = format_decimal_br(item["hours_to_next_revision"])
-                    next_hourmeter = format_decimal_br(item["next_revision_hourmeter"])
-
-                    lines.append(
-                        f"• {item['plan_name']}: próxima em {next_hourmeter}h "
-                        f"(faltam {hours}h)"
-                    )
-
-                lines.extend([
-                    "",
-                    "Para atualizar:",
-                    f"HM {machine.identifier} {format_decimal_br(machine.current_hourmeter)}",
-                    "",
-                    "Para registrar revisão:",
-                    f"REV {machine.identifier} 300 {format_decimal_br(machine.current_hourmeter)}",
-                ])
-
-                body = "\n".join(lines)
-
                 for item in due_items:
                     try:
                         dispatch, created = MachineMaintenanceAlertDispatch.objects.get_or_create(
@@ -135,18 +112,46 @@ class Command(BaseCommand):
                         skipped += 1
                         continue
 
+                    current_hourmeter = format_decimal_br(machine.current_hourmeter)
+                    next_hourmeter = format_decimal_br(item["next_revision_hourmeter"])
+                    hours_remaining = format_decimal_br(item["hours_to_next_revision"])
+                    plan_name = str(item.get("plan_name") or "Revisão programada")
+                    machine_label = f"{machine.identifier} - {machine.description}"
+
+                    body_text = (
+                        f"Revisão próxima | "
+                        f"{machine.fazenda} | {machine.identifier} | "
+                        f"{plan_name} | faltam {hours_remaining}h"
+                    )
+
                     if dry_run:
-                        self.stdout.write(body)
+                        self.stdout.write(
+                            "[REVISION_ALERT] "
+                            f"{manager.phone_e164} | "
+                            f"fazenda={machine.fazenda} | "
+                            f"machine={machine_label} | "
+                            f"current={current_hourmeter} | "
+                            f"plan={plan_name} | "
+                            f"next={next_hourmeter} | "
+                            f"remaining={hours_remaining}"
+                        )
                         continue
 
                     try:
-                        resp = send_text(manager.phone_e164, body)
+                        resp = send_template(
+                            manager.phone_e164,
+                            template_name=MACHINE_REVISION_ALERT_TEMPLATE,
+                            body_params=[
+                                str(machine.fazenda),
+                                machine_label,
+                                current_hourmeter,
+                                plan_name,
+                                next_hourmeter,
+                                hours_remaining,
+                            ],
+                        )
 
-                        provider_id = ""
-                        try:
-                            provider_id = ((resp or {}).get("messages") or [{}])[0].get("id") or ""
-                        except Exception:
-                            provider_id = ""
+                        provider_id = extract_provider_message_id(resp)
 
                         dispatch.sent_at = now
                         dispatch.provider_message_id = provider_id
@@ -157,7 +162,7 @@ class Command(BaseCommand):
                             to_phone=manager.phone_e164,
                             provider_message_id=provider_id,
                             kind="machine_revision_alert",
-                            text=body,
+                            text=body_text,
                             sent_at=now,
                             raw_response=resp,
                             wa_status="sent" if provider_id else "",
@@ -168,7 +173,7 @@ class Command(BaseCommand):
 
                     except Exception as exc:
                         self.stderr.write(
-                            f"Erro ao enviar para {manager}: {exc}"
+                            f"Erro ao enviar alerta de revisão para {manager}: {exc}"
                         )
 
         self.stdout.write(
