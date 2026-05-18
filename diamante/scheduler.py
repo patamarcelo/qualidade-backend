@@ -30,6 +30,11 @@ from opscheckin.cron import (
     run_opscheckin_personal_reminder_coordinator_daily_actions
 )
 
+from maquinario.cron import (
+    run_machine_revision_alert_tick,
+    run_machine_hourmeter_stale_tick,
+)
+
 from .scheduler_lock import acquire_scheduler_lock
 
 logger = logging.getLogger(__name__)
@@ -102,6 +107,19 @@ def job_run_opscheckin_manager_personal_reminder_tick():
 def job_run_opscheckin_personal_reminder_coordinator_daily_actions():
     _prepare_db_for_job()
     return run_opscheckin_personal_reminder_coordinator_daily_actions()
+
+# =====================================================================
+# Mquinario func
+# =====================================================================
+
+def job_run_machine_revision_alert_tick():
+    _prepare_db_for_job()
+    return run_machine_revision_alert_tick()
+
+
+def job_run_machine_hourmeter_stale_tick():
+    _prepare_db_for_job()
+    return run_machine_hourmeter_stale_tick()
 
 # =====================================================================
 # INICIALIZAÇÃO DO SCHEDULER
@@ -208,6 +226,31 @@ def start():
                 hour="8",
                 minute="30",
                 id="opscheckin_personal_reminder_coordinator_daily_actions_0830",
+                replace_existing=True,
+                misfire_grace_time=600,
+                coalesce=True,
+            )
+            
+            # GRUPO F — MAQUINÁRIO / ALERTAS WHATSAPP
+            scheduler.add_job(
+                job_run_machine_hourmeter_stale_tick,
+                "cron",
+                day_of_week="mon-fri",
+                hour="7",
+                minute="10",
+                id="machine_hourmeter_stale_tick_0710",
+                replace_existing=True,
+                misfire_grace_time=600,
+                coalesce=True,
+            )
+
+            scheduler.add_job(
+                job_run_machine_revision_alert_tick,
+                "cron",
+                day_of_week="mon-fri",
+                hour="7",
+                minute="20",
+                id="machine_revision_alert_tick_0720",
                 replace_existing=True,
                 misfire_grace_time=600,
                 coalesce=True,

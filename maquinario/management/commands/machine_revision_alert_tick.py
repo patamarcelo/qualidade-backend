@@ -13,7 +13,8 @@ from opscheckin.services.whatsapp import send_template
 
 
 DEFAULT_HOURS_THRESHOLD = Decimal("50.0")
-UPDATE_MACHINE_CODE = "update_machine"
+MACHINE_REVISION_ALERT_CODE = "machine_revision_alert"
+MACHINE_REVISION_ALERT_TEMPLATE = "machine_revision_alert"
 MACHINE_REVISION_ALERT_TEMPLATE = "machine_revision_alert"
 
 def extract_provider_message_id(resp):
@@ -32,12 +33,6 @@ def format_decimal_br(value):
     return text.replace(",", "X").replace(".", ",").replace("X", ".")
 
 
-def manager_can_update_machine(manager):
-    return manager.notification_subscriptions.filter(
-        notification_type__code=UPDATE_MACHINE_CODE,
-        notification_type__is_active=True,
-        is_active=True,
-    ).exists()
 
 
 class Command(BaseCommand):
@@ -84,7 +79,7 @@ class Command(BaseCommand):
                 .filter(
                     is_active=True,
                     projeto__fazenda_id=machine.fazenda_id,
-                    notification_subscriptions__notification_type__code=UPDATE_MACHINE_CODE,
+                    notification_subscriptions__notification_type__code=MACHINE_REVISION_ALERT_CODE,
                     notification_subscriptions__notification_type__is_active=True,
                     notification_subscriptions__is_active=True,
                 )
