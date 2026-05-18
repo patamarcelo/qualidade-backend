@@ -504,7 +504,7 @@ def notify_field_managers(command, action_label):
 def apply_command(command):
     command = (
         MachineWhatsappCommand.objects
-        .select_for_update()
+        .select_for_update(of=("self",))
         .select_related("machine", "manager")
         .get(id=command.id)
     )
