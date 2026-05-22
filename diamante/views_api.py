@@ -4379,28 +4379,30 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "plantio__talhao",
                     "plantio__safra",
                     "plantio__ciclo",
+                    "plantio__variedade",
+                    "plantio__variedade__cultura",
                 )
                 .filter(
                     colheita_safra_ciclo_q,
                     plantio__plantio_descontinuado=False,
                 )
                 .exclude(
-                    variedade__isnull=True,
+                    plantio__variedade__isnull=True,
                 )
                 .exclude(
-                    variedade__cultura__isnull=True,
+                    plantio__variedade__cultura__isnull=True,
                 )
                 .exclude(
-                    variedade__nome_fantasia__isnull=True,
+                    plantio__variedade__nome_fantasia__isnull=True,
                 )
                 .exclude(
-                    variedade__nome_fantasia="",
+                    plantio__variedade__nome_fantasia="",
                 )
                 .exclude(
-                    variedade__cultura__cultura__isnull=True,
+                    plantio__variedade__cultura__cultura__isnull=True,
                 )
                 .exclude(
-                    variedade__cultura__cultura="",
+                    plantio__variedade__cultura__cultura="",
                 )
                 .values(
                     "plantio__talhao__id_talhao",
