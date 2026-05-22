@@ -4476,6 +4476,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "acompanhamento_medias",
                     "area_colheita",
                     "area_parcial",
+                    "area_planejamento_plantio",
                 )
                 .annotate(
                     totaldays=(datetime.datetime.now().date() - F("data_plantio"))
