@@ -87,6 +87,25 @@ def get_manager_allowed_machines(manager):
     )
 
 
+def send_machine_text(manager, body, *, kind="machine_text"):
+    resp = send_text(manager.phone_e164, body)
+
+    provider_id = extract_provider_message_id(resp)
+
+    OutboundMessage.objects.create(
+        manager=manager,
+        to_phone=manager.phone_e164,
+        provider_message_id=provider_id,
+        kind=kind,
+        text=body,
+        sent_at=timezone.now(),
+        raw_response=resp,
+        wa_status="sent" if provider_id else "",
+        wa_sent_at=timezone.now() if provider_id else None,
+    )
+
+    return resp
+
 def parse_machinery_message(text):
     raw = normalize_text(text)
     low = raw.lower()
@@ -670,9 +689,10 @@ def apply_bulk_hourmeter_update(*, manager, inbound, parsed_bulk):
     empty_lines = parsed_bulk.get("empty_lines") or []
 
     if not manager_can_update_machine(manager):
-        send_text(
-            manager.phone_e164,
+        send_machine_text(
+            manager,
             "Seu número está cadastrado, mas não está habilitado para atualizar máquinas pelo WhatsApp.",
+            kind="machine_update_not_allowed",
         )
         return True
 
@@ -700,7 +720,11 @@ def apply_bulk_hourmeter_update(*, manager, inbound, parsed_bulk):
                 *invalid_lines[:10],
             ])
 
-        send_text(manager.phone_e164, "\n".join(message_lines).strip())
+        send_machine_text(
+            manager,
+            "\n".join(message_lines).strip(),
+            kind="machine_bulk_hourmeter_empty",
+        )
         return True
 
     updated = []
@@ -848,7 +872,11 @@ def apply_bulk_hourmeter_update(*, manager, inbound, parsed_bulk):
     if not response_lines:
         response_lines.append("Nenhum horímetro foi atualizado.")
 
-    send_text(manager.phone_e164, "\n".join(response_lines).strip())
+    send_machine_text(
+        manager,
+        "\n".join(response_lines).strip(),
+        kind="machine_bulk_hourmeter_result",
+    )
 
     return True
 
@@ -974,16 +1002,18 @@ def handle_machinery_whatsapp_message(*, manager, inbound, text, reply_id=""):
         return False
 
     if not manager_can_update_machine(manager):
-        send_text(
-            manager.phone_e164,
+        send_machine_text(
+            manager,
             "Seu número está cadastrado, mas não está habilitado para atualizar máquinas pelo WhatsApp.",
+            kind="machine_update_not_allowed",
         )
         return True
 
     if parsed.get("hourmeter") is None:
-        send_text(
-            manager.phone_e164,
-            "Não consegui identificar o horímetro. Use: HM TR23 1240 ou REV TR23 300 1200",
+        send_machine_text(
+            manager,
+            "Não consegui identificar o horímetro. Use: HM TR23 1240 ou HM TR 23 1240.",
+            kind="machine_invalid_hourmeter",
         )
         return True
 
@@ -995,36 +1025,51 @@ def handle_machinery_whatsapp_message(*, manager, inbound, text, reply_id=""):
                 f"{idx}) {item.identifier} - {item.description} - {item.fazenda}"
                 for idx, item in enumerate(matches, start=1)
             ]
-            send_text(
-                manager.phone_e164,
+
+            body = (
                 "Encontrei mais de uma máquina parecida. Envie o identificador mais específico:\n\n"
-                + "\n".join(lines),
+                + "\n".join(lines)
+            )
+
+            send_machine_text(
+                manager,
+                body,
+                kind="machine_ambiguous_match",
             )
             return True
 
-        send_text(
-            manager.phone_e164,
-            (
-                "Não encontrei essa máquina entre as fazendas liberadas para seu número.\n\n"
-                f"Máquina informada: {parsed.get('machine_query') or '-'}\n\n"
-                "Confira o código e envie novamente no padrão:\n"
-                "HM TR54 3909.8\n"
-                "ou\n"
-                "HM TR 54 3909.8"
-            ),
+        body = (
+            "Não encontrei essa máquina entre as fazendas liberadas para seu número.\n\n"
+            f"Máquina informada: {parsed.get('machine_query') or '-'}\n\n"
+            "Confira o código e envie novamente no padrão:\n"
+            "HM TR54 3909.8\n"
+            "ou\n"
+            "HM TR 54 3909.8"
+        )
+
+        send_machine_text(
+            manager,
+            body,
+            kind="machine_not_found",
         )
         return True
 
     hourmeter = parsed["hourmeter"]
 
     if machine.current_hourmeter and hourmeter < machine.current_hourmeter:
-        send_text(
-            manager.phone_e164,
-            (
-                "Não salvei.\n\n"
-                f"A máquina {machine.identifier} está com {format_decimal_br(machine.current_hourmeter)}h.\n"
-                f"Você informou {format_decimal_br(hourmeter)}h, que é menor que o atual."
-            ),
+        body = (
+            "Não salvei este horímetro.\n\n"
+            f"A máquina {machine.identifier} está cadastrada com {format_decimal_br(machine.current_hourmeter)}h.\n"
+            f"Você informou {format_decimal_br(hourmeter)}h, que é menor que o valor atual.\n\n"
+            "Confira o horímetro correto e envie novamente no padrão:\n"
+            f"HM {machine.identifier} 0000.0\n\n"
+            "Se o valor cadastrado no sistema estiver errado, avise o administrador."
+        )
+
+        send_machine_text(
+            manager,
+            body,
+            kind="machine_hourmeter_lower_than_current",
         )
         return True
 
@@ -1032,9 +1077,10 @@ def handle_machinery_whatsapp_message(*, manager, inbound, text, reply_id=""):
     if parsed["action"] == MachineWhatsappCommand.Action.REGISTER_REVISION:
         plan = find_maintenance_plan(machine, parsed.get("plan_hours"))
         if not plan:
-            send_text(
-                manager.phone_e164,
+            send_machine_text(
+                manager,
                 "Não encontrei um plano de revisão ativo com essa quantidade de horas para essa fazenda/máquina.",
+                kind="machine_revision_plan_not_found",
             )
             return True
 
@@ -1060,28 +1106,34 @@ def handle_machinery_whatsapp_message(*, manager, inbound, text, reply_id=""):
     except Exception:
         # fallback se template ainda não estiver aprovado/liberado
         if command.action == MachineWhatsappCommand.Action.UPDATE_HOURMETER:
-            send_text(
-                manager.phone_e164,
-                (
-                    "Confirme a atualização do horímetro:\n\n"
-                    f"Máquina: {machine.identifier} - {machine.description}\n"
-                    f"Fazenda: {machine.fazenda}\n"
-                    f"Horímetro atual: {format_decimal_br(machine.current_hourmeter)}h\n"
-                    f"Novo horímetro: {format_decimal_br(hourmeter)}h\n\n"
-                    "Responda CONFIRMAR para salvar ou CANCELAR para ignorar."
-                ),
+            body = (
+                "Confirme a atualização do horímetro:\n\n"
+                f"Máquina: {machine.identifier} - {machine.description}\n"
+                f"Fazenda: {machine.fazenda}\n"
+                f"Horímetro atual: {format_decimal_br(machine.current_hourmeter)}h\n"
+                f"Novo horímetro: {format_decimal_br(hourmeter)}h\n\n"
+                "Responda CONFIRMAR para salvar ou CANCELAR para ignorar."
+            )
+
+            send_machine_text(
+                manager,
+                body,
+                kind="machine_update_confirmation_fallback",
             )
         else:
-            send_text(
-                manager.phone_e164,
-                (
-                    "Confirme o registro da revisão:\n\n"
-                    f"Máquina: {machine.identifier} - {machine.description}\n"
-                    f"Fazenda: {machine.fazenda}\n"
-                    f"Revisão: {plan_name}\n"
-                    f"Horímetro informado: {format_decimal_br(hourmeter)}h\n\n"
-                    "Responda CONFIRMAR para salvar ou CANCELAR para ignorar."
-                ),
+            body = (
+                "Confirme o registro da revisão:\n\n"
+                f"Máquina: {machine.identifier} - {machine.description}\n"
+                f"Fazenda: {machine.fazenda}\n"
+                f"Revisão: {plan_name}\n"
+                f"Horímetro informado: {format_decimal_br(hourmeter)}h\n\n"
+                "Responda CONFIRMAR para salvar ou CANCELAR para ignorar."
+            )
+
+            send_machine_text(
+                manager,
+                body,
+                kind="machine_revision_confirmation_fallback",
             )
 
     return True
