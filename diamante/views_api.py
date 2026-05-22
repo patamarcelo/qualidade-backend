@@ -4273,23 +4273,86 @@ class PlantioViewSet(viewsets.ModelViewSet):
     def get_colheita_plantio_info_react_native(self, request, pk=None):
         if request.user.is_authenticated:
             print('pegando dados da colheira: ')
+            # safra_filter = None
+            # cicle_filter = None
+            # try:
+            #     # safra_filter = request.data["safra"]
+            #     # cicle_filter = request.data["ciclo"]
+            #     # print('safra filter: ', safra_filter)
+            #     # print('cicle filter: ', cicle_filter)
+                
+            #     safracicle_filter = CicloAtual.objects.filter(nome="Colheita")[0]
+            #     safra_filter = safracicle_filter.safra.safra
+            #     cicle_filter = str(safracicle_filter.ciclo.ciclo)
+                
+            # except Exception as e:
+            #     print(e)
+            # safra_filter = "2023/2024" if safra_filter == None else safra_filter
+            # cicle_filter = "1" if cicle_filter == None else cicle_filter
+            # print('safra e ciclo filtr', safra_filter, cicle_filter)
+            
             safra_filter = None
             cicle_filter = None
+
+            # Aceita POST body e também query params
             try:
-                # safra_filter = request.data["safra"]
-                # cicle_filter = request.data["ciclo"]
-                # print('safra filter: ', safra_filter)
-                # print('cicle filter: ', cicle_filter)
-                
-                safracicle_filter = CicloAtual.objects.filter(nome="Colheita")[0]
-                safra_filter = safracicle_filter.safra.safra
-                cicle_filter = str(safracicle_filter.ciclo.ciclo)
-                
+                if request.method == "POST":
+                    safra_filter = request.data.get("safra")
+                    cicle_filter = request.data.get("ciclo")
+                else:
+                    safra_filter = request.query_params.get("safra")
+                    cicle_filter = request.query_params.get("ciclo")
             except Exception as e:
-                print(e)
-            safra_filter = "2023/2024" if safra_filter == None else safra_filter
-            cicle_filter = "1" if cicle_filter == None else cicle_filter
-            print('safra e ciclo filtr', safra_filter, cicle_filter)
+                print("Erro lendo safra/ciclo da request:", e)
+
+            safra_filter = str(safra_filter).strip() if safra_filter else None
+            cicle_filter = str(cicle_filter).strip() if cicle_filter else None
+
+            # Busca os ciclos operacionais configurados no admin
+            navigation_current_filters = (
+                CicloAtual.objects
+                .select_related("safra", "ciclo")
+                .filter(nome__in=["Plantio", "Colheita"])
+                .order_by("nome")
+            )
+
+            safra_ciclo_options = []
+
+            for current in navigation_current_filters:
+                if current.safra and current.ciclo:
+                    safra_ciclo_options.append({
+                        "nome": current.nome,
+                        "label": current.nome,
+                        "safra": str(current.safra.safra),
+                        "ciclo": str(current.ciclo.ciclo),
+                    })
+
+            # Mantém Colheita como padrão para não mudar o comportamento atual da tela.
+            # Se quiser abrir Plantio por padrão, basta inverter esta prioridade.
+            default_filter = (
+                next((item for item in safra_ciclo_options if item["nome"] == "Colheita"), None)
+                or next((item for item in safra_ciclo_options if item["nome"] == "Plantio"), None)
+            )
+
+            if not safra_filter or not cicle_filter:
+                if default_filter:
+                    safra_filter = default_filter["safra"]
+                    cicle_filter = default_filter["ciclo"]
+
+            # Segurança final
+            safra_filter = safra_filter or "2025/2026"
+            cicle_filter = str(cicle_filter or "1")
+
+            # Se veio uma combinação inválida, volta para o padrão
+            if safra_ciclo_options:
+                requested_pair_is_valid = any(
+                    item["safra"] == safra_filter and str(item["ciclo"]) == str(cicle_filter)
+                    for item in safra_ciclo_options
+                )
+
+                if not requested_pair_is_valid and default_filter:
+                    safra_filter = default_filter["safra"]
+                    cicle_filter = default_filter["ciclo"]
             total_dias_plantado_acompanhamento = {
                 "arroz": 117,
                 "soja_feijao": 10
@@ -4315,8 +4378,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         )
                     )
                     .filter(
-                        plantio__safra=s_dict[safra_filter],
-                        plantio__ciclo=c_dict[cicle_filter],
+                        plantio__safra__safra=safra_filter,
+                        plantio__ciclo__ciclo=cicle_filter,
                         plantio__finalizado_plantio=True,
                         # plantio__finalizado_colheita=False,
                         plantio__plantio_descontinuado=False,
@@ -4359,8 +4422,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         totaldays=(datetime.datetime.now().date() - F("data_plantio"))
                     )
                     .filter(
-                        safra=s_dict[safra_filter],
-                        ciclo=c_dict[cicle_filter],
+                        safra__safra=safra_filter,
+                        ciclo__ciclo=cicle_filter,
                         finalizado_plantio=True,
                         # finalizado_colheita=False,
                         plantio_descontinuado=False,
@@ -4388,11 +4451,24 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 filter_data['farm'] = list(set(filter_data_farm))
                 filter_data['proj'] = list(set(filter_data_proj))
                 filter_data['variety'] = list({tuple(d.items()): d for d in filter_data_variety}.values())
+                filter_data["safra_ciclo"] = safra_ciclo_options
                 
                 grouped_data = self.group_data(qs)
                 
                 response = {
                     "msg": "Consulta realizada com sucesso!!",
+                    "selected_safra_ciclo": {
+                        "safra": safra_filter,
+                        "ciclo": cicle_filter,
+                        "nome": next(
+                            (
+                                item["nome"]
+                                for item in safra_ciclo_options
+                                if item["safra"] == safra_filter and str(item["ciclo"]) == str(cicle_filter)
+                            ),
+                            None,
+                        ),
+                    },
                     "data": qs,
                     "grouped_data": grouped_data,
                     "filter_data": filter_data
