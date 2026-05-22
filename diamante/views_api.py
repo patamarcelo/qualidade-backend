@@ -7132,6 +7132,7 @@ class ProgramasDetails(viewsets.ModelViewSet):
                     "operacao__programa__ciclo__ciclo",
                     "defensivo__produto",
                     "defensivo__tipo",
+                    "defensivo__id_farmbox",
                 ).filter(
                     Q(ativo=True)
                     & Q(operacao__programa__ativo=True)
