@@ -23,6 +23,7 @@ class MachineListSerializer(serializers.ModelSerializer):
     maintenance_summary = serializers.SerializerMethodField()
     next_due_maintenance = serializers.SerializerMethodField()
     fazenda_name = serializers.SerializerMethodField()
+    last_status_change = serializers.SerializerMethodField()
 
     class Meta:
         model = Machine
@@ -39,6 +40,7 @@ class MachineListSerializer(serializers.ModelSerializer):
             "model_name",
             "status",
             "status_label",
+            "last_status_change",
             "current_hourmeter",
             "last_hourmeter_at",
             "last_revision_hourmeter",
@@ -52,6 +54,18 @@ class MachineListSerializer(serializers.ModelSerializer):
             "next_due_maintenance",
         ]
 
+    def get_last_status_change(self, obj):
+        status_change = (
+            MachineStatusChange.objects
+            .filter(machine=obj)
+            .order_by("-created_at", "-id")
+            .first()
+        )
+
+        if not status_change:
+            return None
+
+        return MachineStatusChangeSerializer(status_change).data
     
     def get_fazenda_name(self, obj):
         return str(obj.fazenda) if obj.fazenda else None
