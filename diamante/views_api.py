@@ -4470,6 +4470,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "variedade__cultura__map_color",
                     "variedade__cultura__map_color_line",
                     "finalizado_plantio",
+                    "inicializado_plantio",
                     "finalizado_colheita",
                     "plantio_descontinuado",
                     "acompanhamento_medias",
