@@ -66,3 +66,5 @@ docker-compose.yml
 
 # env local
 env-qual
+
+*opscheckin/scripts/*

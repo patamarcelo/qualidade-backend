@@ -91,7 +91,23 @@ def parse_machinery_message(text):
     raw = normalize_text(text)
     low = raw.lower()
 
+    # HM TR 23 1240
+    # Hm tr 54 3909.8
+    m = re.search(
+        r"^\s*HM\s+([a-zA-Z]+)\s*[- ]\s*(\d+)\s+(\d+(?:[,.]\d+)?)\s*$",
+        raw,
+        re.I,
+    )
+    if m:
+        return {
+            "action": MachineWhatsappCommand.Action.UPDATE_HOURMETER,
+            "machine_query": f"{m.group(1)}{m.group(2)}".upper(),
+            "hourmeter": normalize_decimal(m.group(3)),
+            "plan_hours": None,
+        }
+
     # HM TR23 1240
+    # Hm tr54 3909.8
     m = re.search(
         r"^\s*HM\s+([a-zA-Z0-9._/-]+)\s+(\d+(?:[,.]\d+)?)\s*$",
         raw,
@@ -939,8 +955,22 @@ def handle_machinery_whatsapp_message(*, manager, inbound, text, reply_id=""):
         return True
 
     parsed = parse_machinery_message(raw)
+    
+    logger.warning(
+        "MACHINE_MESSAGE_PARSED manager=%s raw=%r action=%s machine_query=%s hourmeter=%s",
+        getattr(manager, "name", ""),
+        raw,
+        parsed.get("action"),
+        parsed.get("machine_query"),
+        parsed.get("hourmeter"),
+    )
 
     if not parsed.get("action"):
+        logger.warning(
+            "MACHINE_MESSAGE_NOT_RECOGNIZED manager=%s raw=%r",
+            getattr(manager, "name", ""),
+            raw,
+        )
         return False
 
     if not manager_can_update_machine(manager):
@@ -974,7 +1004,14 @@ def handle_machinery_whatsapp_message(*, manager, inbound, text, reply_id=""):
 
         send_text(
             manager.phone_e164,
-            "Não encontrei essa máquina entre as fazendas liberadas para seu número.",
+            (
+                "Não encontrei essa máquina entre as fazendas liberadas para seu número.\n\n"
+                f"Máquina informada: {parsed.get('machine_query') or '-'}\n\n"
+                "Confira o código e envie novamente no padrão:\n"
+                "HM TR54 3909.8\n"
+                "ou\n"
+                "HM TR 54 3909.8"
+            ),
         )
         return True
 
