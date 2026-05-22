@@ -4271,218 +4271,267 @@ class PlantioViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["GET", "POST"])
     def get_colheita_plantio_info_react_native(self, request, pk=None):
-        if request.user.is_authenticated:
-            print('pegando dados da colheira: ')
-            # safra_filter = None
-            # cicle_filter = None
-            # try:
-            #     # safra_filter = request.data["safra"]
-            #     # cicle_filter = request.data["ciclo"]
-            #     # print('safra filter: ', safra_filter)
-            #     # print('cicle filter: ', cicle_filter)
-                
-            #     safracicle_filter = CicloAtual.objects.filter(nome="Colheita")[0]
-            #     safra_filter = safracicle_filter.safra.safra
-            #     cicle_filter = str(safracicle_filter.ciclo.ciclo)
-                
-            # except Exception as e:
-            #     print(e)
-            # safra_filter = "2023/2024" if safra_filter == None else safra_filter
-            # cicle_filter = "1" if cicle_filter == None else cicle_filter
-            # print('safra e ciclo filtr', safra_filter, cicle_filter)
-            
-            safra_filter = None
-            cicle_filter = None
-
-            # Aceita POST body e também query params
-            try:
-                if request.method == "POST":
-                    safra_filter = request.data.get("safra")
-                    cicle_filter = request.data.get("ciclo")
-                else:
-                    safra_filter = request.query_params.get("safra")
-                    cicle_filter = request.query_params.get("ciclo")
-            except Exception as e:
-                print("Erro lendo safra/ciclo da request:", e)
-
-            safra_filter = str(safra_filter).strip() if safra_filter else None
-            cicle_filter = str(cicle_filter).strip() if cicle_filter else None
-
-            # Busca os ciclos operacionais configurados no admin
-            navigation_current_filters = (
-                CicloAtual.objects
-                .select_related("safra", "ciclo")
-                .filter(nome__in=["Plantio", "Colheita"])
-                .order_by("nome")
-            )
-
-            safra_ciclo_options = []
-
-            for current in navigation_current_filters:
-                if current.safra and current.ciclo:
-                    safra_ciclo_options.append({
-                        "nome": current.nome,
-                        "label": current.nome,
-                        "safra": str(current.safra.safra),
-                        "ciclo": str(current.ciclo.ciclo),
-                    })
-
-            # Mantém Colheita como padrão para não mudar o comportamento atual da tela.
-            # Se quiser abrir Plantio por padrão, basta inverter esta prioridade.
-            default_filter = (
-                next((item for item in safra_ciclo_options if item["nome"] == "Colheita"), None)
-                or next((item for item in safra_ciclo_options if item["nome"] == "Plantio"), None)
-            )
-
-            if not safra_filter or not cicle_filter:
-                if default_filter:
-                    safra_filter = default_filter["safra"]
-                    cicle_filter = default_filter["ciclo"]
-
-            # Segurança final
-            safra_filter = safra_filter or "2025/2026"
-            cicle_filter = str(cicle_filter or "1")
-
-            # Se veio uma combinação inválida, volta para o padrão
-            if safra_ciclo_options:
-                requested_pair_is_valid = any(
-                    item["safra"] == safra_filter and str(item["ciclo"]) == str(cicle_filter)
-                    for item in safra_ciclo_options
-                )
-
-                if not requested_pair_is_valid and default_filter:
-                    safra_filter = default_filter["safra"]
-                    cicle_filter = default_filter["ciclo"]
-            total_dias_plantado_acompanhamento = {
-                "arroz": 117,
-                "soja_feijao": 10
-            }
-            try:
-                cargas_query = (
-                    Colheita.objects.select_related(
-                        "plantio__talhao__fazenda",
-                        "plantio__talhao",
-                    )
-                    .values(
-                        "plantio__talhao__id_talhao",
-                        "plantio__id",
-                        "plantio__talhao__fazenda__nome",
-                    )
-                    .annotate(
-                        total_peso_liquido=Sum("peso_liquido"),
-                        total_romaneio=Count("romaneio"),
-                    )
-                    .annotate(
-                        totaldays=(
-                            datetime.datetime.now().date() - F("plantio__data_plantio")
-                        )
-                    )
-                    .filter(
-                        plantio__safra__safra=safra_filter,
-                        plantio__ciclo__ciclo=cicle_filter,
-                        plantio__finalizado_plantio=True,
-                        # plantio__finalizado_colheita=False,
-                        plantio__plantio_descontinuado=False,
-                        plantio__acompanhamento_medias=True,
-                        # totaldays__gte=datetime.timedelta(days=total_dias_plantado_acompanhamento["soja_feijao"]),
-                        # ARROZ = 117
-                        # totaldays__gte=datetime.timedelta(days=117),
-                    )
-                )
-                qs = (
-                    Plantio.objects.select_related(
-                        "talhao__fazenda",
-                        "safra",
-                        "ciclo",
-                        "variedade",
-                        "variedade__cultura",
-                    )
-                    .values(
-                        "id",
-                        "talhao__id_talhao",
-                        "talhao__id_unico",
-                        "data_plantio",
-                        "safra__safra",
-                        "ciclo__ciclo",
-                        "talhao__fazenda__nome",
-                        "talhao__fazenda__map_centro_id",
-                        "talhao__fazenda__map_zoom",
-                        "talhao__fazenda__fazenda__nome",
-                        "variedade__nome_fantasia",
-                        "variedade__dias_ciclo",
-                        "variedade__cultura__cultura",
-                        "variedade__cultura__map_color",
-                        "variedade__cultura__map_color_line",
-                        "finalizado_plantio",
-                        "finalizado_colheita",
-                        "area_colheita",
-                        "area_parcial",
-                    )
-                    .annotate(
-                        totaldays=(datetime.datetime.now().date() - F("data_plantio"))
-                    )
-                    .filter(
-                        safra__safra=safra_filter,
-                        ciclo__ciclo=cicle_filter,
-                        finalizado_plantio=True,
-                        # finalizado_colheita=False,
-                        plantio_descontinuado=False,
-                        acompanhamento_medias=True
-                        # totaldays__gte=datetime.timedelta(days=total_dias_plantado_acompanhamento["soja_feijao"]),
-                    )
-                    .order_by("talhao__id_unico")
-                )
-                
-                # Iterate through the 'data' array
-                for item in qs:
-                    # Find matching 'cargas' based on the 'id' in 'data' and 'plantio__id' in 'cargas'
-                    matching_cargas = [carga for carga in cargas_query if carga["plantio__id"] == item["id"]]
-                    
-                    # If there are matching 'cargas', insert them into the 'data' object
-                    if matching_cargas:
-                        item["cargas"] = matching_cargas
-                
-                filter_data = {}
-                filter_data_farm = [x['talhao__fazenda__fazenda__nome'] for x in qs]
-                filter_data_proj = [x['talhao__fazenda__nome'] for x in qs]
-                filter_data_variety = [{'variety': x['variedade__nome_fantasia'] ,'culture': x['variedade__cultura__cultura'] } for x in qs]
-                
-                
-                filter_data['farm'] = list(set(filter_data_farm))
-                filter_data['proj'] = list(set(filter_data_proj))
-                filter_data['variety'] = list({tuple(d.items()): d for d in filter_data_variety}.values())
-                filter_data["safra_ciclo"] = safra_ciclo_options
-                
-                grouped_data = self.group_data(qs)
-                
-                response = {
-                    "msg": "Consulta realizada com sucesso!!",
-                    "selected_safra_ciclo": {
-                        "safra": safra_filter,
-                        "ciclo": cicle_filter,
-                        "nome": next(
-                            (
-                                item["nome"]
-                                for item in safra_ciclo_options
-                                if item["safra"] == safra_filter and str(item["ciclo"]) == str(cicle_filter)
-                            ),
-                            None,
-                        ),
-                    },
-                    "data": qs,
-                    "grouped_data": grouped_data,
-                    "filter_data": filter_data
-                }
-                return Response(response, status=status.HTTP_200_OK)
-            except Exception as e:
-                response = {"message": f"Ocorreu um Erro: {e}"}
-                return Response(response, status=status.HTTP_400_BAD_REQUEST)
-
-        else:
+        if not request.user.is_authenticated:
             response = {"message": "Você precisa estar logado!!!"}
             return Response(response, status=status.HTTP_401_UNAUTHORIZED)
+
+        print("pegando dados da colheita/plantio")
+
+        safra_filter = None
+        cicle_filter = None
+
+        try:
+            if request.method == "POST":
+                safra_filter = request.data.get("safra")
+                cicle_filter = request.data.get("ciclo")
+            else:
+                safra_filter = request.query_params.get("safra")
+                cicle_filter = request.query_params.get("ciclo")
+        except Exception as e:
+            print("Erro lendo safra/ciclo da request:", e)
+
+        safra_filter = str(safra_filter).strip() if safra_filter else None
+        cicle_filter = str(cicle_filter).strip() if cicle_filter else None
+
+        navigation_current_filters = (
+            CicloAtual.objects
+            .select_related("safra", "ciclo")
+            .filter(nome__in=["Plantio", "Colheita"])
+            .order_by("nome")
+        )
+
+        safra_ciclo_options = []
+
+        for current in navigation_current_filters:
+            if current.safra and current.ciclo:
+                safra_ciclo_options.append({
+                    "nome": current.nome,
+                    "label": current.nome,
+                    "safra": str(current.safra.safra),
+                    "ciclo": str(current.ciclo.ciclo),
+                })
+
+        default_filter = (
+            next((item for item in safra_ciclo_options if item["nome"] == "Colheita"), None)
+            or next((item for item in safra_ciclo_options if item["nome"] == "Plantio"), None)
+        )
+
+        if not safra_filter or not cicle_filter:
+            if default_filter:
+                safra_filter = default_filter["safra"]
+                cicle_filter = default_filter["ciclo"]
+
+        safra_filter = safra_filter or "2025/2026"
+        cicle_filter = str(cicle_filter or "1")
+
+        if safra_ciclo_options:
+            requested_pair_is_valid = any(
+                item["safra"] == safra_filter and str(item["ciclo"]) == str(cicle_filter)
+                for item in safra_ciclo_options
+            )
+
+            if not requested_pair_is_valid and default_filter:
+                safra_filter = default_filter["safra"]
+                cicle_filter = default_filter["ciclo"]
+
+        total_dias_plantado_acompanhamento = {
+            "arroz": 117,
+            "soja_feijao": 10,
+        }
+
+        plantio_safra_ciclo_q = Q()
+        colheita_safra_ciclo_q = Q()
+
+        for item in safra_ciclo_options:
+            safra_value = str(item.get("safra") or "").strip()
+            ciclo_value = str(item.get("ciclo") or "").strip()
+
+            if not safra_value or not ciclo_value:
+                continue
+
+            plantio_safra_ciclo_q |= Q(
+                safra__safra=safra_value,
+                ciclo__ciclo=ciclo_value,
+            )
+
+            colheita_safra_ciclo_q |= Q(
+                plantio__safra__safra=safra_value,
+                plantio__ciclo__ciclo=ciclo_value,
+            )
+
+        if not plantio_safra_ciclo_q:
+            plantio_safra_ciclo_q = Q(
+                safra__safra=safra_filter,
+                ciclo__ciclo=cicle_filter,
+            )
+
+        if not colheita_safra_ciclo_q:
+            colheita_safra_ciclo_q = Q(
+                plantio__safra__safra=safra_filter,
+                plantio__ciclo__ciclo=cicle_filter,
+            )
+
+        try:
+            cargas_query = (
+                Colheita.objects
+                .select_related(
+                    "plantio__talhao__fazenda",
+                    "plantio__talhao",
+                    "plantio__safra",
+                    "plantio__ciclo",
+                )
+                .filter(
+                    colheita_safra_ciclo_q,
+                    plantio__plantio_descontinuado=False,
+                )
+                .values(
+                    "plantio__talhao__id_talhao",
+                    "plantio__id",
+                    "plantio__talhao__fazenda__nome",
+                    "plantio__safra__safra",
+                    "plantio__ciclo__ciclo",
+                )
+                .annotate(
+                    total_peso_liquido=Sum("peso_liquido"),
+                    total_romaneio=Count("romaneio"),
+                )
+                .annotate(
+                    totaldays=(
+                        datetime.datetime.now().date() - F("plantio__data_plantio")
+                    )
+                )
+            )
+
+            qs = (
+                Plantio.objects
+                .select_related(
+                    "talhao__fazenda",
+                    "safra",
+                    "ciclo",
+                    "variedade",
+                    "variedade__cultura",
+                )
+                .filter(
+                    plantio_safra_ciclo_q,
+                    plantio_descontinuado=False,
+                )
+                .values(
+                    "id",
+                    "talhao__id_talhao",
+                    "talhao__id_unico",
+                    "data_plantio",
+                    "safra__safra",
+                    "ciclo__ciclo",
+                    "talhao__fazenda__nome",
+                    "talhao__fazenda__map_centro_id",
+                    "talhao__fazenda__map_zoom",
+                    "talhao__fazenda__fazenda__nome",
+                    "variedade__nome_fantasia",
+                    "variedade__dias_ciclo",
+                    "variedade__cultura__cultura",
+                    "variedade__cultura__map_color",
+                    "variedade__cultura__map_color_line",
+                    "finalizado_plantio",
+                    "finalizado_colheita",
+                    "plantio_descontinuado",
+                    "acompanhamento_medias",
+                    "area_colheita",
+                    "area_parcial",
+                )
+                .annotate(
+                    totaldays=(datetime.datetime.now().date() - F("data_plantio"))
+                )
+                .order_by(
+                    "safra__safra",
+                    "ciclo__ciclo",
+                    "talhao__fazenda__nome",
+                    "talhao__id_unico",
+                )
+            )
+
+            cargas_list = list(cargas_query)
+            qs_list = list(qs)
+
+            cargas_by_plantio_id = {}
+
+            for carga in cargas_list:
+                plantio_id = carga.get("plantio__id")
+
+                if not plantio_id:
+                    continue
+
+                cargas_by_plantio_id.setdefault(plantio_id, []).append(carga)
+
+            for item in qs_list:
+                plantio_id = item.get("id")
+                item["cargas"] = cargas_by_plantio_id.get(plantio_id, [])
+
+            filter_data_farm = [
+                x["talhao__fazenda__fazenda__nome"]
+                for x in qs_list
+                if x.get("talhao__fazenda__fazenda__nome")
+            ]
+
+            filter_data_proj = [
+                x["talhao__fazenda__nome"]
+                for x in qs_list
+                if x.get("talhao__fazenda__nome")
+            ]
+
+            filter_data_variety = [
+                {
+                    "variety": x["variedade__nome_fantasia"],
+                    "culture": x["variedade__cultura__cultura"],
+                }
+                for x in qs_list
+                if x.get("variedade__nome_fantasia")
+            ]
+
+            filter_data = {
+                "farm": sorted(list(set(filter_data_farm))),
+                "proj": sorted(list(set(filter_data_proj))),
+                "variety": list(
+                    {tuple(d.items()): d for d in filter_data_variety}.values()
+                ),
+                "safra_ciclo": safra_ciclo_options,
+            }
+
+            grouped_data = self.group_data(qs_list)
+
+            selected_nome = next(
+                (
+                    item["nome"]
+                    for item in safra_ciclo_options
+                    if item["safra"] == safra_filter
+                    and str(item["ciclo"]) == str(cicle_filter)
+                ),
+                None,
+            )
+
+            response = {
+                "msg": "Consulta realizada com sucesso!!",
+                "selected_safra_ciclo": {
+                    "safra": safra_filter,
+                    "ciclo": cicle_filter,
+                    "nome": selected_nome,
+                    "label": selected_nome,
+                },
+                "debug_counts": {
+                    "safra_ciclo_options": safra_ciclo_options,
+                    "total_data": len(qs_list),
+                    "total_cargas": len(cargas_list),
+                },
+                "data": qs_list,
+                "grouped_data": grouped_data,
+                "filter_data": filter_data,
+            }
+
+            return Response(response, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            response = {"message": f"Ocorreu um Erro: {e}"}
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)
         
-    
     
     @action(detail=False, methods=["GET", "POST"])
     def get_kmls_aviacao(self, request, pk=None):
