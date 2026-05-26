@@ -91,7 +91,8 @@ from .models import (
     SeedStock,
     SeedConfig,
     BackgroundTaskStatus,
-    FarmPolygon
+    FarmPolygon,
+    FarmboxPlantioSyncState
 )
 
 from django.db.models import OuterRef, Subquery
@@ -174,6 +175,12 @@ from types import SimpleNamespace
 
 from .services.generate_kml import create_kml
 from .services.geo_merge import merge_no_flood
+
+
+from .services.farmbox_plantio_sync import (
+    fetch_farmbox_plantations_parallel,
+    get_milliseconds_from_datetime,
+)
 
 import unicodedata
 from django.db import close_old_connections
@@ -561,6 +568,291 @@ class TalaoViewSet(viewsets.ModelViewSet):
 
 # --------------------- --------------------- END PROJETOS API --------------------- --------------------- #
 
+
+def process_farmbox_plantations_payload(payload, safra_nome=None):
+    """
+    Reaproveita a mesma lógica da action update_plantio_from_farmBox,
+    mas como função interna para poder ser chamada por outras actions.
+    """
+
+    BATCH_SIZE = 500
+
+    if not isinstance(payload, (list, tuple)):
+        raise ValueError("Payload deve ser uma lista.")
+
+    talhao_list = Talhao.objects.all().only("id", "id_unico")
+    variedade_list = Variedade.objects.all().only("id", "id_farmbox")
+    safra_list = list(Safra.objects.all().only("id", "safra"))
+    ciclo_list = list(Ciclo.objects.all().only("id"))
+    projetos = Projeto.objects.all().only("id", "id_farmbox", "id_d")
+
+    projetos_by_farmbox = {p.id_farmbox: p.id_d for p in projetos}
+    talhao_by_unico = {t.id_unico: t for t in talhao_list}
+    variedade_by_farmbox = {v.id_farmbox: v for v in variedade_list}
+    safra_by_nome = {s.safra: s for s in safra_list}
+
+    ids_farmbox_list = [
+        it.get("id")
+        for it in payload
+        if it.get("id") is not None
+    ]
+
+    plantio_area_qs = (
+        PlantioExtratoArea.objects
+        .select_related("plantio")
+        .filter(plantio__id_farmbox__in=ids_farmbox_list, ativo=True)
+        .values("plantio__id_farmbox")
+        .annotate(total_area_plantada=Sum("area_plantada"))
+    )
+
+    area_by_farmbox = {
+        row["plantio__id_farmbox"]: (row["total_area_plantada"] or 0)
+        for row in plantio_area_qs
+    }
+
+    plantios_by_farmbox = Plantio.objects.filter(
+        id_farmbox__in=ids_farmbox_list
+    ).in_bulk(field_name="id_farmbox")
+
+    combo_keys = set()
+    resolvidos_temp = []
+
+    for it in payload:
+        safra_farm = it.get("harvest_name")
+        ciclo_json = it.get("cycle")
+        fazenda_id = it.get("farm", {}).get("id")
+        parcela = (it.get("name") or "").replace(" ", "")
+
+        try:
+            safra = safra_by_nome.get(safra_farm)
+            ciclo = ciclo_list[ciclo_json - 1] if ciclo_json else None
+            id_d = projetos_by_farmbox.get(fazenda_id)
+            talhao_unico = f"{id_d}{parcela}" if id_d else None
+            talhao = talhao_by_unico.get(talhao_unico)
+
+            if safra and ciclo and talhao:
+                combo_keys.add((safra.id, ciclo.id, talhao.id))
+
+            resolvidos_temp.append((it, safra, ciclo, talhao))
+        except Exception:
+            resolvidos_temp.append((it, None, None, None))
+
+    plantio_by_combo = {}
+
+    if combo_keys:
+        plantios_combo_qs = Plantio.objects.filter(
+            safra_id__in={k[0] for k in combo_keys},
+            ciclo_id__in={k[1] for k in combo_keys},
+            talhao_id__in={k[2] for k in combo_keys},
+        ).only(
+            "id",
+            "safra_id",
+            "ciclo_id",
+            "talhao_id",
+            "farmbox_update",
+            "finalizado_colheita",
+            "variedade_id",
+            "programa_id",
+            "id_farmbox",
+            "area_colheita",
+            "area_planejamento_plantio",
+            "map_centro_id",
+            "map_geo_points",
+            "data_plantio",
+            "data_emergencia",
+            "inicializado_plantio",
+        )
+
+        plantio_by_combo = {
+            (p.safra_id, p.ciclo_id, p.talhao_id): p
+            for p in plantios_combo_qs
+        }
+
+    to_update = []
+    to_create = []
+
+    count_alterados = 0
+    count_ignorados = 0
+    erros = []
+
+    for it, safra, ciclo, talhao in resolvidos_temp:
+        try:
+            state = it.get("state")
+            date_plantio = it.get("date")
+            emergence_date = it.get("emergence_date")
+            area = it.get("area")
+            area_planejamento = it.get("area")
+            id_plantio_farmbox = it.get("id")
+
+            variedade_planejada_id = it.get("planned_variety_id")
+            variety_id = it.get("variety_id")
+
+            map_centro_id_farm = it.get("centroid")
+            map_geo_points_farm = it.get("geo_points")
+
+            total_area_plantada = area_by_farmbox.get(id_plantio_farmbox, area or 0)
+
+            var_planejada = (
+                variedade_by_farmbox.get(variedade_planejada_id)
+                if variedade_planejada_id
+                else None
+            )
+            var_definitiva = (
+                variedade_by_farmbox.get(variety_id)
+                if variety_id
+                else None
+            )
+
+            inst = plantios_by_farmbox.get(id_plantio_farmbox)
+
+            if not inst and safra and ciclo and talhao:
+                inst = plantio_by_combo.get((safra.id, ciclo.id, talhao.id))
+
+            if not inst:
+                if not (safra and ciclo and talhao):
+                    count_ignorados += 1
+                    erros.append({
+                        "id_farmbox": id_plantio_farmbox,
+                        "motivo": "Sem safra/ciclo/talhão para criar.",
+                        "name": it.get("name"),
+                        "farm_name": it.get("farm_name"),
+                        "harvest_name": it.get("harvest_name"),
+                    })
+                    continue
+
+                novo = Plantio(
+                    safra=safra,
+                    ciclo=ciclo,
+                    talhao=talhao,
+                    variedade=var_definitiva or var_planejada,
+                    area_colheita=total_area_plantada or area,
+                    map_centro_id=map_centro_id_farm,
+                    map_geo_points=map_geo_points_farm,
+                    id_farmbox=id_plantio_farmbox,
+                    area_planejamento_plantio=area_planejamento if (var_planejada or var_definitiva) else None,
+                )
+
+                if state == "active" and date_plantio:
+                    novo.data_plantio = date_plantio
+                    novo.inicializado_plantio = True
+                    novo.area_colheita = total_area_plantada
+
+                if emergence_date:
+                    novo.data_emergencia = emergence_date
+
+                to_create.append(novo)
+                continue
+
+            if inst.farmbox_update:
+                inst.id_farmbox = id_plantio_farmbox or inst.id_farmbox
+
+                if area is not None:
+                    inst.area_colheita = total_area_plantada
+                    inst.area_planejamento_plantio = area_planejamento
+
+                if map_centro_id_farm:
+                    inst.map_centro_id = map_centro_id_farm
+
+                if map_geo_points_farm:
+                    inst.map_geo_points = map_geo_points_farm
+
+                if state == "active" and date_plantio:
+                    inst.data_plantio = date_plantio
+                    inst.inicializado_plantio = True
+                    inst.area_colheita = total_area_plantada
+
+                if emergence_date:
+                    inst.data_emergencia = emergence_date
+
+                if var_definitiva:
+                    inst.variedade = var_definitiva
+                elif var_planejada:
+                    inst.variedade = var_planejada
+
+                count_alterados += 1
+            else:
+                if map_centro_id_farm:
+                    inst.map_centro_id = map_centro_id_farm
+
+                if map_geo_points_farm:
+                    inst.map_geo_points = map_geo_points_farm
+
+            to_update.append(inst)
+
+        except Exception as e:
+            count_ignorados += 1
+            erros.append({
+                "id_farmbox": it.get("id"),
+                "motivo": str(e),
+                "name": it.get("name"),
+                "farm_name": it.get("farm_name"),
+            })
+
+    with transaction.atomic():
+        if to_create:
+            for i in range(0, len(to_create), BATCH_SIZE):
+                Plantio.objects.bulk_create(
+                    to_create[i:i + BATCH_SIZE],
+                    batch_size=BATCH_SIZE,
+                    ignore_conflicts=False,
+                )
+
+        if to_update:
+            fields = [
+                "id_farmbox",
+                "area_colheita",
+                "area_planejamento_plantio",
+                "map_centro_id",
+                "map_geo_points",
+                "data_plantio",
+                "inicializado_plantio",
+                "data_emergencia",
+                "variedade",
+            ]
+
+            for i in range(0, len(to_update), BATCH_SIZE):
+                Plantio.objects.bulk_update(
+                    to_update[i:i + BATCH_SIZE],
+                    fields,
+                    batch_size=BATCH_SIZE,
+                )
+
+        if to_create or to_update:
+            cache.clear()
+
+        if safra_nome:
+            total_now = Plantio.objects.filter(safra__safra=safra_nome).count()
+        else:
+            payload_safras = {
+                str(it.get("harvest_name")).strip()
+                for it in payload
+                if it.get("harvest_name")
+            }
+
+            if len(payload_safras) == 1:
+                total_now = Plantio.objects.filter(
+                    safra__safra=list(payload_safras)[0]
+                ).count()
+            else:
+                total_now = Plantio.objects.count()
+
+        resp = {
+            "msg": "Consulta realizada com sucesso!",
+            "total_return": total_now,
+            "Total de Talhões alterados": count_alterados,
+            "criadas": len(to_create),
+            "atualizadas": len(to_update),
+            "ignoradas": count_ignorados,
+
+            # aliases novos
+            "alteradas_com_farmbox_update": count_alterados,
+            "recebidos": len(payload),
+            "erros": erros[:50],
+        }
+
+        print("resp::", resp)
+
+        return resp
 
 class PlantioViewSet(viewsets.ModelViewSet):
     queryset = Plantio.objects.all().order_by("data_plantio")
@@ -1346,228 +1638,385 @@ class PlantioViewSet(viewsets.ModelViewSet):
     #         return Response(response, status=status.HTTP_400_BAD_REQUEST)
     
 
+    # @action(detail=True, methods=["GET", "POST"])
+    # def update_plantio_from_farmBox(self, request, pk=None):
+    #     BATCH_SIZE = 500  # ajuste fino
+    #     if not request.user.is_authenticated:
+    #         return Response({"message": "Você precisa estar logado!!!"}, status=status.HTTP_400_BAD_REQUEST)
+
+    #     try:
+    #         payload = request.data
+    #         if not isinstance(payload, (list, tuple)):
+    #             return Response({"message": "Payload deve ser uma lista."}, status=status.HTTP_400_BAD_REQUEST)
+
+    #         # -------- 1) Pré-carregamentos em memória (dicts) ----------
+    #         talhao_list = Talhao.objects.all().only("id", "id_unico")
+    #         variedade_list = Variedade.objects.all().only("id", "id_farmbox")
+    #         safra_list = list(Safra.objects.all().only("id", "safra"))
+    #         ciclo_list = list(Ciclo.objects.all().only("id"))  # índice (ciclo_json - 1) é usado
+    #         projetos = Projeto.objects.all().only("id", "id_farmbox", "id_d")
+
+    #         # Dicts rápidos pra lookup O(1)
+    #         # Projeto por id_farmbox -> id_d (prefixo do talhão)
+    #         projetos_by_farmbox = {p.id_farmbox: p.id_d for p in projetos}
+    #         # Talhão por id_unico
+    #         talhao_by_unico = {t.id_unico: t for t in talhao_list}
+    #         # Variedade por id_farmbox
+    #         variedade_by_farmbox = {v.id_farmbox: v for v in variedade_list}
+    #         # Safra por string safra
+    #         safra_by_nome = {s.safra: s for s in safra_list}
+
+    #         # -------- 2) Pré-agregações e fetches em bloco ----------
+    #         ids_farmbox_list = [it.get("id") for it in payload if "id" in it and it.get("id") is not None]
+
+    #         # Mapa de área plantada (um SELECT + GROUP BY, uma vez só)
+    #         plantio_area_qs = (
+    #             PlantioExtratoArea.objects
+    #             .select_related("plantio")
+    #             .filter(plantio__id_farmbox__in=ids_farmbox_list, ativo=True)
+    #             .values("plantio__id_farmbox")
+    #             .annotate(total_area_plantada=Sum("area_plantada"))
+    #         )
+    #         area_by_farmbox = {row["plantio__id_farmbox"]: (row["total_area_plantada"] or 0) for row in plantio_area_qs}
+
+    #         # Pegar plantios existentes por id_farmbox (atualizações “certas”)
+    #         plantios_by_farmbox = Plantio.objects.filter(id_farmbox__in=ids_farmbox_list).in_bulk(field_name="id_farmbox")
+
+    #         # Também vamos precisar localizar por (safra, ciclo, talhao) quando id_farmbox ainda não estiver no DB
+    #         # Para isso, primeiro resolvemos quais chaves (safra_id, ciclo_id, talhao_id) serão usadas
+    #         combo_keys = set()
+    #         resolvidos_temp = []  # guardamos resoluções básicas para não repetir trabalho
+    #         for it in payload:
+    #             safra_farm = it.get("harvest_name")
+    #             ciclo_json = it.get("cycle")
+    #             fazenda_id = it.get("farm", {}).get("id")
+    #             parcela = (it.get("name") or "").replace(" ", "")
+    #             try:
+    #                 safra = safra_by_nome[safra_farm]
+    #                 ciclo = ciclo_list[ciclo_json - 1] if ciclo_json else None
+    #                 id_d = projetos_by_farmbox.get(fazenda_id)
+    #                 talhao_unico = f"{id_d}{parcela}" if id_d else None
+    #                 talhao = talhao_by_unico.get(talhao_unico)
+    #                 if safra and ciclo and talhao:
+    #                     combo_keys.add((safra.id, ciclo.id, talhao.id))
+    #                 resolvidos_temp.append((it, safra, ciclo, talhao))
+    #             except Exception:
+    #                 resolvidos_temp.append((it, None, None, None))
+
+    #         # Buscar de uma vez os plantios que casam pelo trio (safra, ciclo, talhao)
+    #         plantios_combo_qs = Plantio.objects.filter(
+    #             safra_id__in={k[0] for k in combo_keys},
+    #             ciclo_id__in={k[1] for k in combo_keys},
+    #             talhao_id__in={k[2] for k in combo_keys},
+    #         ).only("id", "safra_id", "ciclo_id", "talhao_id", "farmbox_update", "finalizado_colheita",
+    #             "variedade_id", "programa_id", "id_farmbox", "area_colheita", "area_planejamento_plantio",
+    #             "map_centro_id", "map_geo_points", "data_plantio", "data_emergencia", "inicializado_plantio")
+
+    #         # Índice por (safra_id, ciclo_id, talhao_id)
+    #         plantio_by_combo = {(p.safra_id, p.ciclo_id, p.talhao_id): p for p in plantios_combo_qs}
+
+    #         # -------- 3) Loop: decidir updates/creates sem .save() por item ----------
+    #         to_update = []
+    #         to_create = []
+
+    #         count_alterados = 0
+
+    #         for (it, safra, ciclo, talhao) in resolvidos_temp:
+    #             try:
+    #                 state = it.get("state")
+    #                 date_plantio = it.get("date")
+    #                 emergence_date = it.get("emergence_date")
+    #                 parcela = (it.get("name") or "").replace(" ", "")
+    #                 farm_name = it.get("farm_name")
+    #                 area = it.get("area")
+    #                 area_planejamento = it.get("area")
+    #                 id_plantio_farmbox = it.get("id")
+
+    #                 planned_date = (it.get("planned_date") or "").split("T")[0] if it.get("planned_date") else None
+
+    #                 variedade_planejada_id = it.get("planned_variety_id")
+    #                 variety_id = it.get("variety_id")
+
+    #                 map_centro_id_farm = it.get("centroid")
+    #                 map_geo_points_farm = it.get("geo_points")
+
+    #                 # Área plantada: se existir extrato, usa; senão, cai para `area`
+    #                 total_area_plantada = area_by_farmbox.get(id_plantio_farmbox, area or 0)
+
+    #                 # Resolve variedades
+    #                 var_planejada = variedade_by_farmbox.get(variedade_planejada_id) if variedade_planejada_id else None
+    #                 var_definitiva = variedade_by_farmbox.get(variety_id) if variety_id else None
+
+    #                 # 1º caminho: update por id_farmbox (mais específico e barato)
+    #                 inst = plantios_by_farmbox.get(id_plantio_farmbox)
+
+    #                 # 2º caminho: se não achou por farmbox, tenta pelo trio (safra,ciclo,talhao)
+    #                 if not inst and safra and ciclo and talhao:
+    #                     inst = plantio_by_combo.get((safra.id, ciclo.id, talhao.id))
+
+    #                 # Caso CREATE
+    #                 if not inst:
+    #                     if not (safra and ciclo and talhao):
+    #                         # sem chaves mínimas, não tem como criar
+    #                         continue
+    #                     novo = Plantio(
+    #                         safra=safra,
+    #                         ciclo=ciclo,
+    #                         talhao=talhao,
+    #                         variedade=var_definitiva or var_planejada,
+    #                         area_colheita=total_area_plantada or area,
+    #                         map_centro_id=map_centro_id_farm,
+    #                         map_geo_points=map_geo_points_farm,
+    #                         id_farmbox=id_plantio_farmbox,
+    #                         area_planejamento_plantio=area_planejamento if (var_planejada or var_definitiva) else None,
+    #                     )
+    #                     # status do plantio
+    #                     if state == "active" and date_plantio:
+    #                         novo.data_plantio = date_plantio
+    #                         novo.inicializado_plantio = True
+    #                         novo.area_colheita = total_area_plantada
+    #                     if emergence_date:
+    #                         novo.data_emergencia = emergence_date
+    #                     to_create.append(novo)
+    #                     continue
+
+    #                 # Caso UPDATE
+    #                 # Se for bloqueado por farmbox_update=False, ainda assim atualizamos mapa para manter coerência
+    #                 if inst.farmbox_update:
+    #                     # Campos principais
+    #                     inst.id_farmbox = id_plantio_farmbox or inst.id_farmbox
+    #                     if area is not None:
+    #                         inst.area_colheita = total_area_plantada
+    #                         inst.area_planejamento_plantio = area_planejamento
+    #                     if map_centro_id_farm:
+    #                         inst.map_centro_id = map_centro_id_farm
+    #                     if map_geo_points_farm:
+    #                         inst.map_geo_points = map_geo_points_farm
+    #                     if state == "active" and date_plantio:
+    #                         inst.data_plantio = date_plantio
+    #                         inst.inicializado_plantio = True
+    #                         inst.area_colheita = total_area_plantada
+    #                     if emergence_date:
+    #                         inst.data_emergencia = emergence_date
+
+    #                     # Variedade
+    #                     if var_definitiva:
+    #                         inst.variedade = var_definitiva
+    #                     else:
+    #                         inst.variedade = var_planejada or inst.variedade
+
+    #                     count_alterados += 1
+    #                 else:
+    #                     # Mesmo quando travado, atualiza mapas (barato e útil)
+    #                     if map_centro_id_farm:
+    #                         inst.map_centro_id = map_centro_id_farm
+    #                     if map_geo_points_farm:
+    #                         inst.map_geo_points = map_geo_points_farm
+
+    #                 to_update.append(inst)
+
+    #             except Exception as e:
+    #                 # Logar, mas não derrubar o lote
+    #                 print(f"[update_plantio] Erro processando item {it.get('id')}: {e}")
+
+    #         # -------- 4) Bulk ops em transação ----------
+    #         with transaction.atomic():
+    #             # creates
+    #             if to_create:
+    #                 for i in range(0, len(to_create), BATCH_SIZE):
+    #                     Plantio.objects.bulk_create(to_create[i:i+BATCH_SIZE], batch_size=BATCH_SIZE, ignore_conflicts=False)
+
+    #             # updates: defina explicitamente os campos
+    #             if to_update:
+    #                 fields = [
+    #                     "id_farmbox", "area_colheita", "area_planejamento_plantio",
+    #                     "map_centro_id", "map_geo_points",
+    #                     "data_plantio", "inicializado_plantio", "data_emergencia",
+    #                     "variedade",
+    #                 ]
+    #                 for i in range(0, len(to_update), BATCH_SIZE):
+    #                     Plantio.objects.bulk_update(to_update[i:i+BATCH_SIZE], fields, batch_size=BATCH_SIZE)
+                
+    #         # Agora **sempre** limpa cache se houve qualquer alteração:
+    #         if to_create or to_update:
+    #             cache.clear()
+
+    #         # -------- 5) Resposta ----------
+    #         total_now = Plantio.objects.filter(safra__safra="2023/2024").count()
+    #         resp = {
+    #             "msg": "Consulta realizada com sucesso!",
+    #             "total_return": total_now,
+    #             "Total de Talhões alterados": count_alterados,
+    #             "criadas": len(to_create),
+    #             "atualizadas": len(to_update),
+    #         }
+    #         print('resp::', resp)
+    #         return Response(resp, status=status.HTTP_200_OK)
+
+    #     except Exception as e:
+    #         print(f"Problema ao processar: {e}")
+    #         return Response({"message": f"Ocorreu um Erro: {e}"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        
     @action(detail=True, methods=["GET", "POST"])
     def update_plantio_from_farmBox(self, request, pk=None):
-        BATCH_SIZE = 500  # ajuste fino
         if not request.user.is_authenticated:
-            return Response({"message": "Você precisa estar logado!!!"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"message": "Você precisa estar logado!!!"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         try:
-            payload = request.data
-            if not isinstance(payload, (list, tuple)):
-                return Response({"message": "Payload deve ser uma lista."}, status=status.HTTP_400_BAD_REQUEST)
-
-            # -------- 1) Pré-carregamentos em memória (dicts) ----------
-            talhao_list = Talhao.objects.all().only("id", "id_unico")
-            variedade_list = Variedade.objects.all().only("id", "id_farmbox")
-            safra_list = list(Safra.objects.all().only("id", "safra"))
-            ciclo_list = list(Ciclo.objects.all().only("id"))  # índice (ciclo_json - 1) é usado
-            projetos = Projeto.objects.all().only("id", "id_farmbox", "id_d")
-
-            # Dicts rápidos pra lookup O(1)
-            # Projeto por id_farmbox -> id_d (prefixo do talhão)
-            projetos_by_farmbox = {p.id_farmbox: p.id_d for p in projetos}
-            # Talhão por id_unico
-            talhao_by_unico = {t.id_unico: t for t in talhao_list}
-            # Variedade por id_farmbox
-            variedade_by_farmbox = {v.id_farmbox: v for v in variedade_list}
-            # Safra por string safra
-            safra_by_nome = {s.safra: s for s in safra_list}
-
-            # -------- 2) Pré-agregações e fetches em bloco ----------
-            ids_farmbox_list = [it.get("id") for it in payload if "id" in it and it.get("id") is not None]
-
-            # Mapa de área plantada (um SELECT + GROUP BY, uma vez só)
-            plantio_area_qs = (
-                PlantioExtratoArea.objects
-                .select_related("plantio")
-                .filter(plantio__id_farmbox__in=ids_farmbox_list, ativo=True)
-                .values("plantio__id_farmbox")
-                .annotate(total_area_plantada=Sum("area_plantada"))
+            result = process_farmbox_plantations_payload(request.data)
+            return Response(result, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(
+                {"message": f"Ocorreu um Erro: {e}"},
+                status=status.HTTP_400_BAD_REQUEST,
             )
-            area_by_farmbox = {row["plantio__id_farmbox"]: (row["total_area_plantada"] or 0) for row in plantio_area_qs}
 
-            # Pegar plantios existentes por id_farmbox (atualizações “certas”)
-            plantios_by_farmbox = Plantio.objects.filter(id_farmbox__in=ids_farmbox_list).in_bulk(field_name="id_farmbox")
+    @action(detail=False, methods=["GET"])
+    def farmbox_sync_options(self, request):
+        if not request.user.is_authenticated:
+            return Response(
+                {"message": "Você precisa estar logado!!!"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-            # Também vamos precisar localizar por (safra, ciclo, talhao) quando id_farmbox ainda não estiver no DB
-            # Para isso, primeiro resolvemos quais chaves (safra_id, ciclo_id, talhao_id) serão usadas
-            combo_keys = set()
-            resolvidos_temp = []  # guardamos resoluções básicas para não repetir trabalho
-            for it in payload:
-                safra_farm = it.get("harvest_name")
-                ciclo_json = it.get("cycle")
-                fazenda_id = it.get("farm", {}).get("id")
-                parcela = (it.get("name") or "").replace(" ", "")
-                try:
-                    safra = safra_by_nome[safra_farm]
-                    ciclo = ciclo_list[ciclo_json - 1] if ciclo_json else None
-                    id_d = projetos_by_farmbox.get(fazenda_id)
-                    talhao_unico = f"{id_d}{parcela}" if id_d else None
-                    talhao = talhao_by_unico.get(talhao_unico)
-                    if safra and ciclo and talhao:
-                        combo_keys.add((safra.id, ciclo.id, talhao.id))
-                    resolvidos_temp.append((it, safra, ciclo, talhao))
-                except Exception:
-                    resolvidos_temp.append((it, None, None, None))
+        safras = (
+            Safra.objects
+            .filter(id_farmbox__isnull=False, ativo=True)
+            .order_by("-safra")
+        )
 
-            # Buscar de uma vez os plantios que casam pelo trio (safra, ciclo, talhao)
-            plantios_combo_qs = Plantio.objects.filter(
-                safra_id__in={k[0] for k in combo_keys},
-                ciclo_id__in={k[1] for k in combo_keys},
-                talhao_id__in={k[2] for k in combo_keys},
-            ).only("id", "safra_id", "ciclo_id", "talhao_id", "farmbox_update", "finalizado_colheita",
-                "variedade_id", "programa_id", "id_farmbox", "area_colheita", "area_planejamento_plantio",
-                "map_centro_id", "map_geo_points", "data_plantio", "data_emergencia", "inicializado_plantio")
+        dados = []
 
-            # Índice por (safra_id, ciclo_id, talhao_id)
-            plantio_by_combo = {(p.safra_id, p.ciclo_id, p.talhao_id): p for p in plantios_combo_qs}
+        for safra in safras:
+            state = FarmboxPlantioSyncState.objects.filter(safra=safra).first()
 
-            # -------- 3) Loop: decidir updates/creates sem .save() por item ----------
-            to_update = []
-            to_create = []
+            dados.append({
+                "id": safra.id,
+                "safra": safra.safra,
+                "id_farmbox": safra.id_farmbox,
+                "last_sync_at": state.last_sync_at if state else None,
+                "last_total_received": state.last_total_received if state else 0,
+            })
 
-            count_alterados = 0
+        return Response({
+            "msg": "Safras carregadas com sucesso.",
+            "dados": dados,
+        }, status=status.HTTP_200_OK)
+    
+    @action(detail=False, methods=["POST"])
+    def sync_plantio_farmbox(self, request):
+        if not request.user.is_authenticated:
+            return Response(
+                {"message": "Você precisa estar logado!!!"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-            for (it, safra, ciclo, talhao) in resolvidos_temp:
-                try:
-                    state = it.get("state")
-                    date_plantio = it.get("date")
-                    emergence_date = it.get("emergence_date")
-                    parcela = (it.get("name") or "").replace(" ", "")
-                    farm_name = it.get("farm_name")
-                    area = it.get("area")
-                    area_planejamento = it.get("area")
-                    id_plantio_farmbox = it.get("id")
+        try:
+            safra_id = request.data.get("safra_id")
+            updated_since = request.data.get("updated_since")
+            force_full = request.data.get("force_full", False)
+            dry_run = request.data.get("dry_run", False)
 
-                    planned_date = (it.get("planned_date") or "").split("T")[0] if it.get("planned_date") else None
+            if not safra_id:
+                return Response(
+                    {"message": "Informe a safra."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
-                    variedade_planejada_id = it.get("planned_variety_id")
-                    variety_id = it.get("variety_id")
+            safra = Safra.objects.filter(id=safra_id, ativo=True).first()
 
-                    map_centro_id_farm = it.get("centroid")
-                    map_geo_points_farm = it.get("geo_points")
+            if not safra:
+                return Response(
+                    {"message": "Safra não encontrada."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
-                    # Área plantada: se existir extrato, usa; senão, cai para `area`
-                    total_area_plantada = area_by_farmbox.get(id_plantio_farmbox, area or 0)
+            if not safra.id_farmbox:
+                return Response(
+                    {"message": f"A safra {safra.safra} não possui id_farmbox cadastrado."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
-                    # Resolve variedades
-                    var_planejada = variedade_by_farmbox.get(variedade_planejada_id) if variedade_planejada_id else None
-                    var_definitiva = variedade_by_farmbox.get(variety_id) if variety_id else None
+            state, _ = FarmboxPlantioSyncState.objects.get_or_create(safra=safra)
 
-                    # 1º caminho: update por id_farmbox (mais específico e barato)
-                    inst = plantios_by_farmbox.get(id_plantio_farmbox)
+            updated_since_ms = None
 
-                    # 2º caminho: se não achou por farmbox, tenta pelo trio (safra,ciclo,talhao)
-                    if not inst and safra and ciclo and talhao:
-                        inst = plantio_by_combo.get((safra.id, ciclo.id, talhao.id))
+            if not force_full:
+                if updated_since:
+                    updated_since_ms = get_milliseconds_from_datetime(updated_since)
+                elif state.last_sync_at:
+                    updated_since_ms = get_milliseconds_from_datetime(state.last_sync_at)
 
-                    # Caso CREATE
-                    if not inst:
-                        if not (safra and ciclo and talhao):
-                            # sem chaves mínimas, não tem como criar
-                            continue
-                        novo = Plantio(
-                            safra=safra,
-                            ciclo=ciclo,
-                            talhao=talhao,
-                            variedade=var_definitiva or var_planejada,
-                            area_colheita=total_area_plantada or area,
-                            map_centro_id=map_centro_id_farm,
-                            map_geo_points=map_geo_points_farm,
-                            id_farmbox=id_plantio_farmbox,
-                            area_planejamento_plantio=area_planejamento if (var_planejada or var_definitiva) else None,
-                        )
-                        # status do plantio
-                        if state == "active" and date_plantio:
-                            novo.data_plantio = date_plantio
-                            novo.inicializado_plantio = True
-                            novo.area_colheita = total_area_plantada
-                        if emergence_date:
-                            novo.data_emergencia = emergence_date
-                        to_create.append(novo)
-                        continue
+            farmbox_result = fetch_farmbox_plantations_parallel(
+                harvest_id=safra.id_farmbox,
+                updated_since_ms=updated_since_ms,
+                max_workers=10,
+            )
 
-                    # Caso UPDATE
-                    # Se for bloqueado por farmbox_update=False, ainda assim atualizamos mapa para manter coerência
-                    if inst.farmbox_update:
-                        # Campos principais
-                        inst.id_farmbox = id_plantio_farmbox or inst.id_farmbox
-                        if area is not None:
-                            inst.area_colheita = total_area_plantada
-                            inst.area_planejamento_plantio = area_planejamento
-                        if map_centro_id_farm:
-                            inst.map_centro_id = map_centro_id_farm
-                        if map_geo_points_farm:
-                            inst.map_geo_points = map_geo_points_farm
-                        if state == "active" and date_plantio:
-                            inst.data_plantio = date_plantio
-                            inst.inicializado_plantio = True
-                            inst.area_colheita = total_area_plantada
-                        if emergence_date:
-                            inst.data_emergencia = emergence_date
+            data = farmbox_result["plantations"]
+            farmbox_meta = farmbox_result["meta"]
 
-                        # Variedade
-                        if var_definitiva:
-                            inst.variedade = var_definitiva
-                        else:
-                            inst.variedade = var_planejada or inst.variedade
+            if dry_run:
+                return Response({
+                    "msg": "Busca realizada em modo teste. Nenhum dado foi gravado.",
+                    "safra": safra.safra,
+                    "id_farmbox": safra.id_farmbox,
+                    "updated_since_ms": updated_since_ms,
+                    "total_recebido": len(data),
+                    "farmbox_meta": farmbox_meta,
+                    "preview": data[:3],
+                }, status=status.HTTP_200_OK)
 
-                        count_alterados += 1
-                    else:
-                        # Mesmo quando travado, atualiza mapas (barato e útil)
-                        if map_centro_id_farm:
-                            inst.map_centro_id = map_centro_id_farm
-                        if map_geo_points_farm:
-                            inst.map_geo_points = map_geo_points_farm
+            result = process_farmbox_plantations_payload(
+                data,
+                safra_nome=safra.safra,
+            )
 
-                    to_update.append(inst)
+            now = timezone.now()
 
-                except Exception as e:
-                    # Logar, mas não derrubar o lote
-                    print(f"[update_plantio] Erro processando item {it.get('id')}: {e}")
-
-            # -------- 4) Bulk ops em transação ----------
-            with transaction.atomic():
-                # creates
-                if to_create:
-                    for i in range(0, len(to_create), BATCH_SIZE):
-                        Plantio.objects.bulk_create(to_create[i:i+BATCH_SIZE], batch_size=BATCH_SIZE, ignore_conflicts=False)
-
-                # updates: defina explicitamente os campos
-                if to_update:
-                    fields = [
-                        "id_farmbox", "area_colheita", "area_planejamento_plantio",
-                        "map_centro_id", "map_geo_points",
-                        "data_plantio", "inicializado_plantio", "data_emergencia",
-                        "variedade",
-                    ]
-                    for i in range(0, len(to_update), BATCH_SIZE):
-                        Plantio.objects.bulk_update(to_update[i:i+BATCH_SIZE], fields, batch_size=BATCH_SIZE)
-                
-            # Agora **sempre** limpa cache se houve qualquer alteração:
-            if to_create or to_update:
-                cache.clear()
-
-            # -------- 5) Resposta ----------
-            total_now = Plantio.objects.filter(safra__safra="2023/2024").count()
-            resp = {
-                "msg": "Consulta realizada com sucesso!",
-                "total_return": total_now,
-                "Total de Talhões alterados": count_alterados,
-                "criadas": len(to_create),
-                "atualizadas": len(to_update),
+            state.last_sync_at = now
+            state.last_updated_since_ms = updated_since_ms
+            state.last_total_received = len(data)
+            state.last_result = {
+                "farmbox_meta": farmbox_meta,
+                "processamento": result,
             }
-            print('resp::', resp)
-            return Response(resp, status=status.HTTP_200_OK)
+            state.save()
+
+            return Response({
+                "msg": "Sincronização Farmbox finalizada com sucesso.",
+                "safra": safra.safra,
+                "id_farmbox": safra.id_farmbox,
+                "updated_since_ms": updated_since_ms,
+                "total_recebido_farmbox": len(data),
+                "farmbox_meta": farmbox_meta,
+
+                # compatibilidade com log antigo
+                "total_return": result.get("total_return", 0),
+                "Total de Talhões alterados": result.get(
+                    "Total de Talhões alterados",
+                    result.get("alteradas_com_farmbox_update", 0),
+                ),
+                "criadas": result.get("criadas", 0),
+                "atualizadas": result.get("atualizadas", 0),
+                "ignoradas": result.get("ignoradas", 0),
+
+                # formato novo completo
+                "resultado": result,
+                "last_sync_at": now,
+            }, status=status.HTTP_200_OK)
 
         except Exception as e:
-            print(f"Problema ao processar: {e}")
-            return Response({"message": f"Ocorreu um Erro: {e}"}, status=status.HTTP_400_BAD_REQUEST)
-        
-        
-    
-
+            return Response(
+                {"message": f"Ocorreu um erro ao sincronizar Farmbox: {e}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+            
+            
     # --------------------- ---------------------- UPDATE PLANTIO API FROM FARMBOX END--------------------- ----------------------#
 
     # --------------------- ---------------------- UPDATE GEO POINNTS API FROM FARMBOX START --------------------- ----------------------#

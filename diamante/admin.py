@@ -118,6 +118,7 @@ from .models import (
     FarmPolygon,
     AplicacaoPlantio,
     TIPO_CHOICES,
+    FarmboxPlantioSyncState
 )
 
 from .forms import (
@@ -6385,3 +6386,20 @@ class FarmPolygonAdmin(admin.ModelAdmin):
             preview_url,
         )
     map_preview.short_description = "Mapa"
+    
+@admin.register(FarmboxPlantioSyncState)
+class FarmboxPlantioSyncStateAdmin(admin.ModelAdmin):
+    list_display = (
+        "safra",
+        "last_sync_at",
+        "last_total_received",
+        "ativo",
+    )
+    search_fields = ("safra__safra",)
+    list_filter = ("ativo", "safra")
+    readonly_fields = (
+        "last_sync_at",
+        "last_updated_since_ms",
+        "last_total_received",
+        "last_result",
+    )

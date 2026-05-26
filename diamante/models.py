@@ -1966,3 +1966,42 @@ class FarmPolygon(models.Model):
     def __str__(self):
         return f"{self.name} - {self.farm_name or 'Sem fazenda'}"
     
+    
+# models.py
+
+class FarmboxPlantioSyncState(Base):
+    safra = models.OneToOneField(
+        Safra,
+        on_delete=models.PROTECT,
+        related_name="farmbox_sync_state",
+    )
+
+    last_sync_at = models.DateTimeField(
+        "Última sincronização",
+        blank=True,
+        null=True,
+    )
+
+    last_updated_since_ms = models.BigIntegerField(
+        "Último updated_since enviado",
+        blank=True,
+        null=True,
+    )
+
+    last_total_received = models.PositiveIntegerField(
+        "Último total recebido",
+        default=0,
+    )
+
+    last_result = models.JSONField(
+        "Último resultado",
+        blank=True,
+        null=True,
+    )
+
+    class Meta:
+        verbose_name = "Sync Plantio Farmbox"
+        verbose_name_plural = "Sync Plantios Farmbox"
+
+    def __str__(self):
+        return f"{self.safra} - {self.last_sync_at or 'Nunca sincronizado'}"
