@@ -8977,11 +8977,17 @@ class ColheitaPlantioExtratoAreaViewSet(viewsets.ModelViewSet):
                             f"Total Aplicado ({total_aplicado_to_save}) maior que area_colheita ({area_colheita}). "
                             f"Salvando area_parcial como {area_colheita}."
                         )
-                        total_aplicado_to_save = area_colheita
-
+                        
+                        plantio_to_save.area_parcial = area_colheita
+                        plantio_to_save.save(update_fields=["area_parcial"])
+                        
+                        # Não cria novo ColheitaPlantioExtratoArea, porque passou da área colhida permitida.
+                        continue
+                    
                     plantio_to_save.area_parcial = total_aplicado_to_save
                     plantio_to_save.save(update_fields=["area_parcial"])
-
+                    
+                    
                     # Wrap critical operation in a separate atomic block
                     with transaction.atomic():
                         new_colheita = ColheitaPlantioExtratoArea(
