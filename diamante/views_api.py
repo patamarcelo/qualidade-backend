@@ -8964,13 +8964,23 @@ class ColheitaPlantioExtratoAreaViewSet(viewsets.ModelViewSet):
                     if not plantio_to_save:
                         raise ValueError(f"Plantio with id_farmbox={plantio_id_to_save} not found")
 
-                    area_to_save = Decimal(i['Area Aplicada'].replace(',', '.'))
+                    area_to_save = Decimal(str(i['Area Aplicada']).replace(',', '.'))
                     data_to_save = i['Data Aplicacao']
                     hour_to_save, minute_to_save = map(int, i['Hora Aplicacao'].split(':'))
-                    total_aplicado_to_save = Decimal(i['Total Aplicado'].replace(',', '.'))
+                    total_aplicado_to_save = Decimal(str(i['Total Aplicado']).replace(',', '.'))
+
+                    area_colheita = plantio_to_save.area_colheita or Decimal("0")
+
+                    if total_aplicado_to_save > area_colheita:
+                        print(
+                            f"[CORREÇÃO] Plantio {plantio_to_save.id} / Farmbox {plantio_id_to_save}: "
+                            f"Total Aplicado ({total_aplicado_to_save}) maior que area_colheita ({area_colheita}). "
+                            f"Salvando area_parcial como {area_colheita}."
+                        )
+                        total_aplicado_to_save = area_colheita
 
                     plantio_to_save.area_parcial = total_aplicado_to_save
-                    plantio_to_save.save()
+                    plantio_to_save.save(update_fields=["area_parcial"])
 
                     # Wrap critical operation in a separate atomic block
                     with transaction.atomic():
