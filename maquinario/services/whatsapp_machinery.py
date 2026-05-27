@@ -21,6 +21,7 @@ logger = logging.getLogger("opscheckin.whatsapp")
 
 UPDATE_MACHINE_CODE = "update_machine"
 FIELD_MANAGER_DIVISION_NAME = "Gerente de Campo"
+MACHINE_NOT_FOUND_ALERT_CODE = "machine_not_found_alert"
 
 CONFIRM_WORDS = {"confirmar", "confirma", "sim", "ok", "certo"}
 CANCEL_WORDS = {"cancelar", "cancela", "nao", "não"}
@@ -29,6 +30,7 @@ CANCEL_WORDS = {"cancelar", "cancela", "nao", "não"}
 
 MACHINE_UPDATE_CONFIRMATION_TEMPLATE = "machine_update_confirmation_v2"
 MACHINE_REVISION_CONFIRMATION_TEMPLATE = "machine_revision_confirmation_v2"
+MACHINE_NOT_FOUND_ALERT_TEMPLATE = "machine_not_found_alert"
 
 MACHINE_BUTTON_PREFIX = "MC:"
 MACHINE_BUTTON_CONFIRM = "CONFIRM"
@@ -448,6 +450,66 @@ def send_command_confirmation(command):
 
     return None
 
+def notify_machine_not_found_managers(*, actor_manager, machine_query, original_text):
+    if not actor_manager:
+        logger.warning(
+            "MACHINE_NOT_FOUND_ALERT_SKIPPED_NO_ACTOR machine_query=%s",
+            machine_query,
+        )
+        return
+
+    managers = get_machine_not_found_alert_managers(actor_manager)
+
+    actor_farms = (
+        actor_manager.projeto
+        .filter(ativo=True)
+        .select_related("fazenda")
+        .values_list("fazenda__nome", flat=True)
+        .distinct()
+    )
+
+    farms_text = ", ".join(list(actor_farms)[:5]) or "-"
+
+    for manager in managers:
+        try:
+            resp = send_template(
+                manager.phone_e164,
+                template_name=MACHINE_NOT_FOUND_ALERT_TEMPLATE,
+                body_params=[
+                    machine_query or "-",
+                    actor_manager.name if actor_manager else "Sistema",
+                    farms_text,
+                    original_text or "-",
+                ],
+            )
+
+            provider_id = extract_provider_message_id(resp)
+
+            OutboundMessage.objects.create(
+                manager=manager,
+                to_phone=manager.phone_e164,
+                provider_message_id=provider_id,
+                kind="machine_not_found_alert",
+                text=(
+                    f"Máquina não encontrada | "
+                    f"Informada: {machine_query or '-'} | "
+                    f"Responsável: {actor_manager.name if actor_manager else 'Sistema'} | "
+                    f"Fazendas: {farms_text} | "
+                    f"Mensagem: {original_text or '-'}"
+                ),
+                sent_at=timezone.now(),
+                raw_response=resp,
+                wa_status="sent" if provider_id else "",
+                wa_sent_at=timezone.now() if provider_id else None,
+            )
+
+        except Exception:
+            logger.exception(
+                "MACHINE_NOT_FOUND_ALERT_FAILED actor_manager_id=%s target_manager_id=%s machine_query=%s",
+                getattr(actor_manager, "id", None),
+                getattr(manager, "id", None),
+                machine_query,
+            )
 
 def machine_command_phone(command):
     return command.manager.phone_e164
@@ -487,6 +549,26 @@ def get_field_managers_for_machine(machine, actor_manager):
         .order_by("name")
     )
 
+
+def get_machine_not_found_alert_managers(actor_manager):
+    actor_farm_ids = list(get_manager_allowed_farm_ids(actor_manager))
+
+    if not actor_farm_ids:
+        return Manager.objects.none()
+
+    return (
+        Manager.objects
+        .filter(
+            is_active=True,
+            projeto__fazenda_id__in=actor_farm_ids,
+            notification_subscriptions__notification_type__code=MACHINE_NOT_FOUND_ALERT_CODE,
+            notification_subscriptions__notification_type__is_active=True,
+            notification_subscriptions__is_active=True,
+        )
+        .exclude(id=actor_manager.id if actor_manager else None)
+        .distinct()
+        .order_by("name")
+    )
 
 def notify_field_managers(command, action_label):
     machine = command.machine
@@ -1052,6 +1134,15 @@ def handle_machinery_whatsapp_message(*, manager, inbound, text, reply_id=""):
             body,
             kind="machine_not_found",
         )
+
+        transaction.on_commit(
+            lambda: notify_machine_not_found_managers(
+                actor_manager=manager,
+                machine_query=parsed.get("machine_query"),
+                original_text=raw,
+            )
+        )
+
         return True
 
     hourmeter = parsed["hourmeter"]
