@@ -168,8 +168,11 @@
 
       <div class="plantio-ac-main">
         <div class="plantio-ac-line1">
-          <strong>${escapeHtml(parsed.talhao || "-")}</strong>
-          <span class="plantio-ac-project">${escapeHtml(parsed.projeto || "-")}</span>
+          <div class="plantio-ac-primary-info">
+            <strong>${escapeHtml(parsed.talhao || "-")}</strong>
+            <span class="plantio-ac-project">${escapeHtml(parsed.projeto || "-")}</span>
+            ${parsed.variedade ? `<span class="plantio-ac-variedade">${escapeHtml(parsed.variedade)}</span>` : ""}
+          </div>
 
           <span class="plantio-ac-badges-inline">
             ${badges}
@@ -177,8 +180,6 @@
         </div>
 
         <div class="plantio-ac-line2">
-          <span>${escapeHtml(parsed.cultura || "-")}</span>
-          ${parsed.variedade ? `<span>${escapeHtml(parsed.variedade)}</span>` : ""}
           ${parsed.safraCiclo ? `<span>${escapeHtml(parsed.safraCiclo)}</span>` : ""}
           ${parsed.area ? `<span>${escapeHtml(parsed.area)}</span>` : ""}
         </div>

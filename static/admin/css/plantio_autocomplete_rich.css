@@ -131,3 +131,54 @@
 .select2-results__option--highlighted .plantio-ac-line2 span::after {
   color: rgba(255, 255, 255, 0.7);
 }
+
+
+.plantio-ac-line1 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.plantio-ac-primary-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.plantio-ac-primary-info strong {
+  color: #111827;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.plantio-ac-project,
+.plantio-ac-variedade {
+  color: #374151;
+  font-size: 12px;
+  font-weight: 700;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plantio-ac-variedade {
+  color: #4b5563;
+  font-weight: 800;
+  margin-left: 30px;
+}
+
+.plantio-ac-badges-inline {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 4px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
