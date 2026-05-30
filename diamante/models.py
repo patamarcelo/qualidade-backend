@@ -28,6 +28,73 @@ from decimal import Decimal, ROUND_HALF_UP
 # Create your models here.
 
 
+CULTURA_UI_PRESETS = {
+    "Arroz": {
+        "class": "culture-rice",
+        "color": "rgba(251,191,112,1)",
+        "border": "#D97706",
+        "icon": "rice.png",
+    },
+    "Soja": {
+        "class": "culture-soy",
+        "color": "#35B637",
+        "border": "#15803D",
+        "icon": "soy.png",
+    },
+    "Feijão": {
+        "class": "culture-beans",
+        "color": "#8B4513",
+        "border": "#5F2D12",
+        "icon": "beans.png",
+    },
+    "Algodão": {
+        "class": "culture-cotton",
+        "color": "#F8FAFC",
+        "border": "#CBD5E1",
+        "icon": "cotton.png",
+    },
+}
+
+
+def get_cultura_ui_preset(cultura_nome=None, variedade_nome=None):
+    cultura_nome = cultura_nome or ""
+    variedade_nome = variedade_nome or ""
+
+    if variedade_nome == "Mungo Preto":
+        return {
+            "class": "culture-beans-dark",
+            "color": "rgba(170,88,57,1)",
+            "border": "#7C2D12",
+            "icon": "beans2.png",
+        }
+
+    if variedade_nome == "Mungo Verde":
+        return {
+            "class": "culture-beans-green",
+            "color": "#82202B",
+            "border": "#5F111B",
+            "icon": "beans.png",
+        }
+
+    if variedade_nome == "Caupi":
+        return {
+            "class": "culture-caupi",
+            "color": "#3F4B7D",
+            "border": "#1E293B",
+            "icon": "beans.png",
+        }
+
+    return CULTURA_UI_PRESETS.get(
+        cultura_nome,
+        {
+            "class": "culture-default",
+            "color": "#F1F5F9",
+            "border": "#CBD5E1",
+            "icon": "x.png",
+        },
+    )
+    
+    
 class Base(models.Model):
     criados = models.DateTimeField("Criação", auto_now_add=True)
     modificado = models.DateTimeField("Atualização", auto_now=True)
@@ -687,6 +754,24 @@ class Plantio(Base):
         "Acompanhamento das Médias", default=True, help_text="Acompanha as médias do Plantio / Safra?"
     )
 
+
+    @property
+    def cultura_ui(self):
+        cultura_nome = ""
+        variedade_nome = ""
+
+        if self.variedade_id:
+            variedade_nome = self.variedade.variedade or ""
+
+            if self.variedade.cultura_id:
+                cultura_nome = self.variedade.cultura.cultura or ""
+
+        return get_cultura_ui_preset(
+            cultura_nome=cultura_nome,
+            variedade_nome=variedade_nome,
+        )
+        
+        
     @property
     def get_dap(self):
         dap = 0
@@ -892,11 +977,52 @@ class Plantio(Base):
             )
         ]
 
-    def __str__(self):
-        if self.variedade is not None:
-            return f"{self.talhao.id_talhao} | {self.talhao.fazenda.nome} | {self.safra}-{self.ciclo} | {self.variedade.variedade}| {str(self.area_colheita)}"
-        return f"{self.talhao.id_talhao} | {self.talhao.fazenda.nome} | {self.safra}-{self.ciclo} | {str(self.area_colheita)}"
+    # def __str__(self):
+    #     if self.variedade is not None:
+    #         return f"{self.talhao.id_talhao} | {self.talhao.fazenda.nome} | {self.safra}-{self.ciclo} | {self.variedade.variedade}| {str(self.area_colheita)}"
+    #     return f"{self.talhao.id_talhao} | {self.talhao.fazenda.nome} | {self.safra}-{self.ciclo} | {str(self.area_colheita)}"
 
+    def __str__(self):
+        talhao = self.talhao.id_talhao if self.talhao_id else "-"
+        projeto = self.talhao.fazenda.nome if self.talhao_id and self.talhao.fazenda_id else "-"
+        safra = self.safra.safra if self.safra_id else "-"
+        ciclo = self.ciclo.ciclo if self.ciclo_id else "-"
+
+        cultura = "-"
+        variedade = "-"
+
+        if self.variedade_id:
+            variedade = self.variedade.variedade or "-"
+            if self.variedade.cultura_id:
+                cultura = self.variedade.cultura.cultura or "-"
+
+        area = self.area_colheita or self.area_planejamento_plantio or 0
+
+        status = "NAO_INICIADO"
+
+        if self.plantio_descontinuado:
+            status = "DESCONTINUADO"
+        elif self.finalizado_colheita:
+            status = "FINALIZADO_COLHEITA"
+        elif self.finalizado_plantio:
+            status = "FINALIZADO_PLANTIO"
+        elif self.inicializado_plantio:
+            status = "INICIALIZADO_PLANTIO"
+
+        flags = []
+
+        if self.area_aferida:
+            flags.append("AREA_AFERIDA")
+
+        if self.replantio:
+            flags.append("REPLANTIO")
+
+        flags_text = f" | {' | '.join(flags)}" if flags else ""
+
+        return (
+            f"{talhao} | {projeto} | {cultura} | {variedade} | "
+            f"{safra}-{ciclo} | {area} ha | {status}{flags_text}"
+        )
 class PlantioExtratoArea(Base):
     plantio = models.ForeignKey(Plantio, on_delete=models.PROTECT)
 

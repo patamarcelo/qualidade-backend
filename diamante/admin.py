@@ -15,6 +15,7 @@ from types import SimpleNamespace
 from typing import Any
 from uuid import UUID
 from django.core.serializers.json import DjangoJSONEncoder
+from django.contrib.admin.views.autocomplete import AutocompleteJsonView
 
 
 import dropbox
@@ -1421,7 +1422,56 @@ class GerarKMLForm(AdminActionForm):
         label="Cor KML",
     )
 
+class PlantioAutocompleteJsonView(AutocompleteJsonView):
+    def serialize_result(self, obj, to_field_name):
+        data = super().serialize_result(obj, to_field_name)
 
+        cultura = ""
+        variedade = ""
+
+        if obj.variedade_id:
+            variedade = obj.variedade.variedade or ""
+
+            if obj.variedade.cultura_id:
+                cultura = obj.variedade.cultura.cultura or ""
+
+        cultura_ui = obj.cultura_ui
+
+        data.update({
+            "talhao": obj.talhao.id_talhao if obj.talhao_id else "",
+            "projeto": obj.talhao.fazenda.nome if obj.talhao_id and obj.talhao.fazenda_id else "",
+            "fazenda": (
+                obj.talhao.fazenda.fazenda.nome
+                if obj.talhao_id and obj.talhao.fazenda_id and obj.talhao.fazenda.fazenda_id
+                else ""
+            ),
+            "safra": obj.safra.safra if obj.safra_id else "",
+            "ciclo": str(obj.ciclo.ciclo) if obj.ciclo_id else "",
+            "cultura": cultura,
+            "variedade": variedade,
+            "area_colheita": str(obj.area_colheita or ""),
+            "area_planejamento_plantio": str(obj.area_planejamento_plantio or ""),
+            "data_plantio": obj.data_plantio.strftime("%d/%m/%Y") if obj.data_plantio else "",
+            "data_prevista_plantio": obj.data_prevista_plantio.strftime("%d/%m/%Y") if obj.data_prevista_plantio else "",
+            "id_farmbox": obj.id_farmbox or "",
+
+            "culture_class": cultura_ui["class"],
+            "culture_color": cultura_ui["color"],
+            "culture_border": cultura_ui["border"],
+            "culture_icon": cultura_ui["icon"],
+
+            "status": {
+                "inicializado_plantio": obj.inicializado_plantio,
+                "finalizado_plantio": obj.finalizado_plantio,
+                "finalizado_colheita": obj.finalizado_colheita,
+                "plantio_descontinuado": obj.plantio_descontinuado,
+                "area_aferida": obj.area_aferida,
+                "replantio": obj.replantio,
+            },
+        })
+
+        return data
+    
 @admin.register(Plantio)
 class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
     actions = [
@@ -1438,6 +1488,9 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
     action_form = GerarKMLForm
 
     TOTAL_C_2_CACHE_KEY = "admin_plantio_total_c_2"
+    
+    def autocomplete_view(self, request):
+        return PlantioAutocompleteJsonView.as_view(model_admin=self)(request)
 
     def get_total_c_2(self, force_refresh=False):
         """
@@ -1469,9 +1522,15 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
 
     class Media:
         css = {
-            "all": ("admin/css/plantio_changelist.css",)
+            "all": (
+                "admin/css/plantio_changelist.css",
+                "admin/css/plantio_autocomplete_rich.css",
+            )
         }
-        js = ('admin/js/colapsar-mapdetails.js',)
+        js = (
+            "admin/js/colapsar-mapdetails.js",
+            "admin/js/plantio_autocomplete_rich.js",
+        )
 
     def get_urls(self):
         urls = super().get_urls()
@@ -5312,9 +5371,15 @@ class PlantioExtratoAreaAdmin(admin.ModelAdmin):
 
     class Media:
         css = {
-            "all": ("admin/css/custom.css",)
+            "all": (
+                "admin/css/custom.css",
+                "admin/css/plantio_autocomplete_rich.css",
+                )
         }
-        js = ("admin/js/plantio_extrato_area_preview.js",)
+        js = (
+            "admin/js/plantio_extrato_area_preview.js",
+            "admin/js/plantio_autocomplete_rich.js",
+            )
 
 @admin.register(ColheitaPlantioExtratoArea)
 class ColheitaPlantioExtratoAreaAdmin(admin.ModelAdmin):

@@ -1,0 +1,133 @@
+.plantio-ac-option {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 4px;
+  min-height: 46px;
+}
+
+.plantio-ac-icon-mask {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  background: var(--icon-color, #64748b);
+  -webkit-mask: var(--icon-url) center / contain no-repeat;
+  mask: var(--icon-url) center / contain no-repeat;
+}
+
+.plantio-ac-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.plantio-ac-line1 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.plantio-ac-line1 strong {
+  color: #111827;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.plantio-ac-project {
+  color: #374151;
+  font-size: 12px;
+  font-weight: 700;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plantio-ac-line2 {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 3px;
+  color: #6b7280;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.plantio-ac-line2 span {
+  display: inline-flex;
+  align-items: center;
+}
+
+.plantio-ac-line2 span:not(:last-child)::after {
+  content: "•";
+  margin-left: 5px;
+  color: #9ca3af;
+}
+
+.plantio-ac-badges-inline {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.plantio-ac-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 2px 7px;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.plantio-ac-badge.is-success {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.plantio-ac-badge.is-info {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.plantio-ac-badge.is-muted {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+.plantio-ac-badge.is-dark {
+  background: #e5e7eb;
+  color: #111827;
+}
+
+.plantio-ac-badge.is-danger {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.plantio-ac-badge.is-purple {
+  background: #f3e8ff;
+  color: #7e22ce;
+}
+
+.plantio-ac-badge.is-warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.select2-results__option--highlighted .plantio-ac-line1 strong,
+.select2-results__option--highlighted .plantio-ac-project,
+.select2-results__option--highlighted .plantio-ac-line2 {
+  color: #ffffff;
+}
+
+.select2-results__option--highlighted .plantio-ac-line2 span::after {
+  color: rgba(255, 255, 255, 0.7);
+}
