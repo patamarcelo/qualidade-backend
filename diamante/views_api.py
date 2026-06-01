@@ -7757,13 +7757,22 @@ class ProgramasDetails(viewsets.ModelViewSet):
                 ).filter(Q(programa__ativo=True) & Q(ativo=True))
                 qs_programas = (
                     Programa.objects.values(
+                        "id",
                         "nome",
                         "nome_fantasia",
                         "safra__safra",
                         "ciclo__ciclo",
+                        "cultura__cultura",
                         "versao",
+                        "start_date",
+                        "end_date",
                     )
-                    .order_by("safra", "ciclo", "nome")
+                    .order_by(
+                        "cultura__cultura",
+                        "safra__safra",
+                        "ciclo__ciclo",
+                        "nome",
+                    )
                     .filter(Q(ativo=True))
                 )
                 # qs_area_total_program = (
