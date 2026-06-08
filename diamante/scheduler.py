@@ -161,11 +161,11 @@ def start():
                 id="update_farmbox_apps_hourly", replace_existing=True, misfire_grace_time=1800, coalesce=True
             )
 
-            # GRUPO C — E-MAILS / ALERTAS
-            scheduler.add_job(
-                job_enviar_email_diario, "cron", day_of_week="mon-fri", hour="6", minute="20",
-                id="enviar_email_diario_0620", replace_existing=True, misfire_grace_time=3600
-            )
+            # # GRUPO C — E-MAILS / ALERTAS
+            # scheduler.add_job(
+            #     job_enviar_email_diario, "cron", day_of_week="mon-fri", hour="6", minute="20",
+            #     id="enviar_email_diario_0620", replace_existing=True, misfire_grace_time=3600
+            # )
             scheduler.add_job(
                 job_enviar_email_alerta_mungo_verde_por_regra, "cron", day_of_week="sun", hour="12", minute="0",
                 id="alerta_mungo_verde_domingo_12h", replace_existing=True
