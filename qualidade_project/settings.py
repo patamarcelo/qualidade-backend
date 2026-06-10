@@ -198,7 +198,7 @@ DATABASES = {
         "HOST": env("DB_EL_HOST"),
         "PORT": env("DB_EL_PORT"),
 
-        "CONN_MAX_AGE": 60,
+        "CONN_MAX_AGE": 30,
         "CONN_HEALTH_CHECKS": True,
         "ATOMIC_REQUESTS": True,
 
@@ -211,6 +211,10 @@ DATABASES = {
             "keepalives_idle": 30,
             "keepalives_interval": 10,
             "keepalives_count": 5,
+            
+            # Opcional, mas útil para não deixar query travada eternamente.
+            # 120000 = 2 minutos.
+            "options": "-c statement_timeout=120000",
         },
     },
     # "dev": {
