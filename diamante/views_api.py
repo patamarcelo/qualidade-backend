@@ -3788,6 +3788,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         .filter(data_plantio__isnull=False)
                         .filter(plantio_descontinuado=False)
                         .filter(finalizado_colheita=False)
+                        .filter(ativo=True)
                     )
                     
                     if use_multi and multi_list:
