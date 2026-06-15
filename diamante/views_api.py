@@ -2979,6 +2979,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     .filter(Q(data_plantio=None))
                     .filter(plantio_descontinuado=False)
                     .filter(finalizado_colheita=False)
+                    .filter(ativo=True)
                 )
                 if use_multi and multi_list:
                     # === Forma 1 ===
@@ -3715,6 +3716,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         .filter(data_plantio__isnull=False)
                         .filter(plantio_descontinuado=False)
                         .filter(finalizado_colheita=False)
+                        .filter(ativo=True)
                     )
                     if use_multi and multi_list:
                         # === Forma 1 ===
