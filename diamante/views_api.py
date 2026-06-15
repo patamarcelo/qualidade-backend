@@ -5138,6 +5138,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     # finalizado_plantio=True,
                     # programa__isnull=False,
                     talhao__fazenda__fazenda=projeto_get.fazenda,
+                    ativo=True
                 ).order_by('data_prevista_plantio')
 
                 plantio_ids = Plantio.objects.values(
@@ -5147,10 +5148,11 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     # finalizado_plantio=True,
                     # programa__isnull=False,
                     talhao__fazenda__fazenda=projeto_get.fazenda,
+                    ativo=True
                 ).order_by('data_prevista_plantio')
 
                 gp_date = ( 
-                        Plantio.objects.filter(safra__safra=safra_filter, ciclo__ciclo=ciclo_filter, programa__isnull=False)
+                        Plantio.objects.filter(safra__safra=safra_filter, ciclo__ciclo=ciclo_filter, programa__isnull=False, ativo=True)
                                         .filter(talhao__fazenda__fazenda=projeto_get.fazenda)
                                         .annotate(date_only=TruncDate('data_prevista_plantio'))
                                         .values('date_only', 'id_farmbox')
@@ -5178,7 +5180,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     # finalizado_plantio=True,
                     # programa__isnull=False,
                     talhao__fazenda__id_farmbox=projeto_filter,
-                    plantio_descontinuado=False
+                    plantio_descontinuado=False,
+                    ativo=True
                 ).order_by('data_prevista_plantio')
 
                 plantio_ids = Plantio.objects.values(
@@ -5188,6 +5191,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     # finalizado_plantio=True,
                     # programa__isnull=False,
                     talhao__fazenda__id_farmbox=projeto_filter,
+                    ativo=True
                 ).order_by('data_prevista_plantio')
 
             print("depois de fazer a query")
@@ -5298,7 +5302,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 ciclo__ciclo="3",
                 finalizado_plantio=True,
                 talhao__fazenda__nome=projeto_filter,
-                plantio_descontinuado=False
+                plantio_descontinuado=False,
+                ativo=True
             )
 
             print("depois de fazer a query")
