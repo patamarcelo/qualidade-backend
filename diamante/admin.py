@@ -2107,6 +2107,7 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         "safra__safra",
         "ciclo__ciclo",
         "variedade__cultura",
+        "ativo",
         ColheitaFilter,
         ColheitaFilterNoProgram,
         "inicializado_plantio",

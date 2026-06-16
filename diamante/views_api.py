@@ -5869,6 +5869,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                     "finalizado_plantio"
                 )
                 .filter(cond_1 | cond_2)
+                .filter(ativo=True)
             )
             response = {
                 "msg": f"Aplicação Aberta com sucesso!!!!",
