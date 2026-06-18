@@ -270,127 +270,200 @@ class PlantioDetailAdmin(admin.ModelAdmin):
     safra_filter = None
 
     exclude_j = False
+
     if exclude_j:
         list_ids = [263066, 264740]
     else:
         list_ids = []
 
+    CUSTOM_QUERY_PARAMS = (
+        "ciclo",
+        "safra",
+        "created_at_gte",
+        "created_at_lte",
+        "data_gte",
+        "data_lte",
+    )
+
     def get_queryset(self, request):
-        global cicle_filter, safra_filter
+        """
+        Queryset principal da listagem do admin.
 
-        request.GET = request.GET.copy()
+        Retorna somente Plantios ativos.
+        Os filtros customizados de safra e ciclo são armazenados no request
+        antes de serem removidos para o processamento padrão do Django Admin.
+        """
 
-        ciclo = request.GET.pop("ciclo", None)
-        safra = request.GET.pop("safra", None)
+        ciclo = getattr(
+            request,
+            "_plantio_ciclo_filter",
+            request.GET.get("ciclo"),
+        )
 
-        # remove também os filtros customizados para o admin não tentar processar
-        request.GET.pop("created_at_gte", None)
-        request.GET.pop("created_at_lte", None)
-        request.GET.pop("data_gte", None)
-        request.GET.pop("data_lte", None)
+        safra = getattr(
+            request,
+            "_plantio_safra_filter",
+            request.GET.get("safra"),
+        )
 
-        if ciclo:
-            ciclo_index = ciclo[0]
-            safra_filter = safra[0].replace("_", "/").strip()
-            cicle_filter = Ciclo.objects.filter(ciclo=ciclo_index)[0]
-            safra_filter = Safra.objects.filter(safra=safra_filter)[0]
-            return (
-                super(PlantioDetailAdmin, self)
-                .get_queryset(request)
-                .select_related(
-                    "talhao",
-                    "safra",
-                    "ciclo",
-                    "talhao__fazenda",
-                    "variedade",
-                    "programa",
-                )
-                .filter(ciclo=cicle_filter, safra=safra_filter)
-                .order_by("data_plantio")
-            )
-        else:
-            cicle_filter = CicloAtual.objects.filter(nome="Colheita")[0].ciclo
-            safra_filter = CicloAtual.objects.filter(nome="Colheita")[0].safra
-
-        return (
-            super(PlantioDetailAdmin, self)
+        queryset = (
+            super()
             .get_queryset(request)
+            .filter(
+                ativo=True,
+            )
             .select_related(
                 "talhao",
+                "talhao__fazenda",
                 "safra",
                 "ciclo",
-                "talhao__fazenda",
                 "variedade",
+                "variedade__cultura",
                 "programa",
             )
-            .order_by("data_plantio")
         )
-        
+
+        if ciclo and safra:
+            safra_normalizada = safra.replace("_", "/").strip()
+
+            queryset = queryset.filter(
+                ciclo__ciclo=ciclo,
+                ciclo__ativo=True,
+                safra__safra=safra_normalizada,
+                safra__ativo=True,
+            )
+
+        return queryset.order_by("data_plantio")
+
     def changelist_view(self, request, extra_context=None):
         request.GET = request.GET.copy()
+
+        # =========================================================
+        # CAPTURA OS FILTROS CUSTOMIZADOS
+        # =========================================================
 
         ciclo = request.GET.get("ciclo")
         safra = request.GET.get("safra")
 
         created_at_gte = request.GET.get("created_at_gte")
         created_at_lte = request.GET.get("created_at_lte")
+
         data_gte = request.GET.get("data_gte")
         data_lte = request.GET.get("data_lte")
 
-        print("GET COMPLETO ORIGINAL:", dict(request.GET))
-        print("created_at_gte:", created_at_gte)
-        print("created_at_lte:", created_at_lte)
-        print("data_gte:", data_gte)
-        print("data_lte:", data_lte)
+        # Salva ciclo e safra no request para o get_queryset conseguir
+        # utilizá-los mesmo após a limpeza do request.GET.
+        request._plantio_ciclo_filter = ciclo
+        request._plantio_safra_filter = safra
 
-        # limpa parâmetros customizados antes do admin padrão processar
+        # =========================================================
+        # LIMPA PARÂMETROS QUE NÃO PERTENCEM AO DJANGO ADMIN
+        # =========================================================
+
         clean_get = request.GET.copy()
-        clean_get.pop("ciclo", None)
-        clean_get.pop("safra", None)
-        clean_get.pop("created_at_gte", None)
-        clean_get.pop("created_at_lte", None)
-        clean_get.pop("data_gte", None)
-        clean_get.pop("data_lte", None)
+
+        for param in self.CUSTOM_QUERY_PARAMS:
+            clean_get.pop(param, None)
+
         request.GET = clean_get
+        request.META["QUERY_STRING"] = clean_get.urlencode()
 
         response = super().changelist_view(
             request,
             extra_context=extra_context,
         )
 
-        safra_ciclo = CicloAtual.objects.filter(nome="Colheita")[0]
-        safra_filter = safra_ciclo.safra.safra
-        cicle_filter = safra_ciclo.ciclo.ciclo
-
-        if ciclo and safra:
-            safra_filter = safra.replace("_", "/")
-            cicle_filter = ciclo
-
+        # Em redirects, erros ou outras respostas sem context_data,
+        # não há resumo para processar.
         try:
             qs = response.context_data["cl"].queryset
-        except (AttributeError, KeyError):
+        except (AttributeError, KeyError, TypeError):
             return response
 
         # =========================================================
-        # BASE DO PLANTIO -> ÁREA TOTAL (SEM FILTRO DE DATA/CRIADO)
+        # DEFINE SAFRA E CICLO
         # =========================================================
+
+        safra_ciclo_atual = (
+            CicloAtual.objects
+            .filter(
+                nome="Colheita",
+                ativo=True,
+                safra__ativo=True,
+                ciclo__ativo=True,
+            )
+            .select_related(
+                "safra",
+                "ciclo",
+            )
+            .first()
+        )
+
+        if ciclo and safra:
+            safra_filter = safra.replace("_", "/").strip()
+            cicle_filter = ciclo
+
+        elif safra_ciclo_atual:
+            safra_filter = safra_ciclo_atual.safra.safra
+            cicle_filter = safra_ciclo_atual.ciclo.ciclo
+
+        else:
+            # Sem configuração de safra/ciclo atual, devolve a página
+            # sem tentar executar as agregações.
+            response.context_data["summary_2"] = json.dumps(
+                [],
+                cls=DjangoJSONEncoder,
+            )
+
+            response.context_data["colheita_2"] = json.dumps(
+                [],
+                cls=DjangoJSONEncoder,
+            )
+
+            response.context_data["created_at_gte"] = created_at_gte or ""
+            response.context_data["created_at_lte"] = created_at_lte or ""
+            response.context_data["data_gte"] = data_gte or ""
+            response.context_data["data_lte"] = data_lte or ""
+
+            return response
+
+        # =========================================================
+        # BASE DO PLANTIO
+        #
+        # A área total não recebe filtros de data de criação nem de
+        # data de colheita. Ela representa o total da safra/ciclo.
+        # =========================================================
+
         base_qs = (
             qs.filter(
+                ativo=True,
+                safra__ativo=True,
                 safra__safra=safra_filter,
+                ciclo__ativo=True,
                 ciclo__ciclo=cicle_filter,
                 finalizado_plantio=True,
                 plantio_descontinuado=False,
                 acompanhamento_medias=True,
+                variedade__isnull=False,
+                variedade__ativo=True,
+                variedade__cultura__ativo=True,
             )
-            .filter(~Q(variedade__cultura__cultura="Milheto"))
-            .filter(~Q(variedade__cultura__cultura="Algodão"))
-            .filter(~Q(id_farmbox__in=self.list_ids))
+            .exclude(
+                variedade__cultura__cultura__in=[
+                    "Milheto",
+                    "Algodão",
+                ]
+            )
         )
 
-        print("base_qs count:", base_qs.count())
+        if self.list_ids:
+            base_qs = base_qs.exclude(
+                id_farmbox__in=self.list_ids,
+            )
 
         area_total_qs = (
-            base_qs.values(
+            base_qs
+            .values(
                 "talhao__fazenda__nome",
                 "variedade__cultura__cultura",
                 "variedade__variedade",
@@ -402,24 +475,57 @@ class PlantioDetailAdmin(admin.ModelAdmin):
                     output_field=DecimalField(),
                 )
             )
-            .order_by("talhao__fazenda__nome")
+            .order_by(
+                "talhao__fazenda__nome",
+                "variedade__cultura__cultura",
+                "variedade__variedade",
+            )
         )
 
         # =========================================================
-        # ÁREA COLHIDA -> VEM DO EXTRATO DE COLHEITA
+        # ÁREA COLHIDA
+        #
+        # A área colhida é obtida dos extratos ativos.
+        # Além do extrato ativo, o Plantio relacionado também precisa
+        # estar ativo.
         # =========================================================
+
         colheita_extrato_qs = (
-            ColheitaPlantioExtratoArea.objects.filter(
+            ColheitaPlantioExtratoArea.objects
+            .filter(
                 ativo=True,
+
+                plantio__ativo=True,
+
+                plantio__safra__ativo=True,
                 plantio__safra__safra=safra_filter,
+
+                plantio__ciclo__ativo=True,
                 plantio__ciclo__ciclo=cicle_filter,
+
                 plantio__plantio_descontinuado=False,
                 plantio__acompanhamento_medias=True,
+
+                plantio__variedade__isnull=False,
+                plantio__variedade__ativo=True,
+                plantio__variedade__cultura__ativo=True,
             )
-            .filter(~Q(plantio__variedade__cultura__cultura="Milheto"))
-            .filter(~Q(plantio__variedade__cultura__cultura="Algodão"))
-            .filter(~Q(plantio__id_farmbox__in=self.list_ids))
+            .exclude(
+                plantio__variedade__cultura__cultura__in=[
+                    "Milheto",
+                    "Algodão",
+                ]
+            )
         )
+
+        if self.list_ids:
+            colheita_extrato_qs = colheita_extrato_qs.exclude(
+                plantio__id_farmbox__in=self.list_ids,
+            )
+
+        # =========================================================
+        # FILTRO PELA DATA DE CRIAÇÃO DO EXTRATO
+        # =========================================================
 
         if created_at_gte or created_at_lte:
             created_q = build_created_filters(
@@ -427,8 +533,14 @@ class PlantioDetailAdmin(admin.ModelAdmin):
                 created_at_lte=created_at_lte,
                 field_name="criados",
             )
-            print("created_q area extrato:", created_q)
-            colheita_extrato_qs = colheita_extrato_qs.filter(created_q)
+
+            colheita_extrato_qs = colheita_extrato_qs.filter(
+                created_q
+            )
+
+        # =========================================================
+        # FILTRO PELA DATA EFETIVA DA COLHEITA
+        # =========================================================
 
         if data_gte or data_lte:
             data_q = build_date_filters(
@@ -436,13 +548,14 @@ class PlantioDetailAdmin(admin.ModelAdmin):
                 data_lte=data_lte,
                 field_name="data_colheita",
             )
-            print("data_q area extrato:", data_q)
-            colheita_extrato_qs = colheita_extrato_qs.filter(data_q)
 
-        print("colheita_extrato_qs count:", colheita_extrato_qs.count())
+            colheita_extrato_qs = colheita_extrato_qs.filter(
+                data_q
+            )
 
         area_colhida_qs = (
-            colheita_extrato_qs.values(
+            colheita_extrato_qs
+            .values(
                 "plantio__talhao__fazenda__nome",
                 "plantio__variedade__cultura__cultura",
                 "plantio__variedade__variedade",
@@ -454,14 +567,17 @@ class PlantioDetailAdmin(admin.ModelAdmin):
                     output_field=DecimalField(),
                 )
             )
-            .order_by("plantio__talhao__fazenda__nome")
+            .order_by(
+                "plantio__talhao__fazenda__nome",
+                "plantio__variedade__cultura__cultura",
+                "plantio__variedade__variedade",
+            )
         )
 
-        print("NEW AREA COLHIDA QS:::", area_colhida_qs)
+        # =========================================================
+        # JUNTA ÁREA TOTAL E ÁREA COLHIDA
+        # =========================================================
 
-        # =========================================================
-        # JUNTA ÁREA TOTAL + ÁREA COLHIDA FILTRADA
-        # =========================================================
         summary_dict = {}
 
         for item in area_total_qs:
@@ -470,10 +586,17 @@ class PlantioDetailAdmin(admin.ModelAdmin):
                 item["variedade__cultura__cultura"],
                 item["variedade__variedade"],
             )
+
             summary_dict[key] = {
-                "talhao__fazenda__nome": item["talhao__fazenda__nome"],
-                "variedade__cultura__cultura": item["variedade__cultura__cultura"],
-                "variedade__variedade": item["variedade__variedade"],
+                "talhao__fazenda__nome": (
+                    item["talhao__fazenda__nome"]
+                ),
+                "variedade__cultura__cultura": (
+                    item["variedade__cultura__cultura"]
+                ),
+                "variedade__variedade": (
+                    item["variedade__variedade"]
+                ),
                 "area_total": item["area_total"] or 0,
                 "area_finalizada": 0,
             }
@@ -487,18 +610,39 @@ class PlantioDetailAdmin(admin.ModelAdmin):
 
             if key not in summary_dict:
                 summary_dict[key] = {
-                    "talhao__fazenda__nome": item["plantio__talhao__fazenda__nome"],
-                    "variedade__cultura__cultura": item["plantio__variedade__cultura__cultura"],
-                    "variedade__variedade": item["plantio__variedade__variedade"],
+                    "talhao__fazenda__nome": (
+                        item["plantio__talhao__fazenda__nome"]
+                    ),
+                    "variedade__cultura__cultura": (
+                        item[
+                            "plantio__variedade__cultura__cultura"
+                        ]
+                    ),
+                    "variedade__variedade": (
+                        item["plantio__variedade__variedade"]
+                    ),
                     "area_total": 0,
                     "area_finalizada": 0,
                 }
 
-            summary_dict[key]["area_finalizada"] = item["area_finalizada"] or 0
+            summary_dict[key]["area_finalizada"] = (
+                item["area_finalizada"] or 0
+            )
 
         summary_list = list(summary_dict.values())
 
-        print("summary_list len:", len(summary_list))
+        # Ordenação final após a junção dos dois querysets.
+        summary_list.sort(
+            key=lambda item: (
+                item["talhao__fazenda__nome"] or "",
+                item["variedade__cultura__cultura"] or "",
+                item["variedade__variedade"] or "",
+            )
+        )
+
+        # =========================================================
+        # CONTEXTO DO TEMPLATE
+        # =========================================================
 
         response.context_data["summary_2"] = json.dumps(
             summary_list,
@@ -518,10 +662,24 @@ class PlantioDetailAdmin(admin.ModelAdmin):
             cls=DjangoJSONEncoder,
         )
 
-        response.context_data["created_at_gte"] = created_at_gte or ""
-        response.context_data["created_at_lte"] = created_at_lte or ""
-        response.context_data["data_gte"] = data_gte or ""
-        response.context_data["data_lte"] = data_lte or ""
+        response.context_data["created_at_gte"] = (
+            created_at_gte or ""
+        )
+
+        response.context_data["created_at_lte"] = (
+            created_at_lte or ""
+        )
+
+        response.context_data["data_gte"] = (
+            data_gte or ""
+        )
+
+        response.context_data["data_lte"] = (
+            data_lte or ""
+        )
+
+        response.context_data["safra_filter"] = safra_filter
+        response.context_data["cicle_filter"] = cicle_filter
 
         return response
     
