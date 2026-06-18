@@ -541,47 +541,68 @@ class PlantioDetailPlantioAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request):
         global cicle_filter, safra_filter
+
         request.GET = request.GET.copy()
+
         ciclo = request.GET.pop("ciclo", None)
         safra = request.GET.pop("safra", None)
-        if ciclo:
-            ciclo_index = ciclo[0]
-            safra_filter = safra[0].replace("_", "/").strip()
-            cicle_filter = Ciclo.objects.filter(ciclo=ciclo_index)[0]
-            safra_filter = Safra.objects.filter(safra=safra_filter)[0]
-            return (
-                super(PlantioDetailPlantioAdmin, self)
-                .get_queryset(request)
-                .select_related(
-                    "talhao",
-                    "safra",
-                    "ciclo",
-                    "talhao__fazenda",
-                    "variedade",
-                    "programa",
-                )
-                .filter(ciclo=cicle_filter, safra=safra_filter)
-                .order_by("data_plantio")
-            )
-        else:
-            cicle_filter = CicloAtual.objects.filter(nome="Plantio")[0]
-            cicle_filter = cicle_filter.ciclo
-            safra_filter = CicloAtual.objects.filter(nome="Plantio")[0]
-            safra_filter = safra_filter.safra
-        return (
-            super(PlantioDetailPlantioAdmin, self)
+
+        queryset = (
+            super()
             .get_queryset(request)
+            .filter(ativo=True)
             .select_related(
                 "talhao",
                 "safra",
                 "ciclo",
                 "talhao__fazenda",
                 "variedade",
+                "variedade__cultura",
                 "programa",
             )
-            # .filter(ciclo=cicle_filter, safra=safra_filter)
-            .order_by("data_plantio")
         )
+
+        if ciclo and safra:
+            ciclo_index = ciclo[0]
+            safra_value = safra[0].replace("_", "/").strip()
+
+            cicle_filter = Ciclo.objects.get(
+                ciclo=ciclo_index,
+                ativo=True,
+            )
+
+            safra_filter = Safra.objects.get(
+                safra=safra_value,
+                ativo=True,
+            )
+
+            return (
+                queryset
+                .filter(
+                    ciclo=cicle_filter,
+                    safra=safra_filter,
+                )
+                .order_by("data_plantio")
+            )
+
+        ciclo_atual = (
+            CicloAtual.objects
+            .select_related("ciclo", "safra")
+            .filter(
+                nome="Plantio",
+                ativo=True,
+            )
+            .first()
+        )
+
+        if ciclo_atual:
+            cicle_filter = ciclo_atual.ciclo
+            safra_filter = ciclo_atual.safra
+        else:
+            cicle_filter = None
+            safra_filter = None
+
+        return queryset.order_by("data_plantio")
 
     def changelist_view(self, request, extra_context=None):
         # global safra_filter
@@ -634,14 +655,18 @@ class PlantioDetailPlantioAdmin(admin.ModelAdmin):
         }
         query_data = (
             qs.filter(
+                ativo=True,
                 safra__safra=safra_filter,
                 ciclo__ciclo=cicle_filter,
                 plantio_descontinuado=False,
-                # programa__isnull=False
             )
-            .filter(~Q(variedade__cultura__cultura="Milheto"))
-            .filter(~Q(variedade__cultura__cultura="Algodão"))
-            .filter(~Q(variedade=None))
+            .exclude(
+                variedade__cultura__cultura__in=[
+                    "Milheto",
+                    "Algodão",
+                ]
+            )
+            .exclude(variedade__isnull=True)
             .values(
                 "talhao__fazenda__nome",
                 "variedade__cultura__cultura",
