@@ -3525,12 +3525,13 @@ class OperacaoAdmin(admin.ModelAdmin):
         "programa__nome_fantasia",
         "programa__cultura__cultura",
         "estagio",
-        "prazo_dap",
         "obs",
+        "observacao",
         "maquina__nome",
         "maquina__tipo",
-        "maquina__placa",
+        "maquina__referencia",
         "maquina__patrimonio",
+        "maquina__chassi",
         "maquina__fazenda__nome",
     ]
 
