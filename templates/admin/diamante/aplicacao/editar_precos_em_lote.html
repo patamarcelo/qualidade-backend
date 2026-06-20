@@ -11,6 +11,7 @@
     --text: #111827;
     --primary: #2563eb;
     --primary-hover: #1d4ed8;
+    --primary-active: #1e40af;
     --success: #059669;
     --bg-soft: #f8fafc;
     --row-hover: #f3f7ff;
@@ -60,37 +61,37 @@
   }
 
   .page-subtitle {
-    margin: 8px 0 0 0;
+    margin: 8px 0 0;
     color: var(--muted);
     font-size: 14px;
   }
 
   .stats-wrap {
     display: flex;
-    gap: 12px;
     flex-wrap: wrap;
+    gap: 12px;
   }
 
   .stat-box {
     min-width: 150px;
+    padding: 12px 14px;
     background: #fff;
     border: 1px solid var(--card-border);
     border-radius: 12px;
-    padding: 12px 14px;
   }
 
   .stat-label {
+    margin-bottom: 6px;
+    color: var(--muted);
     font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    color: var(--muted);
-    margin-bottom: 6px;
   }
 
   .stat-value {
+    color: var(--text);
     font-size: 24px;
     font-weight: 700;
-    color: var(--text);
   }
 
   .bulk-fill-card {
@@ -98,13 +99,13 @@
   }
 
   .bulk-fill-title {
-    margin: 0 0 6px 0;
-    font-size: 18px;
+    margin: 0 0 6px;
     color: var(--text);
+    font-size: 18px;
   }
 
   .bulk-fill-desc {
-    margin: 0 0 16px 0;
+    margin: 0 0 16px;
     color: var(--muted);
     font-size: 14px;
   }
@@ -118,22 +119,22 @@
 
   .field-group label {
     display: block;
+    margin-bottom: 6px;
+    color: var(--muted);
     font-size: 12px;
     font-weight: 600;
-    color: var(--muted);
-    margin-bottom: 6px;
   }
 
   .field-group input,
   .field-group select {
     width: 100%;
     height: 42px;
+    padding: 0 12px;
+    box-sizing: border-box;
+    background: #fff;
     border: 1px solid #d1d5db;
     border-radius: 10px;
-    padding: 0 12px;
     font-size: 14px;
-    background: #fff;
-    box-sizing: border-box;
   }
 
   .field-group input:focus,
@@ -152,37 +153,62 @@
   }
 
   .btn {
-    height: 42px;
-    border: 0;
-    border-radius: 10px;
-    padding: 0 16px;
-    cursor: pointer;
-    font-weight: 600;
-    font-size: 14px;
-    transition: 0.18s ease;
-    text-decoration: none;
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    height: 42px;
+    padding: 0 16px;
     box-sizing: border-box;
+    border: 0;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    transition:
+      background-color 0.18s ease,
+      border-color 0.18s ease,
+      color 0.18s ease,
+      box-shadow 0.18s ease,
+      transform 0.18s ease,
+      filter 0.18s ease;
   }
 
-  .btn-primary {
-    background: var(--primary);
-    color: #fff;
-  }
-
-  .btn-primary:hover {
-    background: var(--primary-hover);
-  }
+  /*
+   * Botão principal:
+   * Aplicar preço + moeda
+   *
+   * O ID deixa a regra mais específica que o CSS do Django Admin.
+   */
+  
 
   .btn-secondary {
     background: #eef2ff;
     color: #1e3a8a;
+    border: 1px solid transparent;
   }
 
   .btn-secondary:hover {
     background: #dbeafe;
+    color: #1e3a8a;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 14px rgba(37, 99, 235, 0.18);
+  }
+
+  .btn-secondary:focus,
+  .btn-secondary:focus-visible {
+    background: #dbeafe;
+    color: #1e3a8a;
+    outline: none;
+    transform: translateY(-1px);
+    box-shadow:
+      0 0 0 3px rgba(37, 99, 235, 0.18),
+      0 6px 14px rgba(37, 99, 235, 0.18);
+  }
+
+  .btn-secondary:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 6px rgba(37, 99, 235, 0.14);
   }
 
   .btn-success {
@@ -192,6 +218,18 @@
 
   .btn-success:hover {
     filter: brightness(0.95);
+    transform: translateY(-1px);
+  }
+
+  .btn-success:focus,
+  .btn-success:focus-visible {
+    outline: none;
+    filter: brightness(0.95);
+    box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.18);
+  }
+
+  .btn-success:active {
+    transform: translateY(0);
   }
 
   .btn-light {
@@ -201,19 +239,34 @@
 
   .btn-light:hover {
     background: #e5e7eb;
+    transform: translateY(-1px);
   }
 
-  .btn[disabled] {
+  .btn-light:focus,
+  .btn-light:focus-visible {
+    background: #e5e7eb;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(107, 114, 128, 0.14);
+  }
+
+  .btn-light:active {
+    transform: translateY(0);
+  }
+
+  .btn[disabled],
+  button#apply-both-all[disabled] {
     opacity: 0.75;
     cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
   }
 
   .hint-box {
     margin-top: 14px;
+    padding: 12px 14px;
     background: var(--warning-bg);
     border: 1px solid #fed7aa;
     border-radius: 12px;
-    padding: 12px 14px;
     color: #9a3412;
     font-size: 13px;
   }
@@ -224,22 +277,22 @@
 
   .table-header {
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    justify-content: space-between;
     gap: 10px;
     padding: 16px 18px;
-    border-bottom: 1px solid var(--card-border);
     background: #fcfcfd;
+    border-bottom: 1px solid var(--card-border);
   }
 
   .table-header h3 {
     margin: 0;
-    font-size: 17px;
     color: var(--text);
+    font-size: 17px;
   }
 
   .table-header p {
-    margin: 4px 0 0 0;
+    margin: 4px 0 0;
     color: var(--muted);
     font-size: 13px;
   }
@@ -251,31 +304,31 @@
 
   table.bulk-table {
     width: 100%;
+    min-width: 1450px;
     border-collapse: separate;
     border-spacing: 0;
-    min-width: 1450px;
   }
 
   .bulk-table thead th {
     position: sticky;
     top: 0;
     z-index: 3;
+    padding: 12px 10px;
     background: #f8fafc;
+    border-bottom: 1px solid var(--card-border);
     color: #374151;
     font-size: 12px;
+    text-align: left;
     text-transform: uppercase;
     letter-spacing: 0.03em;
-    padding: 12px 10px;
-    border-bottom: 1px solid var(--card-border);
-    text-align: left;
     white-space: nowrap;
   }
 
   .bulk-table tbody td {
     padding: 10px;
+    background: #fff;
     border-bottom: 1px solid #eef2f7;
     vertical-align: middle;
-    background: #fff;
   }
 
   .bulk-table tbody tr:nth-child(even) td {
@@ -309,22 +362,22 @@
     min-width: 52px;
     padding: 5px 10px;
     background: #eff6ff;
-    color: #1d4ed8;
     border-radius: 999px;
-    font-weight: 700;
+    color: #1d4ed8;
     font-size: 12px;
+    font-weight: 700;
   }
 
   .main-text {
-    font-weight: 600;
     color: #111827;
+    font-weight: 600;
   }
 
   .sub-text {
     display: block;
     margin-top: 3px;
-    font-size: 12px;
     color: var(--muted);
+    font-size: 12px;
   }
 
   .table-input,
@@ -332,12 +385,12 @@
     width: 100%;
     min-width: 110px;
     height: 38px;
-    border: 1px solid #d1d5db;
-    border-radius: 10px;
     padding: 0 10px;
-    font-size: 14px;
     box-sizing: border-box;
     background: #fff;
+    border: 1px solid #d1d5db;
+    border-radius: 10px;
+    font-size: 14px;
   }
 
   .money-col {
@@ -345,8 +398,8 @@
   }
 
   .readonly-money {
-    font-weight: 700;
     color: #0f172a;
+    font-weight: 700;
   }
 
   .footer-actions {
@@ -354,8 +407,8 @@
     bottom: 0;
     z-index: 6;
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    justify-content: space-between;
     gap: 12px;
     padding: 14px 16px;
     background: rgba(255, 255, 255, 0.96);
@@ -369,27 +422,130 @@
 
   .footer-right {
     display: flex;
-    gap: 10px;
     flex-wrap: wrap;
+    gap: 10px;
   }
 
   .spinner {
+    display: inline-block;
     width: 16px;
     height: 16px;
-    border: 2px solid rgba(255,255,255,0.45);
+    margin-right: 8px;
+    border: 2px solid rgba(255, 255, 255, 0.45);
     border-top-color: #fff;
     border-radius: 50%;
-    display: inline-block;
     animation: spin 0.8s linear infinite;
-    margin-right: 8px;
   }
 
   .hidden {
     display: none !important;
   }
 
+  .row-remove-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    background: #fff1f2;
+    border: 1px solid #fecaca;
+    border-radius: 10px;
+    color: #be123c;
+    cursor: pointer;
+    font-size: 17px;
+    font-weight: 800;
+    line-height: 1;
+    transition:
+      background-color 0.18s ease,
+      border-color 0.18s ease,
+      box-shadow 0.18s ease,
+      transform 0.18s ease;
+  }
+
+  .row-remove-btn:hover {
+    background: #ffe4e6;
+    border-color: #fb7185;
+    transform: translateY(-1px);
+  }
+
+  .row-remove-btn:focus,
+  .row-remove-btn:focus-visible {
+    outline: none;
+    background: #ffe4e6;
+    border-color: #fb7185;
+    box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.14);
+  }
+
+  .row-remove-btn:active {
+    transform: translateY(0);
+  }
+
+  .row-remove-btn[disabled] {
+    opacity: 0.65;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .removed-warning {
+    margin-top: 10px;
+    color: #9f1239;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .toast-stack {
+    position: fixed;
+    right: 22px;
+    bottom: 82px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    pointer-events: none;
+  }
+
+  .toast-item {
+    min-width: 280px;
+    max-width: 420px;
+    padding: 12px 14px;
+    background: green;
+    border-radius: 14px;
+    box-shadow: 0 16px 40px rgba(15, 23, 42, 0.22);
+    color: #fff;
+    font-size: 13px;
+    line-height: 1.35;
+    opacity: 0;
+    transform: translateY(8px);
+    animation: toastIn 0.18s ease forwards;
+  }
+
+  .toast-title {
+    margin-bottom: 3px;
+    font-weight: 800;
+  }
+
+  .toast-desc {
+    color: rgba(255, 255, 255, 0.78);
+  }
+
   @keyframes spin {
-    to { transform: rotate(360deg); }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes toastIn {
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes toastOut {
+    to {
+      opacity: 0;
+      transform: translateY(8px);
+    }
   }
 
   @media (max-width: 1100px) {
@@ -411,85 +567,6 @@
       width: 100%;
     }
   }
-
-  .row-remove-btn {
-    width: 34px;
-    height: 34px;
-    border: 1px solid #fecaca;
-    border-radius: 10px;
-    background: #fff1f2;
-    color: #be123c;
-    cursor: pointer;
-    font-size: 17px;
-    font-weight: 800;
-    line-height: 1;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    transition: 0.18s ease;
-  }
-
-  .row-remove-btn:hover {
-    background: #ffe4e6;
-    border-color: #fb7185;
-    transform: translateY(-1px);
-  }
-
-  .removed-warning {
-    margin-top: 10px;
-    color: #9f1239;
-    font-size: 13px;
-    font-weight: 600;
-  }
-
-  .toast-stack {
-  position: fixed;
-  right: 22px;
-  bottom: 82px;
-  z-index: 9999;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  pointer-events: none;
-}
-
-.toast-item {
-  min-width: 280px;
-  max-width: 420px;
-  background: green;
-  color: #fff;
-  border-radius: 14px;
-  padding: 12px 14px;
-  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.22);
-  font-size: 13px;
-  line-height: 1.35;
-  opacity: 0;
-  transform: translateY(8px);
-  animation: toastIn 0.18s ease forwards;
-}
-
-.toast-title {
-  font-weight: 800;
-  margin-bottom: 3px;
-}
-
-.toast-desc {
-  color: rgba(255, 255, 255, 0.78);
-}
-
-@keyframes toastIn {
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes toastOut {
-  to {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-}
 </style>
 {% endblock %}
 
@@ -553,6 +630,9 @@
         </div>
 
         <div class="bulk-actions">
+          <button type="button" class="btn btn-secondary" id="apply-both-all">
+            Aplicar preço + moeda
+          </button>
           <button type="button" class="btn btn-light" id="keep-visible-only">
             Manter só exibidos
           </button>
@@ -565,9 +645,6 @@
           </button>
           <button type="button" class="btn btn-secondary" id="apply-currency-all">
             Aplicar moeda em todos
-          </button>
-          <button type="button" class="btn btn-primary" id="apply-both-all">
-            Aplicar preço + moeda
           </button>
           <button type="button" class="btn btn-light" id="clear-bulk-fields">
             Limpar topo

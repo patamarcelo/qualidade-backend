@@ -4837,6 +4837,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 .filter(
                     colheita_safra_ciclo_q,
                     plantio__plantio_descontinuado=False,
+                    plantio__ativo=True,
                 )
                 .exclude(
                     plantio__variedade__isnull=True,
@@ -4886,6 +4887,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 .filter(
                     plantio_safra_ciclo_q,
                     plantio_descontinuado=False,
+                    ativo=True
                 )
                 .exclude(
                     variedade__isnull=True,
