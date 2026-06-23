@@ -2681,6 +2681,8 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
                 cultura_url = "soy"
             if cultura == "Feijão":
                 cultura_url = "beans2"
+            if cultura == "Milho":
+                cultura_url = "corn"
             if cultura == "Arroz":
                 cultura_url = "rice"
             image_url = None
@@ -3119,6 +3121,8 @@ class ColheitaAdmin(admin.ModelAdmin):
                 cultura_url = "beans2"
             if cultura == "Arroz":
                 cultura_url = "rice"
+            if cultura == "Milho":
+                cultura_url = "corn"
             image_url = None
             if cultura_url is not None:
                 image_url = f"/static/images/icons/{cultura_url}.png"
@@ -5534,6 +5538,8 @@ class PlantioExtratoAreaAdmin(admin.ModelAdmin):
                 cultura_url = "soy"
             elif cultura == "Feijão":
                 cultura_url = "beans2"
+            elif cultura == "Milho":
+                cultura_url = "corn"
             elif cultura == "Arroz":
                 cultura_url = "rice"
 
@@ -5626,6 +5632,8 @@ class ColheitaPlantioExtratoAreaAdmin(admin.ModelAdmin):
                 cultura_url = "soy"
             if cultura == "Feijão":
                 cultura_url = "beans2"
+            if cultura == "Milho":
+                cultura_url = "corn"
             if cultura == "Arroz":
                 cultura_url = "rice"
             image_url = None
@@ -5902,6 +5910,8 @@ class SentSeedsAdmin(admin.ModelAdmin):
                 cultura_url = "soy"
             if cultura == "Feijão":
                 cultura_url = "beans2"
+            if cultura == "Milho":
+                cultura_url = "corn"
             if cultura == "Arroz":
                 cultura_url = "rice"
             image_url = None
@@ -5949,6 +5959,8 @@ class SeedStockAdmin(admin.ModelAdmin):
                 cultura_url = "soy"
             if cultura == "Feijão":
                 cultura_url = "beans2"
+            if cultura == "Milho":
+                cultura_url = "corn"
             if cultura == "Arroz":
                 cultura_url = "rice"
             image_url = None
@@ -5997,6 +6009,8 @@ class SeedConfigAdmin(admin.ModelAdmin):
                 cultura_url = "soy"
             if cultura == "Feijão":
                 cultura_url = "beans2"
+            if cultura == "Milho":
+                cultura_url = "corn"
             if cultura == "Arroz":
                 cultura_url = "rice"
             image_url = None
