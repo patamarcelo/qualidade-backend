@@ -6129,7 +6129,10 @@ class PlantioViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["GET", "POST"])
     def get_plot_mapa_data_fetchrn_app(self, request, pk=None):
         if not request.user.is_authenticated:
-            return Response({"message": "Você precisa estar logado!!!"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"message": "Você precisa estar logado!!!"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         try:
             # 1) Params básicos (query -> body -> default)
@@ -6151,43 +6154,122 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 or None
             )
 
-            # 2) onlyIds (query -> body)
-            only_ids = request.query_params.get("onlyIds") or request.data.get("onlyIds") or []
+            mode = (
+                request.query_params.get("mode")
+                or request.data.get("mode")
+                or "default"
+            )
+
+            # 2) Pairs enviados pelo novo fluxo
+            pairs_request = request.data.get("pairs") or []
+
+            normalized_pairs_request = []
+
+            if isinstance(pairs_request, (list, tuple)):
+                for pair in pairs_request:
+                    if not isinstance(pair, dict):
+                        continue
+
+                    safra = str(
+                        pair.get("safra")
+                        or pair.get("safra__safra")
+                        or ""
+                    ).strip()
+
+                    ciclo = str(
+                        pair.get("ciclo")
+                        if pair.get("ciclo") is not None
+                        else pair.get("ciclo__ciclo")
+                        or ""
+                    ).strip()
+
+                    if not safra or not ciclo:
+                        continue
+
+                    pair_data = {
+                        "safra": safra,
+                        "ciclo": ciclo,
+                    }
+
+                    if pair_data not in normalized_pairs_request:
+                        normalized_pairs_request.append(pair_data)
+
+            # 3) onlyIds (query -> body)
+            only_ids = (
+                request.query_params.get("onlyIds")
+                or request.data.get("onlyIds")
+                or []
+            )
 
             # Normaliza onlyIds (aceita lista ou "1,2,3")
             if isinstance(only_ids, str):
-                only_ids = [x.strip() for x in only_ids.split(",") if x.strip()]
+                only_ids = [
+                    x.strip()
+                    for x in only_ids.split(",")
+                    if x.strip()
+                ]
 
             normalized_only_ids = []
+
             if isinstance(only_ids, (list, tuple)):
                 for x in only_ids:
                     if x is None:
                         continue
+
                     try:
                         normalized_only_ids.append(int(x))
                     except (TypeError, ValueError):
                         continue
 
-            # 3) Base queryset (sempre exclui Milheto)
-            base_qs = Plantio.objects.filter(~Q(variedade__cultura__cultura="Milheto"))
+            # 4) Base queryset (sempre exclui Milheto)
+            base_qs = Plantio.objects.filter(
+                ~Q(variedade__cultura__cultura="Milheto")
+            )
 
             if farm_filter is not None:
-                base_qs = base_qs.filter(talhao__fazenda__id_farmbox=farm_filter)
+                base_qs = base_qs.filter(
+                    talhao__fazenda__id_farmbox=farm_filter
+                )
 
             meta = {
                 "farm": farm_filter,
                 "mode": "default",
-                "pairs": [{"safra": safra_filter, "ciclo": ciclo_filter}],
+                "pairs": [
+                    {
+                        "safra": safra_filter,
+                        "ciclo": ciclo_filter,
+                    }
+                ],
             }
 
-            # 4) Se tem onlyIds -> descobrir pares (safra/ciclo) e buscar TODOS talhões desses pares
-            if normalized_only_ids:
+            # 5) Novo modo: busca todos os talhões da fazenda
+            # para os pares de safra/ciclo enviados
+            if mode == "farmSafraCiclo" and normalized_pairs_request:
+                pair_q = Q()
+
+                for pair in normalized_pairs_request:
+                    pair_q |= Q(
+                        safra__safra=pair["safra"],
+                        ciclo__ciclo=pair["ciclo"],
+                    )
+
+                qs = base_qs.filter(pair_q)
+
+                meta["mode"] = "farmSafraCiclo"
+                meta["pairs"] = normalized_pairs_request
+
+            # 6) Fluxo antigo com onlyIds
+            elif normalized_only_ids:
                 meta["mode"] = "onlyIds"
 
-                # 4.1 Descobre pares de safra/ciclo presentes nos IDs
+                # 6.1 Descobre pares de safra/ciclo presentes nos IDs
                 pairs = list(
-                    base_qs.filter(id_farmbox__in=normalized_only_ids)
-                    .values("safra__safra", "ciclo__ciclo")
+                    base_qs
+                    .filter(id_farmbox__in=normalized_only_ids)
+                    .values(
+                        "safra__safra",
+                        "ciclo__ciclo"
+                    )
                     .distinct()
                 )
 
@@ -6197,51 +6279,88 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         safra__safra=safra_filter,
                         ciclo__ciclo=ciclo_filter,
                     )
+
                     meta["mode"] = "fallback_default"
-                    meta["pairs"] = [{"safra": safra_filter, "ciclo": ciclo_filter}]
+                    meta["pairs"] = [
+                        {
+                            "safra": safra_filter,
+                            "ciclo": ciclo_filter,
+                        }
+                    ]
+
                 else:
-                    # 4.2 Monta OR de todos os pares
+                    # 6.2 Monta OR de todos os pares
                     pair_q = Q()
                     normalized_pairs = []
+
                     for p in pairs:
                         s = p.get("safra__safra")
                         c = p.get("ciclo__ciclo")
+
                         if s is None or c is None:
                             continue
-                        normalized_pairs.append({"safra": s, "ciclo": c})
-                        pair_q |= Q(safra__safra=s, ciclo__ciclo=c)
+
+                        normalized_pairs.append(
+                            {
+                                "safra": s,
+                                "ciclo": c,
+                            }
+                        )
+
+                        pair_q |= Q(
+                            safra__safra=s,
+                            ciclo__ciclo=c
+                        )
 
                     meta["pairs"] = normalized_pairs
 
-                    # 4.3 Busca TODOS os talhões da fazenda que estão em qualquer par safra/ciclo
+                    # 6.3 Busca TODOS os talhões da fazenda
+                    # que estão em qualquer par safra/ciclo
                     qs = base_qs.filter(pair_q)
 
             else:
-                # 5) Sem onlyIds -> comportamento antigo
+                # 7) Sem pairs e sem onlyIds -> comportamento antigo
                 qs = base_qs.filter(
                     safra__safra=safra_filter,
                     ciclo__ciclo=ciclo_filter,
                 )
 
-            # 6) Retorno do mapa
+            # 8) Retorno do mapa
             data = qs.values(
                 "talhao__id_talhao",
+                "talhao__fazenda__nome",
+                "talhao__fazenda__id_farmbox",
+                "talhao__fazenda__map_centro_id",
+                "area_colheita",
                 "map_geo_points",
                 "map_centro_id",
                 "pk",
                 "id_farmbox",
                 "safra__safra",
                 "ciclo__ciclo",
+                "variedade__nome_fantasia",
+                "variedade__cultura__cultura",
+                "variedade__cultura__map_color",
+                "variedade__cultura__map_color_line",
+                "plantio_descontinuado",
+                "finalizado_colheita",
+                "finalizado_plantio",
             )
 
             return Response(
-                {"msg": "Consulta realizada com sucesso!!", "meta": meta, "data": data},
+                {
+                    "msg": "Consulta realizada com sucesso!!",
+                    "meta": meta,
+                    "data": data,
+                },
                 status=status.HTTP_200_OK
             )
 
         except Exception as e:
-            return Response({"message": f"Ocorreu um Erro: {e}"}, status=status.HTTP_400_BAD_REQUEST)
-
+            return Response(
+                {"message": f"Ocorreu um Erro: {e}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
     
     @action(detail=False, methods=['GET'])
