@@ -6224,7 +6224,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
             # 4) Base queryset (sempre exclui Milheto)
             base_qs = Plantio.objects.filter(
                 ~Q(variedade__cultura__cultura="Milheto")
-            )
+            ).filtr(ativo=True)
 
             if farm_filter is not None:
                 base_qs = base_qs.filter(
