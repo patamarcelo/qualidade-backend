@@ -397,6 +397,54 @@
       text-align: left;
     }
   }
+  .kml-map-card:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  border-radius: 0;
+  background: #fff;
+}
+
+.kml-map-card:fullscreen .kml-map {
+  min-height: 0;
+  height: 100%;
+}
+
+.kml-map-card:-webkit-full-screen {
+  width: 100vw;
+  height: 100vh;
+  border-radius: 0;
+  background: #fff;
+}
+
+.kml-map-card:-webkit-full-screen .kml-map {
+  min-height: 0;
+  height: 100%;
+}
+
+.kml-fullscreen-control {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  background: #fff;
+  color: #0f172a;
+  cursor: pointer;
+  font-size: 19px;
+  font-weight: 900;
+  line-height: 34px;
+  text-align: center;
+}
+
+.kml-fullscreen-control:hover {
+  background: #f1f5f9;
+}
+
+.kml-fullscreen-control svg {
+  width: 17px;
+  height: 17px;
+  vertical-align: middle;
+  pointer-events: none;
+}
 </style>
 <style>
   .kml-admin-action-loading {
@@ -686,6 +734,120 @@
       initMaps(geojson.input, geojson.output);
     }, 120);
   }
+  function getFullscreenElement() {
+  return (
+    document.fullscreenElement ||
+    document.webkitFullscreenElement ||
+    null
+  );
+}
+
+async function enterFullscreen(element) {
+  if (element.requestFullscreen) {
+    await element.requestFullscreen();
+    return;
+  }
+
+  if (element.webkitRequestFullscreen) {
+    element.webkitRequestFullscreen();
+  }
+}
+
+async function exitFullscreen() {
+  if (document.exitFullscreen) {
+    await document.exitFullscreen();
+    return;
+  }
+
+  if (document.webkitExitFullscreen) {
+    document.webkitExitFullscreen();
+  }
+}
+
+function createFullscreenControl(map, elementId) {
+  const FullscreenControl = L.Control.extend({
+    options: {
+      position: "topright",
+    },
+
+    onAdd: function () {
+      const container = L.DomUtil.create(
+        "div",
+        "leaflet-bar leaflet-control"
+      );
+
+      const button = L.DomUtil.create(
+        "button",
+        "kml-fullscreen-control",
+        container
+      );
+
+      button.type = "button";
+      button.title = "Abrir mapa em tela cheia";
+      button.setAttribute("aria-label", "Abrir mapa em tela cheia");
+
+      button.innerHTML = `
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M8 3H5a2 2 0 0 0-2 2v3"></path>
+          <path d="M16 3h3a2 2 0 0 1 2 2v3"></path>
+          <path d="M8 21H5a2 2 0 0 1-2-2v-3"></path>
+          <path d="M16 21h3a2 2 0 0 0 2-2v-3"></path>
+        </svg>
+      `;
+
+      L.DomEvent.disableClickPropagation(container);
+      L.DomEvent.disableScrollPropagation(container);
+
+      L.DomEvent.on(button, "click", async function (event) {
+        L.DomEvent.stop(event);
+
+        const mapElement = document.getElementById(elementId);
+
+        if (!mapElement) return;
+
+        const mapCard = mapElement.closest(".kml-map-card");
+
+        if (!mapCard) return;
+
+        try {
+          if (getFullscreenElement() === mapCard) {
+            await exitFullscreen();
+          } else {
+            await enterFullscreen(mapCard);
+          }
+
+          setTimeout(function () {
+            map.invalidateSize();
+
+            if (map._kmlGeoJsonLayer) {
+              const bounds = map._kmlGeoJsonLayer.getBounds();
+
+              if (bounds && bounds.isValid()) {
+                map.fitBounds(bounds, {
+                  padding: [40, 40],
+                });
+              }
+            }
+          }, 180);
+        } catch (error) {
+          console.error("Erro ao abrir mapa em tela cheia:", error);
+        }
+      });
+
+      return container;
+    },
+  });
+
+  map.addControl(new FullscreenControl());
+}
 
   function initOneMap(elementId, geojson, type) {
 
@@ -707,7 +869,12 @@
       referrerPolicy: "no-referrer",
     }).addTo(map);
 
-    const layer = L.geoJSON(geojson || { type: "FeatureCollection", features: [] }, {
+    const layer = L.geoJSON(
+    geojson || {
+      type: "FeatureCollection",
+      features: [],
+    },
+    {
       style: function () {
         if (type === "input") {
           return {
@@ -725,6 +892,7 @@
           fillOpacity: 0.18,
         };
       },
+
       pointToLayer: function (feature, latlng) {
         return L.circleMarker(latlng, {
           radius: 5,
@@ -734,12 +902,19 @@
           fillOpacity: 0.85,
         });
       },
+
       onEachFeature: function (feature, layer) {
         const props = feature.properties || {};
         const name = props.name || props.kind || "Feature";
+
         layer.bindPopup(escapeHtml(name));
       },
-    }).addTo(map);
+    }
+  ).addTo(map);
+
+  map._kmlGeoJsonLayer = layer;
+
+  createFullscreenControl(map, elementId);
 
     try {
       const bounds = layer.getBounds();
@@ -772,6 +947,27 @@
     outputMap = output.map;
     outputLayer = output.layer;
   }
+  function refreshFullscreenMaps() {
+  setTimeout(function () {
+    if (inputMap) {
+      inputMap.invalidateSize();
+    }
+
+    if (outputMap) {
+      outputMap.invalidateSize();
+    }
+  }, 180);
+}
+
+document.addEventListener(
+  "fullscreenchange",
+  refreshFullscreenMaps
+);
+
+document.addEventListener(
+  "webkitfullscreenchange",
+  refreshFullscreenMaps
+);
 
   async function loadPreview(url) {
     openDrawer();
