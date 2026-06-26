@@ -8868,8 +8868,16 @@ class StViewSet(viewsets.ModelViewSet):
                                 "error": f"Error ao Abrir ST no Protheus, erro: {parsed_json['message']}"  # General error message
                             }
                             return Response(response, status=status.HTTP_208_ALREADY_REPORTED)
-                except Exception as e:
-                    print('Erro ao enviar a ST', e)
+                except requests.RequestException as exc:
+                    logger.exception("Erro ao enviar ST ao Protheus", str(exc))
+
+                    return Response(
+                        {
+                            "msg": "Erro ao enviar a ST ao Protheus",
+                            "error": str(exc),
+                        },
+                        status=status.HTTP_502_BAD_GATEWAY,
+                    )
 
             try:
                 # create context to send as response to frontend
