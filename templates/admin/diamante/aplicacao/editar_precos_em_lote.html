@@ -1036,14 +1036,6 @@
     clearBulkBtn.addEventListener("click", clearBulkFields);
 
     form.addEventListener("submit", function (event) {
-      if (bulkPreco.value !== "") {
-        applyPriceToAll();
-      }
-
-      if (bulkMoeda.value !== "") {
-        applyCurrencyToAll();
-      }
-
       syncBulkHiddenFields();
       syncActiveIds();
       injectSubmissionFields();

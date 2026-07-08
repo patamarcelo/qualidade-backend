@@ -650,7 +650,7 @@
       <div class="bulk-card-header">
         <div>
           <h2>Alteração</h2>
-          <div class="bulk-card-subtitle">Defina o novo produto e os ajustes opcionais.</div>
+          <div class="bulk-card-subtitle">Defina o novo produto e, se necessário, ajuste a dose. O custo será zerado automaticamente.</div>
         </div>
       </div>
 
@@ -726,16 +726,11 @@
               {% endif %}
             </div>
 
-            <div class="form-row-modern">
-              <div class="checkbox-row">
-                {{ form.zerar_custo }}
-                <label for="{{ form.zerar_custo.id_for_label }}">Zerar custo</label>
-              </div>
-            </div>
 
             <div class="help-box">
-              A rotina salva as <strong>Aplicações</strong> individualmente para preservar os cálculos
-              e depois reprocesa o <strong>cronograma_programa</strong> de forma consolidada por programa,
+              A rotina salva as <strong>Aplicações</strong> individualmente, substitui o produto,
+              zera automaticamente o custo da aplicação e depois reprocesa o
+              <strong>cronograma_programa</strong> de forma consolidada por programa,
               evitando conflito quando mais de um estágio do mesmo plantio foi alterado.
             </div>
 

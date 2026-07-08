@@ -3861,6 +3861,7 @@ def _normalizar_nome_produto(nome):
 @admin.register(Aplicacao)
 class AplicacaoAdmin(admin.ModelAdmin):
     
+  
     @staticmethod
     def processar_substituicao_cronograma_em_background(
         task_id,
@@ -4201,6 +4202,22 @@ class AplicacaoAdmin(admin.ModelAdmin):
                 "operacao__programa__cultura",
             )
         )
+    
+    def lookup_allowed(self, lookup, value, request):
+        allowed_lookups = {
+            "operacao__programa__ciclo__ciclo",
+            "operacao__programa__safra__safra",
+            "operacao__programa__ciclo",
+            "operacao__programa__safra",
+            "operacao__programa__ciclo_id",
+            "operacao__programa__safra_id",
+        }
+
+        if lookup in allowed_lookups:
+            return True
+
+        return super().lookup_allowed(lookup, value, request)
+
 
     def get_urls(self):
         urls = super().get_urls()
@@ -4333,7 +4350,8 @@ class AplicacaoAdmin(admin.ModelAdmin):
                 produto_destino = form.cleaned_data["produto_destino"]
                 alterar_dose = form.cleaned_data["alterar_dose"]
                 nova_dose = form.cleaned_data["nova_dose"]
-                zerar_custo = form.cleaned_data["zerar_custo"]
+                # zerar_custo = form.cleaned_data["zerar_custo"]
+                zerar_custo = True
 
                 atualizados = 0
                 conflitos = 0
@@ -4559,15 +4577,15 @@ class AplicacaoAdmin(admin.ModelAdmin):
 
 
     def editar_precos_em_lote_view(self, request):
-        print("\n\n🔥🔥🔥 ENTROU NA editar_precos_em_lote_view 🔥🔥🔥", flush=True)
-        print("METHOD:", request.method, flush=True)
-        print("PATH:", request.path, flush=True)
-        print("FULL PATH:", request.get_full_path(), flush=True)
         post_ids_raw = request.POST.get("ids")
         get_ids_raw = request.GET.get("ids", "")
 
         ids_raw = post_ids_raw or get_ids_raw
-        next_url = request.POST.get("next") or request.GET.get("next") or reverse("admin:diamante_aplicacao_changelist")
+        next_url = (
+            request.POST.get("next")
+            or request.GET.get("next")
+            or reverse("admin:diamante_aplicacao_changelist")
+        )
 
         ids = []
         for item in (ids_raw or "").split(","):
@@ -4593,7 +4611,12 @@ class AplicacaoAdmin(admin.ModelAdmin):
                 "operacao__programa__safra",
                 "operacao__programa__ciclo",
             )
-            .order_by("defensivo__produto", "operacao__programa__nome", "operacao__estagio", "id")
+            .order_by(
+                "defensivo__produto",
+                "operacao__programa__nome",
+                "operacao__estagio",
+                "id",
+            )
         )
 
         total_registros = qs.count()
@@ -4612,79 +4635,28 @@ class AplicacaoAdmin(admin.ModelAdmin):
             erros = 0
             programas_afetados = set()
 
-            # agora o topo também vale no backend
-            bulk_preco_raw = request.POST.get("bulk_preco_submit")
-            bulk_moeda = request.POST.get("bulk_moeda_submit")
-
-            bulk_preco = None
-            has_bulk_preco = False
-            has_bulk_moeda = bool(bulk_moeda)
-
-            try:
-                if bulk_preco_raw not in [None, ""]:
-                    bulk_preco = Decimal(str(bulk_preco_raw).replace(",", "."))
-                    has_bulk_preco = True
-            except (InvalidOperation, ValueError):
-                self.message_user(
-                    request,
-                    "O preço informado no preenchimento em massa é inválido.",
-                    level=messages.ERROR,
-                )
-                context = {
-                    **self.admin_site.each_context(request),
-                    "opts": self.model._meta,
-                    "title": "Editar preços em lote",
-                    "queryset": qs,
-                    "total_registros": total_registros,
-                    "moeda_choices": self.model._meta.get_field("moeda").choices,
-                    "ids": ",".join(map(str, ids)),
-                    "next": next_url,
-                    "changelist_url": next_url,
-                }
-                return render(
-                    request,
-                    "admin/diamante/aplicacao/editar_precos_em_lote.html",
-                    context,
-                )
-
             with transaction.atomic():
                 for app in qs:
                     prefix = f"row_{app.pk}_"
-                    print("\n--- DEBUG LINHA ---")
-                    print("app.pk:", app.pk)
-                    print("defensivo:", app.defensivo)
-                    print("prefix:", prefix)
-                    print("POST preco raw:", repr(request.POST.get(f"{prefix}preco")))
-                    print("POST moeda raw:", repr(request.POST.get(f"{prefix}moeda")))
-                    print("has_bulk_preco:", has_bulk_preco, "bulk_preco:", repr(bulk_preco))
-                    print("has_bulk_moeda:", has_bulk_moeda, "bulk_moeda:", repr(bulk_moeda))
-                    print("preco atual app.preco:", repr(app.preco))
-                    print("moeda atual app.moeda:", repr(app.moeda))
 
-                    # prioridade:
-                    # 1) se vier preenchimento em massa, usa ele
-                    # 2) senão usa o valor individual da linha
-                    if has_bulk_preco:
-                        preco_novo = bulk_preco
-                    else:
-                        preco_raw = request.POST.get(f"{prefix}preco")
-                        try:
-                            if preco_raw is None:
-                                ignorados += 1
-                                continue
+                    preco_raw = request.POST.get(f"{prefix}preco")
+                    moeda_nova = request.POST.get(f"{prefix}moeda")
 
-                            if preco_raw == "":
-                                preco_novo = None
-                            else:
-                                preco_novo = Decimal(str(preco_raw).replace(",", "."))
-                        except (InvalidOperation, ValueError):
-                            erros += 1
+                    try:
+                        if preco_raw is None:
+                            ignorados += 1
                             continue
 
-                    if has_bulk_moeda:
-                        moeda_nova = bulk_moeda
-                    else:
-                        moeda_nova = request.POST.get(f"{prefix}moeda")
+                        preco_raw = str(preco_raw).strip()
+
+                        if preco_raw == "":
+                            preco_novo = None
+                        else:
+                            preco_novo = Decimal(preco_raw.replace(",", "."))
+
+                    except (InvalidOperation, ValueError, TypeError):
+                        erros += 1
+                        continue
 
                     preco_antigo = app.preco
                     moeda_antiga = app.moeda
@@ -4698,9 +4670,6 @@ class AplicacaoAdmin(admin.ModelAdmin):
                     if moeda_nova and moeda_antiga != moeda_nova:
                         app.moeda = moeda_nova
                         mudou_algo = True
-                        print("preco_novo:", repr(preco_novo))
-                        print("moeda_nova:", repr(moeda_nova))
-                        print("mudou_algo:", mudou_algo)
 
                     if not mudou_algo:
                         ignorados += 1
@@ -4709,6 +4678,8 @@ class AplicacaoAdmin(admin.ModelAdmin):
                     app.save()
                     atualizados += 1
 
+                    if app.operacao_id and app.operacao and app.operacao.programa_id:
+                        programas_afetados.add(app.operacao.programa_id)
 
             if atualizados:
                 self.message_user(
@@ -4731,14 +4702,6 @@ class AplicacaoAdmin(admin.ModelAdmin):
                     level=messages.WARNING,
                 )
 
-            print("\n================ RESULTADO EDITAR PREÇOS EM LOTE ================")
-            print("atualizados:", atualizados)
-            print("ignorados:", ignorados)
-            print("erros:", erros)
-            print("programas_afetados:", programas_afetados)
-            print("redirect:", next_url)
-            print("==================================================================\n")
-            
             return redirect(next_url)
 
         context = {
@@ -4758,7 +4721,6 @@ class AplicacaoAdmin(admin.ModelAdmin):
             "admin/diamante/aplicacao/editar_precos_em_lote.html",
             context,
         )
-
 
 @admin.register(AplicacaoPlantio)
 class AplicacaoPlantioAdmin(admin.ModelAdmin):
