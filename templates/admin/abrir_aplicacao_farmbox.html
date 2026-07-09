@@ -13,125 +13,394 @@
 
 <style>
     :root {
-        --farmbox-card-radius: 16px;
-        --farmbox-border: rgba(15, 23, 42, 0.10);
-        --farmbox-soft-bg: #f8fafc;
-        --farmbox-soft-bg-2: #f1f5f9;
+        --farmbox-bg: #f5f7fb;
+        --farmbox-bg-soft: #f8fafc;
+        --farmbox-card: rgba(255, 255, 255, 0.96);
+        --farmbox-card-solid: #ffffff;
         --farmbox-text: #0f172a;
         --farmbox-muted: #64748b;
-        --farmbox-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+        --farmbox-muted-2: #94a3b8;
+        --farmbox-border: rgba(15, 23, 42, 0.10);
+        --farmbox-border-strong: rgba(15, 23, 42, 0.16);
+        --farmbox-primary: #2563eb;
+        --farmbox-primary-soft: rgba(37, 99, 235, 0.10);
+        --farmbox-success: #16a34a;
+        --farmbox-success-soft: rgba(22, 163, 74, 0.12);
+        --farmbox-danger: #dc2626;
+        --farmbox-danger-soft: rgba(220, 38, 38, 0.10);
+        --farmbox-warning-soft: rgba(245, 158, 11, 0.12);
+
+        --farmbox-radius-xl: 24px;
+        --farmbox-radius-lg: 20px;
+        --farmbox-radius-md: 16px;
+        --farmbox-radius-sm: 12px;
+
+        --farmbox-shadow-sm: 0 8px 22px rgba(15, 23, 42, 0.07);
+        --farmbox-shadow-md: 0 14px 38px rgba(15, 23, 42, 0.10);
+        --farmbox-shadow-sticky: 0 -14px 36px rgba(15, 23, 42, 0.14);
+
+        --farmbox-safe-bottom: env(safe-area-inset-bottom, 0px);
+        --farmbox-header-height-mobile: 74px;
+    }
+
+    html {
+        scroll-behavior: smooth;
+    }
+
+    body {
+        background: var(--farmbox-bg) !important;
+        color: var(--farmbox-text);
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+        font-size: 16px;
     }
 
     .farmbox-page {
         max-width: 1180px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .farmbox-shell {
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
     }
 
     .farmbox-header {
         display: flex;
-        align-items: flex-start;
+        align-items: center;
         justify-content: space-between;
         gap: 16px;
-        padding: 16px 18px;
-        margin-bottom: 18px;
+        padding: 18px 20px;
         border: 1px solid var(--farmbox-border);
-        border-radius: var(--farmbox-card-radius);
-        background: #ffffff;
-        box-shadow: var(--farmbox-shadow);
+        border-radius: var(--farmbox-radius-xl);
+        background:
+            radial-gradient(circle at top left, rgba(37, 99, 235, 0.12), transparent 34%),
+            linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.96));
+        box-shadow: var(--farmbox-shadow-md);
+        overflow: hidden;
+        position: relative;
+    }
+
+    .farmbox-header::after {
+        content: "";
+        position: absolute;
+        right: -44px;
+        top: -52px;
+        width: 150px;
+        height: 150px;
+        border-radius: 999px;
+        background: rgba(37, 99, 235, 0.08);
+        pointer-events: none;
+    }
+
+    .farmbox-header-main {
+        position: relative;
+        z-index: 1;
+        min-width: 0;
+    }
+
+    .farmbox-header-eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+        padding: 5px 10px;
+        border-radius: 999px;
+        background: var(--farmbox-primary-soft);
+        color: #1d4ed8;
+        font-size: 0.78rem;
+        font-weight: 800;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
     }
 
     .farmbox-header-title {
         margin: 0;
-        font-size: clamp(1.25rem, 2vw, 1.7rem);
-        line-height: 1.2;
+        font-size: clamp(1.28rem, 2vw, 1.85rem);
+        line-height: 1.12;
         color: var(--farmbox-text);
+        letter-spacing: -0.035em;
     }
 
     .farmbox-header-subtitle {
-        margin: 6px 0 0;
+        margin: 8px 0 0;
         color: var(--farmbox-muted);
-        font-size: 0.95rem;
+        font-size: 0.96rem;
+        line-height: 1.35;
     }
 
     .farmbox-total-card,
     .farmbox-section-card {
         border: 1px solid var(--farmbox-border);
-        border-radius: var(--farmbox-card-radius);
-        background: #ffffff;
-        box-shadow: var(--farmbox-shadow);
-        padding: 16px;
+        border-radius: var(--farmbox-radius-xl);
+        background: var(--farmbox-card);
+        box-shadow: var(--farmbox-shadow-sm);
+        padding: 18px;
+        overflow: visible;
     }
 
     .farmbox-total-card {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(180px, 260px);
+        grid-template-columns: minmax(0, 1fr) minmax(180px, 270px);
         align-items: center;
-        gap: 12px;
-        margin-bottom: 18px;
+        gap: 14px;
     }
 
-    .farmbox-total-card .form-label {
-        margin-bottom: 0;
+    .farmbox-total-label {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+    }
+
+    .farmbox-total-label strong {
+        color: var(--farmbox-text);
+        font-size: 1rem;
+    }
+
+    .farmbox-total-label span {
+        color: var(--farmbox-muted);
+        font-size: 0.88rem;
+    }
+
+    .farmbox-section-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 14px;
     }
 
     .farmbox-section-title {
-        font-size: 1rem;
-        font-weight: 700;
+        font-size: 1.05rem;
+        font-weight: 850;
         color: var(--farmbox-text);
-        margin-bottom: 12px;
+        margin: 0;
+        letter-spacing: -0.018em;
+    }
+
+    .farmbox-section-subtitle {
+        margin: 4px 0 0;
+        color: var(--farmbox-muted);
+        font-size: 0.88rem;
+        line-height: 1.35;
+    }
+
+    .farmbox-pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 28px;
+        padding: 5px 10px;
+        border-radius: 999px;
+        background: var(--farmbox-bg-soft);
+        border: 1px solid var(--farmbox-border);
+        color: var(--farmbox-muted);
+        font-size: 0.78rem;
+        font-weight: 800;
+        white-space: nowrap;
+    }
+
+    .form-label {
+        color: var(--farmbox-text);
+        font-weight: 750;
+        margin-bottom: 7px;
+    }
+
+    .form-control,
+    .form-select,
+    .ts-control {
+        border-radius: 14px !important;
+        border-color: var(--farmbox-border-strong) !important;
+        min-height: 42px;
+        box-shadow: none !important;
+    }
+
+    .form-control:focus,
+    .form-select:focus,
+    .ts-wrapper.focus .ts-control {
+        border-color: rgba(37, 99, 235, 0.65) !important;
+        box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12) !important;
+    }
+
+    .form-control[readonly],
+    .form-control:disabled,
+    .form-select:disabled {
+        background-color: #f8fafc;
+        color: var(--farmbox-muted);
+        opacity: 1;
+    }
+
+    #total-area-display {
+        font-size: 1.08rem;
+        font-weight: 900 !important;
+        text-align: right;
+        background: linear-gradient(135deg, #f8fafc, #ffffff);
+    }
+
+    .plantios-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .plantio-wrapper {
+        margin-bottom: 0 !important;
     }
 
     .plantio-card {
         border: 1px solid var(--farmbox-border);
-        border-radius: 14px;
-        background: #ffffff;
-        padding: 12px 14px;
+        border-radius: var(--farmbox-radius-lg);
+        background:
+            linear-gradient(135deg, rgba(255, 255, 255, 0.99), rgba(248, 250, 252, 0.96));
+        padding: 13px 14px;
+        transition:
+            transform 160ms ease,
+            box-shadow 160ms ease,
+            border-color 160ms ease;
+    }
+
+    .plantio-card:hover {
+        transform: translateY(-1px);
+        border-color: rgba(37, 99, 235, 0.20);
+        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
     }
 
     .plantio-content {
         display: grid;
         grid-template-columns:
-            auto
-            minmax(80px, .7fr)
-            minmax(120px, 1fr)
-            minmax(130px, 1fr)
+            36px
+            minmax(220px, 1.6fr)
             minmax(160px, auto)
             auto;
         align-items: center;
         gap: 10px 14px;
     }
 
+    .plantio-main-info {
+    min-width: 0;
+}
+
+.plantio-title-line {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    line-height: 1.22;
+}
+
+.plantio-talhao {
+    font-size: 1rem;
+    font-weight: 900;
+    color: var(--farmbox-text);
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+}
+
+.plantio-separator {
+    color: var(--farmbox-muted-2);
+    font-weight: 900;
+}
+
+.plantio-variedade {
+    min-width: 0;
+    font-size: 0.94rem;
+    font-weight: 750;
+    color: var(--farmbox-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.plantio-safra {
+    margin-top: 3px;
+    color: var(--farmbox-muted);
+    font-size: 0.84rem;
+    font-weight: 650;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
     .plantio-icon {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 28px;
-        height: 28px;
-        border-radius: 999px;
-        background: var(--farmbox-soft-bg);
+        width: 36px;
+        height: 36px;
+        flex: 0 0 auto;
+        background: transparent;
+        border: 0;
+        box-shadow: none;
+        border-radius: 0;
+    }
+
+    .plantio-icon img {
+        width: 23px !important;
+        height: 23px !important;
+        object-fit: contain;
     }
 
     .plantio-meta {
         min-width: 0;
-        font-size: 0.95rem;
         color: var(--farmbox-text);
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+        line-height: 1.22;
     }
 
-    .plantio-muted {
+    .plantio-talhao {
+        font-size: 1rem;
+        font-weight: 900;
+        letter-spacing: -0.02em;
+    }
+
+    .plantio-variedade {
+        font-size: 0.94rem;
+        font-weight: 750;
+    }
+
+    .plantio-safra {
         color: var(--farmbox-muted);
+        font-size: 0.9rem;
     }
 
     .plantio-area-control {
         display: flex;
         align-items: center;
+        justify-content: flex-end;
         gap: 8px;
         white-space: nowrap;
     }
 
+    .plantio-area-control label {
+        margin: 0;
+        font-size: 0.88rem;
+        color: var(--farmbox-muted);
+    }
+
     .plantio-area-control input {
-        max-width: 95px;
+        max-width: 104px;
+        min-height: 40px;
+        text-align: right;
+        font-weight: 850;
+    }
+
+    .remove-plantio-btn {
+        min-height: 40px;
+        border-radius: 14px !important;
+        font-weight: 800;
+        padding-left: 13px;
+        padding-right: 13px;
     }
 
     .programa-grid,
@@ -141,40 +410,62 @@
         gap: 14px;
     }
 
+    .programa-grid {
+        margin-bottom: 16px !important;
+    }
+
     .estagio-row {
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto;
-        gap: 8px;
+        gap: 10px;
         align-items: end;
     }
 
+    #programa-meta {
+        min-height: 18px;
+        margin-bottom: 4px;
+        color: var(--farmbox-muted) !important;
+        font-weight: 650;
+    }
+
     #btn-reset-programa {
-        min-height: 38px;
+        min-height: 42px;
         white-space: nowrap;
+        border-radius: 14px;
+        font-weight: 800;
+    }
+
+    .manager-help {
+        display: block;
+        margin-top: 7px;
+        color: var(--farmbox-muted);
+        font-size: 0.81rem;
+        line-height: 1.3;
     }
 
     #defensivos-container {
         display: flex;
         flex-direction: column;
-        gap: 10px;
+        gap: 12px;
     }
 
     .defensivo-group {
         display: grid !important;
         grid-template-columns:
-            minmax(240px, 1.8fr)
-            minmax(110px, .65fr)
-            minmax(90px, .55fr)
-            36px
-            36px
-            minmax(70px, .55fr);
-        gap: 8px;
+            minmax(250px, 1.75fr)
+            minmax(120px, 0.7fr)
+            minmax(105px, 0.55fr)
+            40px
+            40px
+            minmax(88px, 0.55fr);
+        gap: 10px;
         align-items: center;
-        padding: 10px;
+        padding: 12px;
         border: 1px solid var(--farmbox-border);
-        border-radius: 14px;
-        background: #ffffff;
-        
+        border-radius: var(--farmbox-radius-lg);
+        background:
+            linear-gradient(135deg, #ffffff, #f8fafc);
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.045);
     }
 
     .defensivo-group .ts-wrapper,
@@ -184,29 +475,43 @@
         min-width: 0 !important;
     }
 
+    .defensivo-group input[name="tipo_defensivo"] {
+        font-weight: 750;
+        color: var(--farmbox-muted);
+    }
+
+    .defensivo-group input[name="dosage_value"] {
+        font-weight: 850;
+        text-align: right;
+    }
+
     .defensivo-group .btn {
-        width: 38px;
-        height: 34px;
+        width: 40px;
+        height: 40px;
+        min-height: 40px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
         padding: 0;
-        font-weight: 700;
+        border-radius: 14px;
+        font-weight: 950;
+        font-size: 1.05rem;
     }
 
     .dose-result {
-        min-width: 100px !important;
+        min-width: 92px !important;
         max-width: 100%;
-        justify-self: center;
+        justify-self: stretch;
         align-self: center;
         text-align: center;
-        font-weight: 700;
+        font-weight: 900;
         color: var(--farmbox-text);
         white-space: nowrap;
         font-size: 0.9rem;
-        padding: 6px 10px;
-        border-radius: 10px;
-        background: var(--farmbox-soft-bg);
+        padding: 9px 10px;
+        border-radius: 14px;
+        background: var(--farmbox-success-soft);
+        border: 1px solid rgba(22, 163, 74, 0.18);
         overflow: hidden;
         text-overflow: ellipsis;
     }
@@ -218,246 +523,522 @@
     }
 
     .farmbox-submit-bar #btn-submit {
-        min-height: 42px;
-        font-weight: 700;
-        padding-left: 22px;
-        padding-right: 22px;
+        min-height: 46px;
+        border-radius: 16px;
+        font-weight: 900;
+        padding-left: 24px;
+        padding-right: 24px;
+        box-shadow: 0 12px 24px rgba(22, 163, 74, 0.22);
     }
 
     .ts-wrapper {
         position: relative;
     }
 
+    .ts-control {
+        align-items: center;
+        padding: 8px 12px !important;
+    }
+
     .ts-dropdown {
         z-index: 9999 !important;
-    }
-
-   /* =========================
-   TABLET / TELAS MÉDIAS
-   Mantém mais campos lado a lado
-========================= */
-@media (max-width: 991.98px) {
-    .farmbox-page {
-        max-width: 100%;
-        padding-left: 12px;
-        padding-right: 12px;
-    }
-
-    .farmbox-header {
-        position: sticky;
-        top: 0;
-        z-index: 25;
-        border-radius: 0 0 18px 18px;
-        margin-left: -12px;
-        margin-right: -12px;
-        margin-top: -24px;
-    }
-
-    .farmbox-total-card {
-        grid-template-columns: minmax(0, 1fr) minmax(150px, 220px);
-    }
-
-    .plantio-content {
-        grid-template-columns:
-            auto
-            minmax(70px, .65fr)
-            minmax(120px, 1fr)
-            minmax(120px, .9fr)
-            minmax(150px, auto)
-            minmax(110px, auto);
-        gap: 8px 12px;
-    }
-
-    .plantio-content .remove-plantio-btn {
-        grid-column: auto;
-        grid-row: auto;
-        width: 100%;
-    }
-
-    .plantio-area-control {
-        grid-column: auto;
-    }
-
-    .plantio-area-control input {
-        max-width: 90px;
-    }
-
-    .programa-grid,
-    .managers-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .estagio-row {
-        grid-template-columns: minmax(0, 1fr) auto;
-    }
-
-    .defensivo-group {
-        grid-template-columns:
-            minmax(160px, 1.25fr)
-            minmax(105px, .65fr)
-            minmax(85px, .5fr)
-            36px
-            36px
-            minmax(80px, .55fr);
-        gap: 8px;
-    }
-
-    .defensivo-group .ts-wrapper {
-        grid-column: auto;
-    }
-
-    .defensivo-group input[name="tipo_defensivo"],
-    .defensivo-group input[name="dosage_value"] {
-        grid-column: auto;
-    }
-
-    .defensivo-group .btn {
-        width: 38px;
-    }
-
-    .dose-result {
-        grid-column: auto;
-        justify-self: center;
-        text-align: center !important;
-        padding: 6px 10px;
-        border-radius: 10px;
-        background: var(--farmbox-soft-bg);
+        border-radius: 16px !important;
         overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+        box-shadow: 0 18px 42px rgba(15, 23, 42, 0.18) !important;
+        border-color: var(--farmbox-border-strong) !important;
     }
+
+    .ts-dropdown .option {
+        padding: 11px 12px !important;
+        font-size: 0.95rem;
+    }
+
+    .ts-dropdown .active,
+    .ts-dropdown .option:hover {
+        background: var(--farmbox-primary-soft) !important;
+        color: var(--farmbox-text) !important;
+    }
+
+    .btn {
+        touch-action: manipulation;
+    }
+
+    @media (max-width: 991.98px) {
+        .farmbox-page {
+            max-width: 100%;
+            padding-left: 12px;
+            padding-right: 12px;
+        }
+
+        .farmbox-shell {
+            gap: 14px;
+        }
+
+        .farmbox-header {
+            position: sticky;
+            top: 0;
+            z-index: 40;
+            margin-left: -12px;
+            margin-right: -12px;
+            margin-top: -24px;
+            border-top-left-radius: 0;
+            border-top-right-radius: 0;
+            border-bottom-left-radius: 24px;
+            border-bottom-right-radius: 24px;
+            padding: 15px 16px;
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+        }
+
+        .farmbox-header-title {
+            font-size: 1.32rem;
+        }
+
+        .farmbox-header-subtitle {
+            font-size: 0.9rem;
+        }
+
+        .farmbox-total-card {
+            grid-template-columns: minmax(0, 1fr) minmax(150px, 220px);
+        }
+
+        .plantio-content {
+            grid-template-columns:
+                36px
+                minmax(65px, 0.55fr)
+                minmax(120px, 1fr)
+                minmax(110px, 0.8fr)
+                minmax(142px, auto)
+                auto;
+            gap: 9px 10px;
+        }
+
+        .plantio-area-control input {
+            max-width: 92px;
+        }
+
+        .programa-grid,
+        .managers-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .defensivo-group {
+            grid-template-columns:
+                minmax(180px, 1.25fr)
+                minmax(112px, 0.7fr)
+                minmax(92px, 0.55fr)
+                40px
+                40px
+                minmax(80px, 0.55fr);
+        }
+    }
+
+    @media (max-width: 767.98px) {
+        .farmbox-total-card,
+        .farmbox-section-card {
+            border-radius: 22px;
+            padding: 15px;
+        }
+
+        .programa-grid,
+        .managers-grid {
+            grid-template-columns: 1fr;
+            gap: 13px;
+        }
+
+        .estagio-row {
+            grid-template-columns: 1fr;
+        }
+
+        #btn-reset-programa {
+            width: 100%;
+        }
+
+        .plantios-list {
+            gap: 12px;
+        }
+
+        .plantio-card {
+            padding: 14px;
+        }
+.plantio-content {
+    grid-template-columns: 34px minmax(0, 1fr) auto;
+    gap: 8px 10px;
 }
 
-/* =========================
-   TABLET ESTREITO / CELULAR GRANDE
-   Só aqui começa a quebrar melhor
-========================= */
-@media (max-width: 767.98px) {
-    .programa-grid,
-    .managers-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .plantio-content {
-        grid-template-columns: auto minmax(0, 1fr) minmax(120px, auto);
-    }
-
-    .plantio-content .remove-plantio-btn {
-        grid-column: 3;
-        grid-row: 1 / span 2;
-        align-self: center;
-    }
-
-    .plantio-area-control {
-        grid-column: 2 / 4;
-    }
-
-    .defensivo-group {
-        grid-template-columns:
-            minmax(160px, 1fr)
-            minmax(105px, .55fr)
-            36px
-            36px;
-    }
-
-    .defensivo-group .ts-wrapper {
-        grid-column: 1;
-    }
-
-    .defensivo-group input[name="tipo_defensivo"] {
-        grid-column: 1;
-    }
-
-    .defensivo-group input[name="dosage_value"] {
-        grid-column: 2;
-    }
-
-    .defensivo-group .btn {
-        width: 100%;
-    }
-
-    .dose-result {
-        grid-column: 1 / -1;
-        justify-self: stretch;
-        text-align: center !important;
-        padding: 8px 10px;
-        border-radius: 10px;
-        background: var(--farmbox-soft-bg);
-        overflow: visible;
-        text-overflow: initial;
-        white-space: normal;
-        word-break: break-word;
-    }
+.plantio-icon {
+    width: 34px;
+    height: 34px;
+    grid-column: 1;
+    grid-row: 1;
+    align-self: start;
 }
 
-/* =========================
-   CELULAR
-   Layout realmente empilhado
-========================= */
-@media (max-width: 575.98px) {
-    .farmbox-header {
-        display: block;
-        padding: 14px;
-    }
-
-    .farmbox-total-card {
-        grid-template-columns: 1fr;
-    }
-
-    .plantio-content {
-        grid-template-columns: auto minmax(0, 1fr);
-    }
-
-    .plantio-content .remove-plantio-btn {
-        grid-column: 1 / -1;
-        grid-row: auto;
-        width: 100%;
-    }
-
-    .plantio-area-control {
-        grid-column: 1 / -1;
-        justify-content: space-between;
-    }
-
-    .plantio-area-control input {
-        max-width: 130px;
-    }
-
-    .estagio-row {
-        grid-template-columns: 1fr;
-    }
-
-    #btn-reset-programa {
-        width: 100%;
-    }
-
-    .defensivo-group {
-        grid-template-columns: 1fr;
-    }
-
-    .defensivo-group .ts-wrapper,
-    .defensivo-group input[name="tipo_defensivo"],
-    .defensivo-group input[name="dosage_value"] {
-        grid-column: auto;
-    }
-
-    .farmbox-submit-bar {
-        position: sticky;
-        bottom: 0;
-        z-index: 30;
-        margin-left: -12px;
-        margin-right: -12px;
-        padding: 10px 12px;
-        background: rgba(248, 250, 252, 0.94);
-        backdrop-filter: blur(10px);
-        border-top: 1px solid var(--farmbox-border);
-    }
-
-    .farmbox-submit-bar #btn-submit {
-        width: 100%;
-        min-height: 46px;
-    }
+.plantio-icon img {
+    width: 30px !important;
+    height: 30px !important;
 }
+
+.plantio-main-info {
+    grid-column: 2 / 4;
+    grid-row: 1;
+    min-width: 0;
+}
+
+.plantio-title-line {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+}
+
+.plantio-talhao {
+    font-size: 1rem;
+    font-weight: 950;
+    white-space: nowrap;
+}
+
+.plantio-variedade {
+    font-size: 0.9rem;
+    font-weight: 750;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.plantio-safra {
+    margin-top: 3px;
+    font-size: 0.78rem;
+    color: var(--farmbox-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.plantio-area-control {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    margin-top: 6px;
+}
+
+.remove-plantio-btn {
+    grid-column: 1 / -1;
+    grid-row: 3;
+}
+
+        .plantio-area-control {
+            grid-column: 1 / -1;
+            grid-row: 4;
+            margin-top: 6px;
+            padding: 10px;
+            border-radius: 16px;
+            background: #ffffff;
+            border: 1px solid var(--farmbox-border);
+            justify-content: space-between;
+        }
+
+        .plantio-area-control label {
+            font-size: 0.9rem;
+            font-weight: 850;
+            color: var(--farmbox-text);
+        }
+
+        .plantio-area-control input {
+            max-width: 136px;
+            min-height: 44px;
+            font-size: 1rem;
+        }
+
+        .remove-plantio-btn {
+            grid-column: 3;
+            grid-row: 1;
+            width: auto;
+            min-height: 36px;
+            padding: 6px 10px;
+            font-size: 0.82rem;
+            border-radius: 999px !important;
+        }
+
+        .defensivo-group {
+            grid-template-columns: minmax(0, 1fr) minmax(96px, 0.45fr);
+            gap: 10px;
+            padding: 13px;
+        }
+
+        .defensivo-group .ts-wrapper {
+            grid-column: 1 / -1;
+        }
+
+        .defensivo-group input[name="tipo_defensivo"] {
+            grid-column: 1;
+        }
+
+        .defensivo-group input[name="dosage_value"] {
+            grid-column: 2;
+        }
+
+        .defensivo-group .btn {
+            width: 100%;
+        }
+
+        .defensivo-group .btn-outline-primary {
+            grid-column: 1;
+        }
+
+        .defensivo-group .remove-defensivo-btn {
+            grid-column: 2;
+        }
+
+        .dose-result {
+            grid-column: 1 / -1;
+            min-height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            white-space: normal;
+            word-break: break-word;
+        }
+    }
+
+    @media (max-width: 575.98px) {
+        body {
+            background:
+                radial-gradient(circle at top, rgba(37, 99, 235, 0.09), transparent 30%),
+                var(--farmbox-bg) !important;
+        }
+
+        .farmbox-page {
+            padding-left: 10px;
+            padding-right: 10px;
+            padding-bottom: calc(92px + var(--farmbox-safe-bottom)) !important;
+        }
+
+        .farmbox-header {
+            display: block;
+            margin-left: -10px;
+            margin-right: -10px;
+            padding: 14px 14px 15px;
+            box-shadow: 0 10px 28px rgba(15, 23, 42, 0.11);
+        }
+
+        .farmbox-header-eyebrow {
+            font-size: 0.7rem;
+            padding: 4px 9px;
+            margin-bottom: 7px;
+        }
+
+        .farmbox-header-title {
+            font-size: 1.2rem;
+            line-height: 1.15;
+        }
+
+        .farmbox-header-subtitle {
+            margin-top: 6px;
+            font-size: 0.84rem;
+        }
+
+        .farmbox-total-card {
+            grid-template-columns: 1fr;
+            gap: 10px;
+            padding: 14px;
+        }
+
+        .farmbox-total-label strong {
+            font-size: 0.96rem;
+        }
+
+        .farmbox-total-label span {
+            font-size: 0.82rem;
+        }
+
+        #total-area-display {
+            text-align: left;
+            min-height: 48px;
+            font-size: 1.18rem;
+            border-radius: 16px !important;
+        }
+
+        .farmbox-section-card {
+            padding: 14px;
+            border-radius: 24px;
+        }
+
+        .farmbox-section-head {
+            margin-bottom: 13px;
+        }
+
+        .farmbox-section-title {
+            font-size: 1rem;
+        }
+
+        .farmbox-section-subtitle {
+            font-size: 0.82rem;
+        }
+
+        .farmbox-pill {
+            display: none;
+        }
+
+        .form-control,
+        .form-select,
+        .ts-control {
+            min-height: 48px;
+            border-radius: 16px !important;
+        }
+
+        .form-label {
+            font-size: 0.92rem;
+            margin-bottom: 6px;
+        }
+
+        .manager-help {
+            font-size: 0.78rem;
+        }
+
+        .plantio-content {
+            grid-template-columns: 42px minmax(0, 1fr);
+        }
+
+        .plantio-talhao {
+            grid-column: 2;
+            grid-row: 1;
+        }
+
+        .plantio-variedade {
+            grid-column: 2;
+            grid-row: 2;
+        }
+
+        .plantio-safra {
+            grid-column: 2;
+            grid-row: 3;
+        }
+
+        .remove-plantio-btn {
+            grid-column: 1 / -1;
+            grid-row: 5;
+            width: 100%;
+            min-height: 42px;
+            border-radius: 16px !important;
+            margin-top: 2px;
+        }
+
+        .plantio-area-control {
+            grid-column: 1 / -1;
+            grid-row: 4;
+        }
+
+        .plantio-area-control input {
+            max-width: 132px;
+        }
+
+        .defensivo-group {
+            grid-template-columns: 1fr;
+            padding: 12px;
+            border-radius: 22px;
+            gap: 10px;
+        }
+
+        
+
+        .defensivo-group input[name="dosage_value"] {
+            text-align: left;
+        }
+
+        .defensivo-group .ts-wrapper,
+        .defensivo-group input[name="tipo_defensivo"],
+        .defensivo-group input[name="dosage_value"],
+        .dose-result {
+            grid-column: 1 / -1 !important;
+        }
+
+        .defensivo-group .btn-outline-primary {
+            grid-column: 1 / 2 !important;
+        }
+
+        .defensivo-group .remove-defensivo-btn {
+            grid-column: 2 / 3 !important;
+        }
+
+        .defensivo-group {
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .defensivo-group .btn {
+            width: 100%;
+            min-height: 46px;
+            height: 46px;
+            border-radius: 16px;
+            font-size: 1.15rem;
+        }
+
+        .dose-result {
+            min-height: 46px;
+            border-radius: 16px;
+            font-size: 1rem;
+        }
+
+        .farmbox-submit-bar {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 1000;
+            margin: 0;
+            padding: 12px 12px calc(12px + var(--farmbox-safe-bottom));
+            background: rgba(248, 250, 252, 0.88);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border-top: 1px solid var(--farmbox-border);
+            box-shadow: var(--farmbox-shadow-sticky);
+        }
+
+        .farmbox-submit-bar #btn-submit {
+            width: 100%;
+            min-height: 54px;
+            border-radius: 18px;
+            font-size: 1rem;
+            box-shadow: 0 14px 28px rgba(22, 163, 74, 0.28);
+        }
+
+        .ts-dropdown {
+            font-size: 16px;
+        }
+
+        .ts-dropdown .option {
+            padding: 13px 12px !important;
+        }
+    }
+
+    @media (max-width: 380px) {
+        .farmbox-header-title {
+            font-size: 1.1rem;
+        }
+
+        .plantio-area-control {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 7px;
+        }
+
+        .plantio-area-control input {
+            max-width: 100%;
+            width: 100%;
+            text-align: left;
+        }
+    }
+
+    input[type="number"]::-webkit-outer-spin-button,
+    input[type="number"]::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+
+    input[type="number"] {
+        -moz-appearance: textfield;
+        appearance: textfield;
+    }
 </style>
 {% endblock %}
 
@@ -471,217 +1052,263 @@
         data-token="{{ YOUR_TOKEN }}">
     </div>
 
-    <div class="farmbox-header">
-        <div>
-            <h2 class="farmbox-header-title">
-                <strong>{{ projeto_nome }}</strong>
-            </h2>
-            <p class="farmbox-header-subtitle">
-                📦 Abrir Aplicação no Farmbox
-            </p>
-        </div>
-    </div>
+    <div class="farmbox-shell">
+        <header class="farmbox-header">
+            <div class="farmbox-header-main">
+                <div class="farmbox-header-eyebrow">
+                    <span>Farmbox</span>
+                    <span>Aplicação</span>
+                </div>
 
-    <div class="farmbox-total-card">
-        <label class="form-label">
-            <strong>Área total selecionada:</strong>
-        </label>
+                <h2 class="farmbox-header-title">
+                    <strong>{{ projeto_nome }}</strong>
+                </h2>
 
-        <input type="text"
-            class="form-control fw-bold"
-            id="total-area-display"
-            value="{{ total_area|formatar_numero_br }} Há"
-            readonly>
-    </div>
+                <p class="farmbox-header-subtitle">
+                    📦 Abrir aplicação com plantios, programa, estágio e defensivos.
+                </p>
+            </div>
+        </header>
 
-    <div class="farmbox-section-card mb-4">
-        <h5 class="farmbox-section-title">Plantios Selecionados</h5>
+        <section class="farmbox-total-card">
+            <div class="farmbox-total-label">
+                <strong>Área total selecionada</strong>
+                <span>Soma automática dos plantios ativos na aplicação.</span>
+            </div>
 
-        {% for p in plantios %}
-        <div class="plantio-wrapper mb-2" data-plantation-id="{{ p.id_farmbox }}">
-            <div class="plantio-card">
-                <input type="hidden" name="plantation_id" value="{{ p.id_farmbox|stringformat:'d' }}">
+            <input type="text"
+                class="form-control fw-bold"
+                id="total-area-display"
+                value="{{ total_area|formatar_numero_br }} Há"
+                readonly>
+        </section>
 
-                <div class="plantio-content">
-                    <div class="plantio-icon">
-                        {% with cultura=p.variedade.cultura.cultura %}
-                        {% if cultura == "Soja" %}
-                        <img src="{% static 'images/icons/soy.png' %}" alt="Soja" style="width: 22px; height: 22px;" />
-                        {% elif cultura == "Feijão" %}
-                        <img src="{% static 'images/icons/beans2.png' %}" alt="Feijão" style="width: 22px; height: 22px;" />
-                        {% elif cultura == "Arroz" %}
-                        <img src="{% static 'images/icons/rice.png' %}" alt="Arroz" style="width: 22px; height: 22px;" />
-                        {% elif cultura == "Milho" %}
-                        <img src="{% static 'images/icons/corn.png' %}" alt="Arroz" style="width: 22px; height: 22px;" />
-                        {% else %}
-                        <img src="{% static 'images/icons/question.png' %}" alt="Cultura" style="width: 22px; height: 22px;" />
-                        {% endif %}
-                        {% endwith %}
+        <section class="farmbox-section-card">
+            <div class="farmbox-section-head">
+                <div>
+                    <h5 class="farmbox-section-title">Plantios Selecionados</h5>
+                    <p class="farmbox-section-subtitle">
+                        Ajuste a área ou remova plantios antes de confirmar.
+                    </p>
+                </div>
+
+                <span class="farmbox-pill">
+                    {{ plantios|length }} item(ns)
+                </span>
+            </div>
+
+            <div class="plantios-list">
+                {% for p in plantios %}
+                <div class="plantio-wrapper" data-plantation-id="{{ p.id_farmbox }}">
+                    <div class="plantio-card">
+                        <input type="hidden" name="plantation_id" value="{{ p.id_farmbox|stringformat:'d' }}">
+
+                        <div class="plantio-content">
+                            <div class="plantio-icon">
+                                {% with cultura=p.variedade.cultura.cultura %}
+                                {% if cultura == "Soja" %}
+                                <img src="{% static 'images/icons/soy.png' %}" alt="Soja" />
+                                {% elif cultura == "Feijão" %}
+                                <img src="{% static 'images/icons/beans2.png' %}" alt="Feijão" />
+                                {% elif cultura == "Arroz" %}
+                                <img src="{% static 'images/icons/rice.png' %}" alt="Arroz" />
+                                {% elif cultura == "Milho" %}
+                                <img src="{% static 'images/icons/corn.png' %}" alt="Milho" />
+                                {% else %}
+                                <img src="{% static 'images/icons/question.png' %}" alt="Cultura" />
+                                {% endif %}
+                                {% endwith %}
+                            </div>
+
+                            <div class="plantio-main-info">
+                                <div class="plantio-title-line">
+                                    <span class="plantio-talhao">{{ p.talhao.id_talhao }}</span>
+                                    <span class="plantio-separator">·</span>
+                                    <span class="plantio-variedade">{{ p.variedade }}</span>
+                                </div>
+
+                                <div class="plantio-safra">
+                                    {{ p.safra }} - {{ p.ciclo }}
+                                </div>
+                            </div>
+
+                            <div class="plantio-area-control">
+                                <label for="area-{{ forloop.counter }}" class="form-label">
+                                    Área
+                                </label>
+
+                                <input type="number"
+                                    id="area-{{ forloop.counter }}"
+                                    step="any"
+                                    inputmode="decimal"
+                                    class="form-control form-control-sm area-input"
+                                    name="sought_area"
+                                    value="{% with p.area_colheita|stringformat:'f' as area_float %}{{ area_float|slice:':-4' }}{% endwith %}"
+                                    data-plantation-id="{{ p.id_farmbox }}">
+                            </div>
+
+                            <button type="button"
+                                class="btn btn-sm btn-outline-danger remove-plantio-btn"
+                                onclick="removerPlantio(this)">
+                                Remover
+                            </button>
+                        </div>
                     </div>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
 
-                    <div class="plantio-meta fw-bold">
-                        {{ p.talhao.id_talhao }}
-                    </div>
+        <script id="programas-json" type="application/json">{{ programa_data_json|safe }}</script>
+        <script id="managers-json" type="application/json">{{ managers_json|safe }}</script>
 
-                    <div class="plantio-meta">
-                        {{ p.variedade }}
-                    </div>
-
-                    <div class="plantio-meta plantio-muted">
-                        {{ p.safra }} - {{ p.ciclo }}
-                    </div>
-
-                    <div class="plantio-area-control">
-                        <label for="area-{{ forloop.counter }}" class="form-label mb-0">
-                            <strong>Área:</strong>
-                        </label>
-
-                        <input type="number"
-                            step="any"
-                            class="form-control form-control-sm area-input"
-                            name="sought_area"
-                            value="{% with p.area_colheita|stringformat:'f' as area_float %}{{ area_float|slice:':-4' }}{% endwith %}"
-                            data-plantation-id="{{ p.id_farmbox }}">
-                    </div>
-
-                    <button type="button"
-                        class="btn btn-sm btn-outline-danger remove-plantio-btn"
-                        onclick="removerPlantio(this)">
-                        Remover
-                    </button>
+        <section class="farmbox-section-card">
+            <div class="farmbox-section-head">
+                <div>
+                    <h5 class="farmbox-section-title">Programa e responsáveis</h5>
+                    <p class="farmbox-section-subtitle">
+                        Selecione programa, estágio e gestores da aplicação.
+                    </p>
                 </div>
             </div>
-        </div>
-        {% endfor %}
-    </div>
 
-    <script id="programas-json" type="application/json">{{ programa_data_json|safe }}</script>
-    <script id="managers-json" type="application/json">{{ managers_json|safe }}</script>
-
-    <div class="farmbox-section-card mb-4">
-        <div class="programa-grid mb-3">
-            <div>
-                <small class="text-muted d-block" id="programa-meta"></small>
-
-                <label class="form-label">
-                    <strong>Programa</strong>
-                </label>
-
-                <select id="select-programa" class="form-select">
-                    <option value="">-- Selecione um programa --</option>
-                </select>
-            </div>
-
-            <div class="estagio-row">
+            <div class="programa-grid mb-3">
                 <div>
-                    <label class="form-label">
-                        <strong>Estágio</strong>
+                    <small class="text-muted d-block" id="programa-meta"></small>
+
+                    <label class="form-label" for="select-programa">
+                        Programa
                     </label>
 
-                    <select id="select-estagio" class="form-select" disabled>
-                        <option value="">-- Selecione um estágio --</option>
+                    <select id="select-programa" class="form-select">
+                        <option value="">-- Selecione um programa --</option>
                     </select>
                 </div>
 
-                <button type="button"
-                    id="btn-reset-programa"
-                    class="btn btn-outline-danger"
-                    title="Limpar programa/estágio/itens">
-                    <span class="me-1">Limpar</span> 🗑️
-                </button>
-            </div>
-        </div>
+                <div class="estagio-row">
+                    <div>
+                        <label class="form-label" for="select-estagio">
+                            Estágio
+                        </label>
 
-        <div class="managers-grid">
-            <div>
-                <label class="form-label">
-                    <strong>Responsável</strong>
-                </label>
+                        <select id="select-estagio" class="form-select" disabled>
+                            <option value="">-- Selecione um estágio --</option>
+                        </select>
+                    </div>
 
-                <select id="select-responsible" class="form-select">
-                    <option value="">-- Usar responsável padrão --</option>
-                </select>
-
-                <small class="text-muted">
-                    Se não selecionar, usa o responsável padrão da fazenda.
-                </small>
-            </div>
-
-            <div>
-                <label class="form-label">
-                    <strong>Encarregado</strong>
-                </label>
-
-                <select id="select-charge" class="form-select">
-                    <option value="">-- Usar encarregado padrão --</option>
-                </select>
-
-                <small class="text-muted">
-                    Se não selecionar, usa o encarregado padrão da fazenda.
-                </small>
-            </div>
-        </div>
-    </div>
-
-    <div class="farmbox-section-card">
-        <h5 class="farmbox-section-title">Adicionar Defensivos</h5>
-
-        <div id="defensivos-container" class="mb-3">
-            <div class="defensivo-group">
-                <select name="input_id"
-                    class="form-select form-select-sm select-busca-avancada"
-                    required>
-                    <option value="">-- Selecione um defensivo --</option>
-
-                    {% for d in defensivos %}
-                    <option value="{{ d.id_farmbox_str|stringformat:'d' }}"
-                        data-unidade="{{ d.unidade_medida }}"
-                        data-tipo="{{ d.tipo_display }}"
-                        data-formulacao="{{ d.formulacao }}">
-                        {{ d.produto }}
-                    </option>
-                    {% endfor %}
-                </select>
-
-                <input type="text"
-                    name="tipo_defensivo"
-                    class="form-control form-control-sm"
-                    placeholder=" - "
-                    disabled>
-
-                <input type="number"
-                    step="0.01"
-                    name="dosage_value"
-                    class="form-control form-control-sm"
-                    placeholder="Dose"
-                    required>
-
-                <button type="button"
-                    class="btn btn-outline-primary btn-sm"
-                    onclick="duplicarLinha(this)">
-                    +
-                </button>
-
-                <button type="button"
-                    class="btn btn-outline-danger btn-sm remove-defensivo-btn"
-                    onclick="removerLinha(this)">
-                    −
-                </button>
-
-                <div class="dose-result">
-                    0,00
+                    <button type="button"
+                        id="btn-reset-programa"
+                        class="btn btn-outline-danger"
+                        title="Limpar programa/estágio/itens">
+                        <span class="me-1">Limpar</span> 🗑️
+                    </button>
                 </div>
             </div>
-        </div>
 
-        <div class="farmbox-submit-bar">
-            <button type="button"
-                class="btn btn-success"
-                id="btn-submit"
-                onclick="enviarAplicacao()">
-                ✅ Confirmar Aplicação
-            </button>
-        </div>
+            <div class="managers-grid">
+                <div>
+                    <label class="form-label" for="select-responsible">
+                        Responsável
+                    </label>
+
+                    <select id="select-responsible" class="form-select">
+                        <option value="">-- Usar responsável padrão --</option>
+                    </select>
+
+                    <small class="manager-help">
+                        Se não selecionar, usa o responsável padrão da fazenda.
+                    </small>
+                </div>
+
+                <div>
+                    <label class="form-label" for="select-charge">
+                        Encarregado
+                    </label>
+
+                    <select id="select-charge" class="form-select">
+                        <option value="">-- Usar encarregado padrão --</option>
+                    </select>
+
+                    <small class="manager-help">
+                        Se não selecionar, usa o encarregado padrão da fazenda.
+                    </small>
+                </div>
+            </div>
+        </section>
+
+        <section class="farmbox-section-card">
+            <div class="farmbox-section-head">
+                <div>
+                    <h5 class="farmbox-section-title">Adicionar Defensivos</h5>
+                    <p class="farmbox-section-subtitle">
+                        Informe o produto e a dose. O total será calculado por item.
+                    </p>
+                </div>
+            </div>
+
+            <div id="defensivos-container" class="mb-3">
+                <div class="defensivo-group">
+                    <select name="input_id"
+                        class="form-select form-select-sm select-busca-avancada"
+                        required
+                        aria-label="Selecionar defensivo">
+                        <option value="">-- Selecione um defensivo --</option>
+
+                        {% for d in defensivos %}
+                        <option value="{{ d.id_farmbox_str|stringformat:'d' }}"
+                            data-unidade="{{ d.unidade_medida }}"
+                            data-tipo="{{ d.tipo_display }}"
+                            data-formulacao="{{ d.formulacao }}">
+                            {{ d.produto }}
+                        </option>
+                        {% endfor %}
+                    </select>
+
+                    <input type="text"
+                        name="tipo_defensivo"
+                        class="form-control form-control-sm"
+                        placeholder="Tipo"
+                        aria-label="Tipo do defensivo"
+                        disabled>
+
+                    <input type="number"
+                        step="0.01"
+                        inputmode="decimal"
+                        name="dosage_value"
+                        class="form-control form-control-sm"
+                        placeholder="Dose"
+                        aria-label="Dose"
+                        required>
+
+                    <button type="button"
+                        class="btn btn-outline-primary btn-sm"
+                        onclick="duplicarLinha(this)"
+                        aria-label="Adicionar defensivo">
+                        +
+                    </button>
+
+                    <button type="button"
+                        class="btn btn-outline-danger btn-sm remove-defensivo-btn"
+                        onclick="removerLinha(this)"
+                        aria-label="Remover defensivo">
+                        −
+                    </button>
+
+                    <div class="dose-result">
+                        0,00
+                    </div>
+                </div>
+            </div>
+
+            <div class="farmbox-submit-bar">
+                <button type="button"
+                    class="btn btn-success"
+                    id="btn-submit"
+                    onclick="enviarAplicacao()">
+                    ✅ Confirmar Aplicação
+                </button>
+            </div>
+        </section>
     </div>
 </div>
 {% endblock %}
