@@ -130,7 +130,9 @@ def _day_bounds(day: date):
 
 def coordinator_has_activity_for_day(coordinator: Manager, day: date) -> bool:
     manager_ids = list(
-        coordinator.personal_reminder_managers.values_list("id", flat=True)
+        coordinator.personal_reminder_managers
+        .filter(is_active=True)
+        .values_list("id", flat=True)
     )
 
     if not manager_ids:
@@ -172,7 +174,7 @@ def notify_personal_reminder_coordinator(dispatch: ManagerPersonalReminderDispat
 
     coordinators = (
         manager.personal_reminder_coordinators
-        .filter(is_personal_reminder_coordinator=True)
+        .filter(is_active=True, is_personal_reminder_coordinator=True)
         .exclude(phone_e164="")
         .order_by("name")
     )
@@ -251,7 +253,7 @@ def notify_personal_reminder_coordinator(dispatch: ManagerPersonalReminderDispat
 def get_active_personal_reminder_coordinators():
     return (
         Manager.objects
-        .filter(is_personal_reminder_coordinator=True)
+        .filter(is_active=True, is_personal_reminder_coordinator=True)
         .exclude(phone_e164="")
         .order_by("name")
     )
@@ -269,7 +271,11 @@ def send_coordinator_daily_action_template(
     """
     day = day or timezone.localdate()
 
-    if not coordinator or not coordinator.phone_e164:
+    if (
+        not coordinator
+        or not coordinator.is_active
+        or not coordinator.phone_e164
+    ):
         return False
 
     if not getattr(coordinator, "is_personal_reminder_coordinator", False):
@@ -354,7 +360,7 @@ def build_coordinator_daily_summary_blocks(*, coordinator: Manager, day: date | 
 
     managers = list(
         coordinator.personal_reminder_managers
-        .all()
+        .filter(is_active=True)
         .order_by("name")
     )
 
@@ -552,7 +558,7 @@ def handle_coordinator_personal_reminder_action(*, manager: Manager, reply_id: s
     if rid != PAYLOAD_COORDINATOR_DAILY:
         return False
 
-    if not manager:
+    if not manager or not manager.is_active:
         return False
 
     if not getattr(manager, "is_personal_reminder_coordinator", False):

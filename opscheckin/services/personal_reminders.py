@@ -84,6 +84,7 @@ def get_managers_subscribed_to_personal_reminders():
     """
     return (
         Manager.objects.filter(
+            is_active=True,
             notification_subscriptions__notification_type__code=PERSONAL_REMINDER_NOTIFICATION_CODE,
             notification_subscriptions__notification_type__is_active=True,
             notification_subscriptions__is_active=True,
@@ -280,6 +281,13 @@ def send_manager_personal_reminder(
         return ReminderSendResult(ok=False, status="no-manager", detail="Reminder sem manager.")
 
     manager = reminder.manager
+    
+    if not manager.is_active:
+        return ReminderSendResult(
+            ok=False,
+            status="inactive-manager",
+            detail="Manager inativo.",
+        )
 
     # Segurança extra: exige subscription ativa do tipo personal_reminder
     is_subscribed = ManagerNotificationSubscription.objects.filter(
@@ -605,6 +613,7 @@ def run_personal_reminder_tick(*, now_local: Optional[datetime] = None):
         ManagerPersonalReminder.objects.select_related("manager")
         .filter(
             is_active=True,
+            manager__is_active=True,
             manager__notification_subscriptions__notification_type__code=PERSONAL_REMINDER_NOTIFICATION_CODE,
             manager__notification_subscriptions__notification_type__is_active=True,
             manager__notification_subscriptions__is_active=True,
