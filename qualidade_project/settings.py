@@ -175,21 +175,6 @@ use_db = "default"
 # use_db_dev = "dev"
 
 DATABASES = {
-    # "dev": {
-    #     'ENGINE': 'django.db.backends.postgresql',
-    #     "NAME": env("DB_EL_NAME_NEON", default="default_db_name"),
-    #     "USER": env("DB_EL_USER_NEON", default="default_user"),
-    #     "PASSWORD": env("DB_EL_PASSWORD_NEON", default="default_password"),
-    #     "HOST": env("DB_EL_HOST_NEON", default="localhost"),
-    #     "PORT": env("DB_EL_PORT_NEON", default="5432"),
-    #     'CONN_MAX_AGE': 600,
-    #     'OPTIONS': {
-    #         'sslmode': 'require',
-    #         'connect_timeout': 10,
-    #     },
-    #     "CONN_HEALTH_CHECKS": True,
-    #     'ATOMIC_REQUESTS': True,
-    # },
     "default": {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": env("DB_EL_NAME"),
@@ -198,39 +183,19 @@ DATABASES = {
         "HOST": env("DB_EL_HOST"),
         "PORT": env("DB_EL_PORT"),
 
-        "CONN_MAX_AGE": 30,
+        "CONN_MAX_AGE": int(os.getenv("DB_CONN_MAX_AGE", "0")),
         "CONN_HEALTH_CHECKS": True,
-        "ATOMIC_REQUESTS": True,
 
         "OPTIONS": {
-            "sslmode": "require",
+            "sslmode": os.getenv("DB_SSLMODE", "prefer"),
             "connect_timeout": 10,
-
-            # keepalive (libpq / psycopg2)
             "keepalives": 1,
             "keepalives_idle": 30,
             "keepalives_interval": 10,
             "keepalives_count": 5,
-            
-            # Opcional, mas útil para não deixar query travada eternamente.
-            # 120000 = 2 minutos.
             "options": "-c statement_timeout=120000",
         },
     },
-    # "dev": {
-    #     'ENGINE': 'dj_db_conn_pool.backends.postgresql',
-    #     "NAME": env("DB_EL_NAME_LOCAL"),
-    #     "USER": env("DB_EL_USER_LOCAL"),
-    #     "PASSWORD": env("DB_EL_PASSWORD_LOCAL"),
-    #     "HOST": env("DB_EL_HOST_LOCAL"),
-    #     "PORT": env("DB_EL_PORT_LOCAL"),
-    #     'POOL_OPTIONS': {
-    #         'POOL_SIZE': 20,            # Number of connections in the pool
-    #         'MAX_OVERFLOW': 10,         # Extra connections beyond the pool size
-    #         'RECYCLE': 1800,            # Recycle connections after a certain time to avoid stale connections
-    #         'PRE_PING': True,           # Check connections before using them to avoid using a broken connection
-    #     }
-    # },
 }
 
 DATABASES["default"] = DATABASES[use_db]

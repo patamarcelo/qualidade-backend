@@ -1,6 +1,7 @@
 import logging
 import time
 import pytz
+import random
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.jobstores.memory import MemoryJobStore
@@ -9,13 +10,13 @@ from django_apscheduler.jobstores import register_events
 from django_apscheduler.models import DjangoJobExecution
 
 from django.conf import settings
+
 from django.db import (
     close_old_connections,
-    connection,
+    connections,
     OperationalError,
     InterfaceError,
 )
-
 # Imports das suas funções de negócio
 from diamante.utils import (
     finalizar_parcelas_encerradas,
@@ -54,59 +55,43 @@ logger = logging.getLogger(__name__)
 # DB HELPERS
 # =====================================================================
 
-def _prepare_db_for_job():
-    """
-    Garante que a conexão com o banco esteja fresca antes de rodar o job.
 
-    Isso é importante porque o APScheduler fica vivo no mesmo processo,
-    e conexões antigas do Django podem ficar obsoletas, quebradas ou
-    inutilizáveis depois de timeout/restart do Postgres/Railway.
-    """
+
+
+
+def _close_all_db_connections():
     try:
         close_old_connections()
     except Exception:
         logger.warning(
-            "[Scheduler] Falha ao executar close_old_connections antes do job",
+            "[Scheduler] Falha em close_old_connections",
             exc_info=True,
         )
 
-    try:
-        connection.close_if_unusable_or_obsolete()
-    except Exception:
-        logger.warning(
-            "[Scheduler] Falha ao validar conexão antiga. Fechando conexão.",
-            exc_info=True,
-        )
-
+    for db_connection in connections.all():
         try:
-            connection.close()
+            db_connection.close()
         except Exception:
-            pass
+            logger.warning(
+                "[Scheduler] Falha ao fechar conexão do banco",
+                exc_info=True,
+            )
+
+
+def _prepare_db_for_job():
+    _close_all_db_connections()
 
 
 def _close_db_after_job():
-    """
-    Fecha/limpa conexões após o job.
-
-    Isso reduz o risco de o scheduler segurar uma conexão quebrada
-    ou velha para a próxima execução.
-    """
-    try:
-        close_old_connections()
-    except Exception:
-        pass
+    _close_all_db_connections()
 
 
-def _run_job_with_db_guard(job_name, func, retries=3, delay=5):
-    """
-    Executa um job com proteção de conexão.
-
-    Inclui:
-    - limpeza de conexão antes;
-    - retry para OperationalError/InterfaceError;
-    - limpeza de conexão depois;
-    - logs padronizados.
-    """
+def _run_job_with_db_guard(
+    job_name,
+    func,
+    retries=3,
+    delay=5,
+):
     last_error = None
 
     for attempt in range(1, retries + 1):
@@ -122,14 +107,19 @@ def _run_job_with_db_guard(job_name, func, retries=3, delay=5):
 
             result = func()
 
-            logger.info("[Scheduler] Job %s finalizado com sucesso", job_name)
+            logger.info(
+                "[Scheduler] Job %s finalizado com sucesso",
+                job_name,
+            )
+
             return result
 
         except (OperationalError, InterfaceError) as exc:
             last_error = exc
 
             logger.warning(
-                "[Scheduler] Falha de conexão no job %s | tentativa %s/%s | erro=%s",
+                "[Scheduler] Falha de conexão no job %s "
+                "| tentativa %s/%s | erro=%s",
                 job_name,
                 attempt,
                 retries,
@@ -137,26 +127,29 @@ def _run_job_with_db_guard(job_name, func, retries=3, delay=5):
                 exc_info=True,
             )
 
-            try:
-                connection.close()
-            except Exception:
-                pass
-
             if attempt < retries:
-                time.sleep(delay)
+                sleep_seconds = (
+                    delay * attempt
+                    + random.uniform(0, 2)
+                )
+
+                time.sleep(sleep_seconds)
 
         except Exception:
-            logger.exception("[Scheduler] Erro interno no job %s", job_name)
+            logger.exception(
+                "[Scheduler] Erro interno no job %s",
+                job_name,
+            )
             raise
 
         finally:
             _close_db_after_job()
 
     logger.error(
-        "[Scheduler] Job %s falhou após %s tentativas",
+        "[Scheduler] Job %s falhou após %s tentativas | erro=%s",
         job_name,
         retries,
-        exc_info=True,
+        last_error,
     )
 
     raise last_error
