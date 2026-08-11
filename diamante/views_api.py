@@ -5551,9 +5551,9 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 headers = {
                     "Accept": "application/json",
                     "Content-Type": "application/json",
-                    "Authorization": f'Basic ${PROTHEUS_TOKEN}',
+                    "Authorization": f'Basic {PROTHEUS_TOKEN}',
                     "Access-Control-Allow-Origin": "*",
-                    "tenantId": "02"
+                    "tenantId": "02,0201"
                 }
                 url = "https://api.diamanteagricola.com.br:8089/rest/planejamento/cabecalho"
 
@@ -5562,7 +5562,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 }
                 if len(farm_list) > 0:
                     try:
-                        response_headers = requests.post(url, data=json.dumps(payload), headers=headers, verify=False, auth=HTTPBasicAuth('api', PROTHEUS_TOKEN))
+                        response_headers = requests.post(url, data=json.dumps(payload), headers=headers, verify=False)
 
                         print('response headers from protheus:', response_headers)
                         print('\n\n')
@@ -5606,7 +5606,27 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         print('Erro ao enviar o cabeçalho para o protheus', e)
 
                 get_planner_codes = HeaderPlanejamentoAgricola.objects.values('projeto__id_d', 'codigo_planejamento').filter(safra__safra=safra_filter, ciclo__ciclo=cicle_filter)
-                format_data_to_send = [{**x,'area_parcela': float(x['area_parcela']) ,'codigo_planejamento': [cod['codigo_planejamento'] for cod in get_planner_codes if cod['projeto__id_d'] == x['projeto']][0] } for x in list_returned ]
+                # format_data_to_send = [{**x,'area_parcela': float(x['area_parcela']) ,'codigo_planejamento': [cod['codigo_planejamento'] for cod in get_planner_codes if cod['projeto__id_d'] == x['projeto']][0] } for x in list_returned ]
+                format_data_to_send = []
+                for x in list_returned:
+                    codigos = [
+                        cod['codigo_planejamento']
+                        for cod in get_planner_codes
+                        if cod['projeto__id_d'] == x['projeto']
+                    ]
+
+                    if not codigos:
+                        raise ValueError(
+                            f"Não foi encontrado código de planejamento para o projeto "
+                            f"{x['projeto']} - {x['projeto_nome']}. "
+                            f"Provavelmente o cabeçalho não foi criado no Protheus."
+                        )
+
+                    format_data_to_send.append({
+                        **x,
+                        'area_parcela': float(x['area_parcela']),
+                        'codigo_planejamento': codigos[0],
+                    })
                 url_talhoes = 'https://api.diamanteagricola.com.br:8089/rest/planejamento/talhoes'
                 payload_talhoes = {
                     'parcelas': format_data_to_send
@@ -5634,9 +5654,10 @@ class PlantioViewSet(viewsets.ModelViewSet):
             except Exception as e:
                 print('Problema em gerar os dados para enviar ao protheus', e)
                 response = {
-                    "message": "Arquivo desconhecido",
-                    "problem": e
-                    }
+                    "message": "Erro ao gerar dados para o Protheus",
+                    "problem": str(e),
+                    "error_type": type(e).__name__,
+                }
                 return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
         else:
@@ -8838,17 +8859,18 @@ class StViewSet(viewsets.ModelViewSet):
                 headers = {
                     "Accept": "application/json",
                     "Content-Type": "application/json",
-                    "Authorization": f'Basic ${PROTHEUS_TOKEN}',
+                    "Authorization": f'Basic {PROTHEUS_TOKEN}',
                     "Access-Control-Allow-Origin": "*",
-                    "tenantid": "02"
+                    "tenantId": "02,0201"
                 }
 
                 url = "https://api.diamanteagricola.com.br:8089/rest/apisolicitacao/new"
                 payload = req_data
+                print('token', PROTHEUS_TOKEN )
 
                 try:
                     if generate_pre_st:
-                        response_headers = requests.post(url, data=json.dumps(payload), headers=headers, verify=False, auth=HTTPBasicAuth('api', PROTHEUS_TOKEN))
+                        response_headers = requests.post(url, data=json.dumps(payload), headers=headers, verify=False)
                         print('response headers from protheus:', response_headers)
                         print('\n\n')
                         print('response:', response_headers.status_code, response_headers.text)
