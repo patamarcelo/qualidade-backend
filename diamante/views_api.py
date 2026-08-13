@@ -8097,6 +8097,8 @@ def save_from_protheus_logic(data_json, user_id):
                                 destino = 1
                             elif "BIGUA" in destino_norm:
                                 destino = 3
+                            elif "AGB" in destino_norm:
+                                destino = 11
                             elif "JK" in destino_norm:
                                 destino = 7
 
