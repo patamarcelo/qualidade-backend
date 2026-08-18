@@ -782,7 +782,7 @@ def is_older_than_7_days(date_string):
     input_date = datetime.datetime.strptime(date_string, date_format)
 
     # Calculate the date 30 days ago from today
-    thirty_days_ago = datetime.datetime.today() - datetime.timedelta(days=7)
+    thirty_days_ago = datetime.datetime.today() - datetime.timedelta(days=20)
 
     # Check if the input date is older than 30 days ago
     return input_date > thirty_days_ago
