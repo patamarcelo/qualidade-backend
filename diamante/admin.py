@@ -1009,7 +1009,12 @@ def export_plantio(modeladmin, request, queryset):
     response = HttpResponse(content_type="text/csv")
     response["Content-Disposition"] = 'attachment; filename="Plantio.csv"'
     response.write(codecs.BOM_UTF8)
-    writer = csv.writer(response, delimiter=";")
+
+    writer = csv.writer(
+        response,
+        delimiter=";"
+    )
+
     writer.writerow(
         [
             "Fazenda",
@@ -1024,26 +1029,29 @@ def export_plantio(modeladmin, request, queryset):
             "Plantio Descontinuado",
             "Area Planejada",
             "Data Prev Colheita",
-            "area Plantada",
+            "Area Plantada",
             "Data Plantio",
-            # "Dap",
             "Ciclo Variedade",
             "Programa",
             "ID FarmBox",
             "Data Prevista Plantio",
-            'Plantio Iniciado',
+            "Plantio Iniciado",
+
+            # CARGAS
             "Cargas Carregadas",
+            "1ª Carga",
+            "Últ. Carga",
             "Carregado Kg",
+
             "Produtividade",
             "Area Parcial",
-            # "Area a Considerar",
             "lat",
             "long",
             "dap",
             "Area Saldo Carregar",
             "Area Aferida",
             "Saldo Plantar",
-            "Data Prevista Colheita Real"
+            "Data Prevista Colheita Real",
         ]
     )
 
@@ -1071,129 +1079,438 @@ def export_plantio(modeladmin, request, queryset):
         "inicializado_plantio",
         "variedade__dias_germinacao",
         "area_aferida",
-        "data_prevista_colheita_real"
+        "data_prevista_colheita_real",
     )
+
+    # ---------------------------------------------------------
+    # Já contém:
+    #
+    # x[0] = plantio_id
+    # x[1] = peso_scs_limpo_e_seco
+    # x[2] = data_colheita
+    #
+    # É a mesma fonte usada pelas colunas do Django Admin.
+    # ---------------------------------------------------------
     cargas_list = modeladmin.total_c_2
 
-    def get_total_prod(total_c_2, plantio):
-        total_filt_list = sum([(x[1] * 60) for x in total_c_2 if plantio[0] == x[0]])
+    # ---------------------------------------------------------
+    # Monta cache por plantio para não ficar percorrendo
+    # TODAS as cargas várias vezes para cada linha exportada.
+    # ---------------------------------------------------------
+    cargas_por_plantio = defaultdict(list)
+
+    for carga in cargas_list:
+        plantio_id = carga[0]
+
+        cargas_por_plantio[plantio_id].append(
+            carga
+        )
+
+    def get_total_prod(cargas_plantio, plantio):
+        total_filt_list = sum(
+            [
+                (x[1] * 60)
+                for x in cargas_plantio
+                if x[1] is not None
+            ]
+        )
+
         prod_scs = 0
+
         if plantio[8]:
             try:
-                prod = total_filt_list / plantio[11]
+                prod = (
+                    total_filt_list
+                    / plantio[11]
+                )
+
                 prod_scs = prod / 60
-            except ZeroDivisionError:
-                prod_scs = float("Inf")
+
+            except (
+                ZeroDivisionError,
+                TypeError,
+            ):
+                prod_scs = 0
+
         if plantio[14]:
             try:
                 if plantio[16] is not None:
-                    print('total_filt', total_filt_list, 'plantio 16', plantio[16])
-                    print('\n')
-                    prod = total_filt_list / plantio[16]
-                    prod_scs = prod / 60
-            except ZeroDivisionError:
-                prod_scs = float("Inf")
-        if prod_scs:
-            return localize(round(prod_scs, 2))
-        else:
-            return " - "
+                    prod = (
+                        total_filt_list
+                        / plantio[16]
+                    )
 
-    def get_prev_colheita(data_plantio, timeDelta):
-        if timeDelta != " - ":
+                    prod_scs = prod / 60
+
+            except (
+                ZeroDivisionError,
+                TypeError,
+            ):
+                prod_scs = 0
+
+        if prod_scs:
+            return localize(
+                round(prod_scs, 2)
+            )
+
+        return " - "
+
+    def get_prev_colheita(
+        data_plantio,
+        time_delta,
+    ):
+        if time_delta != " - ":
             if data_plantio:
-                prev_date_delta = timedelta(timeDelta)
-                prev_date_final = data_plantio + prev_date_delta
-                return prev_date_final
-        else:
-            return " - "
+                prev_date_delta = timedelta(
+                    days=time_delta
+                )
+
+                return (
+                    data_plantio
+                    + prev_date_delta
+                )
+
+        return " - "
 
     def get_dap(data_plantio):
         dap = 0
         today = date.today()
+
         if data_plantio:
             dap = today - data_plantio
             dap = dap.days + 1
+
         return dap
 
+    # ---------------------------------------------------------
+    # Formatação das datas das cargas.
+    # ---------------------------------------------------------
+    def formatar_data_carga(value):
+        if not value:
+            return " - "
+
+        try:
+            return date_format(
+                value,
+                format="SHORT_DATE_FORMAT",
+                use_l10n=True,
+            )
+
+        except Exception:
+            return str(value)
+
+    # ---------------------------------------------------------
+    # Primeiro e último carregamento do plantio.
+    # ---------------------------------------------------------
+    def get_primeira_ultima_carga(
+        cargas_plantio,
+    ):
+        datas = [
+            carga[2]
+            for carga in cargas_plantio
+            if carga[2] is not None
+        ]
+
+        if not datas:
+            return " - ", " - "
+
+        datas.sort()
+
+        primeira = formatar_data_carga(
+            datas[0]
+        )
+
+        ultima = formatar_data_carga(
+            datas[-1]
+        )
+
+        return primeira, ultima
+
     for plantio in plantios:
-        plantio_detail = list(plantio)
-        data_prevista_colheita_real = plantio_detail.pop()
-        time_delta_variedade_germinacao = plantio_detail[-2]
-        area_aferida = plantio_detail.pop()
-        area_aferida = "Sim" if area_aferida == True else "Não"
-        print('area_aferida', area_aferida)
+        plantio_id = plantio[0]
+
+        # -----------------------------------------------------
+        # Todas as cargas deste plantio.
+        # -----------------------------------------------------
+        cargas_plantio = (
+            cargas_por_plantio.get(
+                plantio_id,
+                []
+            )
+        )
+
+        primeira_carga, ultima_carga = (
+            get_primeira_ultima_carga(
+                cargas_plantio
+            )
+        )
+
+        plantio_detail = list(
+            plantio
+        )
+
+        data_prevista_colheita_real = (
+            plantio_detail.pop()
+        )
+
+        time_delta_variedade_germinacao = (
+            plantio_detail[-2]
+        )
+
+        area_aferida = (
+            plantio_detail.pop()
+        )
+
+        area_aferida = (
+            "Sim"
+            if area_aferida is True
+            else "Não"
+        )
+
         val_11 = plantio_detail[11]
         val_12 = plantio_detail[12]
-        
-        area_plantada_math = val_12 if val_11 is not None and val_12 is not None and val_11 > 0 and val_12 > 0 else 0
-        print('\n')
-        print('plantio_detail[12]: ', plantio_detail[12])
-        print('plantio_detail[11]: ', plantio_detail[11])
-        print('\n')
-        
-        area_planejada_math = val_11 if val_11 is not None and val_12 is not None and val_11 > 0 and val_12 > 0 else 0
-        saldo_plantar = area_planejada_math - area_plantada_math
-        
+
+        area_plantada_math = (
+            val_12
+            if (
+                val_11 is not None
+                and val_12 is not None
+                and val_11 > 0
+                and val_12 > 0
+            )
+            else 0
+        )
+
+        area_planejada_math = (
+            val_11
+            if (
+                val_11 is not None
+                and val_12 is not None
+                and val_11 > 0
+                and val_12 > 0
+            )
+            else 0
+        )
+
+        saldo_plantar = (
+            area_planejada_math
+            - area_plantada_math
+        )
+
         plantio_detail.pop()
+
         lat = ""
         lng = ""
-        
-        area_parcial_number = plantio_detail[16] if plantio_detail[16] else 0
-        area_parcial = str(area_parcial_number).replace(".",",") if area_parcial_number else 0
-        
-        area_plantada_number = plantio_detail[12] if plantio_detail[12] else 0
-        area_plantada = str(area_plantada_number).replace(".",",") if plantio_detail[20] == True else ' - '
-        
-        area_saldo_carregar = area_plantada_number - area_parcial_number
-        
-        if isinstance(plantio_detail[17], dict):
+
+        area_parcial_number = (
+            plantio_detail[16]
+            if plantio_detail[16]
+            else 0
+        )
+
+        area_parcial = (
+            str(
+                area_parcial_number
+            ).replace(".", ",")
+            if area_parcial_number
+            else 0
+        )
+
+        area_plantada_number = (
+            plantio_detail[12]
+            if plantio_detail[12]
+            else 0
+        )
+
+        area_plantada = (
+            str(
+                area_plantada_number
+            ).replace(".", ",")
+            if plantio_detail[20] is True
+            else " - "
+        )
+
+        area_saldo_carregar = (
+            area_plantada_number
+            - area_parcial_number
+        )
+
+        if isinstance(
+            plantio_detail[17],
+            dict,
+        ):
             lat = (
-                str(plantio_detail[17]["lat"]).replace(".", ",")
-                if plantio_detail[17]["lat"] != None
+                str(
+                    plantio_detail[17]["lat"]
+                ).replace(".", ",")
+                if (
+                    plantio_detail[17].get(
+                        "lat"
+                    )
+                    is not None
+                )
                 else ""
             )
+
             lng = (
-                str(plantio_detail[17]["lng"]).replace(".", ",")
-                if plantio_detail[17]["lng"] != None
+                str(
+                    plantio_detail[17]["lng"]
+                ).replace(".", ",")
+                if (
+                    plantio_detail[17].get(
+                        "lng"
+                    )
+                    is not None
+                )
                 else ""
             )
+
+        # Remove map_centro_id
         plantio_detail.pop(17)
-        data_plantio = plantio_detail[13] if plantio_detail[13] else plantio_detail[-2]
-        time_delta_plantio = plantio_detail[14]
-        plantio_detail[11] = localize(plantio_detail[11])
+
+        data_plantio = (
+            plantio_detail[13]
+            if plantio_detail[13]
+            else plantio_detail[-2]
+        )
+
+        time_delta_plantio = (
+            plantio_detail[14]
+        )
+
+        if plantio_detail[11] is not None:
+            plantio_detail[11] = localize(
+                plantio_detail[11]
+            )
+
+        # -----------------------------------------------------
+        # Cargas
+        # -----------------------------------------------------
         cargas_carregadas_filter = [
-            (x[1] * 60) for x in cargas_list if plantio_detail[0] == x[0]
+            (x[1] * 60)
+            for x in cargas_plantio
+            if x[1] is not None
         ]
-        cargas_carregadas_kg = localize(sum(cargas_carregadas_filter))
-        cargas_carregadas_quantidade = len(cargas_carregadas_filter)
+
+        cargas_carregadas_kg = (
+            localize(
+                sum(
+                    cargas_carregadas_filter
+                )
+            )
+        )
+
+        cargas_carregadas_quantidade = (
+            len(cargas_plantio)
+        )
+
         try:
-            produtividade = get_total_prod(cargas_list, plantio)
-        except:
+            produtividade = get_total_prod(
+                cargas_plantio,
+                plantio,
+            )
+        except Exception:
             produtividade = 0
+
+        # Remove area_parcial original,
+        # pois será reinserida formatada.
         plantio_detail.pop(16)
-        plantio_detail.append(cargas_carregadas_quantidade)
-        plantio_detail.append(cargas_carregadas_kg)
-        plantio_detail.append(produtividade)
-        plantio_detail.append(str(area_parcial).replace(".", ','))
-        
-        # plantio_detail.append(area_considerar)
+
+        # -----------------------------------------------------
+        # Adiciona colunas calculadas.
+        #
+        # ORDEM precisa acompanhar o cabeçalho.
+        # -----------------------------------------------------
+        plantio_detail.append(
+            cargas_carregadas_quantidade
+        )
+
+        # NOVOS CAMPOS
+        plantio_detail.append(
+            primeira_carga
+        )
+
+        plantio_detail.append(
+            ultima_carga
+        )
+
+        plantio_detail.append(
+            cargas_carregadas_kg
+        )
+
+        plantio_detail.append(
+            produtividade
+        )
+
+        plantio_detail.append(
+            str(
+                area_parcial
+            ).replace(".", ",")
+        )
+
         plantio_detail.append(lat)
         plantio_detail.append(lng)
+
+        # Remove PK.
         plantio_detail.pop(0)
-        time_delta_calc = time_delta_plantio + time_delta_variedade_germinacao if time_delta_plantio is not None and time_delta_variedade_germinacao is not None else " - "
-        print('data plantio: ', data_plantio)
-        print('time delta: ', time_delta_calc)
-        plantio_detail.insert(11, get_prev_colheita(data_plantio, time_delta_calc))
-        plantio_detail.append(get_dap(data_plantio))
-        plantio_detail[12] = area_plantada
-        print(plantio_detail)
-        print(lat, lng)
-        plantio_detail.append(str(area_saldo_carregar).replace(".", ','))
-        plantio_detail.append(area_aferida)
-        plantio_detail.append(str(saldo_plantar if saldo_plantar >= 1 else 0).replace(".", ','))
-        plantio_detail.append(data_prevista_colheita_real)
-        plantio = tuple(plantio_detail)
-        writer.writerow(plantio)
+
+        time_delta_calc = (
+            time_delta_plantio
+            + time_delta_variedade_germinacao
+            if (
+                time_delta_plantio
+                is not None
+                and
+                time_delta_variedade_germinacao
+                is not None
+            )
+            else " - "
+        )
+
+        plantio_detail.insert(
+            11,
+            get_prev_colheita(
+                data_plantio,
+                time_delta_calc,
+            )
+        )
+
+        plantio_detail.append(
+            get_dap(
+                data_plantio
+            )
+        )
+
+        plantio_detail[12] = (
+            area_plantada
+        )
+
+        plantio_detail.append(
+            str(
+                area_saldo_carregar
+            ).replace(".", ",")
+        )
+
+        plantio_detail.append(
+            area_aferida
+        )
+
+        plantio_detail.append(
+            str(
+                saldo_plantar
+                if saldo_plantar >= 1
+                else 0
+            ).replace(".", ",")
+        )
+
+        plantio_detail.append(
+            data_prevista_colheita_real
+        )
+
+        writer.writerow(
+            tuple(plantio_detail)
+        )
+
     return response
 
 

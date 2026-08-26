@@ -9114,7 +9114,7 @@ class ColheitaPlantioExtratoAreaViewSet(viewsets.ModelViewSet):
             try:
                 req_data = request.data
             except Exception as e:
-                print('erro ao pegar os dados', e)
+                print("erro ao pegar os dados", e)
 
             if not req_data:
                 return Response(
@@ -9122,23 +9122,29 @@ class ColheitaPlantioExtratoAreaViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            list_of_ids = [x['plantioId'] for x in req_data if x.get('plantioId')]
+            list_of_ids = [
+                x["plantioId"]
+                for x in req_data
+                if x.get("plantioId")
+            ]
 
-            filtered_query = Plantio.objects.filter(id_farmbox__in=list_of_ids)
+            filtered_query = Plantio.objects.filter(
+                id_farmbox__in=list_of_ids
+            )
 
             plantios_by_farmbox_id = {
                 plantio.id_farmbox: plantio
                 for plantio in filtered_query
             }
 
-            # Ordena para processar na sequência correta da colheita.
-            # Isso evita atualizar acumulado fora de ordem.
+            # Ordena cronologicamente para processar os apontamentos
+            # na sequência correta.
             req_data_sorted = sorted(
                 req_data,
                 key=lambda x: (
-                    x.get('Data Aplicacao') or '',
-                    x.get('Hora Aplicacao') or '',
-                    x.get('plantioId') or 0,
+                    x.get("Data Aplicacao") or "",
+                    x.get("Hora Aplicacao") or "",
+                    x.get("plantioId") or 0,
                 )
             )
 
@@ -9148,199 +9154,516 @@ class ColheitaPlantioExtratoAreaViewSet(viewsets.ModelViewSet):
             ignorados_por_regra_7_dias = 0
             ignorados_sem_saldo = 0
             ignorados_area_zero = 0
+            ignorados_duplicados_payload = 0
             erros = 0
 
-            # Cache local da soma de extratos já salvos por plantio.
-            # Importante: usa os extratos, não o Plantio.area_parcial.
+            # ---------------------------------------------------------
+            # Cache da soma REAL dos extratos existentes por plantio.
+            #
+            # Não usamos Plantio.area_parcial como fonte da verdade.
+            # A fonte da verdade é ColheitaPlantioExtratoArea.
+            # ---------------------------------------------------------
             soma_extratos_por_plantio = {}
 
             for plantio in filtered_query:
-                soma_salva = ColheitaPlantioExtratoArea.objects.filter(
-                    plantio=plantio
-                ).aggregate(
-                    total=Sum('area_colhida')
-                )['total'] or Decimal("0")
+                soma_salva = (
+                    ColheitaPlantioExtratoArea.objects
+                    .filter(plantio=plantio)
+                    .aggregate(
+                        total=Sum("area_colhida")
+                    )["total"]
+                    or Decimal("0")
+                )
 
                 soma_extratos_por_plantio[plantio.id] = soma_salva
 
+            # ---------------------------------------------------------
+            # Evita processar duas vezes o MESMO apontamento dentro
+            # do próprio payload recebido.
+            #
+            # A chave considerada é:
+            # plantio + data + hora
+            #
+            # Essa é a mesma regra usada no banco para localizar
+            # extrato existente.
+            # ---------------------------------------------------------
+            apontamentos_processados = set()
+
             for i in req_data_sorted:
                 try:
-                    check_this = is_older_than_7_days(i['editado'])
+                    check_this = is_older_than_7_days(i["editado"])
 
-                    projeto = str(i.get('Projeto', '')).strip().lower()
-                    is_lago_verde = projeto == 'fazenda lago verde'
+                    projeto = str(
+                        i.get("Projeto", "")
+                    ).strip().lower()
+
+                    is_lago_verde = (
+                        projeto == "fazenda lago verde"
+                    )
 
                     if not check_this and not is_lago_verde:
                         ignorados_por_regra_7_dias += 1
-                        print('[IGNORADO REGRA 7 DIAS]', i)
+
+                        print(
+                            "[IGNORADO REGRA 7 DIAS]",
+                            i
+                        )
+
                         continue
 
                     if not check_this and is_lago_verde:
-                        print('[LIBERADO EXCEÇÃO LAGO VERDE]', i)
+                        print(
+                            "[LIBERADO EXCEÇÃO LAGO VERDE]",
+                            i
+                        )
 
-                    print('check here:', i)
+                    print("check here:", i)
 
-                    plantio_id_to_save = i['plantioId']
+                    plantio_id_to_save = i["plantioId"]
 
-                    plantio_to_save = plantios_by_farmbox_id.get(plantio_id_to_save)
+                    plantio_to_save = (
+                        plantios_by_farmbox_id.get(
+                            plantio_id_to_save
+                        )
+                    )
 
                     if not plantio_to_save:
                         raise ValueError(
-                            f"Plantio with id_farmbox={plantio_id_to_save} not found"
+                            f"Plantio with "
+                            f"id_farmbox={plantio_id_to_save} "
+                            f"not found"
                         )
 
-                    area_to_save = Decimal(str(i['Area Aplicada']).replace(',', '.'))
-                    data_to_save = i['Data Aplicacao']
+                    area_to_save = Decimal(
+                        str(
+                            i["Area Aplicada"]
+                        ).replace(",", ".")
+                    )
+
+                    data_to_save = i["Data Aplicacao"]
+
                     hour_to_save, minute_to_save = map(
                         int,
-                        i['Hora Aplicacao'].split(':')
+                        i["Hora Aplicacao"].split(":")
                     )
-                    hora_to_save = dateTime(hour_to_save, minute_to_save)
+
+                    hora_to_save = dateTime(
+                        hour_to_save,
+                        minute_to_save
+                    )
 
                     total_aplicado_to_save = Decimal(
-                        str(i['Total Aplicado']).replace(',', '.')
+                        str(
+                            i["Total Aplicado"]
+                        ).replace(",", ".")
                     )
 
-                    area_colheita = plantio_to_save.area_colheita or Decimal("0")
+                    area_colheita = (
+                        plantio_to_save.area_colheita
+                        or Decimal("0")
+                    )
 
+                    # -------------------------------------------------
+                    # Proteção contra duplicidade dentro do MESMO
+                    # payload recebido.
+                    # -------------------------------------------------
+                    chave_apontamento = (
+                        plantio_to_save.id,
+                        str(data_to_save),
+                        hora_to_save,
+                    )
+
+                    if chave_apontamento in apontamentos_processados:
+                        ignorados_duplicados_payload += 1
+
+                        print(
+                            f"[IGNORADO DUPLICADO PAYLOAD] "
+                            f"Plantio {plantio_to_save.id} / "
+                            f"Farmbox {plantio_id_to_save}: "
+                            f"data={data_to_save}, "
+                            f"hora={hora_to_save}"
+                        )
+
+                        continue
+
+                    apontamentos_processados.add(
+                        chave_apontamento
+                    )
+
+                    # -------------------------------------------------
                     # Não salva extrato zerado vindo do Farmbox.
+                    # -------------------------------------------------
                     if area_to_save <= Decimal("0"):
                         ignorados_area_zero += 1
 
-                        area_parcial_final = min(total_aplicado_to_save, area_colheita)
-                        plantio_to_save.area_parcial = area_parcial_final
-                        plantio_to_save.save(update_fields=["area_parcial"])
+                        area_parcial_final = min(
+                            total_aplicado_to_save,
+                            area_colheita
+                        )
+
+                        plantio_to_save.area_parcial = (
+                            area_parcial_final
+                        )
+
+                        plantio_to_save.save(
+                            update_fields=[
+                                "area_parcial"
+                            ]
+                        )
 
                         print(
-                            f"[IGNORADO AREA ZERO] Plantio {plantio_to_save.id} / Farmbox {plantio_id_to_save}: "
-                            f"area_to_save={area_to_save}"
+                            f"[IGNORADO AREA ZERO] "
+                            f"Plantio "
+                            f"{plantio_to_save.id} / "
+                            f"Farmbox "
+                            f"{plantio_id_to_save}: "
+                            f"area_to_save="
+                            f"{area_to_save}"
                         )
+
                         continue
 
-                    soma_extratos_atual = soma_extratos_por_plantio.get(
-                        plantio_to_save.id,
-                        Decimal("0")
+                    # -------------------------------------------------
+                    # Soma atual dos extratos do plantio.
+                    # -------------------------------------------------
+                    soma_extratos_atual = (
+                        soma_extratos_por_plantio.get(
+                            plantio_to_save.id,
+                            Decimal("0")
+                        )
                     )
 
-                    saldo_restante = area_colheita - soma_extratos_atual
-
-                    # Se a soma dos extratos já bateu a área_colheita, não salva mais.
-                    if saldo_restante <= Decimal("0"):
-                        ignorados_sem_saldo += 1
-
-                        plantio_to_save.area_parcial = area_colheita
-                        plantio_to_save.save(update_fields=["area_parcial"])
-
-                        print(
-                            f"[IGNORADO SEM SALDO] Plantio {plantio_to_save.id} / Farmbox {plantio_id_to_save}: "
-                            f"soma_extratos_atual={soma_extratos_atual}, "
-                            f"area_colheita={area_colheita}. "
-                            f"Nenhum novo extrato será salvo."
-                        )
-                        continue
-
-                    # Regra principal:
-                    # salva no extrato no máximo o saldo restante.
-                    area_colhida_extrato = min(area_to_save, saldo_restante)
-
-                    if total_aplicado_to_save > area_colheita or area_to_save > saldo_restante:
-                        corrigidos_por_excesso += 1
-
-                        print(
-                            f"[CORREÇÃO EXCESSO] Plantio {plantio_to_save.id} / Farmbox {plantio_id_to_save}: "
-                            f"Total Aplicado={total_aplicado_to_save}, "
-                            f"Area Aplicada={area_to_save}, "
-                            f"area_colheita={area_colheita}, "
-                            f"soma_extratos_atual={soma_extratos_atual}, "
-                            f"saldo_restante={saldo_restante}, "
-                            f"area_colhida_extrato={area_colhida_extrato}"
-                        )
-
-                    # Segurança extra.
-                    if area_colhida_extrato <= Decimal("0"):
-                        ignorados_sem_saldo += 1
-                        print(
-                            f"[IGNORADO EXTRATO ZERO] Plantio {plantio_to_save.id} / Farmbox {plantio_id_to_save}: "
-                            f"area_colhida_extrato={area_colhida_extrato}"
-                        )
-                        continue
-
-                    with transaction.atomic():
-                        # Se já existe o extrato para mesma data/hora/plantio, atualiza.
-                        # Se não existe, cria.
-                        extrato_existente = ColheitaPlantioExtratoArea.objects.filter(
+                    # -------------------------------------------------
+                    # MUITO IMPORTANTE:
+                    #
+                    # Descobre ANTES do cálculo se o apontamento
+                    # já existe.
+                    #
+                    # A regra de não duplicidade continua:
+                    #
+                    # plantio + data + hora
+                    #
+                    # Se existir:
+                    #     atualiza.
+                    #
+                    # Se não existir:
+                    #     cria.
+                    # -------------------------------------------------
+                    extrato_existente = (
+                        ColheitaPlantioExtratoArea.objects
+                        .filter(
                             plantio=plantio_to_save,
                             data_colheita=data_to_save,
                             time=hora_to_save,
-                        ).first()
+                        )
+                        .first()
+                    )
 
-                        area_antiga = Decimal("0")
+                    area_antiga = Decimal("0")
 
-                        if extrato_existente:
-                            area_antiga = extrato_existente.area_colhida or Decimal("0")
-                            extrato_existente.area_colhida = area_colhida_extrato
-                            extrato_existente.save(update_fields=["area_colhida"])
-                            new_colheita = extrato_existente
-                            created = False
-                        else:
-                            new_colheita = ColheitaPlantioExtratoArea.objects.create(
-                                plantio=plantio_to_save,
-                                area_colhida=area_colhida_extrato,
-                                data_colheita=data_to_save,
-                                time=hora_to_save,
-                            )
-                            created = True
-
-                        # Atualiza cache local sem precisar consultar o banco a cada linha.
-                        soma_extratos_por_plantio[plantio_to_save.id] = (
-                            soma_extratos_atual - area_antiga + area_colhida_extrato
+                    if extrato_existente:
+                        area_antiga = (
+                            extrato_existente.area_colhida
+                            or Decimal("0")
                         )
 
-                        soma_final_extratos = soma_extratos_por_plantio[plantio_to_save.id]
+                    # -------------------------------------------------
+                    # CORREÇÃO PRINCIPAL
+                    #
+                    # A soma atual contém o próprio extrato quando
+                    # estamos atualizando um apontamento existente.
+                    #
+                    # Portanto precisamos removê-lo antes de calcular
+                    # o saldo disponível.
+                    # -------------------------------------------------
+                    soma_outros_extratos = (
+                        soma_extratos_atual
+                        - area_antiga
+                    )
 
-                        # O acumulado do Plantio nunca pode passar da area_colheita.
-                        # Aqui ele acompanha a soma real dos extratos salvos.
+                    if soma_outros_extratos < Decimal("0"):
+                        soma_outros_extratos = Decimal("0")
+
+                    saldo_disponivel = (
+                        area_colheita
+                        - soma_outros_extratos
+                    )
+
+                    # -------------------------------------------------
+                    # Se OUTROS extratos já preencheram toda a área,
+                    # não existe espaço para este apontamento.
+                    #
+                    # Atenção:
+                    # aqui não estamos considerando o próprio extrato
+                    # existente, porque ele já foi removido acima.
+                    # -------------------------------------------------
+                    if saldo_disponivel <= Decimal("0"):
+                        ignorados_sem_saldo += 1
+
+                        soma_final_atual = min(
+                            soma_extratos_atual,
+                            area_colheita
+                        )
+
+                        plantio_to_save.area_parcial = (
+                            soma_final_atual
+                        )
+
+                        plantio_to_save.save(
+                            update_fields=[
+                                "area_parcial"
+                            ]
+                        )
+
+                        print(
+                            f"[IGNORADO SEM SALDO] "
+                            f"Plantio "
+                            f"{plantio_to_save.id} / "
+                            f"Farmbox "
+                            f"{plantio_id_to_save}: "
+                            f"soma_extratos_atual="
+                            f"{soma_extratos_atual}, "
+                            f"area_antiga="
+                            f"{area_antiga}, "
+                            f"soma_outros_extratos="
+                            f"{soma_outros_extratos}, "
+                            f"area_colheita="
+                            f"{area_colheita}. "
+                            f"Nenhum saldo disponível "
+                            f"para este apontamento."
+                        )
+
+                        continue
+
+                    # -------------------------------------------------
+                    # REGRA PRINCIPAL CORRIGIDA
+                    #
+                    # Por padrão salva exatamente o valor apontado
+                    # pelo Farmbox.
+                    # -------------------------------------------------
+                    area_colhida_extrato = area_to_save
+
+                    # -------------------------------------------------
+                    # Só limita se:
+                    #
+                    # soma dos OUTROS extratos
+                    # +
+                    # apontamento atual
+                    #
+                    # ultrapassar a área total do plantio.
+                    # -------------------------------------------------
+                    if area_to_save > saldo_disponivel:
+                        area_colhida_extrato = (
+                            saldo_disponivel
+                        )
+
+                        corrigidos_por_excesso += 1
+
+                        print(
+                            f"[CORREÇÃO EXCESSO] "
+                            f"Plantio "
+                            f"{plantio_to_save.id} / "
+                            f"Farmbox "
+                            f"{plantio_id_to_save}: "
+                            f"Total Aplicado="
+                            f"{total_aplicado_to_save}, "
+                            f"Area Aplicada="
+                            f"{area_to_save}, "
+                            f"area_colheita="
+                            f"{area_colheita}, "
+                            f"soma_extratos_atual="
+                            f"{soma_extratos_atual}, "
+                            f"area_antiga="
+                            f"{area_antiga}, "
+                            f"soma_outros_extratos="
+                            f"{soma_outros_extratos}, "
+                            f"saldo_disponivel="
+                            f"{saldo_disponivel}, "
+                            f"area_colhida_extrato="
+                            f"{area_colhida_extrato}"
+                        )
+
+                    # -------------------------------------------------
+                    # Segurança extra.
+                    # -------------------------------------------------
+                    if area_colhida_extrato <= Decimal("0"):
+                        ignorados_sem_saldo += 1
+
+                        print(
+                            f"[IGNORADO EXTRATO ZERO] "
+                            f"Plantio "
+                            f"{plantio_to_save.id} / "
+                            f"Farmbox "
+                            f"{plantio_id_to_save}: "
+                            f"area_colhida_extrato="
+                            f"{area_colhida_extrato}"
+                        )
+
+                        continue
+
+                    # -------------------------------------------------
+                    # Salva/atualiza de forma atômica.
+                    # -------------------------------------------------
+                    with transaction.atomic():
+
+                        if extrato_existente:
+                            # -----------------------------------------
+                            # JÁ EXISTE:
+                            # atualiza o MESMO extrato.
+                            #
+                            # Não cria duplicado.
+                            # -----------------------------------------
+                            extrato_existente.area_colhida = (
+                                area_colhida_extrato
+                            )
+
+                            extrato_existente.save(
+                                update_fields=[
+                                    "area_colhida"
+                                ]
+                            )
+
+                            new_colheita = (
+                                extrato_existente
+                            )
+
+                            created = False
+
+                        else:
+                            # -----------------------------------------
+                            # NÃO EXISTE:
+                            # cria novo extrato.
+                            # -----------------------------------------
+                            new_colheita = (
+                                ColheitaPlantioExtratoArea
+                                .objects
+                                .create(
+                                    plantio=plantio_to_save,
+                                    area_colhida=(
+                                        area_colhida_extrato
+                                    ),
+                                    data_colheita=(
+                                        data_to_save
+                                    ),
+                                    time=hora_to_save,
+                                )
+                            )
+
+                            created = True
+
+                        # -------------------------------------------------
+                        # Como soma_outros_extratos já removeu a área
+                        # antiga do registro atual, basta adicionar
+                        # a nova área.
+                        # -------------------------------------------------
+                        soma_final_extratos = (
+                            soma_outros_extratos
+                            + area_colhida_extrato
+                        )
+
+                        soma_extratos_por_plantio[
+                            plantio_to_save.id
+                        ] = soma_final_extratos
+
+                        # -------------------------------------------------
+                        # area_parcial acompanha a soma REAL dos extratos.
+                        # Nunca ultrapassa area_colheita.
+                        # -------------------------------------------------
                         plantio_to_save.area_parcial = min(
                             soma_final_extratos,
                             area_colheita
                         )
-                        plantio_to_save.save(update_fields=["area_parcial"])
+
+                        plantio_to_save.save(
+                            update_fields=[
+                                "area_parcial"
+                            ]
+                        )
 
                     if created:
                         salvos += 1
-                        print(f'{Fore.GREEN}Colheita Salva com sucesso!!{Style.RESET_ALL}')
+
+                        print(
+                            f"{Fore.GREEN}"
+                            f"Colheita Salva com sucesso!!"
+                            f"{Style.RESET_ALL}"
+                        )
+
                     else:
                         atualizados += 1
-                        print(f'{Fore.GREEN}Colheita Atualizada com sucesso!!{Style.RESET_ALL}')
+
+                        print(
+                            f"{Fore.GREEN}"
+                            f"Colheita Atualizada com sucesso!!"
+                            f"{Style.RESET_ALL}"
+                        )
 
                     print(new_colheita)
-                    print('\n')
+
+                    print(
+                        f"[RESUMO EXTRATO] "
+                        f"Plantio={plantio_to_save.id}, "
+                        f"Farmbox={plantio_id_to_save}, "
+                        f"Area Aplicada={area_to_save}, "
+                        f"Area Salva={area_colhida_extrato}, "
+                        f"Area Antiga={area_antiga}, "
+                        f"Soma Outros={soma_outros_extratos}, "
+                        f"Soma Final={soma_final_extratos}, "
+                        f"Area Colheita={area_colheita}, "
+                        f"created={created}"
+                    )
+
+                    print("\n")
 
                 except Exception as e:
                     erros += 1
+
                     print(
-                        f'{Fore.LIGHTYELLOW_EX}Problema em Salvar o Plantio: {i} \n'
-                        f'{Fore.LIGHTRED_EX}Error: {e} {Style.RESET_ALL}'
+                        f"{Fore.LIGHTYELLOW_EX}"
+                        f"Problema em Salvar o Plantio: "
+                        f"{i} \n"
+                        f"{Fore.LIGHTRED_EX}"
+                        f"Error: {e} "
+                        f"{Style.RESET_ALL}"
                     )
 
             response = {
-                'msg': 'Colheita Atualizada com sucesso!!',
-                'total_recebido': len(req_data),
-                'salvos': salvos,
-                'atualizados': atualizados,
-                'corrigidos_por_excesso_area_colheita': corrigidos_por_excesso,
-                'ignorados_por_regra_7_dias': ignorados_por_regra_7_dias,
-                'ignorados_sem_saldo': ignorados_sem_saldo,
-                'ignorados_area_zero': ignorados_area_zero,
-                'erros': erros,
+                "msg": "Colheita Atualizada com sucesso!!",
+                "total_recebido": len(req_data),
+                "salvos": salvos,
+                "atualizados": atualizados,
+                "corrigidos_por_excesso_area_colheita": (
+                    corrigidos_por_excesso
+                ),
+                "ignorados_por_regra_7_dias": (
+                    ignorados_por_regra_7_dias
+                ),
+                "ignorados_sem_saldo": (
+                    ignorados_sem_saldo
+                ),
+                "ignorados_area_zero": (
+                    ignorados_area_zero
+                ),
+                "ignorados_duplicados_payload": (
+                    ignorados_duplicados_payload
+                ),
+                "erros": erros,
             }
 
-            return Response(response, status=status.HTTP_201_CREATED)
+            return Response(
+                response,
+                status=status.HTTP_201_CREATED
+            )
 
         else:
-            response = {"message": "Você precisa estar logado!!!"}
-            return Response(response, status=status.HTTP_400_BAD_REQUEST)
-    
+            response = {
+                "message": "Você precisa estar logado!!!"
+            }
+
+            return Response(
+                response,
+                status=status.HTTP_400_BAD_REQUEST
+            )
 class BackgroundTaskStatusViewSet(viewsets.ModelViewSet):
     queryset = BackgroundTaskStatus.objects.all()
     serializer_class = BackgroundTaskStatusSerializer
