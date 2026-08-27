@@ -3122,6 +3122,60 @@ export_cargas.short_description = "Export to csv"
 
 class SomeModelForm(forms.Form):
     csv_file = forms.FileField(required=False, label="please select a file")
+    
+
+class UmidadeInformadaFilter(admin.SimpleListFilter):
+    title = "Umidade"
+    parameter_name = "umidade_status"
+
+    def lookups(self, request, model_admin):
+        return (
+            ("sem", "Sem umidade"),
+            ("com", "Com umidade"),
+        )
+
+    def queryset(self, request, queryset):
+        if self.value() == "sem":
+            return queryset.filter(
+                Q(umidade__isnull=True) |
+                Q(umidade=0)
+            )
+
+        if self.value() == "com":
+            return (
+                queryset
+                .filter(umidade__isnull=False)
+                .exclude(umidade=0)
+            )
+
+        return queryset
+
+
+class ImpurezaInformadaFilter(admin.SimpleListFilter):
+    title = "Impureza"
+    parameter_name = "impureza_status"
+
+    def lookups(self, request, model_admin):
+        return (
+            ("sem", "Sem impureza"),
+            ("com", "Com impureza"),
+        )
+
+    def queryset(self, request, queryset):
+        if self.value() == "sem":
+            return queryset.filter(
+                Q(impureza__isnull=True) |
+                Q(impureza=0)
+            )
+
+        if self.value() == "com":
+            return (
+                queryset
+                .filter(impureza__isnull=False)
+                .exclude(impureza=0)
+            )
+
+        return queryset
 
 
 @admin.register(Colheita)
@@ -3258,7 +3312,7 @@ class ColheitaAdmin(admin.ModelAdmin):
         "get_peso_liquido",
         "get_umidade",
         "get_desconto_umidade",
-        "impureza",
+        "get_impureza",
         "desconto_impureza",
         # "peso_scs_limpo_e_seco",
         # "bandinha",
@@ -3298,6 +3352,9 @@ class ColheitaAdmin(admin.ModelAdmin):
     ]
 
     list_filter = (
+        UmidadeInformadaFilter,
+        ImpurezaInformadaFilter,
+
         "plantio__safra__safra",
         "plantio__ciclo__ciclo",
         "deposito__nome",
@@ -3370,11 +3427,35 @@ class ColheitaAdmin(admin.ModelAdmin):
     #     return view
 
     def get_umidade(self, obj):
-        if obj.umidade and obj.umidade > 0 :
-            return obj.umidade
-        else:
+        if obj.umidade is None:
             return " - "
+
+        if obj.umidade == 0:
+            return format_html(
+                '<span style="color: #dc2626; font-weight: 700;">{}</span>',
+                obj.umidade,
+            )
+
+        return obj.umidade
+
     get_umidade.short_description = "Umidade"
+    get_umidade.admin_order_field = "umidade"
+
+
+    def get_impureza(self, obj):
+        if obj.impureza is None:
+            return " - "
+
+        if obj.impureza == 0:
+            return format_html(
+                '<span style="color: #dc2626; font-weight: 700;">{}</span>',
+                obj.impureza,
+            )
+
+        return obj.impureza
+
+    get_impureza.short_description = "Impureza"
+    get_impureza.admin_order_field = "impureza"
     
     def get_desconto_umidade(self, obj):
         if obj.umidade and obj.umidade > 0 :
