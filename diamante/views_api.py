@@ -5637,7 +5637,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
 
                 if len(format_data_to_send) > 0:
                     try:
-                        response_talhoes = requests.post(url_talhoes,data=json.dumps(payload_talhoes), headers=headers, verify=False, auth=HTTPBasicAuth('api', PROTHEUS_TOKEN))
+                        response_talhoes = requests.post(url_talhoes,data=json.dumps(payload_talhoes), headers=headers, verify=False)
                         print('response headers from protheus:', response_talhoes)
                         print('\n\n')
                         print('response:', response_talhoes.status_code, response_talhoes.text)
@@ -8029,6 +8029,12 @@ def save_from_protheus_logic(data_json, user_id):
                     safra = item["Safra"]
                     ciclo = int(item["Ciclo"])
                     origem_id = int(remove_leading_zeros(str(item["Cod Projeto"])))  # 👈 Corrigido!
+                    
+                    
+                    if normalize(item["Projeto"]) == "PROJETO SANTA MARIA":
+                        origem_id = 11
+                    
+                    
                     parcelas = adjust_parcelas(item["Parcela"])
                     
                     for parcela in parcelas:
@@ -8071,6 +8077,9 @@ def save_from_protheus_logic(data_json, user_id):
                             motorista = i["Motorista"]
                             origem = i["Projeto"]
                             origem_id = remove_leading_zeros(str(i["Cod Projeto"]))
+                            if normalize(i["Projeto"]) == "PROJETO SANTA MARIA":
+                                origem_id = "11"
+
                             parcelas = adjust_parcelas(i["Parcela"])
                             peso_bruto = i["Peso Bruto"]
                             peso_tara = i["Peso Tara"]
