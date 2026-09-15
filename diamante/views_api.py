@@ -2205,6 +2205,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         "area_colheita",
                         "area_parcial",
                         "data_plantio",
+                        "ativo",
                         "plantio_descontinuado"
                     )
                     .order_by("talhao__fazenda__nome", "talhao__id_talhao")
@@ -2250,6 +2251,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 "finalizado_colheita": i["finalizado_colheita"],
                                 "id_plantio": i["pk"],
                                 "plantio_descontinuado": i["plantio_descontinuado"],
+                                "ativo": i["ativo"],
                             }
                         }
                     )
