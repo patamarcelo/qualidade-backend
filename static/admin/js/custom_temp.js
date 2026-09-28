@@ -21,7 +21,7 @@ var app = new Vue({
 		ciclos: ["1", "2", "3"],
 		selectedCiclo: getParam("ciclo", ""),
 		selecredSafra: getParam("safra", "").replace("_", "/"),
-		safras: ["2022/2023", "2023/2024", "2024/2025", "2025/2026", "2026/2027"],
+		safras: ["2022/2023", "2023/2024", "2024/2025", "2025/2026", "2026/2027", "2027/2028"],
 
 		createdAtGte: getParam("created_at_gte", ""),
 		createdAtLte: getParam("created_at_lte", ""),
