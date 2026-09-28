@@ -5807,6 +5807,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 .filter(ciclo__ciclo=cicle_filter)
                 .filter(plantio_descontinuado=False)
                 .filter(variedade__variedade__isnull=False)
+                .filter(ativo=True)
             )
             only_proj = list(set([x["talhao__fazenda__nome"] for x in qs_planned]))
 
