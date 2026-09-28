@@ -4637,7 +4637,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         # finalizado_colheita=False,
                         plantio_descontinuado=False,
                         totaldays__gte=datetime.timedelta(days=total_dias_plantado_acompanhamento["soja_feijao"]),
-                        acompanhamento_medias=True
+                        acompanhamento_medias=True,
+                        ativo=True
                     )
                     .order_by("talhao__id_unico")
                 )
