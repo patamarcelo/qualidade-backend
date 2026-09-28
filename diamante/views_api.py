@@ -2253,6 +2253,16 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 "id_plantio": i["pk"],
                                 "plantio_descontinuado": i["plantio_descontinuado"],
                                 "ativo": i["ativo"],
+                                "area": (
+                                    float(i["area_colheita"])
+                                    if i["area_colheita"] is not None
+                                    else None
+                                ),
+                                "area_parcial": (
+                                    float(i["area_parcial"])
+                                    if i["area_parcial"] is not None
+                                    else None
+                                ),
                             }
                         }
                     )
