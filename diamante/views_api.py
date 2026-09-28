@@ -2416,6 +2416,13 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 "variedade": i["variedade__nome_fantasia"],
                                 "finalizado_colheita": i["finalizado_colheita"],
                                 "id_plantio": i["pk"],
+                                
+                                # Área total da parcela/plantio
+                                "area": i["area_colheita"],
+
+                                # Mantidos também para usos futuros, caso necessário
+                                "area_colheita": i["area_colheita"],
+                                "area_parcial": i["area_parcial"],
                             }
                         }
                     )
