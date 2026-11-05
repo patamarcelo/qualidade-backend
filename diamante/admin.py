@@ -6759,6 +6759,23 @@ from .models import FarmPolygon
 @admin.register(FarmPolygon)
 class FarmPolygonAdmin(admin.ModelAdmin):
     change_list_template = "admin/teste_farmpolygon.html"
+    actions = ["export_selected_kml"]
+
+    @admin.action(description="Exportar selecionados em um único KML", permissions=["view"])
+    def export_selected_kml(self, request, queryset):
+        from .services.farm_polygon_kml import export_farm_polygons_kml
+
+        try:
+            content = export_farm_polygons_kml(queryset.iterator())
+        except ValueError as error:
+            self.message_user(
+                request, f"Exportação cancelada. {error} Nenhum item foi exportado.",
+                level=messages.ERROR,
+            )
+            return None
+        response = HttpResponse(content, content_type="application/vnd.google-earth.kml+xml")
+        response["Content-Disposition"] = 'attachment; filename="poligonos_selecionados.kml"'
+        return response
 
     list_display = (
         "name",
