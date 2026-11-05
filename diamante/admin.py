@@ -6765,8 +6765,21 @@ class FarmPolygonAdmin(admin.ModelAdmin):
     def export_selected_kml(self, request, queryset):
         from .services.farm_polygon_kml import export_farm_polygons_kml
 
+        from .forms_kml_export import FarmPolygonExportForm
+
+        form = FarmPolygonExportForm(request.POST if request.POST.get("export_kml_confirm") else None)
+        if not request.POST.get("export_kml_confirm") or not form.is_valid():
+            return TemplateResponse(request, "admin/diamante/farmpolygon/export_kml.html", {
+                **self.admin_site.each_context(request),
+                "title": "Exportar polígonos em KML",
+                "opts": self.model._meta,
+                "form": form,
+                "selected_ids": request.POST.getlist(helpers.ACTION_CHECKBOX_NAME),
+                "select_across": request.POST.get("select_across", "0"),
+                "selection_count": queryset.count(),
+            })
         try:
-            content = export_farm_polygons_kml(queryset.iterator())
+            content = export_farm_polygons_kml(queryset.iterator(), **form.cleaned_data)
         except ValueError as error:
             self.message_user(
                 request, f"Exportação cancelada. {error} Nenhum item foi exportado.",

@@ -1,0 +1,30 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<p>{{ selection_count }} item(ns) selecionado(s). Cada geometria será preservada e receberá um marcador com seu nome.</p>
+<form method="post">{% csrf_token %}
+  <input type="hidden" name="action" value="export_selected_kml">
+  <input type="hidden" name="export_kml_confirm" value="1">
+  <input type="hidden" name="select_across" value="{{ select_across }}">
+  {% for id in selected_ids %}<input type="hidden" name="_selected_action" value="{{ id }}">{% endfor %}
+  {{ form.non_field_errors }}
+  <p>{{ form.color.label_tag }} {{ form.color }} <span id="kml-color-preview" style="display:inline-block;width:48px;height:24px;border:1px solid #777;vertical-align:middle" aria-label="Prévia da cor"></span> {{ form.color.errors }}</p>
+  <p>{{ form.opacity.label_tag }} {{ form.opacity }} <output>{{ form.opacity.value|default_if_none:"50" }}%</output>
+    {{ form.opacity.errors }}<br>{{ form.opacity.help_text }}</p>
+  <button type="submit" class="default">Baixar KML</button>
+  <a href="{% url 'admin:diamante_farmpolygon_changelist' %}">Cancelar</a>
+</form>
+<script>
+(function () {
+  const color = document.getElementById('id_color');
+  const opacity = document.getElementById('id_opacity');
+  const preview = document.getElementById('kml-color-preview');
+  function updatePreview() {
+    preview.style.backgroundColor = color.value;
+    preview.style.opacity = Number(opacity.value) / 100;
+  }
+  color.addEventListener('change', updatePreview);
+  opacity.addEventListener('input', updatePreview);
+  updatePreview();
+})();
+</script>
+{% endblock %}
