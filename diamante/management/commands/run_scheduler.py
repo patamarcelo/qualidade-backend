@@ -12,17 +12,29 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         self.stdout.write(self.style.SUCCESS("Iniciando container do scheduler..."))
 
-        result = start()
+        while True:
+            result = start()
 
-        if not result or not result.get("ok"):
+            if result and result.get("ok"):
+                break
+
             reason = (result or {}).get("reason", "unknown")
             error = (result or {}).get("error", "")
-            
+
             if reason == "lock_active":
-                self.stdout.write(self.style.WARNING("Scheduler já em execução em outro processo."))
-            else:
-                self.stdout.write(self.style.ERROR(f"Erro crítico: {reason} | {error}"))
-            return
+                self.stdout.write(
+                    self.style.WARNING(
+                        "Outro scheduler está ativo. "
+                        "Aguardando 15 segundos para tentar novamente..."
+                    )
+                )
+
+                time.sleep(15)
+                continue
+
+            raise RuntimeError(
+                f"Falha ao iniciar scheduler: {reason} | {error}"
+            )
 
         scheduler = result["scheduler"]
         self.stdout.write(self.style.SUCCESS("Scheduler ativo e monitorando jobs."))
@@ -30,6 +42,8 @@ class Command(BaseCommand):
         try:
             loop_count = 0
             while True:
+                if not scheduler.running:
+                    raise RuntimeError("APScheduler parou inesperadamente.")
                 # Limpa conexões inativas para evitar que o processo pai morra por timeout de rede
                 close_old_connections()
                 connection.close_if_unusable_or_obsolete()
