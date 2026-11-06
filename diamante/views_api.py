@@ -6464,7 +6464,7 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 {"message": "Você precisa estar logado!!!"},
                 status=status.HTTP_401_UNAUTHORIZED
             )
-
+        
         def resolve_plantio_status(item, planning_pairs):
             item_pair = (
                 str(item["safra__safra"]).strip(),
@@ -6501,18 +6501,23 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 and area_colheita >= area_planejamento
             )
 
-            if item_pair in planning_pairs:
-                return "planejado", "Planejado"
-
+            # 1. Colheita finalizada tem prioridade máxima
             if item.get("finalizado_colheita") or colheita_finalizada_por_area:
                 return "colhido", "Colhido"
 
+            # 2. Plantio finalizado
             if item.get("finalizado_plantio") or plantio_finalizado_por_area:
                 return "plantado", "Plantado"
 
+            # 3. Plantio iniciado
             if item.get("inicializado_plantio"):
                 return "em_plantio", "Em plantio"
 
+            # 4. Ciclo configurado como Planejamento
+            if item_pair in planning_pairs:
+                return "planejado", "Planejado"
+
+            # 5. Plantio com variedade definida
             if item.get("variedade__cultura__cultura"):
                 return "planejado", "Planejado"
 
