@@ -1,8 +1,8 @@
+
 (function plantioAutocompleteRichBoot() {
     const $ = window.django?.jQuery || window.jQuery;
 
     if (typeof $ !== "function") {
-        console.warn("[plantio rich] aguardando jQuery/django.jQuery...");
         setTimeout(plantioAutocompleteRichBoot, 100);
         return;
     }
@@ -13,15 +13,13 @@
 
     window.__plantioAutocompleteRichLoaded = true;
 
-    console.log("[plantio rich] jQuery carregado corretamente");
-
-    const CULTURE_ICON_BASE = "/static/admin/img/icons/";
+    const CULTURE_ICON_BASE = "/static/images/icons/";
 
     const CULTURE_PRESETS = {
         Arroz: {
             className: "culture-rice",
             icon: "rice.png",
-            color: "rgba(251,191,112,1)",
+            color: "#FBBF70",
             border: "#D97706",
         },
         Soja: {
@@ -29,6 +27,12 @@
             icon: "soy.png",
             color: "#35B637",
             border: "#15803D",
+        },
+        Milho: {
+            className: "culture-corn",
+            icon: "corn.png",
+            color: "#EAB308",
+            border: "#CA8A04",
         },
         Feijão: {
             className: "culture-beans",
@@ -45,7 +49,7 @@
     };
 
     function escapeHtml(value) {
-        return String(value || "")
+        return String(value ?? "")
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
             .replace(/>/g, "&gt;")
@@ -75,8 +79,6 @@
             return {
                 className: "culture-beans-dark",
                 icon: "beans2.png",
-                color: "rgba(170,88,57,1)",
-                border: "#7C2D12",
             };
         }
 
@@ -84,8 +86,6 @@
             return {
                 className: "culture-beans-green",
                 icon: "beans.png",
-                color: "#82202B",
-                border: "#5F111B",
             };
         }
 
@@ -93,8 +93,6 @@
             return {
                 className: "culture-caupi",
                 icon: "beans.png",
-                color: "#3F4B7D",
-                border: "#1E293B",
             };
         }
 
@@ -102,18 +100,16 @@
             CULTURE_PRESETS[cultura] || {
                 className: "culture-default",
                 icon: "x.png",
-                color: "#F1F5F9",
-                border: "#CBD5E1",
             }
         );
     }
 
     function badge(label, className) {
         return `
-      <span class="plantio-ac-badge ${className}">
-        ${escapeHtml(label)}
-      </span>
-    `;
+            <span class="plantio-ac-badge ${className}">
+                ${escapeHtml(label)}
+            </span>
+        `;
     }
 
     function getStatusBadges(parsed) {
@@ -122,28 +118,42 @@
         const flags = parsed.flags || [];
 
         if (status === "DESCONTINUADO") {
-            badges.push(badge("Descontinuado", "is-danger"));
+            badges.push(
+                badge("Descontinuado", "is-danger")
+            );
             return badges.join("");
         }
 
         if (status === "FINALIZADO_COLHEITA") {
-            badges.push(badge("Colheita finalizada", "is-dark"));
+            badges.push(
+                badge("Colheita finalizada", "is-dark")
+            );
         }
 
         if (status === "FINALIZADO_PLANTIO") {
-            badges.push(badge("Plantio finalizado", "is-success"));
+            badges.push(
+                badge("Plantio finalizado", "is-success")
+            );
         } else if (status === "INICIALIZADO_PLANTIO") {
-            badges.push(badge("Plantio iniciado", "is-info"));
+            badges.push(
+                badge("Plantio iniciado", "is-info")
+            );
         } else if (status === "NAO_INICIADO") {
-            badges.push(badge("Não iniciado", "is-muted"));
+            badges.push(
+                badge("Não iniciado", "is-muted")
+            );
         }
 
         if (flags.includes("AREA_AFERIDA")) {
-            badges.push(badge("Área aferida", "is-purple"));
+            badges.push(
+                badge("Área aferida", "is-purple")
+            );
         }
 
         if (flags.includes("REPLANTIO")) {
-            badges.push(badge("Replantio", "is-warning"));
+            badges.push(
+                badge("Replantio", "is-warning")
+            );
         }
 
         return badges.join("");
@@ -151,66 +161,123 @@
 
     function renderPlantioOptionHtml(text) {
         const parsed = parsePlantioText(text);
-        const preset = getCulturePreset(parsed.cultura, parsed.variedade);
+
+        const preset = getCulturePreset(
+            parsed.cultura,
+            parsed.variedade
+        );
+
         const iconUrl = `${CULTURE_ICON_BASE}${preset.icon}`;
         const badges = getStatusBadges(parsed);
 
         return `
-    <div class="plantio-ac-option">
-      <div
-        class="plantio-ac-icon-mask ${escapeHtml(preset.className)}"
-        style="
-          --icon-url: url('${escapeHtml(iconUrl)}');
-          --icon-color: ${escapeHtml(preset.border || preset.color || "#64748b")};
-        "
-        title="${escapeHtml(parsed.cultura || "Cultura")}"
-      ></div>
+            <div class="plantio-ac-option">
 
-      <div class="plantio-ac-main">
-        <div class="plantio-ac-line1">
-          <div class="plantio-ac-primary-info">
-            <strong>${escapeHtml(parsed.talhao || "-")}</strong>
-            <span class="plantio-ac-project">${escapeHtml(parsed.projeto || "-")}</span>
-            ${parsed.variedade ? `<span class="plantio-ac-variedade">${escapeHtml(parsed.variedade)}</span>` : ""}
-          </div>
+                <div
+                    class="plantio-ac-icon-container"
+                    style="
+                        width: 32px;
+                        height: 32px;
+                        min-width: 32px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        flex-shrink: 0;
+                        background: transparent;
+                        border: none;
+                    "
+                    title="${escapeHtml(parsed.cultura || "Cultura")}"
+                >
+                    <img
+                        src="${escapeHtml(iconUrl)}"
+                        alt="${escapeHtml(parsed.cultura || "Cultura")}"
+                        style="
+                            width: 28px;
+                            height: 28px;
+                            object-fit: contain;
+                            display: block;
+                            background: transparent;
+                            border: none;
+                            filter: none;
+                        "
+                    />
+                </div>
 
-          <span class="plantio-ac-badges-inline">
-            ${badges}
-          </span>
-        </div>
+                <div class="plantio-ac-main">
 
-        <div class="plantio-ac-line2">
-          ${parsed.safraCiclo ? `<span>${escapeHtml(parsed.safraCiclo)}</span>` : ""}
-          ${parsed.area ? `<span>${escapeHtml(parsed.area)}</span>` : ""}
-        </div>
-      </div>
-    </div>
-  `;
+                    <div class="plantio-ac-line1">
+
+                        <div class="plantio-ac-primary-info">
+
+                            <strong>
+                                ${escapeHtml(parsed.talhao || "-")}
+                            </strong>
+
+                            <span class="plantio-ac-project">
+                                ${escapeHtml(parsed.projeto || "-")}
+                            </span>
+
+                            ${
+                                parsed.variedade
+                                    ? `<span class="plantio-ac-variedade">
+                                        ${escapeHtml(parsed.variedade)}
+                                       </span>`
+                                    : ""
+                            }
+
+                        </div>
+
+                        <span class="plantio-ac-badges-inline">
+                            ${badges}
+                        </span>
+
+                    </div>
+
+                    <div class="plantio-ac-line2">
+
+                        ${
+                            parsed.safraCiclo
+                                ? `<span>${escapeHtml(parsed.safraCiclo)}</span>`
+                                : ""
+                        }
+
+                        ${
+                            parsed.area
+                                ? `<span>${escapeHtml(parsed.area)}</span>`
+                                : ""
+                        }
+
+                    </div>
+
+                </div>
+
+            </div>
+        `;
     }
 
     function forceMarkField() {
         const $field = $("#id_plantio");
 
         if (!$field.length) {
-            console.log("[plantio rich] id_plantio não encontrado");
             return;
         }
 
         $field.data("plantio-rich-applied", true);
-        $field.attr("data-plantio-rich-applied", "true");
-
-        console.log("[plantio rich] campo marcado:", {
-            id: $field.attr("id"),
-            hasSelect2: !!$field.data("select2"),
-            richApplied: !!$field.data("plantio-rich-applied"),
-        });
+        $field.attr(
+            "data-plantio-rich-applied",
+            "true"
+        );
     }
 
     function enhanceDropdownOptions() {
         $(".select2-results__option").each(function () {
             const $option = $(this);
 
-            if ($option.data("plantio-rich-option-applied")) {
+            if (
+                $option.data(
+                    "plantio-rich-option-applied"
+                )
+            ) {
                 return;
             }
 
@@ -220,18 +287,28 @@
                 return;
             }
 
-            $option.data("plantio-rich-option-applied", true);
-            $option.attr("data-original-text", text);
-            $option.html(renderPlantioOptionHtml(text));
+            $option.data(
+                "plantio-rich-option-applied",
+                true
+            );
 
-            console.log("[plantio rich] opção convertida:", text);
+            $option.attr(
+                "data-original-text",
+                text
+            );
+
+            $option.html(
+                renderPlantioOptionHtml(text)
+            );
         });
     }
 
     function observeSelect2Results() {
         const target = document.body;
 
-        if (target.dataset.plantioRichObserver === "true") {
+        if (
+            target.dataset.plantioRichObserver === "true"
+        ) {
             return;
         }
 
@@ -245,13 +322,9 @@
             childList: true,
             subtree: true,
         });
-
-        console.log("[plantio rich] observer global ativo");
     }
 
     function bootPlantioRich() {
-        console.log("[plantio rich] boot:", window.location.pathname);
-
         forceMarkField();
         observeSelect2Results();
 
@@ -278,18 +351,24 @@
         bootPlantioRich();
     });
 
-    $(document).on("select2:open", "#id_plantio", function () {
-        console.log("[plantio rich] select2 abriu em id_plantio");
+    $(document).on(
+        "select2:open",
+        "#id_plantio",
+        function () {
+            forceMarkField();
 
-        forceMarkField();
+            setTimeout(enhanceDropdownOptions, 50);
+            setTimeout(enhanceDropdownOptions, 200);
+            setTimeout(enhanceDropdownOptions, 600);
+        }
+    );
 
-        setTimeout(enhanceDropdownOptions, 50);
-        setTimeout(enhanceDropdownOptions, 200);
-        setTimeout(enhanceDropdownOptions, 600);
-    });
-
-    $(document).on("keyup input", ".select2-search__field", function () {
-        setTimeout(enhanceDropdownOptions, 100);
-        setTimeout(enhanceDropdownOptions, 300);
-    });
+    $(document).on(
+        "keyup input",
+        ".select2-search__field",
+        function () {
+            setTimeout(enhanceDropdownOptions, 100);
+            setTimeout(enhanceDropdownOptions, 300);
+        }
+    );
 })();

@@ -2507,9 +2507,15 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
 
         return qs
 
+    
     def get_search_results(self, request, queryset, search_term):
-        ciclo_filter = CicloAtual.objects.filter(nome="Colheita").first()
-        ciclo_filter_plantio = CicloAtual.objects.filter(nome="Plantio").first()
+        ciclos_colheita = CicloAtual.objects.filter(
+            nome="Colheita"
+        ).values_list("safra", "ciclo")
+
+        ciclos_plantio = CicloAtual.objects.filter(
+            nome="Plantio"
+        ).values_list("safra", "ciclo")
 
         negate = False
         term = search_term
@@ -2525,16 +2531,25 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
         else:
             use_distinct = False
 
-        print("resquest_Path", request.path)
-        model_request = request.GET.get("model_name")
-        print("model request: ", model_request)
+        print("request_Path", request.path)
 
-        if model_request and model_request == "plantioextratoarea":
+        model_request = request.GET.get("model_name")
+        print("model request:", model_request)
+
+        if model_request == "plantioextratoarea":
+            filtros_plantio = Q()
+
+            for safra, ciclo in ciclos_plantio:
+                filtros_plantio |= Q(
+                    safra=safra,
+                    ciclo=ciclo,
+                )
+
+            if not filtros_plantio:
+                return queryset.none(), use_distinct
+
             queryset = queryset.filter(
-                # ciclo__ciclo__in=["2", "3"],
-                ciclo=ciclo_filter_plantio.ciclo,
-                # safra__safra="2025/2026",
-                safra=ciclo_filter_plantio.safra,
+                filtros_plantio,
                 finalizado_colheita=False,
                 plantio_descontinuado=False,
                 programa__isnull=False,
@@ -2542,18 +2557,25 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
 
             if negate and term:
                 q = Q()
+
                 for field in self.search_fields:
                     q |= Q(**{f"{field}__icontains": term})
-                queryset = queryset.exclude(q)
 
-            if not queryset.exists():
-                return queryset.none(), use_distinct
+                queryset = queryset.exclude(q)
 
             return queryset, use_distinct
 
-        if request.path == "/admin/autocomplete/" and ciclo_filter:
+        if request.path == "/admin/autocomplete/" and ciclos_colheita.exists():
+            filtros_colheita = Q()
+
+            for safra, ciclo in ciclos_colheita:
+                filtros_colheita |= Q(
+                    safra=safra,
+                    ciclo=ciclo,
+                )
+
             queryset = queryset.filter(
-                ciclo=ciclo_filter.ciclo,
+                filtros_colheita,
                 finalizado_plantio=True,
                 finalizado_colheita=False,
                 plantio_descontinuado=False,
@@ -2561,23 +2583,24 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
 
             if negate and term:
                 q = Q()
+
                 for field in self.search_fields:
                     q |= Q(**{f"{field}__icontains": term})
-                queryset = queryset.exclude(q)
 
-            if not queryset.exists():
-                return queryset.none(), use_distinct
+                queryset = queryset.exclude(q)
 
             return queryset, use_distinct
 
         if negate and term:
             q = Q()
+
             for field in self.search_fields:
                 q |= Q(**{f"{field}__icontains": term})
 
             queryset = queryset.exclude(q)
 
         return queryset, use_distinct
+
 
     formfield_overrides = {
         models.JSONField: {
