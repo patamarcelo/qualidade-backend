@@ -2139,27 +2139,90 @@ class PlantioAdmin(ExtraButtonsMixin, AdminConfirmMixin, admin.ModelAdmin):
     @admin.action(description="Gerar KML")
     def gerar_kml_aviacao(self, request, queryset):
         try:
-            should_use_color = bool(request.POST.get("should_use_color"))
+            should_use_color = bool(
+                request.POST.get("should_use_color")
+            )
 
-            values_qs = queryset.values(
+            total_selecionados = queryset.count()
+
+            # Descarta registros sem geometria no banco.
+            queryset_com_mapa = (
+                queryset
+                .exclude(map_geo_points__isnull=True)
+                .exclude(map_geo_points=[])
+                .exclude(map_geo_points={})
+            )
+
+            values_qs = queryset_com_mapa.values(
                 "map_geo_points",
                 "talhao__id_talhao",
                 "id_farmbox",
                 "variedade__cultura__map_color",
             )
 
-            kml_content = create_kml(values_qs, should_use_color)
+            # Remove também valores vazios ou malformados
+            # que não contenham uma estrutura geográfica.
+            registros_validos = []
 
-            filename = f"kml-{timezone.now().strftime('%Y%m%d-%H%M%S')}.kml"
+            for item in values_qs:
+                pontos = item.get("map_geo_points")
+
+                if not isinstance(pontos, (list, dict)):
+                    continue
+
+                if not pontos:
+                    continue
+
+                registros_validos.append(item)
+
+            total_validos = len(registros_validos)
+            total_ignorados = total_selecionados - total_validos
+
+            if not registros_validos:
+                self.message_user(
+                    request,
+                    "Nenhum dos plantios selecionados possui "
+                    "pontos geográficos disponíveis para gerar o KML.",
+                    level=messages.WARNING,
+                )
+                return None
+
+            # Mantém sua função original de geração.
+            kml_content = create_kml(
+                registros_validos,
+                should_use_color,
+            )
+
+            filename = (
+                f"kml-{timezone.now().strftime('%Y%m%d-%H%M%S')}.kml"
+            )
+
             resp = HttpResponse(
                 kml_content,
                 content_type="application/vnd.google-earth.kml+xml",
             )
-            resp["Content-Disposition"] = f'attachment; filename="{filename}"'
+
+            resp["Content-Disposition"] = (
+                f'attachment; filename="{filename}"'
+            )
+
+            self.message_user(
+                request,
+                f"KML gerado: {total_validos} plantios incluídos; "
+                f"{total_ignorados} ignorados por ausência "
+                "de geometria utilizável.",
+                level=messages.SUCCESS,
+            )
+
             return resp
 
         except Exception as e:
-            self.message_user(request, f"Erro ao gerar KML: {e}", level=messages.ERROR)
+            self.message_user(
+                request,
+                f"Erro ao gerar KML: {e}",
+                level=messages.ERROR,
+            )
+            return None
 
     def update_data_prevista_plantio(self, request, queryset):
         selected = queryset.values_list('pk', flat=True)

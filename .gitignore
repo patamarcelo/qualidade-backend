@@ -68,3 +68,9 @@ docker-compose.yml
 env-qual
 
 *opscheckin/scripts/*
+
+# Sincronização pontual Farmbox
+/diamante/management/commands/sync_farmbox_ciclo3.py
+
+# Relatórios de sincronização Farmbox
+/farmbox_sync_reports/
