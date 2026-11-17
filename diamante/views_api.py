@@ -2979,8 +2979,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                         "talhao__fazenda__id",
                         "talhao__fazenda__fazenda__nome",
                         "talhao__fazenda__fazenda__capacidade_plantio_ha_dia",
-                        "talhao__fazenda__fazenda__id_responsavel_farmbox",
-                        "talhao__fazenda__fazenda__id_encarregado_farmbox",
+                        "talhao__fazenda__fazenda__responsavel_farmbox__id_responsavel_farmbox",
+                        "talhao__fazenda__fazenda__encarregado_farmbox__id_responsavel_farmbox",
                         "variedade__nome_fantasia",
                         "variedade__cultura__cultura",
                         "area_colheita",
@@ -3079,8 +3079,12 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                     ],
                                     "projeto_id": i["talhao__fazenda__id"],
                                     "talhao_id_unico": i["talhao__id_unico"],
-                                    "responsavel_id_farmbox": i["talhao__fazenda__fazenda__id_responsavel_farmbox"],
-                                    "encarregado_id_farmbox": i["talhao__fazenda__fazenda__id_encarregado_farmbox"],
+                                    "responsavel_id_farmbox": i[
+                                        "talhao__fazenda__fazenda__responsavel_farmbox__id_responsavel_farmbox"
+                                    ],
+                                    "encarregado_id_farmbox": i[
+                                        "talhao__fazenda__fazenda__encarregado_farmbox__id_responsavel_farmbox"
+                                    ],
                                     "plantio_finalizado": i["finalizado_plantio"],
                                     "inicializado_plantio": i["inicializado_plantio"],
                                     "area_colheita": i["area_colheita"],
@@ -3712,8 +3716,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                             "ciclo__ciclo",
                             "talhao__fazenda__nome",
                             "talhao__fazenda__id_farmbox",
-                            "talhao__fazenda__fazenda__id_responsavel_farmbox",
-                            "talhao__fazenda__fazenda__id_encarregado_farmbox",
+                            "talhao__fazenda__fazenda__responsavel_farmbox__id_responsavel_farmbox",
+                            "talhao__fazenda__fazenda__encarregado_farmbox__id_responsavel_farmbox",
                             "talhao__fazenda__fazenda__nome",
                             "talhao__fazenda__fazenda__capacidade_plantio_ha_dia",
                             "variedade__nome_fantasia",
@@ -3785,8 +3789,8 @@ class PlantioViewSet(viewsets.ModelViewSet):
                             "ciclo__ciclo",
                             "talhao__fazenda__nome",
                             "talhao__fazenda__id_farmbox",
-                            "talhao__fazenda__fazenda__id_responsavel_farmbox",
-                            "talhao__fazenda__fazenda__id_encarregado_farmbox",
+                            "talhao__fazenda__fazenda__responsavel_farmbox__id_responsavel_farmbox",
+                            "talhao__fazenda__fazenda__encarregado_farmbox__id_responsavel_farmbox",
                             "talhao__fazenda__fazenda__nome",
                             "talhao__fazenda__fazenda__capacidade_plantio_ha_dia",
                             "variedade__nome_fantasia",
@@ -3847,8 +3851,12 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 "variedade": i["variedade__nome_fantasia"],
                                 "plantio_id": i["id"],
                                 "projeto_id_farmbox": i["talhao__fazenda__id_farmbox"],
-                                "responsavel_id_farmbox": i["talhao__fazenda__fazenda__id_responsavel_farmbox"],
-                                "encarregado_id_farmbox": i["talhao__fazenda__fazenda__id_encarregado_farmbox"],
+                                "responsavel_id_farmbox": i[
+                                    "talhao__fazenda__fazenda__responsavel_farmbox__id_responsavel_farmbox"
+                                ],
+                                "encarregado_id_farmbox": i[
+                                    "talhao__fazenda__fazenda__encarregado_farmbox__id_responsavel_farmbox"
+                                ],
                                 "fazenda_grupo": i["talhao__fazenda__fazenda__nome"],
                                 "talhao_id_unico": i["talhao__id_unico"],
                                 "plantio_finalizado": i["finalizado_plantio"],
@@ -5698,7 +5706,15 @@ class PlantioViewSet(viewsets.ModelViewSet):
                 dict_app = []
                 today_date = datetime.datetime.today().strftime('%Y-%m-%d')
 
-                query_projetos = Plantio.objects.filter(safra__safra="2024/2025").values('talhao__fazenda__id_farmbox','id_farmbox','talhao__fazenda__fazenda__id_responsavel_farmbox','talhao__fazenda__fazenda__id_encarregado_farmbox')
+                
+                query_projetos = Plantio.objects.filter(
+                    safra__safra="2024/2025"
+                ).values(
+                    "talhao__fazenda__id_farmbox",
+                    "id_farmbox",
+                    "talhao__fazenda__fazenda__responsavel_farmbox__id_responsavel_farmbox",
+                    "talhao__fazenda__fazenda__encarregado_farmbox__id_responsavel_farmbox",
+                )
 
                 for i in load_data:
                     projeto = i['Projeto']
@@ -5721,9 +5737,13 @@ class PlantioViewSet(viewsets.ModelViewSet):
                                 'dose': dose,
                                 'date': today_date,
                                 'harvest_id': 3840,
-                                'farm_id':get_id['talhao__fazenda__id_farmbox'],
-                                'responsible_id': get_id['talhao__fazenda__fazenda__id_responsavel_farmbox'],
-                                'charge_id': get_id['talhao__fazenda__fazenda__id_encarregado_farmbox'],
+                                'farm_id':get_id['talhao__fazenda__id_farmbox'],                                
+                                'responsible_id': get_id[
+                                    'talhao__fazenda__fazenda__responsavel_farmbox__id_responsavel_farmbox'
+                                ],
+                                'charge_id': get_id[
+                                    'talhao__fazenda__fazenda__encarregado_farmbox__id_responsavel_farmbox'
+                                ],
                                 'plantations': [plantation_to_append],
                                 'inputs' : [
                                     # OPERACAO

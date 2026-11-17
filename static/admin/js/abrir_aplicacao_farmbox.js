@@ -638,6 +638,24 @@ document.addEventListener('DOMContentLoaded', function () {
             selCharge?.value?.trim()
                 ? parseFarmboxId(selCharge.value)
                 : parseFarmboxId(appData.dataset.chargeId);
+            
+        
+        if (
+            !Number.isInteger(responsibleIdFinal) ||
+            responsibleIdFinal <= 0 ||
+            !Number.isInteger(chargeIdFinal) ||
+            chargeIdFinal <= 0
+        ) {
+            Swal.fire({
+                icon: "warning",
+                title: "Responsável ou encarregado não informado",
+                text: "Selecione um responsável e um encarregado válidos antes de abrir a aplicação no Farmbox.",
+                confirmButtonText: "Entendi",
+            });
+
+            return;
+        }
+
 
         const payload = {
             date: new Date().toISOString().slice(0, 10),

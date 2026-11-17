@@ -908,17 +908,46 @@ class DepositoAdmin(admin.ModelAdmin):
     ordering = ("nome",)
 
 
+
 @admin.register(Fazenda)
 class FazendaAdmin(admin.ModelAdmin):
-    list_display = ("nome", "id_d", "get_plantio_dia", "id_responsavel_farmbox","id_encarregado_farmbox")
-    ordering = ("nome",) 
+
+    list_display = (
+        "nome",
+        "id_d",
+        "get_plantio_dia",
+        "responsavel_farmbox",
+        "encarregado_farmbox",
+    )
+
+    ordering = ("nome",)
+
     show_full_result_count = False
-    search_fields = ["fazenda"]
+
+    search_fields = ("nome",)
+
+    autocomplete_fields = (
+        "responsavel_farmbox",
+        "encarregado_farmbox",
+    )
+
+    # Mantém os IDs antigos no model e no banco,
+    # mas os remove do formulário de edição.
+    exclude = (
+        "id_responsavel_farmbox",
+        "id_encarregado_farmbox",
+    )
+
+    list_select_related = (
+        "responsavel_farmbox",
+        "encarregado_farmbox",
+    )
 
     def get_plantio_dia(self, obj):
         return f"{obj.capacidade_plantio_ha_dia} ha/dia"
 
     get_plantio_dia.short_description = "Plantio / Dia"
+
 
 class EmailInline(admin.TabularInline):
     model = EmailAberturaST.projetos.through
@@ -1870,9 +1899,21 @@ def abrir_aplicacao_farmbox(self, request, queryset):
 
     # Dados do primeiro plantio (todos devem ter os mesmos dados de fazenda/safra nesse contexto)
     first = queryset[0]
-    projeto_nome = first.talhao.fazenda.nome
-    charge_id = first.talhao.fazenda.fazenda.id_encarregado_farmbox
-    response_id = first.talhao.fazenda.fazenda.id_responsavel_farmbox
+    projeto_nome = first.talhao.fazenda.nome    
+    fazenda = first.talhao.fazenda.fazenda
+
+    charge_id = (
+        fazenda.encarregado_farmbox.id_responsavel_farmbox
+        if fazenda.encarregado_farmbox_id
+        else None
+    )
+
+    response_id = (
+        fazenda.responsavel_farmbox.id_responsavel_farmbox
+        if fazenda.responsavel_farmbox_id
+        else None
+    )
+
     farm_id_farmbox = first.talhao.fazenda.id_farmbox
     harvest_id_farm = first.safra.id_farmbox
     
@@ -1897,8 +1938,8 @@ def abrir_aplicacao_farmbox(self, request, queryset):
         total_area=total_area,
         action='abrir_aplicacao_farmbox',
         YOUR_TOKEN=user_token,
-        CHARGE_ID=int(charge_id),
-        RESPONSE_ID=int(response_id),
+        CHARGE_ID=int(charge_id) if charge_id is not None else None,
+        RESPONSE_ID=int(response_id) if response_id is not None else None,
         FARM_ID=int(farm_id_farmbox),
         HARVEST_ID=int(harvest_id_farm),
         programa_data_json=mark_safe(json.dumps(programas_data)),  # passa como JSON seguro

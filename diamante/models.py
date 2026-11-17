@@ -143,6 +143,29 @@ class Fazenda(Base):
     id_d = models.PositiveIntegerField("ID_D", unique=True)
     id_responsavel_farmbox = models.IntegerField("ID Responsavel FarmBox",  blank=True, null=True)
     id_encarregado_farmbox = models.IntegerField("ID Encarregado FarmBox",  blank=True, null=True)
+    
+    
+    # Novos relacionamentos com os Managers do OpsCheckin
+    responsavel_farmbox = models.ForeignKey(
+        "opscheckin.Manager",
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+        related_name="fazendas_como_responsavel",
+        verbose_name="Responsável Farmbox",
+        help_text="Manager responsável pelas aplicações no Farmbox.",
+    )
+
+    encarregado_farmbox = models.ForeignKey(
+        "opscheckin.Manager",
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+        related_name="fazendas_como_encarregado",
+        verbose_name="Encarregado Farmbox",
+        help_text="Manager encarregado das aplicações no Farmbox.",
+    )
+
 
     capacidade_plantio_ha_dia = models.PositiveIntegerField(
         "Quantidade ha Plantio / dia",
