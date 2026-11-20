@@ -101,6 +101,9 @@ var app = new Vue({
 			if (cultura === "Algodão") {
 				return "/static/images/icons/cotton.png";
 			}
+			if (cultura === "Milho") {
+				return "/static/images/icons/corn.png";
+			}
 			return "";
 		},
 
