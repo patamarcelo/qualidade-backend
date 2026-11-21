@@ -1774,8 +1774,40 @@ class InboundMessageAdmin(admin.ModelAdmin):
     short_text.short_description = "Texto"
 
 
+class DailyManagerEventAdminForm(forms.ModelForm):
+    class Meta:
+        model = DailyManagerEvent
+        fields = "__all__"
+        widgets = {
+            # "override_date": forms.DateInput(
+            #     format="%Y-%m-%d",
+            #     attrs={
+            #         "type": "date",
+            #         "style": "min-height: 44px; font-size: 16px;",
+            #     },
+            # ),
+            "override_time": forms.TimeInput(
+                format="%H:%M",
+                attrs={
+                    "type": "time",
+                    "step": "60",
+                    "style": "min-height: 44px; font-size: 16px;",
+                },
+            ),
+            "default_time": forms.TimeInput(
+                format="%H:%M",
+                attrs={
+                    "type": "time",
+                    "step": "60",
+                    "style": "min-height: 44px; font-size: 16px;",
+                },
+            ),
+        }
+
 @admin.register(DailyManagerEvent)
 class DailyManagerEventAdmin(admin.ModelAdmin):
+    form = DailyManagerEventAdminForm
+    
     list_display = (
         "name",
         "code",
